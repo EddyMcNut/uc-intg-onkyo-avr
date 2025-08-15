@@ -211,6 +211,7 @@ export default class OnkyoDriver {
             console.log("%s input-selector (source) set to: %s", integrationName, entity.attributes?.source);
             break;
           default:
+            // this does not show anything :)
             this.driver.updateEntityAttributes(globalThis.selectedAvr, {
               [uc.MediaPlayerAttributes.MediaTitle]: `${avrUpdates.command} = ${avrUpdates.argument}`
             });

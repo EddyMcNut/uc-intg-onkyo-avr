@@ -39,8 +39,6 @@ I have tested it with my Onkyo TX-RZ50. I gave it a fixed IP address (a while ag
 
 I only have one AVR, I don't know what happens yet when you have multiple Onkyo AVRs in your network.
 
-The code is partly ready to deal with different zones, but that still needs some attention before that will actually work.
-
 ## Installation and usage
 
 - Make sure your AVR is ON or STANDBY.
@@ -76,23 +74,22 @@ The code is partly ready to deal with different zones, but that still needs some
 
   ![](./screenshots/preset15.png)
 
-- As the code uses the impressive JSON mentioned in the Kudos section, you can cheat a bit with it to give commands which are not even known by the driver. For example in the JSON is mentioned `dimmer-level` with possible value `query`, let's give it a try:
+- As the code uses the impressive JSON mentioned in the Kudos section, you can cheat a bit with it to give commands which are not even known by the driver. For example in the JSON is mentioned `dimmer-level` with possible value `dim`, let's give it a try: yes the AVR display dims to the next level!
 
-  ![](./screenshots/dimmer-query.png)
-
-  On the Media Widget you see something like ``.
-If you would change it into `dimmer-level dim` you would see the display of your AVR dim to the next level.
+  ![](./screenshots/dimmer.png)
 
 ## Remote
 
-- `Home` \ `Customise your remote` Add your new Activity to a page and now you can give it a try!
+- `Home` \ `Customise your remote` Add your new Activity to a page and now you can give it a try on the awesome Unfolded Circle Remote!
 
   ![](./screenshots/demo.png)
 
-## Stuff to do
+## Stuff to do / backlog
 - Currently the entity name is model+IPaddress, this might not be the best choice.
 - Have to do a real release in GitHub workflows.
-- Add config steps like volume steps = 0.5 0r 1.
+- Add config options like `volume steps` = 0.5 0r 1.
 - Align and improve logging.
-- simple-commands.ts
-- remote.ts 
+- simple-commands.ts, is this needed considering we can cheat?
+- remote.ts needs to be populated
+- The code is partly ready to deal with different zones, but that still needs some attention before that will actually work.
+- Deal with multilple Onkyo AVRs in the network.
