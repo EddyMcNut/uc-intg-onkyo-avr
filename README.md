@@ -44,7 +44,7 @@ The code is partly ready to deal with different zones, but that still needs some
 ## Installation and usage
 
 - Make sure your AVR is ON or STANDBY.
-- Download `uc-intg-onkyo-avr-0.0.1.tar.gz` from //////////
+- Download `uc-intg-onkyo-avr-0.0.1.tar.gz` from this page.
 - In webconfigurator, go to `Integrations`, `Add new`, `Install custom`, select the `uc-intg-onkyo-avr-0.0.1.tar.gz` and then `Upload`.
 - Uploading can take a few seconds.
 - In `Integrations` select `Onkyo AVR custom`, click `Next`, click `Done`
@@ -88,3 +88,10 @@ If you would change it into `dimmer-level dim` you would see the display of your
 - `Home` \ `Customise your remote` Add your new Activity to a page and now you can give it a try!
 
   ![](./screenshots/demo.png)
+
+## Stuff to do
+- Currently the entity name is model+IPaddress, this I will change.
+- Have to do a real release in GitHub workflows.
+- Add config steps like volume steps = 0.5 0r 1.
+- Align and improve logging.
+- This is going to be a longer list :)
