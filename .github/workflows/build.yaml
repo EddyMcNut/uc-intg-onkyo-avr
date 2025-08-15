@@ -1,0 +1,83 @@
+name: Build dist
+
+on:
+  push:
+    paths:
+      - "**/*.js"
+      - "**/*.ts"
+      - ".github/**/*.yml"
+      - "package-lock.json"
+  pull_request:
+    branches: ["main"]
+    types: [opened, synchronize, reopened]
+
+env:
+  INTG_NAME: onkyo-avr
+  VERSION: 0.0.1
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Fetch all tags to determine version
+        run: |
+          echo "VERSION=0.0.1" >> $GITHUB_ENV
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: ".nvmrc"
+
+      - name: Setup node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: ".nvmrc"
+
+      - name: Build
+        run: |
+          npm install
+          npm run build
+
+      - name: Get production modules
+        run: |
+          rm -Rf node_modules
+          npm install --production
+
+      - name: Add version
+        run: |
+          mkdir -p artifacts
+          cd artifacts
+          echo ${{ env.VERSION }} > version.txt
+
+      - name: Create custom intg archive
+        shell: bash
+        run: |
+          mv dist artifacts/
+          mv artifacts/dist artifacts/bin
+          mv artifacts/bin/index.js artifacts/bin/driver.js
+          cp package.json artifacts/bin/
+          mv node_modules artifacts/bin/
+          cp driver.json artifacts/
+          # patch metadata to not conflict with pre-installed driver
+          jq '.driver_id = "uc_onkyo-avr_driver_custom" | .name.en = "Onkyo AVR custom"' driver.json > artifacts/driver.json
+          echo "ARTIFACT_NAME=uc-intg-${{ env.INTG_NAME }}-${{ env.VERSION }}" >> $GITHUB_ENV
+
+      - name: Set driver.js as executable
+        run: chmod +x artifacts/bin/driver.js
+
+      - name: Create upload artifact
+        shell: bash
+        run: |
+          tar czvf ${{ env.ARTIFACT_NAME }}.tar.gz -C ${GITHUB_WORKSPACE}/artifacts .
+          ls -lah
+
+      - uses: actions/upload-artifact@v4
+        id: upload_artifact
+        with:
+          name: ${{ env.ARTIFACT_NAME }}
+          path: ${{ env.ARTIFACT_NAME }}.tar.gz
+          if-no-files-found: error
+          retention-days: 3
