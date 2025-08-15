@@ -1,0 +1,34 @@
+{
+  "driver_id": "onkyo-avr",
+  "version": "0.0.1",
+  "min_core_api": "0.20.0",
+  "name": { "en": "Onkyo AVR" },
+  "icon": "uc:music",
+  "description": { "en": "Onkyo AVR custom integration for Unfolded Circle Remotes." },
+  "developer": {
+    "name": "Ed Nootebos",
+    "url": "https://github.com/EddyMcNut/uc-intg-onkyo-avr"
+  },
+  "home_page": "https://github.com/EddyMcNut/uc-intg-onkyo-avr",
+  "setup_data_schema": {
+    "title": {
+      "en": "Integration setup"
+    },
+    "settings": [
+      {
+        "id": "info",
+        "label": {
+          "en": "Setup process"
+        },
+        "field": {
+          "label": {
+            "value": {
+              "en": "This integration will allow you to control Onkyo AVRs on your network."
+            }
+          }
+        }
+      }
+    ]
+  },
+  "release_date": "2025-08-12"
+}
