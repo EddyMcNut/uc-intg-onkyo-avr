@@ -108,7 +108,6 @@ export default class OnkyoDriver {
       [key: string]: string | number | boolean;
     }
   ): Promise<uc.StatusCodes> {
-    console.log("%s Got request for %s", integrationName, entity.id);
     const onkyoEntity = this.driver.getConfiguredEntities().getEntity(globalThis.selectedAvr);
     if (onkyoEntity) {
       console.log("%s Got %s media-player command request: %s", integrationName, entity.id, cmdId, params || "");
@@ -147,7 +146,6 @@ export default class OnkyoDriver {
             break;
           case uc.MediaPlayerCommands.SelectSource:
             await eiscp.command(`${params?.source}`);
-            console.log("%s Got %s command request: %s", integrationName, entity.id, cmdId);
             break;
           default:
             return uc.StatusCodes.NotImplemented;
@@ -213,6 +211,9 @@ export default class OnkyoDriver {
             console.log("%s input-selector (source) set to: %s", integrationName, entity.attributes?.source);
             break;
           default:
+            this.driver.updateEntityAttributes(globalThis.selectedAvr, {
+              [uc.MediaPlayerAttributes.MediaTitle]: `${avrUpdates.command} = ${avrUpdates.argument}`
+            });
             console.log("%s cheated? %s %s", integrationName, avrUpdates.command, avrUpdates.argument);
             break;
         }
