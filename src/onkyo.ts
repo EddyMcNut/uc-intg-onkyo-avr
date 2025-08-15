@@ -214,7 +214,7 @@ export default class OnkyoDriver {
             this.driver.updateEntityAttributes(globalThis.selectedAvr, {
               [uc.MediaPlayerAttributes.MediaTitle]: `${avrUpdates.command} = ${avrUpdates.argument}`
             });
-            console.log("%s cheated? %s %s", integrationName, avrUpdates.command, avrUpdates.argument);
+            console.log("%s cheated? %s  %s", integrationName, avrUpdates.command, avrUpdates.argument);
             break;
         }
 

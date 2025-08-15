@@ -90,8 +90,9 @@ If you would change it into `dimmer-level dim` you would see the display of your
   ![](./screenshots/demo.png)
 
 ## Stuff to do
-- Currently the entity name is model+IPaddress, this I will change.
+- Currently the entity name is model+IPaddress, this might not be the best choice.
 - Have to do a real release in GitHub workflows.
 - Add config steps like volume steps = 0.5 0r 1.
 - Align and improve logging.
-- This is going to be a longer list :)
+- simple-commands.ts
+- remote.ts 
