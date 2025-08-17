@@ -42,8 +42,8 @@ I only have one AVR, I don't know what happens yet when you have multiple Onkyo 
 ## Installation and usage
 
 - Make sure your AVR is ON or STANDBY.
-- Download `uc-intg-onkyo-avr-0.0.1.tar.gz` from this page.
-- In webconfigurator, go to `Integrations`, `Add new`, `Install custom`, select the `uc-intg-onkyo-avr-0.0.1.tar.gz` and then `Upload`.
+- Download `uc-intg-onkyo-avr-x.x.x.tar.gz` from this page.
+- In webconfigurator, go to `Integrations`, `Add new`, `Install custom`, select the `uc-intg-onkyo-avr-x.x.x.tar.gz` and then `Upload`.
 - Uploading can take a few seconds.
 - In `Integrations` select `Onkyo AVR custom`, click `Next`, click `Done`
 - In `Integrations` select `Onkyo AVR custom`, click the `+` next to `Configured entities`, add your AVR
@@ -85,6 +85,7 @@ I only have one AVR, I don't know what happens yet when you have multiple Onkyo 
   ![](./screenshots/demo.png)
 
 ## Stuff to do / backlog
+
 - Currently the entity name is model+IPaddress, this might not be the best choice.
 - Have to do a real release in GitHub workflows.
 - Add config options like `volume steps` = 0.5 0r 1.

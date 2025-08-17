@@ -123,3 +123,4 @@ dist
 .pnp.*
 
 .DS_Store
+node_modules

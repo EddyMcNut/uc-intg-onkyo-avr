@@ -1,6 +1,6 @@
 {
   "driver_id": "onkyo-avr",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "min_core_api": "0.20.0",
   "name": { "en": "Onkyo AVR" },
   "icon": "uc:music",
@@ -23,8 +23,41 @@
         "field": {
           "label": {
             "value": {
-              "en": "This integration will allow you to control Onkyo AVRs on your network."
+              "en": "This integration will allow you to control Onkyo AVRs on your network. If below fields are left empty, the integration will attempt to autodiscover your AVR."
             }
+          }
+        }
+      },
+      {
+        "id": "model",
+        "label": {
+          "en": "AVR Model (or a name you prefer)"
+        },
+        "field": {
+          "text": {
+            "value": ""
+          }
+        }
+      },
+      {
+        "id": "ipAddress",
+        "label": {
+          "en": "AVR IP Address (for example 192.168.1.100)"
+        },
+        "field": {
+          "text": {
+            "value": ""
+          }
+        }
+      },
+      {
+        "id": "port",
+        "label": {
+          "en": "AVR Port (Most probably 60128)"
+        },
+        "field": {
+          "text": {
+            "value": ""
           }
         }
       }
