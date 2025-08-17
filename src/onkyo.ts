@@ -14,6 +14,9 @@ const integrationName = "Onkyo-Integration: ";
 export default class OnkyoDriver {
   private driver: uc.IntegrationAPI;
   private avrPreset: string = "unknown";
+  private setupModel: string | undefined;
+  private setupIp: string | undefined;
+  private setupPort: number | undefined;
 
   constructor() {
     this.driver = new uc.IntegrationAPI();
@@ -24,7 +27,22 @@ export default class OnkyoDriver {
   }
 
   private async handleDriverSetup(msg: uc.SetupDriver): Promise<uc.SetupAction> {
-    // Minimal: always complete setup
+    const model = (msg as any).setupData?.model;
+    const ipAddress = (msg as any).setupData?.ipAddress;
+    const port = (msg as any).setupData?.port;
+
+    this.setupModel = typeof model === "string" && model.trim() !== "" ? model.trim() : undefined;
+    this.setupIp = typeof ipAddress === "string" && ipAddress.trim() !== "" ? ipAddress.trim() : undefined;
+    if (port && port.toString().trim() !== "") {
+      const portNum = parseInt(port, 10);
+      this.setupPort = isNaN(portNum) ? undefined : portNum;
+    } else {
+      this.setupPort = undefined;
+    }
+
+    // Only connect after config is submitted
+    await this.handleConnect();
+
     return new uc.SetupComplete();
   }
 
@@ -36,7 +54,13 @@ export default class OnkyoDriver {
     try {
       if (!eiscp.connected) {
         console.log("%s Attempting to connect to AVR...", integrationName);
-        const avr = await eiscp.connect();
+
+        // Use setup fields if present, otherwise let eiscp.connect autodiscover
+        const avr =
+          this.setupModel !== undefined
+            ? await eiscp.connect({ model: this.setupModel, host: this.setupIp, port: this.setupPort })
+            : await eiscp.connect();
+
         const selectedAvr = `${avr.model} ${avr.host}`;
         globalThis.selectedAvr = selectedAvr;
         console.log("%s RECOVERY: Connected to AVR: %s (%s:%s)", integrationName, avr.model, avr.host, avr.port);
@@ -117,7 +141,7 @@ export default class OnkyoDriver {
             await eiscp.command("system-power on");
             break;
           case uc.MediaPlayerCommands.Off:
-            await eiscp.command("system-power off");
+            await eiscp.command("system-power standby");
             break;
           case uc.MediaPlayerCommands.Toggle:
             entity.attributes?.state === uc.MediaPlayerStates.On
@@ -228,7 +252,7 @@ export default class OnkyoDriver {
   }
 
   async init() {
-    this.handleConnect();
+    console.log("%s Initializing...", integrationName);
     this.setupEventHandlers();
   }
 }
