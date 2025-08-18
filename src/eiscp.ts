@@ -478,6 +478,28 @@ self.get_command = function (command: string, callback: any) {
   );
 };
 
+/**
+ * Resolves when the eiscp connection is established.
+ */
+self.waitForConnect = function (timeoutMs = 5000): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (self.is_connected) {
+      resolve();
+      return;
+    }
+    const onConnect = () => {
+      clearTimeout(timer);
+      self.off("connect", onConnect);
+      resolve();
+    };
+    const timer = setTimeout(() => {
+      self.off("connect", onConnect);
+      reject(new Error("Timeout waiting for AVR connection"));
+    }, timeoutMs);
+    self.on("connect", onConnect);
+  });
+};
+
 // Handle unhandled errors
 if (self.listenerCount("error") === 0) {
   self.on("error", (err: any) => {
