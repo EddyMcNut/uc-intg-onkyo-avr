@@ -77,7 +77,7 @@ I only have one AVR, I don't know what happens yet when you have multiple Onkyo 
 
   ![](./screenshots/preset15.png)
 
-- As the code uses the impressive JSON mentioned in the Kudos section, you can cheat a bit with it to give commands which are not even known by the driver. For example in the JSON is mentioned `dimmer-level` with possible value `dim`, let's give it a try: yes the AVR display dims to the next level!
+- As the code uses the impressive JSON mentioned in the Kudos section, you can cheat a bit with it to give commands which are not even known by the driver. For example in the [JSON](./src/eiscp-commands.json) is mentioned `dimmer-level` with possible value `dim`, let's give it a try: yes the AVR display dims to the next level!
 
   ![](./screenshots/dimmer.png)
 

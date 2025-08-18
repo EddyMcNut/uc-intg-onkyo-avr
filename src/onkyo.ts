@@ -97,6 +97,16 @@ export default class OnkyoDriver {
       }
     } catch (err) {
       console.error("%s RECOVERY: Failed to connect to AVR:", integrationName, err);
+      if (typeof eiscp.disconnect === "function") {
+        try {
+          await eiscp.disconnect();
+          console.log("%s AVR connection cleaned up after failure.", integrationName);
+        } catch (cleanupErr) {
+          console.error("%s Failed to clean up AVR connection:", integrationName, cleanupErr);
+        }
+      }
+      await this.driver.setDeviceState(uc.DeviceStates.Disconnected);
+      return;
     }
     await this.driver.setDeviceState(uc.DeviceStates.Connected);
   }
@@ -132,6 +142,27 @@ export default class OnkyoDriver {
       [key: string]: string | number | boolean;
     }
   ): Promise<uc.StatusCodes> {
+    // Wait for AVR connection before sending commands
+    try {
+      await eiscp.waitForConnect();
+    } catch (err) {
+      console.warn("%s Could not send command, AVR not connected: %s", integrationName, err);
+      // Retry up to 5 times, sleeping 1 second between attempts
+      for (let attempt = 1; attempt <= 5; attempt++) {
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+        try {
+          await eiscp.waitForConnect();
+          break; // Connected, exit retry loop
+        } catch (retryErr) {
+          if (attempt === 5) {
+            console.warn("%s Could not connect to AVR after 5 attempts: %s", integrationName, retryErr);
+
+            return uc.StatusCodes.Timeout;
+          }
+        }
+      }
+    }
+
     const onkyoEntity = this.driver.getConfiguredEntities().getEntity(globalThis.selectedAvr);
     if (onkyoEntity) {
       console.log("%s Got %s media-player command request: %s", integrationName, entity.id, cmdId, params || "");
