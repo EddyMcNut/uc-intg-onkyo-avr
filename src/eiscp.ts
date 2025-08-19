@@ -30,6 +30,8 @@ var self: any,
     verify_commands: true
   };
 
+const integrationName = "Onkyo-Integration: ";
+
 self = new events.EventEmitter();
 export default self;
 
@@ -120,14 +122,17 @@ function command_to_iscp(command: string, args: any, zone: string) {
 
   prefix = COMMAND_MAPPINGS[command as keyof typeof COMMAND_MAPPINGS];
 
-  if (Object.prototype.hasOwnProperty.call(VALUE_MAPPINGS[prefix], args)) {
+  if (VALUE_MAPPINGS[prefix] && Object.prototype.hasOwnProperty.call(VALUE_MAPPINGS[prefix], args)) {
     value = VALUE_MAPPINGS[prefix][args].value;
-  } else if (Object.prototype.hasOwnProperty.call(VALUE_MAPPINGS[prefix], "INTRANGES")) {
+  } else if (VALUE_MAPPINGS[prefix] && Object.prototype.hasOwnProperty.call(VALUE_MAPPINGS[prefix], "INTRANGES")) {
     self.emit("debug", util.format("INTRANGES assumed for zone %s, command %s", zone, prefix));
 
     // Convert decimal number to hexadecimal since receiver doesn't understand decimal, Pad value if it is not 2 digits
     value = (+args).toString(16).toUpperCase();
     value = value.length < 2 ? "0" + value : value;
+  } else {
+    console.log("%s not found in JSON: %s %s", integrationName, command, args);
+    value = args;
   }
 
   self.emit("debug", util.format('DEBUG (command_to_iscp) raw command "%s"', prefix + value));

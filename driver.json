@@ -16,14 +16,14 @@
     },
     "settings": [
       {
-        "id": "info",
+        "id": "infoOne",
         "label": {
           "en": "Setup process"
         },
         "field": {
           "label": {
             "value": {
-              "en": "This integration will allow you to control Onkyo AVRs on your network. If below fields are left empty, the integration will attempt to autodiscover your AVR."
+              "en": "This integration will allow you to control Onkyo AVRs on your network. If below fields 'AVR Model' and 'AVR IP Address' are left empty, the integration will attempt to autodiscover your AVR."
             }
           }
         }
@@ -53,11 +53,24 @@
       {
         "id": "port",
         "label": {
-          "en": "AVR Port (Most probably 60128)"
+          "en": "AVR Port (default is 60128)"
         },
         "field": {
-          "text": {
-            "value": ""
+          "number": {
+            "value": 60128
+          }
+        }
+      },
+      {
+        "id": "infoTwo",
+        "label": {
+          "en": "Not auto discoverable? Adjust on-sequence!"
+        },
+        "field": {
+          "label": {
+            "value": {
+              "en": "If your AVR is not auto-discoverable, you may need to adjust the on-sequence settings of your Activities to ensure proper communication. Some models disconnect during power on, in that case you need to add a delay between 'AVR switch on' and the next AVR command of approx 5 seconds."
+            }
           }
         }
       }
