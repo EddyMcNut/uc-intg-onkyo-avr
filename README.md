@@ -21,7 +21,7 @@ This integration has been made possible by:
   - To see what uc-intg-onkyo-avr integration is missing :)
 - [mase1981](https://github.com/mase1981): for helping out when I got stuck packaging this first version.
 
-## This is not yet good enough to replace whatever you currently have configured for you Onkyo AVR
+## This is probably not yet good enough to replace whatever you currently have configured for you Onkyo AVR
 
 Although this integration can be installed on Unfolded Circle remotes, I would not right away use it as replacement for your current setup because this is just the first version where 'something works' and I expect a bug or two somehwere.
 
@@ -38,6 +38,11 @@ It can be nice though to install it an play with it, just to see if it is workin
 I have tested it with my Onkyo TX-RZ50. I gave it a fixed IP address (a while ago to solve Spotify hickups) and it has a wired connection to my network.
 
 I only have one AVR, I don't know what happens yet when you have multiple Onkyo AVRs in your network.
+
+## In case of issues during the 'on requence' of an Activity
+Some AVR models temporarily disconnect when powering on, in that case the next command that the Remote tries to send end up in an error because the Remote cannot re-connect yet. If you encounter that kind of issue, add a delay step between the Switch ON and the next AVR command of approximately 5 seconds:
+
+![](./screenshots/delay-onsequence.png)
 
 ## Installation and usage
 
