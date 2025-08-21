@@ -21,28 +21,30 @@ This integration has been made possible by:
   - To see what uc-intg-onkyo-avr integration is missing :)
 - [mase1981](https://github.com/mase1981): for helping out when I got stuck packaging this first version.
 
-## This is probably not yet good enough to replace whatever you currently have configured for you Onkyo AVR
 
-Although this integration can be installed on Unfolded Circle remotes, I would not right away use it as replacement for your current setup because this is just the first version where 'something works' and I expect a bug or two somehwere.
+## Breaking changes are to be expected
 
-**Breaking changes are to be expected.**
-
-It can be nice though to install it an play with it, just to see if it is working for your specific Onkyo model, if you decide to do so please first create a backup of your remote in its current state.
+As this is in early development.
 
 ## Prerequisites
 
-- Your Onkyo AVR needs to be ON or STANDBY, if it is disconnected from power (off) this integration will fail.
+Your Onkyo AVR needs to be ON or STANDBY, if it is disconnected from power (off) this integration will fail.
+
+In the current shape, this integration can only work well when there is just one AVR in the network.
 
 ## It works on my machine
 
 I have tested it with my Onkyo TX-RZ50. I gave it a fixed IP address (a while ago to solve Spotify hickups) and it has a wired connection to my network.
 
-I only have one AVR, I don't know what happens yet when you have multiple Onkyo AVRs in your network.
-
 ## In case of issues during the 'on requence' of an Activity
+
 Some AVR models temporarily disconnect when powering on, in that case the next command that the Remote tries to send end up in an error because the Remote cannot re-connect yet. If you encounter that kind of issue, add a delay step between the Switch ON and the next AVR command of approximately 5 seconds:
 
 ![](./screenshots/delay-onsequence.png)
+
+## In case the AVR overshoots on long-press
+
+When you long-press a button, for example volume up, and the AVR overshoots then increase the `Long Press Threshold` in the setup step of this integration. The setup step can be run again and again by selecting the integration in de webconfigurator of the Remote.
 
 ## Installation and usage
 
@@ -51,9 +53,9 @@ Some AVR models temporarily disconnect when powering on, in that case the next c
 - In webconfigurator, go to `Integrations`, `Add new`, `Install custom`, select the `uc-intg-onkyo-avr-x.x.x.tar.gz` and then `Upload`.
 - Uploading can take a few seconds.
 - For the next step, it depends on your AVR model if it supports autodiscover, if it does:
-    - In `Integrations` select `Onkyo AVR custom`, leave the input fields empty, click `Next`, click `Done`
+  - In `Integrations` select `Onkyo AVR custom`, leave the input fields empty, click `Next`, click `Done`
 - If auto discover fails, remove the integration completely, upload it again and then after upload:
-    - In `Integrations` select `Onkyo AVR custom`, enter the Name, IP address and Port for your AVR, click `Next`, click `Done`
+  - In `Integrations` select `Onkyo AVR custom`, enter the Name, IP address and Port for your AVR, click `Next`, click `Done`
 - Add your AVR as entity: In `Integrations` select `Onkyo AVR custom`, click the `+` next to `Configured entities`, add your AVR
 
   ![](./screenshots/configured-entities.png)
