@@ -11,6 +11,8 @@ declare global {
 
 const integrationName = "Onkyo-Integration: ";
 
+let lastCommandTime = 0;
+
 export default class OnkyoDriver {
   private driver: uc.IntegrationAPI;
   private avrPreset: string = "unknown";
@@ -19,10 +21,12 @@ export default class OnkyoDriver {
   private static lastSetupModel: string | undefined;
   private static lastSetupIp: string | undefined;
   private static lastSetupPort: number | undefined;
+  private static lastSetupLongPressThreshold: number;
 
   private setupModel: string | undefined;
   private setupIp: string | undefined;
   private setupPort: number | undefined;
+  private setupLongPressThreshold: number = 333;
 
   constructor() {
     this.driver = new uc.IntegrationAPI();
@@ -36,6 +40,7 @@ export default class OnkyoDriver {
     const model = (msg as any).setupData?.model;
     const ipAddress = (msg as any).setupData?.ipAddress;
     const port = (msg as any).setupData?.port;
+    const longPressThreshold = (msg as any).setupData?.longPressThreshold;
 
     this.setupModel = typeof model === "string" && model.trim() !== "" ? model.trim() : undefined;
     this.setupIp = typeof ipAddress === "string" && ipAddress.trim() !== "" ? ipAddress.trim() : undefined;
@@ -45,11 +50,18 @@ export default class OnkyoDriver {
     } else {
       this.setupPort = undefined;
     }
+    if (longPressThreshold && longPressThreshold.toString().trim() !== "") {
+      const longPressNum = parseInt(longPressThreshold, 10);
+      this.setupLongPressThreshold = isNaN(longPressNum) ? 333 : longPressNum;
+    } else {
+      this.setupLongPressThreshold = 333;
+    }
 
     // Store in static fields for reconnects
     OnkyoDriver.lastSetupModel = this.setupModel;
     OnkyoDriver.lastSetupIp = this.setupIp;
     OnkyoDriver.lastSetupPort = this.setupPort;
+    OnkyoDriver.lastSetupLongPressThreshold = this.setupLongPressThreshold;
 
     return new uc.SetupComplete();
   }
@@ -153,7 +165,9 @@ export default class OnkyoDriver {
 
     this.driver.on(uc.Events.SubscribeEntities, async (entityIds: string[]) => {
       entityIds.forEach((entityId: string) => {
-        console.log(`${integrationName} Subscribed entity: ${entityId}`);
+        console.log(
+          `${integrationName} Subscribed entity: ${entityId}, long-press threshold set to: ${OnkyoDriver.lastSetupLongPressThreshold}ms`
+        );
       });
       eiscp.command("system-power query");
       eiscp.command("audio-muting query");
@@ -202,6 +216,7 @@ export default class OnkyoDriver {
     if (onkyoEntity) {
       console.log("%s Got %s media-player command request: %s", integrationName, entity.id, cmdId, params || "");
       if (entity.id === globalThis.selectedAvr) {
+        const now = Date.now();
         switch (cmdId) {
           case uc.MediaPlayerCommands.On:
             await eiscp.command("system-power on");
@@ -223,10 +238,16 @@ export default class OnkyoDriver {
             await eiscp.command("audio-muting toggle");
             break;
           case uc.MediaPlayerCommands.VolumeUp:
-            await eiscp.command("volume level-up-1db-step");
+            if (now - lastCommandTime > OnkyoDriver.lastSetupLongPressThreshold) {
+              lastCommandTime = now;
+              await eiscp.command("volume level-up-1db-step");
+            }
             break;
           case uc.MediaPlayerCommands.VolumeDown:
-            await eiscp.command("volume level-down-1db-step");
+            if (now - lastCommandTime > OnkyoDriver.lastSetupLongPressThreshold) {
+              lastCommandTime = now;
+              await eiscp.command("volume level-down-1db-step");
+            }
             break;
           case uc.MediaPlayerCommands.ChannelUp:
             await eiscp.command("preset up");
@@ -319,6 +340,5 @@ export default class OnkyoDriver {
 
   async init() {
     console.log("%s Initializing...", integrationName);
-    // this.setupEventHandlers();
   }
 }

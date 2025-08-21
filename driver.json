@@ -1,6 +1,6 @@
 {
   "driver_id": "onkyo-avr",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "min_core_api": "0.20.0",
   "name": { "en": "Onkyo AVR" },
   "icon": "uc:music",
@@ -53,11 +53,22 @@
       {
         "id": "port",
         "label": {
-          "en": "AVR Port (default is 60128)"
+          "en": "AVR Port (default 60128)"
         },
         "field": {
           "number": {
             "value": 60128
+          }
+        }
+      },
+      {
+        "id": "longPressThreshold",
+        "label": {
+          "en": "Long Press Threshold to prevent overshoots on button long-press. Default 333"
+        },
+        "field": {
+          "number": {
+            "value": 333
           }
         }
       },
