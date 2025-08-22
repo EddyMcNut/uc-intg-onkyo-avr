@@ -21,7 +21,6 @@ This integration has been made possible by:
   - To see what uc-intg-onkyo-avr integration is missing :)
 - [mase1981](https://github.com/mase1981): for helping out when I got stuck packaging this first version.
 
-
 ## Breaking changes are to be expected
 
 As this is in early development.
@@ -70,6 +69,7 @@ When you long-press a button, for example volume up, and the AVR overshoots then
   ![](./screenshots/sequences.png)
 
 - In the new Activity, `Button mapping`, assign some buttons: `mute`, `volume up/down`, `channel up/down`
+- Also available: `settings`, `cursor left right up down enter` and `home` to go back one level in the settings menu, `settings` you could assign to to the (hamburger) `menu` physical button on the remote and `home` you could for example assign to the `record` physical button next to it.
 
 ## Cheats
 

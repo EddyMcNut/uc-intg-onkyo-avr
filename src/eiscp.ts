@@ -77,7 +77,6 @@ function eiscp_packet(data: any) {
 }
 
 function eiscp_packet_extract(packet: any) {
-  //Exracts message from eISCP packet, Strip first 18 bytes and last 2 since that's only the header and end characters
   return packet.toString("ascii", 18, packet.length - 2);
 }
 
@@ -91,6 +90,7 @@ function iscp_to_command(iscp_message: any) {
       zone: "main"
     };
   value = String(value).replace(/[\x00-\x1F]/g, ""); // remove weird characters like \x1A
+  console.log("%s RAW: %s %s", integrationName, command, value);
   type CommandType = {
     name: string;
     values: { [key: string]: { name: string } };
@@ -100,7 +100,6 @@ function iscp_to_command(iscp_message: any) {
     const commansList = COMMANDS as unknown as { [key: string]: CommandType };
 
     if (typeof commansList[command] !== "undefined") {
-      // const zone_cmd = commansList[command].name;
       result.command = commansList[command].name;
 
       const cmdObj = COMMANDS[command as keyof typeof COMMANDS];
@@ -117,7 +116,6 @@ function iscp_to_command(iscp_message: any) {
 }
 
 function command_to_iscp(command: string, args: any, zone: string) {
-  // Transform high-level command to a low-level ISCP message
   var prefix: any, value: any;
 
   prefix = COMMAND_MAPPINGS[command as keyof typeof COMMAND_MAPPINGS];
@@ -323,15 +321,10 @@ self.connect = async function (options?: any): Promise<{ model: string; host: st
   eiscp
     .on("connect", function () {
       self.is_connected = true;
-      self.emit(
-        "debug",
-        util.format("INFO (connected) Connected to %s:%s (model: %s)", config.host, config.port, config.model)
-      );
       self.emit("connect", config.host, config.port, config.model);
     })
     .on("close", function () {
       self.is_connected = false;
-      self.emit("debug", util.format("INFO (disconnected) Disconnected from %s:%s", config.host, config.port));
       self.emit("close", config.host, config.port);
 
       if (config.reconnect) {
@@ -340,7 +333,6 @@ self.connect = async function (options?: any): Promise<{ model: string; host: st
     })
     .on("error", function (err: any) {
       self.is_connected = false;
-      self.emit("error", util.format("ERROR (server_error) Server error on %s:%s - %s", config.host, config.port, err));
       eiscp.destroy();
     })
     .on("data", function (data: any) {
@@ -360,10 +352,6 @@ self.connect = async function (options?: any): Promise<{ model: string; host: st
       result.port = config.port;
       result.model = config.model;
 
-      self.emit(
-        "debug",
-        util.format("DEBUG (received_data) Received data from %s:%s - %j", config.host, config.port, result)
-      );
       self.emit("data", result);
     });
 
@@ -380,15 +368,11 @@ send_queue = async.queue(function (data: any, callback: any) {
   //Syncronous queue which sends commands to device, callback(bool error, string error_message)
 
   if (self.is_connected) {
-    self.emit("debug", util.format("DEBUG (sent_command) Sent command to %s:%s - %s", config.host, config.port, data));
-
     eiscp.write(eiscp_packet(data));
-
     setTimeout(callback, config.send_delay, false);
     return;
   }
 
-  self.emit("error", util.format("ERROR (send_not_connected) Not connected, can't send data: %j", data));
   callback("Send command, while not connected", null);
 }, 1);
 
@@ -407,7 +391,6 @@ self.raw = function (data: any, callback: any) {
 
 self.command = function (data: any, callback: any) {
   // Send a high level command like system-power=query, callback only tells you that the command was sent but not that it succsessfully did what you asked
-  // Parse data into command, args, and zone for command_to_iscp
   let command: string, args: any, zone: any;
 
   if (typeof data === "string") {
