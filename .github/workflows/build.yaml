@@ -13,7 +13,7 @@ on:
 
 env:
   INTG_NAME: onkyo-avr
-  VERSION: 0.0.5
+  VERSION: 0.0.6
 
 jobs:
   build:
@@ -24,7 +24,7 @@ jobs:
 
       - name: Fetch all tags to determine version
         run: |
-          echo "VERSION=0.0.5" >> $GITHUB_ENV
+          echo "VERSION=0.0.6" >> $GITHUB_ENV
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
