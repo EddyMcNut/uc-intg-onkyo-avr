@@ -129,7 +129,7 @@ Probably you have your AVR set to automatically select the best listening mode, 
 
 eISCP codes for Atmos, DTS:X, Auro-3D, and IMAX Enhanced are not standardized and may vary by receiver model and firmware. 
 
-However, most models `auto-select` the correct mode when the input signal is `Dolby Atmos`, `DTS:X`, `Auro-3D`, `IMAX Enhanced` and the listening mode is set to Straight Decode.
+However, most models `auto-select` the correct mode when the input signal is `Dolby Atmos`, `DTS:X`, `Auro-3D`, `IMAX Enhanced` and the listening mode is set to `Straight Decode`.
 
 | Listening mode | value in `Input source`         |
 |----------------|---------------------------------|
@@ -152,5 +152,6 @@ Please let me know in [Discord](https://discord.com/channels/553671366411288576/
 
 - Have to do a real release in GitHub workflows.
 - Align and improve logging.
+- Better use of the `Media Widget`.
 - The code is partly ready to deal with different zones, but that still needs some attention before that will actually work.
 - Deal with multilple Onkyo AVRs in the network.
