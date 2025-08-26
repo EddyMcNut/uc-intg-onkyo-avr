@@ -20,12 +20,15 @@ This integration has been made possible by:
 - [JackJPowell/uc-intg-yamaha-avr](https://github.com/JackJPowell/uc-intg-yamaha-avr):
   - To see what uc-intg-onkyo-avr integration is missing :)
 - [mase1981](https://github.com/mase1981): for helping out when I got stuck packaging this first version.
+- [harvey28](https://unfolded.community/u/harvey28/summary): for testing and feedback.
 
 ## Breaking changes are to be expected
 
 As this is in early development.
 
 ## Prerequisites
+
+Read this readme completely, it contains some tips for known issues and it also explains how to use `Input source` in a flexibale way so you can send a lot of different commands to your AVR.
 
 Your Onkyo AVR needs to be ON or STANDBY, if it is disconnected from power (off) this integration will fail.
 
@@ -35,11 +38,20 @@ In the current shape, this integration can only work well when there is just one
 
 I have tested it with my Onkyo TX-RZ50. I gave it a fixed IP address (a while ago to solve Spotify hickups) and it has a wired connection to my network.
 
+Users report it also to work with:
+- TX-RZ70
+- TX-NR656
+- TX-NR807
+- Pioneer VSX-932
+- Integra (model unknown)
+
 ## In case of issues during the 'on requence' of an Activity
 
 Some AVR models temporarily disconnect when powering on, in that case the next command that the Remote tries to send end up in an error because the Remote cannot re-connect yet. If you encounter that kind of issue, add a delay step between the Switch ON and the next AVR command of approximately 5 seconds:
 
 ![](./screenshots/delay-onsequence.png)
+
+You can try out shorter delays of course to see where the sweet spot is.
 
 ## In case the AVR overshoots on long-press
 
@@ -73,7 +85,7 @@ When you long-press a button, for example volume up, and the AVR overshoots then
 
 ## Cheats
 
-- In the new Activity, `User interface`, add `Media Widget` and select your AVR: it will for now just show some basic info, I did that to be able to right away see a change done directly on the AVR, like changing volume, back on the remote without checking logs. So this is temporary for checking the 2-way communication.
+- In the new Activity, `User interface`, add `Media Widget` and select your AVR: it will for now just show some basic info, this is temporary for checking the 2-way communication. If you change the volume directly on your AVR, the Remote shoulds still show you the new value.
 - In the new Activity, `User interface`, add `Text Button` and select `Input source`, because there is a text field where you can type anything, we can give all kinds of commands, like presets or input sources:
 
   ![](./screenshots/input-selectorFM.png)
@@ -84,7 +96,7 @@ When you long-press a button, for example volume up, and the AVR overshoots then
 
   ![](./screenshots/preset15.png)
 
-- As the code uses the impressive JSON mentioned in the Kudos section, you can cheat a bit with it to give commands which are not even known by the driver. For example in the [JSON](./src/eiscp-commands.json) is mentioned `dimmer-level` with possible value `dim`, let's give it a try: yes the AVR display dims to the next level!
+- As the code uses the impressive JSON mentioned in the Kudos section, you can cheat a bit with it to give commands which are mentioned in the JSON. For example in the [JSON](./src/eiscp-commands.json) is mentioned `dimmer-level` with possible value `dim`, let's give it a try: yes the AVR display dims to the next level!
 
   ![](./screenshots/dimmer.png)
 
@@ -94,13 +106,51 @@ When you long-press a button, for example volume up, and the AVR overshoots then
 
   ![](./screenshots/demo.png)
 
+## Volume
+
+The AVR itself may display the volume as dB (relative) or as an absolute number, depending on its settings, but the eISCP protocol only accepts and returns the absolute value. There is no command to set the volume directly in dB via eISCP.
+
+## Listening modes
+
+Like descibed in the Cheats section, you can send a lot of different commands which are all mentioned in the [JSON](./src/eiscp-commands.json) file.
+
+Probably you have your AVR set to automatically select the best listening mode, but sometimes you might want to set a favorite mode, see the listening-mode section in the [JSON](./src/eiscp-commands.json), for the correct command. A few examples from that JSON:
+
+| Listening mode                      | value in `Input source`                            |
+|-------------------------------------|----------------------------------------------------|
+| Stereo                              | listening-mode stereo                              |
+| Straight Decode                     | listening-mode straight-decode                     |
+| Neo:6/Neo:X THX Cinema              | listening-mode thx-cinema                          |
+| Neo:6 Cinema DTS Surround Sensation | listening-mode neo-6-cinema-dts-surround-sensation |
+
+![](./screenshots/stereo.png)
+
+## But what about the more modern stuff like `Dolby Atmos`, `DTS:X`, `Auro-3D`, `IMAX Enhanced`?
+
+eISCP codes for Atmos, DTS:X, Auro-3D, and IMAX Enhanced are not standardized and may vary by receiver model and firmware. 
+
+However, most models `auto-select` the correct mode when the input signal is `Dolby Atmos`, `DTS:X`, `Auro-3D`, `IMAX Enhanced` and the listening mode is set to Straight Decode.
+
+| Listening mode | value in `Input source`         |
+|----------------|---------------------------------|
+| Dolby Atmos    | listening-mode straight-decode  |
+| DTS:X          | listening-mode straight-decode  |
+| Auro-3D        | listening-mode straight-decode  |
+| IMAX Enhanced  | listening-mode straight-decode  |
+
+![](./screenshots/straight-decode.png)
+
+## Raw messages
+
+This integration aims to use human readable commands, like `listening-mode straight-decode`. But let's say you have figured out a command for your AVR that does not exist yet in the JSON, then you can try to send it in raw format:
+
+![](./screenshots/raw.png)
+
+Please let me know in [Discord](https://discord.com/channels/553671366411288576/1405962064521855127) what commands you have found, I will try to add them to this integration.
+
 ## Stuff to do / backlog
 
-- Currently the entity name is model+IPaddress, this might not be the best choice.
 - Have to do a real release in GitHub workflows.
-- Add config options like `volume steps` = 0.5 0r 1.
 - Align and improve logging.
-- simple-commands.ts, is this needed considering we can cheat?
-- remote.ts needs to be populated
 - The code is partly ready to deal with different zones, but that still needs some attention before that will actually work.
 - Deal with multilple Onkyo AVRs in the network.
