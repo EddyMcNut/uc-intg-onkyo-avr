@@ -30,11 +30,11 @@ As this is in early development.
 
 Read this readme completely, it contains some tips for known issues and it also explains how to use `Input source` in a flexibale way so you can send a lot of different commands to your AVR.
 
-Your Onkyo AVR needs to be ON or STANDBY, if it is disconnected from power (off) this integration will fail.
+Your Onkyo AVR needs to be ON or STANDBY, if it is disconnected from power (off) this integration will fail. If your AVR has been disconnected from power, it could be that you first have to switch on your AVR manually one time before network commands work again (depends on the model), waking up after STANDBY should then work again.
 
 In the current shape, this integration can only work well when there is just one AVR in the network.
 
-## It works on my machine
+## Reported to work on different brands and models
 
 I have tested it with my Onkyo TX-RZ50. I gave it a fixed IP address (a while ago to solve Spotify hickups) and it has a wired connection to my network.
 
@@ -47,15 +47,17 @@ Users report it also to work with:
 
 ## In case of issues during the 'on requence' of an Activity
 
-Some AVR models temporarily disconnect when powering on, in that case the next command that the Remote tries to send end up in an error because the Remote cannot re-connect yet. If you encounter that kind of issue, add a delay step between the Switch ON and the next AVR command of approximately 5 seconds:
+Some AVR models temporarily disconnect when powering on, in that case the next command that the Remote tries to send ends up in an error or time out because the Remote cannot re-connect yet. If you encounter that kind of issue, add a delay step between the Switch ON and the next AVR command of approximately 5 seconds, then lower it and try again to find the sweet spot:
 
 ![](./screenshots/delay-onsequence.png)
 
-You can try out shorter delays of course to see where the sweet spot is.
-
 ## In case the AVR overshoots on long-press
 
-When you long-press a button, for example volume up, and the AVR overshoots then increase the `Long Press Threshold` in the setup step of this integration. The setup step can be run again and again by selecting the integration in de webconfigurator of the Remote.
+When you long-press a button, for example volume up, and the AVR overshoots then increase the `Long Press Threshold` in the setup step of this integration. The setup step can be run again and again by selecting the integration in de webconfigurator of the Remote. Just assign the volume command to the short-press in webconfigurator.
+
+![](./screenshots/longpress-threshold.png)
+
+![](./screenshots/short-press.png) ![](./screenshots/volume-up.png)
 
 ## Installation and usage
 
