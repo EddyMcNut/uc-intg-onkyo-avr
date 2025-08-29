@@ -39,6 +39,7 @@ In the current shape, this integration can only work well when there is just one
 I have tested it with my Onkyo TX-RZ50. I gave it a fixed IP address (a while ago to solve Spotify hickups) and it has a wired connection to my network.
 
 Users report it also to work with:
+
 - TX-RZ70
 - TX-NR656
 - TX-NR807
@@ -119,7 +120,7 @@ Like descibed in the Cheats section, you can send a lot of different commands wh
 Probably you have your AVR set to automatically select the best listening mode, but sometimes you might want to set a favorite mode, see the listening-mode section in the [JSON](./src/eiscp-commands.json), for the correct command. A few examples from that JSON:
 
 | Listening mode                      | value in `Input source`                            |
-|-------------------------------------|----------------------------------------------------|
+| ----------------------------------- | -------------------------------------------------- |
 | Stereo                              | listening-mode stereo                              |
 | Straight Decode                     | listening-mode straight-decode                     |
 | Neo:6/Neo:X THX Cinema              | listening-mode thx-cinema                          |
@@ -129,16 +130,16 @@ Probably you have your AVR set to automatically select the best listening mode, 
 
 ## But what about the more modern stuff like `Dolby Atmos`, `DTS:X`, `Auro-3D`, `IMAX Enhanced`?
 
-eISCP codes for Atmos, DTS:X, Auro-3D, and IMAX Enhanced are not standardized and may vary by receiver model and firmware. 
+eISCP codes for Atmos, DTS:X, Auro-3D, and IMAX Enhanced are not standardized and may vary by receiver model and firmware.
 
 However, most models `auto-select` the correct mode when the input signal is `Dolby Atmos`, `DTS:X`, `Auro-3D`, `IMAX Enhanced` and the listening mode is set to `Straight Decode`.
 
-| Listening mode | value in `Input source`         |
-|----------------|---------------------------------|
-| Dolby Atmos    | listening-mode straight-decode  |
-| DTS:X          | listening-mode straight-decode  |
-| Auro-3D        | listening-mode straight-decode  |
-| IMAX Enhanced  | listening-mode straight-decode  |
+| Listening mode | value in `Input source`        |
+| -------------- | ------------------------------ |
+| Dolby Atmos    | listening-mode straight-decode |
+| DTS:X          | listening-mode straight-decode |
+| Auro-3D        | listening-mode straight-decode |
+| IMAX Enhanced  | listening-mode straight-decode |
 
 ![](./screenshots/straight-decode.png)
 

@@ -84,13 +84,45 @@ function iscp_to_command(iscp_message: any) {
   // Transform a low-level ISCP message to a high-level command
   var command = iscp_message.slice(0, 3),
     value = iscp_message.slice(3),
-    result: { command: string; argument: string | number; zone: string } = {
+    result: { command: string; argument: string | number | string[]; zone: string } = {
       command: "undefined",
       argument: "undefined",
       zone: "main"
     };
   value = String(value).replace(/[\x00-\x1F]/g, ""); // remove weird characters like \x1A
   console.log("%s RAW: %s %s", integrationName, command, value);
+
+  if (command === "NTM") {
+    result.command = "NTM";
+    result.argument = value;
+    return result;
+  }
+
+  // Special handling for FLD (metadata) responses
+  if (command === "FLD" && value.length >= 2) {
+    const fldTag = value.slice(0, 2).toUpperCase();
+    const hexContent = value.slice(2).replace(/[^0-9A-Fa-f]/g, "");
+    // FLD tag mapping (expand as needed)
+    const fldMap: Record<string, { command: string; name: string }> = {
+      "1A": { command: "NAT", name: "net-usb-artist-name-info" }, // Artist
+      "1B": { command: "NAL", name: "net-usb-album-name-info" }, // Album
+      "1C": { command: "NTI", name: "net-usb-title-name" } // Title
+      // Add more if needed
+    };
+    const mapped = fldMap[fldTag];
+    if (mapped) {
+      result.command = mapped.command;
+      // Decode hex to UTF-8 string
+      const bytes = [];
+      for (let i = 0; i < hexContent.length; i += 2) {
+        bytes.push(parseInt(hexContent.substr(i, 2), 16));
+      }
+      result.argument = Buffer.from(bytes).toString("utf8");
+      console.log("********************** %s", result);
+      return result;
+    }
+  }
+
   type CommandType = {
     name: string;
     values: { [key: string]: { name: string } };
@@ -108,6 +140,19 @@ function iscp_to_command(iscp_message: any) {
         result.argument = valuesObj[value]?.name;
       } else if (Object.prototype.hasOwnProperty.call(VALUE_MAPPINGS[command], "INTRANGES")) {
         result.argument = parseInt(value, 16);
+      } else if (typeof value === "string" && value.match(/^([0-9A-F]{2})+(,([0-9A-F]{2})+)*$/i)) {
+        // Handle hex-encoded string(s), possibly comma-separated
+        result.argument = value.split(",").map((hexStr) => {
+          hexStr = hexStr.trim();
+          let str = "";
+          for (let i = 0; i < hexStr.length; i += 2) {
+            str += String.fromCharCode(parseInt(hexStr.substring(i, i + 2), 16));
+          }
+          return str;
+        });
+        if (result.argument.length === 1) {
+          result.argument = result.argument[0];
+        }
       }
     }
   });
@@ -331,21 +376,29 @@ self.connect = async function (options?: any): Promise<{ model: string; host: st
         setTimeout(() => self.connect(), config.reconnect_sleep * 1000);
       }
     })
-    .on("error", function (err: any) {
+    .on("error", function () {
       self.is_connected = false;
       eiscp.destroy();
     })
     .on("data", function (data: any) {
-      var iscp_message = eiscp_packet_extract(data),
-        result: {
-          command: string | undefined;
-          argument: string | number | undefined;
-          zone: string;
-          iscp_command?: string;
-          host?: string;
-          port?: number;
-          model?: string;
-        } = iscp_to_command(iscp_message);
+      var iscp_message = eiscp_packet_extract(data);
+      const rawResult = iscp_to_command(iscp_message);
+      const result: {
+        command: string | undefined;
+        argument: string | number | undefined;
+        zone: string;
+        iscp_command?: string;
+        host?: string;
+        port?: number;
+        model?: string;
+      } = {
+        ...rawResult,
+        argument: Array.isArray(rawResult.argument)
+          ? rawResult.argument.length === 1
+            ? rawResult.argument[0]
+            : String(rawResult.argument)
+          : rawResult.argument
+      };
 
       result.iscp_command = iscp_message;
       result.host = config.host;

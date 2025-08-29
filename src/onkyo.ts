@@ -298,6 +298,9 @@ export default class OnkyoDriver {
 
   // Receive commands from the AVR
   private setupEiscpListener() {
+    // Store now playing metadata
+    const nowPlaying: { station?: string; artist?: string; album?: string; title?: string } = {};
+
     eiscp.on("error", (err: any) => {
       console.error("%s eiscp error: %s", integrationName, err);
     });
@@ -348,18 +351,61 @@ export default class OnkyoDriver {
             });
             console.log("%s input-selector (source) set to: %s", integrationName, entity.attributes?.source);
             break;
-          default:
-            // this does not show anything :)
+          // --- Now Playing Metadata Handling ---
+          case "internet-radio-preset":
+            console.log("*****1 %s", avrUpdates.argument);
+            nowPlaying.station = String(avrUpdates.argument);
+            break;
+          case "NAT":
+            console.log("*****2 %s", avrUpdates.argument);
+            nowPlaying.artist = String(avrUpdates.argument);
             this.driver.updateEntityAttributes(globalThis.selectedAvr, {
-              [uc.MediaPlayerAttributes.MediaTitle]: `${avrUpdates.command} = ${avrUpdates.argument}`
+              [uc.MediaPlayerAttributes.MediaArtist]: avrUpdates.argument
             });
-            console.log("%s cheated? %s  %s", integrationName, avrUpdates.command, avrUpdates.argument);
+            break;
+          case "NAL":
+            console.log("*****3 %s", avrUpdates.argument);
+            nowPlaying.album = String(avrUpdates.argument);
+            this.driver.updateEntityAttributes(globalThis.selectedAvr, {
+              [uc.MediaPlayerAttributes.MediaAlbum]: avrUpdates.argument
+            });
+            break;
+          case "NTI":
+            console.log("*****4 %s", avrUpdates.argument);
+            nowPlaying.title = String(avrUpdates.argument);
+            this.driver.updateEntityAttributes(globalThis.selectedAvr, {
+              [uc.MediaPlayerAttributes.MediaTitle]: avrUpdates.argument
+            });
+            break;
+          case "NTM":
+            console.log("*****4 %s", avrUpdates.argument);
+            nowPlaying.title = String(avrUpdates.argument);
+            this.driver.updateEntityAttributes(globalThis.selectedAvr, {
+              [uc.MediaPlayerAttributes.MediaPosition]: avrUpdates.argument
+            });
+            break;
+          default:
+            // todo
             break;
         }
 
+        // Always update the media title with the latest now playing info
+        // Build a dynamic media title string with only populated fields
+        const infoParts: string[] = [];
+        if (nowPlaying.station) infoParts.push(`Station: ${nowPlaying.station}`);
+        if (nowPlaying.artist) infoParts.push(`Artist: ${nowPlaying.artist}`);
+        if (nowPlaying.album) infoParts.push(`Album: ${nowPlaying.album}`);
+        if (nowPlaying.title) infoParts.push(`Title: ${nowPlaying.title}`);
+        // infoParts.push(
+        //   `state: ${String(entity.attributes?.state).toUpperCase()}`,
+        //   `volume: ${entity.attributes?.volume}`,
+        //   `source: ${String(entity.attributes?.source).toUpperCase()}`,
+        //   `preset: ${this.avrPreset}`,
+        //   `muted: ${entity.attributes?.muted}`
+        // );
+
         this.driver.updateEntityAttributes(globalThis.selectedAvr, {
-          [uc.MediaPlayerAttributes.MediaTitle]:
-            `state: ${String(entity.attributes?.state).toUpperCase()}, volume: ${entity.attributes?.volume}, source: ${String(entity.attributes?.source).toUpperCase()}, preset: ${this.avrPreset}, muted: ${entity.attributes?.muted}`
+          [uc.MediaPlayerAttributes.MediaImageUrl]: "http://192.168.2.103/album_art.cgi" // SETTINGS!
         });
       }
     );
