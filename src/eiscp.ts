@@ -84,13 +84,14 @@ function iscp_to_command(iscp_message: any) {
   // Transform a low-level ISCP message to a high-level command
   var command = iscp_message.slice(0, 3),
     value = iscp_message.slice(3),
-    result: { command: string; argument: string | number | string[]; zone: string } = {
+    result: { command: string; argument: string | number | string[] | Record<string, string>; zone: string } = {
       command: "undefined",
       argument: "undefined",
       zone: "main"
     };
   value = String(value).replace(/[\x00-\x1F]/g, ""); // remove weird characters like \x1A
-  console.log("%s RAW: %s %s", integrationName, command, value);
+
+  // console.log("%s RAW: %s %s", integrationName, command, value);
 
   if (command === "NTM") {
     result.command = "NTM";
@@ -98,29 +99,31 @@ function iscp_to_command(iscp_message: any) {
     return result;
   }
 
-  // Special handling for FLD (metadata) responses
-  if (command === "FLD" && value.length >= 2) {
-    const fldTag = value.slice(0, 2).toUpperCase();
-    const hexContent = value.slice(2).replace(/[^0-9A-Fa-f]/g, "");
-    // FLD tag mapping (expand as needed)
-    const fldMap: Record<string, { command: string; name: string }> = {
-      "1A": { command: "NAT", name: "net-usb-artist-name-info" }, // Artist
-      "1B": { command: "NAL", name: "net-usb-album-name-info" }, // Album
-      "1C": { command: "NTI", name: "net-usb-title-name" } // Title
-      // Add more if needed
-    };
-    const mapped = fldMap[fldTag];
-    if (mapped) {
-      result.command = mapped.command;
-      // Decode hex to UTF-8 string
-      const bytes = [];
-      for (let i = 0; i < hexContent.length; i += 2) {
-        bytes.push(parseInt(hexContent.substr(i, 2), 16));
+  if (command === "NTI") {
+    value = command + value;
+    const metaResult: Record<string, string> = {};
+    // Split by ISCP!1 (start of each message)
+    const parts = value.split(/ISCP[.!]1/);
+    // console.log("Split parts:", parts);
+    for (const part of parts) {
+      if (!part.trim()) continue; // skip empty parts
+      const match = part.trim().match(/^([A-Z]{3})\s*(.*)$/s);
+      if (match) {
+        const cmd = match[1];
+        const val = match[2].trim();
+        // Only include known metadata commands
+        if (["NAT", "NTI", "NAL"].includes(cmd)) {
+          metaResult[cmd] = val;
+        }
       }
-      result.argument = Buffer.from(bytes).toString("utf8");
-      console.log("********************** %s", result);
+    }
+    // Only return if all three metadata elements are present
+    if (metaResult.NAT && metaResult.NTI && metaResult.NAL) {
+      result.command = "metadata";
+      result.argument = metaResult;
       return result;
     }
+    return;
   }
 
   type CommandType = {
@@ -178,7 +181,7 @@ function command_to_iscp(command: string, args: any, zone: string) {
     value = args;
   }
 
-  self.emit("debug", util.format('DEBUG (command_to_iscp) raw command "%s"', prefix + value));
+  // self.emit("debug", util.format('DEBUG (command_to_iscp) raw command "%s"', prefix + value));
 
   return prefix + value;
 }
@@ -382,30 +385,29 @@ self.connect = async function (options?: any): Promise<{ model: string; host: st
     })
     .on("data", function (data: any) {
       var iscp_message = eiscp_packet_extract(data);
+      const command = iscp_message.slice(0, 3);
+
+      // Ignore FLD messages
+      if (["FLD", "NMS", "NPB"].includes(command)) {
+        return;
+      }
+
       const rawResult = iscp_to_command(iscp_message);
-      const result: {
-        command: string | undefined;
-        argument: string | number | undefined;
-        zone: string;
-        iscp_command?: string;
-        host?: string;
-        port?: number;
-        model?: string;
-      } = {
-        ...rawResult,
-        argument: Array.isArray(rawResult.argument)
-          ? rawResult.argument.length === 1
-            ? rawResult.argument[0]
-            : String(rawResult.argument)
-          : rawResult.argument
-      };
 
-      result.iscp_command = iscp_message;
-      result.host = config.host;
-      result.port = config.port;
-      result.model = config.model;
+      // Only emit if rawResult is defined
+      if (!rawResult) {
+        return;
+      }
 
-      self.emit("data", result);
+      self.emit("data", {
+        command: rawResult.command ?? undefined,
+        argument: rawResult.argument ?? undefined,
+        zone: rawResult.zone ?? undefined,
+        iscpCommand: iscp_message,
+        host: config.host,
+        port: config.port,
+        model: config.model
+      });
     });
 
   return { model: config.model, host: config.host, port: config.port };

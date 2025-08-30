@@ -119,6 +119,11 @@ export default class OnkyoDriver {
                 uc.MediaPlayerFeatures.ChannelSwitcher,
                 uc.MediaPlayerFeatures.SelectSource,
                 uc.MediaPlayerFeatures.MediaTitle,
+                uc.MediaPlayerFeatures.MediaArtist,
+                uc.MediaPlayerFeatures.MediaAlbum,
+                uc.MediaPlayerFeatures.MediaPosition,
+                uc.MediaPlayerFeatures.MediaDuration,
+                uc.MediaPlayerFeatures.MediaImageUrl,
                 uc.MediaPlayerFeatures.Dpad,
                 uc.MediaPlayerFeatures.Settings,
                 uc.MediaPlayerFeatures.Home
@@ -308,7 +313,7 @@ export default class OnkyoDriver {
       "data",
       (avrUpdates: {
         command: string;
-        argument: string | number;
+        argument: string | number | Record<string, string>;
         zone: string;
         iscpCommand: string;
         host: string;
@@ -320,7 +325,7 @@ export default class OnkyoDriver {
           console.warn("%s Entity not found for: %s", integrationName, globalThis.selectedAvr);
           return;
         }
-
+        // console.log("%s here...", avrUpdates.command);
         switch (avrUpdates.command) {
           case "system-power":
             this.driver.updateEntityAttributes(globalThis.selectedAvr, {
@@ -337,7 +342,7 @@ export default class OnkyoDriver {
             break;
           case "volume":
             this.driver.updateEntityAttributes(globalThis.selectedAvr, {
-              [uc.MediaPlayerAttributes.Volume]: avrUpdates.argument
+              [uc.MediaPlayerAttributes.Volume]: avrUpdates.argument.toString()
             });
             console.log("%s volume set to: %s", integrationName, entity.attributes?.volume);
             break;
@@ -347,64 +352,56 @@ export default class OnkyoDriver {
             break;
           case "input-selector":
             this.driver.updateEntityAttributes(globalThis.selectedAvr, {
-              [uc.MediaPlayerAttributes.Source]: avrUpdates.argument
+              [uc.MediaPlayerAttributes.Source]: avrUpdates.argument.toString()
             });
             console.log("%s input-selector (source) set to: %s", integrationName, entity.attributes?.source);
             break;
-          // --- Now Playing Metadata Handling ---
-          case "internet-radio-preset":
-            console.log("*****1 %s", avrUpdates.argument);
-            nowPlaying.station = String(avrUpdates.argument);
-            break;
-          case "NAT":
-            console.log("*****2 %s", avrUpdates.argument);
-            nowPlaying.artist = String(avrUpdates.argument);
-            this.driver.updateEntityAttributes(globalThis.selectedAvr, {
-              [uc.MediaPlayerAttributes.MediaArtist]: avrUpdates.argument
-            });
-            break;
-          case "NAL":
-            console.log("*****3 %s", avrUpdates.argument);
-            nowPlaying.album = String(avrUpdates.argument);
-            this.driver.updateEntityAttributes(globalThis.selectedAvr, {
-              [uc.MediaPlayerAttributes.MediaAlbum]: avrUpdates.argument
-            });
-            break;
-          case "NTI":
-            console.log("*****4 %s", avrUpdates.argument);
-            nowPlaying.title = String(avrUpdates.argument);
-            this.driver.updateEntityAttributes(globalThis.selectedAvr, {
-              [uc.MediaPlayerAttributes.MediaTitle]: avrUpdates.argument
-            });
-            break;
           case "NTM":
-            console.log("*****4 %s", avrUpdates.argument);
-            nowPlaying.title = String(avrUpdates.argument);
+            let [position, duration] = avrUpdates.argument.toString().split("/");
+            // Convert duration and position to seconds if in mm:ss or hh:mm:ss format
+            function timeToSeconds(timeStr: string): number {
+              if (!timeStr) return 0;
+              const parts = timeStr.split(":").map(Number);
+              if (parts.length === 3) {
+                // hh:mm:ss
+                return parts[0] * 3600 + parts[1] * 60 + parts[2];
+              } else if (parts.length === 2) {
+                // mm:ss
+                return parts[0] * 60 + parts[1];
+              } else if (parts.length === 1) {
+                // seconds
+                return parts[0];
+              }
+              return 0;
+            }
+            duration = timeToSeconds(duration).toString();
+            position = timeToSeconds(position).toString();
             this.driver.updateEntityAttributes(globalThis.selectedAvr, {
-              [uc.MediaPlayerAttributes.MediaPosition]: avrUpdates.argument
+              [uc.MediaPlayerAttributes.MediaPosition]: position || "0",
+              [uc.MediaPlayerAttributes.MediaDuration]: duration || "0"
             });
+            break;
+          case "metadata":
+            // console.log("*****5 %s", avrUpdates.argument);
+            if (typeof avrUpdates.argument === "object" && avrUpdates.argument !== null) {
+              nowPlaying.title = (avrUpdates.argument as Record<string, string>).NTI || "unknwn";
+              nowPlaying.album = (avrUpdates.argument as Record<string, string>).NAL || "unknwn";
+              nowPlaying.artist = (avrUpdates.argument as Record<string, string>).NAT || "unknwn";
+            } else {
+              nowPlaying.title = "aa";
+              nowPlaying.album = "bb";
+              nowPlaying.artist = "cc";
+            }
             break;
           default:
             // todo
             break;
         }
 
-        // Always update the media title with the latest now playing info
-        // Build a dynamic media title string with only populated fields
-        const infoParts: string[] = [];
-        if (nowPlaying.station) infoParts.push(`Station: ${nowPlaying.station}`);
-        if (nowPlaying.artist) infoParts.push(`Artist: ${nowPlaying.artist}`);
-        if (nowPlaying.album) infoParts.push(`Album: ${nowPlaying.album}`);
-        if (nowPlaying.title) infoParts.push(`Title: ${nowPlaying.title}`);
-        // infoParts.push(
-        //   `state: ${String(entity.attributes?.state).toUpperCase()}`,
-        //   `volume: ${entity.attributes?.volume}`,
-        //   `source: ${String(entity.attributes?.source).toUpperCase()}`,
-        //   `preset: ${this.avrPreset}`,
-        //   `muted: ${entity.attributes?.muted}`
-        // );
-
         this.driver.updateEntityAttributes(globalThis.selectedAvr, {
+          [uc.MediaPlayerAttributes.MediaArtist]: nowPlaying.artist || "unknown",
+          [uc.MediaPlayerAttributes.MediaTitle]: nowPlaying.title || "unknown",
+          [uc.MediaPlayerAttributes.MediaAlbum]: nowPlaying.album || "unknown",
           [uc.MediaPlayerAttributes.MediaImageUrl]: "http://192.168.2.103/album_art.cgi" // SETTINGS!
         });
       }
