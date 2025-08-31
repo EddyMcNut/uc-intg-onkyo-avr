@@ -2,6 +2,8 @@
 "use strict";
 import * as uc from "@unfoldedcircle/integration-api";
 import eiscp from "./eiscp.js";
+import { OnkyoCommandSender } from "./onkyoCommandSender.js";
+import { OnkyoCommandReceiver } from "./onkyoCommandReceiver.js";
 
 // Augment globalThis to include selectedAvr
 declare global {
@@ -11,11 +13,10 @@ declare global {
 
 const integrationName = "Onkyo-Integration: ";
 
-let lastCommandTime = 0;
-
 export default class OnkyoDriver {
   private driver: uc.IntegrationAPI;
-  private avrPreset: string = "unknown";
+  private commandSender: OnkyoCommandSender;
+  private commandReceiver: OnkyoCommandReceiver;
 
   // Persist setup fields as static properties
   private static lastSetupModel: string | undefined;
@@ -30,9 +31,11 @@ export default class OnkyoDriver {
 
   constructor() {
     this.driver = new uc.IntegrationAPI();
+    this.commandSender = new OnkyoCommandSender(this.driver);
+    this.commandReceiver = new OnkyoCommandReceiver(this.driver);
     this.driver.init("driver.json", this.handleDriverSetup.bind(this));
     this.setupEventHandlers();
-    this.setupEiscpListener();
+    this.commandReceiver.setupEiscpListener();
     this.setupDriverEvents();
   }
 
@@ -126,7 +129,10 @@ export default class OnkyoDriver {
                 uc.MediaPlayerFeatures.MediaImageUrl,
                 uc.MediaPlayerFeatures.Dpad,
                 uc.MediaPlayerFeatures.Settings,
-                uc.MediaPlayerFeatures.Home
+                uc.MediaPlayerFeatures.Home,
+                uc.MediaPlayerFeatures.PlayPause,
+                uc.MediaPlayerFeatures.Next,
+                uc.MediaPlayerFeatures.Previous
               ],
               attributes: {
                 [uc.MediaPlayerAttributes.State]: uc.MediaPlayerStates.Unknown,
@@ -191,221 +197,13 @@ export default class OnkyoDriver {
     });
   }
 
-  // Send commands to the AVR
+  // Use the sender class for command handling
   private async sharedCmdHandler(
     entity: uc.Entity,
     cmdId: string,
-    params?: {
-      [key: string]: string | number | boolean;
-    }
+    params?: { [key: string]: string | number | boolean }
   ): Promise<uc.StatusCodes> {
-    // Wait for AVR connection before sending commands
-    try {
-      await eiscp.waitForConnect();
-    } catch (err) {
-      console.warn("%s Could not send command, AVR not connected: %s", integrationName, err);
-      // Retry up to 5 times, sleeping 1 second between attempts
-      for (let attempt = 1; attempt <= 5; attempt++) {
-        await new Promise((resolve) => setTimeout(resolve, 1000));
-        try {
-          await eiscp.waitForConnect();
-          break; // Connected, exit retry loop
-        } catch (retryErr) {
-          if (attempt === 5) {
-            console.warn("%s Could not connect to AVR after 5 attempts: %s", integrationName, retryErr);
-
-            return uc.StatusCodes.Timeout;
-          }
-        }
-      }
-    }
-
-    const onkyoEntity = this.driver.getConfiguredEntities().getEntity(globalThis.selectedAvr);
-    if (onkyoEntity) {
-      console.log("%s Got %s media-player command request: %s", integrationName, entity.id, cmdId, params || "");
-      if (entity.id === globalThis.selectedAvr) {
-        const now = Date.now();
-        switch (cmdId) {
-          case uc.MediaPlayerCommands.On:
-            await eiscp.command("system-power on");
-            break;
-          case uc.MediaPlayerCommands.Off:
-            await eiscp.command("system-power standby");
-            break;
-          case uc.MediaPlayerCommands.Toggle:
-            entity.attributes?.state === uc.MediaPlayerStates.On
-              ? await eiscp.command("system-power standby")
-              : await eiscp.command("system-power on");
-            break;
-          case uc.MediaPlayerCommands.MuteToggle:
-            await eiscp.command("audio-muting toggle");
-            break;
-          case uc.MediaPlayerCommands.VolumeUp:
-            if (now - lastCommandTime > OnkyoDriver.lastSetupLongPressThreshold) {
-              lastCommandTime = now;
-              await eiscp.command("volume level-up-1db-step");
-            }
-            break;
-          case uc.MediaPlayerCommands.VolumeDown:
-            if (now - lastCommandTime > OnkyoDriver.lastSetupLongPressThreshold) {
-              lastCommandTime = now;
-              await eiscp.command("volume level-down-1db-step");
-            }
-            break;
-          case uc.MediaPlayerCommands.ChannelUp:
-            await eiscp.command("preset up");
-            break;
-          case uc.MediaPlayerCommands.ChannelDown:
-            await eiscp.command("preset down");
-            break;
-          case uc.MediaPlayerCommands.SelectSource:
-            if (params?.source) {
-              if (typeof params.source === "string" && params.source.toLowerCase().startsWith("raw")) {
-                const rawCmd = (params.source as string).substring(3).trim().toUpperCase();
-                console.error("%s sending raw command: %s", integrationName, rawCmd);
-                await eiscp.raw(rawCmd);
-              } else if (typeof params.source === "string") {
-                await eiscp.command(`${params.source.toLowerCase()}`);
-              }
-            }
-            break;
-          case uc.MediaPlayerCommands.Settings:
-            await eiscp.command("setup menu");
-            break;
-          case uc.MediaPlayerCommands.Home:
-            await eiscp.command("setup exit");
-            break;
-          case uc.MediaPlayerCommands.CursorEnter:
-            await eiscp.command("setup enter");
-            break;
-          case uc.MediaPlayerCommands.CursorUp:
-            await eiscp.command("setup up");
-            break;
-          case uc.MediaPlayerCommands.CursorDown:
-            await eiscp.command("setup down");
-            break;
-          case uc.MediaPlayerCommands.CursorLeft:
-            await eiscp.command("setup left");
-            break;
-          case uc.MediaPlayerCommands.CursorRight:
-            await eiscp.command("setup right");
-            break;
-          default:
-            return uc.StatusCodes.NotImplemented;
-        }
-        return uc.StatusCodes.Ok;
-      } else {
-        return uc.StatusCodes.NotFound;
-      }
-    }
-    return uc.StatusCodes.NotFound;
-  }
-
-  // Receive commands from the AVR
-  private setupEiscpListener() {
-    // Store now playing metadata
-    const nowPlaying: { station?: string; artist?: string; album?: string; title?: string } = {};
-
-    eiscp.on("error", (err: any) => {
-      console.error("%s eiscp error: %s", integrationName, err);
-    });
-    eiscp.on(
-      "data",
-      (avrUpdates: {
-        command: string;
-        argument: string | number | Record<string, string>;
-        zone: string;
-        iscpCommand: string;
-        host: string;
-        port: number;
-        model: string;
-      }) => {
-        const entity = this.driver.getConfiguredEntities().getEntity(globalThis.selectedAvr);
-        if (!entity) {
-          console.warn("%s Entity not found for: %s", integrationName, globalThis.selectedAvr);
-          return;
-        }
-        // console.log("%s here...", avrUpdates.command);
-        switch (avrUpdates.command) {
-          case "system-power":
-            this.driver.updateEntityAttributes(globalThis.selectedAvr, {
-              [uc.MediaPlayerAttributes.State]:
-                avrUpdates.argument === "on" ? uc.MediaPlayerStates.On : uc.MediaPlayerStates.Standby
-            });
-            console.log("%s power set to: %s", integrationName, entity.attributes?.state);
-            break;
-          case "audio-muting":
-            this.driver.updateEntityAttributes(globalThis.selectedAvr, {
-              [uc.MediaPlayerAttributes.Muted]: avrUpdates.argument === "on" ? true : false
-            });
-            console.log("%s audio-muting set to: %s", integrationName, entity.attributes?.muted);
-            break;
-          case "volume":
-            this.driver.updateEntityAttributes(globalThis.selectedAvr, {
-              [uc.MediaPlayerAttributes.Volume]: avrUpdates.argument.toString()
-            });
-            console.log("%s volume set to: %s", integrationName, entity.attributes?.volume);
-            break;
-          case "preset":
-            this.avrPreset = avrUpdates.argument.toString();
-            console.log("%s preset set to: %s", integrationName, this.avrPreset);
-            break;
-          case "input-selector":
-            this.driver.updateEntityAttributes(globalThis.selectedAvr, {
-              [uc.MediaPlayerAttributes.Source]: avrUpdates.argument.toString()
-            });
-            console.log("%s input-selector (source) set to: %s", integrationName, entity.attributes?.source);
-            break;
-          case "NTM":
-            let [position, duration] = avrUpdates.argument.toString().split("/");
-            // Convert duration and position to seconds if in mm:ss or hh:mm:ss format
-            function timeToSeconds(timeStr: string): number {
-              if (!timeStr) return 0;
-              const parts = timeStr.split(":").map(Number);
-              if (parts.length === 3) {
-                // hh:mm:ss
-                return parts[0] * 3600 + parts[1] * 60 + parts[2];
-              } else if (parts.length === 2) {
-                // mm:ss
-                return parts[0] * 60 + parts[1];
-              } else if (parts.length === 1) {
-                // seconds
-                return parts[0];
-              }
-              return 0;
-            }
-            duration = timeToSeconds(duration).toString();
-            position = timeToSeconds(position).toString();
-            this.driver.updateEntityAttributes(globalThis.selectedAvr, {
-              [uc.MediaPlayerAttributes.MediaPosition]: position || "0",
-              [uc.MediaPlayerAttributes.MediaDuration]: duration || "0"
-            });
-            break;
-          case "metadata":
-            // console.log("*****5 %s", avrUpdates.argument);
-            if (typeof avrUpdates.argument === "object" && avrUpdates.argument !== null) {
-              nowPlaying.title = (avrUpdates.argument as Record<string, string>).NTI || "unknwn";
-              nowPlaying.album = (avrUpdates.argument as Record<string, string>).NAL || "unknwn";
-              nowPlaying.artist = (avrUpdates.argument as Record<string, string>).NAT || "unknwn";
-            } else {
-              nowPlaying.title = "aa";
-              nowPlaying.album = "bb";
-              nowPlaying.artist = "cc";
-            }
-            break;
-          default:
-            // todo
-            break;
-        }
-
-        this.driver.updateEntityAttributes(globalThis.selectedAvr, {
-          [uc.MediaPlayerAttributes.MediaArtist]: nowPlaying.artist || "unknown",
-          [uc.MediaPlayerAttributes.MediaTitle]: nowPlaying.title || "unknown",
-          [uc.MediaPlayerAttributes.MediaAlbum]: nowPlaying.album || "unknown",
-          [uc.MediaPlayerAttributes.MediaImageUrl]: "http://192.168.2.103/album_art.cgi" // SETTINGS!
-        });
-      }
-    );
+    return this.commandSender.sharedCmdHandler(entity, cmdId, params);
   }
 
   async init() {

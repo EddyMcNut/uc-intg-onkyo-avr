@@ -6,6 +6,7 @@ import util from "util";
 import async from "async";
 import events from "events";
 import eiscp_commands = require("./eiscp-commands.json");
+import { avrCurrentSource, setAvrCurrentSource } from "./state.js";
 
 ("use strict");
 var self: any,
@@ -31,6 +32,8 @@ var self: any,
   };
 
 const integrationName = "Onkyo-Integration: ";
+
+let currentMetadata = { title: "", artist: "", album: "" };
 
 self = new events.EventEmitter();
 export default self;
@@ -80,6 +83,22 @@ function eiscp_packet_extract(packet: any) {
   return packet.toString("ascii", 18, packet.length - 2);
 }
 
+function timeToSeconds(timeStr: string): number {
+  if (!timeStr) return 0;
+  const parts = timeStr.split(":").map(Number);
+  if (parts.length === 3) {
+    // hh:mm:ss
+    return parts[0] * 3600 + parts[1] * 60 + parts[2];
+  } else if (parts.length === 2) {
+    // mm:ss
+    return parts[0] * 60 + parts[1];
+  } else if (parts.length === 1) {
+    // seconds
+    return parts[0];
+  }
+  return 0;
+}
+
 function iscp_to_command(iscp_message: any) {
   // Transform a low-level ISCP message to a high-level command
   var command = iscp_message.slice(0, 3),
@@ -94,36 +113,77 @@ function iscp_to_command(iscp_message: any) {
   // console.log("%s RAW: %s %s", integrationName, command, value);
 
   if (command === "NTM") {
+    let [position, duration] = value.toString().split("/");
+    position = timeToSeconds(position).toString();
+    duration = timeToSeconds(duration).toString();
     result.command = "NTM";
-    result.argument = value;
+    result.argument = position + "/" + duration;
     return result;
   }
 
-  if (command === "NTI") {
-    value = command + value;
-    const metaResult: Record<string, string> = {};
-    // Split by ISCP!1 (start of each message)
-    const parts = value.split(/ISCP[.!]1/);
-    // console.log("Split parts:", parts);
-    for (const part of parts) {
-      if (!part.trim()) continue; // skip empty parts
-      const match = part.trim().match(/^([A-Z]{3})\s*(.*)$/s);
-      if (match) {
-        const cmd = match[1];
-        const val = match[2].trim();
-        // Only include known metadata commands
-        if (["NAT", "NTI", "NAL"].includes(cmd)) {
-          metaResult[cmd] = val;
-        }
+  // if (command === "NTI") {
+  //   const metaResult: Record<string, string> = {};
+  //   if (value.toString().toLowerCase().includes("spotify")) {
+  //     setAvrCurrentSource("spotify");
+  //   }
+  //   value = command + value;
+
+  //   // Split by ISCP!1 (start of each message)
+  //   const parts = value.split(/ISCP[.!]1/);
+  //   // console.log("Split parts:", parts);
+  //   for (const part of parts) {
+  //     if (!part.trim()) continue; // skip empty parts
+  //     const match = part.trim().match(/^([A-Z]{3})\s*(.*)$/s);
+  //     if (match) {
+  //       const cmd = match[1];
+  //       const val = match[2].trim();
+  //       // Only include known metadata commands
+  //       if (["NAT", "NTI", "NAL"].includes(cmd)) {
+  //         metaResult[cmd] = val;
+  //       }
+  //     }
+  //   }
+  //   // // Only return if all three metadata elements are present
+  //   // if (metaResult.NAT && metaResult.NTI && metaResult.NAL) {
+  //   result.command = "metadata";
+  //   result.argument = metaResult;
+  //   return result;
+  //   // }
+  //   // return;
+  // }
+
+  if (["NAT", "NTI", "NAL"].includes(command)) {
+    if (value.toString().toLowerCase().includes("spotify")) {
+      setAvrCurrentSource("spotify");
+    }
+    // console.log("******* %s %s", command, value);
+
+    // If value contains multiple ISCP messages, take only the first part
+    if (value.includes("ISCP") && value.split(/ISCP[.!]1/).length > 1) {
+      value = value.split(/ISCP[.!]1/)[0];
+    }
+
+    // Parse all metadata fields from the value, regardless of command
+    // Handles cases like: "NATTitle\nNTIArtist\nNALAlbum"
+    const metaMatches = value.match(/(NAT|NTI|NAL)[^\n\r]*/g);
+    if (metaMatches) {
+      for (const meta of metaMatches) {
+        const type = meta.slice(0, 3);
+        const val = meta.slice(3).trim();
+        if (type === "NAT") currentMetadata.title = val;
+        if (type === "NTI") currentMetadata.artist = val;
+        if (type === "NAL") currentMetadata.album = val;
       }
+    } else {
+      // Fallback: assign the value to the current command type
+      if (command === "NAT") currentMetadata.title = value;
+      if (command === "NTI") currentMetadata.artist = value;
+      if (command === "NAL") currentMetadata.album = value;
     }
-    // Only return if all three metadata elements are present
-    if (metaResult.NAT && metaResult.NTI && metaResult.NAL) {
-      result.command = "metadata";
-      result.argument = metaResult;
-      return result;
-    }
-    return;
+
+    result.command = "metadata";
+    result.argument = { ...currentMetadata };
+    return result;
   }
 
   type CommandType = {
@@ -387,7 +447,7 @@ self.connect = async function (options?: any): Promise<{ model: string; host: st
       var iscp_message = eiscp_packet_extract(data);
       const command = iscp_message.slice(0, 3);
 
-      // Ignore FLD messages
+      // Ignore these messages
       if (["FLD", "NMS", "NPB"].includes(command)) {
         return;
       }
