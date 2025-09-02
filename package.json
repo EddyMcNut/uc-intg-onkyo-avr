@@ -35,9 +35,10 @@
   "homepage": "https://github.com/EddyMcNut/uc-intg-onkyo-avr",
   "devDependencies": {
     "@ava/typescript": "^5.0.0",
-    "@types/async": "^3.2.24",
+    "@types/async": "^3.2.25",
     "@types/debug": "^4.1.12",
     "@types/node": "^22.5.5",
+    "@types/node-fetch": "^2.6.13",
     "@types/ws": "^8.5.12",
     "@typescript-eslint/eslint-plugin": "^8.8.1",
     "@typescript-eslint/parser": "^8.8.1",

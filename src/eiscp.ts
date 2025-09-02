@@ -156,6 +156,9 @@ function iscp_to_command(iscp_message: any) {
     if (value.toString().toLowerCase().includes("spotify")) {
       setAvrCurrentSource("spotify");
     }
+    if (value.toString().toLowerCase().includes("airplay")) {
+      setAvrCurrentSource("airplay");
+    }
     // console.log("******* %s %s", command, value);
 
     // If value contains multiple ISCP messages, take only the first part
