@@ -27,7 +27,7 @@ var self: any,
     reconnect: true,
     reconnect_sleep: 5,
     modelsets: [] as string[],
-    send_delay: 500,
+    send_delay: 250,
     verify_commands: true
   };
 
@@ -110,7 +110,7 @@ function iscp_to_command(iscp_message: any) {
     };
   value = String(value).replace(/[\x00-\x1F]/g, ""); // remove weird characters like \x1A
 
-  // console.log("%s RAW: %s %s", integrationName, command, value);
+  console.log("%s RAW: %s %s", integrationName, command, value);
 
   if (command === "NTM") {
     let [position, duration] = value.toString().split("/");
@@ -121,67 +121,31 @@ function iscp_to_command(iscp_message: any) {
     return result;
   }
 
-  // if (command === "NTI") {
-  //   const metaResult: Record<string, string> = {};
-  //   if (value.toString().toLowerCase().includes("spotify")) {
-  //     setAvrCurrentSource("spotify");
-  //   }
-  //   value = command + value;
-
-  //   // Split by ISCP!1 (start of each message)
-  //   const parts = value.split(/ISCP[.!]1/);
-  //   // console.log("Split parts:", parts);
-  //   for (const part of parts) {
-  //     if (!part.trim()) continue; // skip empty parts
-  //     const match = part.trim().match(/^([A-Z]{3})\s*(.*)$/s);
-  //     if (match) {
-  //       const cmd = match[1];
-  //       const val = match[2].trim();
-  //       // Only include known metadata commands
-  //       if (["NAT", "NTI", "NAL"].includes(cmd)) {
-  //         metaResult[cmd] = val;
-  //       }
-  //     }
-  //   }
-  //   // // Only return if all three metadata elements are present
-  //   // if (metaResult.NAT && metaResult.NTI && metaResult.NAL) {
-  //   result.command = "metadata";
-  //   result.argument = metaResult;
-  //   return result;
-  //   // }
-  //   // return;
-  // }
-
   if (["NAT", "NTI", "NAL"].includes(command)) {
-    if (value.toString().toLowerCase().includes("spotify")) {
-      setAvrCurrentSource("spotify");
-    }
-    if (value.toString().toLowerCase().includes("airplay")) {
-      setAvrCurrentSource("airplay");
-    }
-    // console.log("******* %s %s", command, value);
-
-    // If value contains multiple ISCP messages, take only the first part
-    if (value.includes("ISCP") && value.split(/ISCP[.!]1/).length > 1) {
-      value = value.split(/ISCP[.!]1/)[0];
-    }
-
-    // Parse all metadata fields from the value, regardless of command
-    // Handles cases like: "NATTitle\nNTIArtist\nNALAlbum"
-    const metaMatches = value.match(/(NAT|NTI|NAL)[^\n\r]*/g);
-    if (metaMatches) {
-      for (const meta of metaMatches) {
-        const type = meta.slice(0, 3);
-        const val = meta.slice(3).trim();
-        if (type === "NAT") currentMetadata.title = val;
-        if (type === "NTI") currentMetadata.artist = val;
-        if (type === "NAL") currentMetadata.album = val;
+    setAvrCurrentSource("net");
+    value = command + value;
+    const parts = value.split(/ISCP(?:[$.!]1|\$!1)/);
+    for (const part of parts) {
+      if (!part.trim()) continue; // skip empty parts
+      const match = part.trim().match(/^([A-Z]{3})\s*(.*)$/s);
+      if (match) {
+        // Parse all metadata fields from the value, regardless of command, handles cases like: "NATTitle\nNTIArtist\nNALAlbum"
+        const metaMatches = value.match(/(NAT|NTI|NAL)[^\n\r]*/g);
+        if (metaMatches) {
+          for (const meta of metaMatches) {
+            const type = match[1];
+            const val = match[2].trim();
+            if (type === "NAT") currentMetadata.title = val;
+            if (type === "NTI") currentMetadata.artist = val;
+            if (type === "NAL") currentMetadata.album = val;
+          }
+        } else {
+          // Fallback: assign the value to the current command type
+          if (command === "NAT") currentMetadata.title = value;
+          if (command === "NTI") currentMetadata.artist = value;
+          if (command === "NAL") currentMetadata.album = value;
+        }
       }
-    } else {
-      // Fallback: assign the value to the current command type
-      if (command === "NAT") currentMetadata.title = value;
-      if (command === "NTI") currentMetadata.artist = value;
-      if (command === "NAL") currentMetadata.album = value;
     }
 
     result.command = "metadata";

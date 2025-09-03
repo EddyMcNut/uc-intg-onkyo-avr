@@ -100,16 +100,16 @@ export class OnkyoCommandReceiver {
             setAvrCurrentSource(avrUpdates.argument.toString());
             console.log("%s input-selector (source) set to: %s", integrationName, avrUpdates.argument.toString());
             break;
+          case "DSN":
+            nowPlaying.station = avrUpdates.argument.toString();
+            console.log("%s station set to: %s", integrationName, avrUpdates.argument.toString());
+            break;
           case "NTM":
             let [position, duration] = avrUpdates.argument.toString().split("/");
-            // console.log("******* NTM A %s %s", Number(entity.attributes?.media_position), Number(position));
-            // if (Math.abs(Number(entity.attributes?.media_position) - Number(position)) > 1) {
-            // console.log("******* NTM B");
             this.driver.updateEntityAttributes(globalThis.selectedAvr, {
               [uc.MediaPlayerAttributes.MediaPosition]: position || "0",
               [uc.MediaPlayerAttributes.MediaDuration]: duration || "0"
             });
-            // }
             break;
           case "metadata":
             if (typeof avrUpdates.argument === "object" && avrUpdates.argument !== null) {
@@ -121,28 +121,41 @@ export class OnkyoCommandReceiver {
           default:
             break;
         }
-        if (avrCurrentSource === "spotify" || avrCurrentSource === "airplay") {
-          const trackId = `${nowPlaying.title}|${nowPlaying.album}|${nowPlaying.artist}`;
-
-          if (trackId !== this.lastTrackId) {
-            // this should be every time!!!
-            this.lastTrackId = trackId;
+        switch (avrCurrentSource) {
+          case "spotify":
+          case "airplay":
+          case "net":
+            const trackId = `${nowPlaying.title}|${nowPlaying.album}|${nowPlaying.artist}`;
+            if (trackId !== this.lastTrackId) {
+              this.lastTrackId = trackId;
+              this.driver.updateEntityAttributes(globalThis.selectedAvr, {
+                [uc.MediaPlayerAttributes.MediaArtist]: nowPlaying.artist + " (" + nowPlaying.album + ")" || "unknown",
+                [uc.MediaPlayerAttributes.MediaTitle]: nowPlaying.title || "unknown",
+                [uc.MediaPlayerAttributes.MediaAlbum]: nowPlaying.album || "unknown"
+              });
+            }
+            await this.maybeUpdateImage(nowPlaying);
+            break;
+          case "dab":
             this.driver.updateEntityAttributes(globalThis.selectedAvr, {
-              [uc.MediaPlayerAttributes.MediaArtist]: nowPlaying.artist + " (" + nowPlaying.album + ")" || "unknown",
-              [uc.MediaPlayerAttributes.MediaTitle]: nowPlaying.title || "unknown",
-              [uc.MediaPlayerAttributes.MediaAlbum]: nowPlaying.album || "unknown"
+              [uc.MediaPlayerAttributes.MediaArtist]: nowPlaying.station || "unknown",
+              [uc.MediaPlayerAttributes.MediaTitle]: "",
+              [uc.MediaPlayerAttributes.MediaAlbum]: "",
+              [uc.MediaPlayerAttributes.MediaImageUrl]: "",
+              [uc.MediaPlayerAttributes.MediaPosition]: "",
+              [uc.MediaPlayerAttributes.MediaDuration]: ""
             });
-          }
-          await this.maybeUpdateImage(nowPlaying);
-        } else {
-          this.driver.updateEntityAttributes(globalThis.selectedAvr, {
-            [uc.MediaPlayerAttributes.MediaArtist]: "",
-            [uc.MediaPlayerAttributes.MediaTitle]: "",
-            [uc.MediaPlayerAttributes.MediaAlbum]: "",
-            [uc.MediaPlayerAttributes.MediaImageUrl]: "",
-            [uc.MediaPlayerAttributes.MediaPosition]: "",
-            [uc.MediaPlayerAttributes.MediaDuration]: ""
-          });
+            break;
+          default:
+            this.driver.updateEntityAttributes(globalThis.selectedAvr, {
+              [uc.MediaPlayerAttributes.MediaArtist]: "",
+              [uc.MediaPlayerAttributes.MediaTitle]: "",
+              [uc.MediaPlayerAttributes.MediaAlbum]: "",
+              [uc.MediaPlayerAttributes.MediaImageUrl]: "",
+              [uc.MediaPlayerAttributes.MediaPosition]: "",
+              [uc.MediaPlayerAttributes.MediaDuration]: ""
+            });
+            break;
         }
       }
     );
