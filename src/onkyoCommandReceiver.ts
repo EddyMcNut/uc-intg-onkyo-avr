@@ -2,7 +2,7 @@ import * as uc from "@unfoldedcircle/integration-api";
 import eiscp from "./eiscp.js";
 import OnkyoDriver from "./onkyo.js";
 import { avrCurrentSource, setAvrCurrentSource } from "./state.js";
-import fetch from "node-fetch";
+// import fetch from "node-fetch";
 import crypto from "crypto";
 
 const integrationName = "Onkyo-Integration: ";
@@ -21,7 +21,8 @@ export class OnkyoCommandReceiver {
   private async getImageHash(url: string): Promise<string> {
     try {
       const res = await fetch(url);
-      const buffer = await res.buffer();
+      const arrayBuffer = await res.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
       return crypto.createHash("md5").update(buffer).digest("hex");
     } catch (err) {
       console.warn("%s Failed to fetch or hash image: %s", integrationName, err);

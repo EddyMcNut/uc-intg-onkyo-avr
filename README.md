@@ -125,8 +125,6 @@ In the new Activity, `User interface`, add `Text Button` and select `Input sourc
 
 - `Home` \ `Customise your remote` Add your new Activity to a page and now you can give it a try on the awesome Unfolded Circle Remote!
 
-  ![](./screenshots/demo.png)
-
 - or, when not created an activity yet: `Home` \ `Customise your remote` and just add your AVR, in that case physical buttons are mapped.
 
 ## Volume
