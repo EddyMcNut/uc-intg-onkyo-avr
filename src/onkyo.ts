@@ -20,14 +20,16 @@ export default class OnkyoDriver {
 
   // Persist setup fields as static properties
   private static lastSetupModel: string | undefined;
-  private static lastSetupIp: string | undefined;
+  static lastSetupIp: string | undefined;
   private static lastSetupPort: number | undefined;
-  private static lastSetupLongPressThreshold: number;
+  static lastSetupLongPressThreshold: number;
+  static lastSetupAlbumArtURL: string = "na";
 
   private setupModel: string | undefined;
   private setupIp: string | undefined;
   private setupPort: number | undefined;
   private setupLongPressThreshold: number = 333;
+  private setupAlbumArtURL: string = "na";
 
   constructor() {
     this.driver = new uc.IntegrationAPI();
@@ -44,6 +46,7 @@ export default class OnkyoDriver {
     const ipAddress = (msg as any).setupData?.ipAddress;
     const port = (msg as any).setupData?.port;
     const longPressThreshold = (msg as any).setupData?.longPressThreshold;
+    const albumArtURL = (msg as any).setupData?.albumArtURL;
 
     this.setupModel = typeof model === "string" && model.trim() !== "" ? model.trim() : undefined;
     this.setupIp = typeof ipAddress === "string" && ipAddress.trim() !== "" ? ipAddress.trim() : undefined;
@@ -59,12 +62,17 @@ export default class OnkyoDriver {
     } else {
       this.setupLongPressThreshold = 333;
     }
+    this.setupAlbumArtURL = typeof albumArtURL === "string" && albumArtURL.trim() !== "" ? albumArtURL.trim() : "";
 
     // Store in static fields for reconnects
     OnkyoDriver.lastSetupModel = this.setupModel;
     OnkyoDriver.lastSetupIp = this.setupIp;
     OnkyoDriver.lastSetupPort = this.setupPort;
     OnkyoDriver.lastSetupLongPressThreshold = this.setupLongPressThreshold;
+    OnkyoDriver.lastSetupAlbumArtURL = this.setupAlbumArtURL;
+
+    // Re-trigger connection after setup
+    await this.handleConnect();
 
     return new uc.SetupComplete();
   }
@@ -103,6 +111,9 @@ export default class OnkyoDriver {
           if (!avr || !avr.model) {
             throw new Error("AVR connection failed or returned null");
           }
+
+          // Update lastSetupIp with discovered IP
+          OnkyoDriver.lastSetupIp = avr.host;
 
           const selectedAvr = `${avr.model} ${avr.host}`;
           globalThis.selectedAvr = selectedAvr;
@@ -188,6 +199,7 @@ export default class OnkyoDriver {
       eiscp.command("volume query");
       eiscp.command("input-selector query");
       eiscp.command("preset query");
+      eiscp.raw("DSNQSTN");
     });
 
     this.driver.on(uc.Events.UnsubscribeEntities, async (entityIds: string[]) => {

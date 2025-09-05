@@ -1,6 +1,6 @@
 {
   "driver_id": "onkyo-avr",
-  "version": "0.0.6",
+  "version": "0.5.0",
   "min_core_api": "0.20.0",
   "name": { "en": "Onkyo AVR" },
   "icon": "uc:music",
@@ -69,6 +69,17 @@
         "field": {
           "number": {
             "value": 333
+          }
+        }
+      },
+      {
+        "id": "albumArtURL",
+        "label": {
+          "en": "AVR AlbumArt endpoint"
+        },
+        "field": {
+          "text": {
+            "value": "album_art.cgi"
           }
         }
       },

@@ -32,7 +32,7 @@ Read this readme completely, it contains some tips for known issues and it also 
 
 Your Onkyo AVR needs to be ON or STANDBY, if it is disconnected from power (off) this integration will fail. If your AVR has been disconnected from power, it could be that you first have to switch on your AVR manually one time before network commands work again (depends on the model), waking up after STANDBY should then work again.
 
-In the current shape, this integration can only work well when there is just one AVR in the network.
+This integration can only work well when there is just one AVR in the network.
 
 ## Reported to work on different brands and models
 
@@ -43,6 +43,7 @@ Users report it also to work with:
 - TX-RZ70
 - TX-NR656
 - TX-NR807
+- TX-NR6100
 - Pioneer VSX-932
 - Integra (model unknown)
 
@@ -67,9 +68,15 @@ When you long-press a button, for example volume up, and the AVR overshoots then
 - In webconfigurator, go to `Integrations`, `Add new`, `Install custom`, select the `uc-intg-onkyo-avr-x.x.x.tar.gz` and then `Upload`.
 - Uploading can take a few seconds.
 - For the next step, it depends on your AVR model if it supports autodiscover, if it does:
-  - In `Integrations` select `Onkyo AVR custom`, leave the input fields empty, click `Next`, click `Done`
+  - In `Integrations` select `Onkyo AVR custom`.
+  - Leave the input fields `AVR Model` and `AVR IP Address` empty.
+  - Check if the endpoint for Album Art corresponds with your AVR model, if it does not have an Album Art endpoint, set it to `na` to prevent errors.
+  - Click `Next`, click `Done`.
 - If auto discover fails, remove the integration completely, upload it again and then after upload:
-  - In `Integrations` select `Onkyo AVR custom`, enter the Name, IP address and Port for your AVR, click `Next`, click `Done`
+  - In `Integrations` select `Onkyo AVR custom`.
+  - Populate `AVR Model` and `AVR IP Address`.
+  - Check if the endpoint for Album Art corresponds with your AVR model, if it does not have an Album Art endpoint, set it to `na` to prevent errors.
+  - Click `Next`, click `Done`.
 - Add your AVR as entity: In `Integrations` select `Onkyo AVR custom`, click the `+` next to `Configured entities`, add your AVR
 
   ![](./screenshots/configured-entities.png)
@@ -86,18 +93,29 @@ When you long-press a button, for example volume up, and the AVR overshoots then
 - In the new Activity, `Button mapping`, assign some buttons: `mute`, `volume up/down`, `channel up/down`
 - Also available: `settings`, `cursor left right up down enter` and `home` to go back one level in the settings menu, `settings` you could assign to to the (hamburger) `menu` physical button on the remote and `home` you could for example assign to the `record` physical button next to it.
 
+## Album Art
+
+- During setup the endpoint for album art is set.
+- If for example the endpoint of your AVR is "http://192.168.2.103/album_art.cgi" then the value for endpoint in the setup is `album_art.cgi`.
+- The album art endpoint is used for specific cases, for example when you listen to Spotify.
+- Album art is refreshed every 5 seconds.
+- **If your AVR does not have an endpoint for Album Art, set the value to `na` to prevent errors.**
+
+## Spotify
+
+Let's say that you select the AVR in the Spotify app on your phone and your AVR switches source to Spotify, the remote will sense that and will try to collect the album art, artist, title and album. All this is collected from the AVR, this integration does not communicate with Spotify directly. Also `play/pause`, `next` and `previous` will be send to the AVR, the AVR will handle the communicatio with your Spotify app.
+
 ## Cheats
 
-- In the new Activity, `User interface`, add `Media Widget` and select your AVR: it will for now just show some basic info, this is temporary for checking the 2-way communication. If you change the volume directly on your AVR, the Remote shoulds still show you the new value.
-- In the new Activity, `User interface`, add `Text Button` and select `Input source`, because there is a text field where you can type anything, we can give all kinds of commands, like presets or input sources:
+In the new Activity, `User interface`, add `Text Button` and select `Input source`, because there is a text field where you can type anything, we can give all kinds of commands, like presets or input sources:
 
-  ![](./screenshots/input-selectorFM.png)
+![](./screenshots/input-selectorFM.png)
 
-  ![](./screenshots/input-selectorDAB.png)
+![](./screenshots/input-selectorDAB.png)
 
-  ![](./screenshots/preset12.png)
+![](./screenshots/preset12.png)
 
-  ![](./screenshots/preset15.png)
+![](./screenshots/preset15.png)
 
 - As the code uses the impressive JSON mentioned in the Kudos section, you can cheat a bit with it to give commands which are mentioned in the JSON. For example in the [JSON](./src/eiscp-commands.json) is mentioned `dimmer-level` with possible value `dim`, let's give it a try: yes the AVR display dims to the next level!
 
@@ -108,6 +126,8 @@ When you long-press a button, for example volume up, and the AVR overshoots then
 - `Home` \ `Customise your remote` Add your new Activity to a page and now you can give it a try on the awesome Unfolded Circle Remote!
 
   ![](./screenshots/demo.png)
+
+- or, when not created an activity yet: `Home` \ `Customise your remote` and just add your AVR, in that case physical buttons are mapped.
 
 ## Volume
 
@@ -155,6 +175,6 @@ Please let me know in [Discord](https://discord.com/channels/553671366411288576/
 
 - Have to do a real release in GitHub workflows.
 - Align and improve logging.
-- Better use of the `Media Widget`.
+- Refactor the code for easier debugging.
 - The code is partly ready to deal with different zones, but that still needs some attention before that will actually work.
 - Deal with multilple Onkyo AVRs in the network.

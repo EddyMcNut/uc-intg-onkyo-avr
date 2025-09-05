@@ -1,5 +1,6 @@
 import * as uc from "@unfoldedcircle/integration-api";
 import eiscp from "./eiscp.js";
+import OnkyoDriver from "./onkyo.js";
 
 const integrationName = "Onkyo-Integration: ";
 let lastCommandTime = 0;
@@ -55,13 +56,13 @@ export class OnkyoCommandSender {
             await eiscp.command("audio-muting toggle");
             break;
           case uc.MediaPlayerCommands.VolumeUp:
-            if (now - lastCommandTime > 333) {
+            if (now - lastCommandTime > OnkyoDriver.lastSetupLongPressThreshold) {
               lastCommandTime = now;
               await eiscp.command("volume level-up-1db-step");
             }
             break;
           case uc.MediaPlayerCommands.VolumeDown:
-            if (now - lastCommandTime > 333) {
+            if (now - lastCommandTime > OnkyoDriver.lastSetupLongPressThreshold) {
               lastCommandTime = now;
               await eiscp.command("volume level-down-1db-step");
             }

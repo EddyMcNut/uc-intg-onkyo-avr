@@ -1,7 +1,7 @@
 {
   "name": "uc-intg-onkyo-avr",
   "type": "module",
-  "version": "0.0.6",
+  "version": "0.5.0",
   "description": "Onkyo AVR custom integration for Unfolded Circle Remotes",
   "main": "dist/index.js",
   "scripts": {

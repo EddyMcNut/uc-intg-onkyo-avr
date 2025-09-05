@@ -1,5 +1,6 @@
 import * as uc from "@unfoldedcircle/integration-api";
 import eiscp from "./eiscp.js";
+import OnkyoDriver from "./onkyo.js";
 import { avrCurrentSource, setAvrCurrentSource } from "./state.js";
 import fetch from "node-fetch";
 import crypto from "crypto";
@@ -29,8 +30,9 @@ export class OnkyoCommandReceiver {
   }
 
   async maybeUpdateImage(nowPlaying: { title?: string; album?: string; artist?: string }) {
-    const imageUrl = "http://192.168.2.103/album_art.cgi";
     const trackId = `${nowPlaying.title}|${nowPlaying.album}|${nowPlaying.artist}`;
+    if (OnkyoDriver.lastSetupAlbumArtURL === "na") return;
+    const imageUrl = `http://${OnkyoDriver.lastSetupIp}/${OnkyoDriver.lastSetupAlbumArtURL}`;
     const now = Date.now();
     if (trackId !== this.lastTrackId || now - this.lastImageCheck > 5000) {
       // 5s throttle
@@ -94,15 +96,17 @@ export class OnkyoCommandReceiver {
             console.log("%s preset set to: %s", integrationName, this.avrPreset);
             break;
           case "input-selector":
+            setAvrCurrentSource(avrUpdates.argument.toString());
             this.driver.updateEntityAttributes(globalThis.selectedAvr, {
               [uc.MediaPlayerAttributes.Source]: avrUpdates.argument.toString()
             });
-            setAvrCurrentSource(avrUpdates.argument.toString());
             console.log("%s input-selector (source) set to: %s", integrationName, avrUpdates.argument.toString());
             break;
           case "DSN":
+            setAvrCurrentSource("dab");
             nowPlaying.station = avrUpdates.argument.toString();
-            console.log("%s station set to: %s", integrationName, avrUpdates.argument.toString());
+            nowPlaying.artist = "DAB Radio";
+            console.log("%s DAB station set to: %s", integrationName, avrUpdates.argument.toString());
             break;
           case "NTM":
             let [position, duration] = avrUpdates.argument.toString().split("/");
@@ -138,8 +142,8 @@ export class OnkyoCommandReceiver {
             break;
           case "dab":
             this.driver.updateEntityAttributes(globalThis.selectedAvr, {
-              [uc.MediaPlayerAttributes.MediaArtist]: nowPlaying.station || "unknown",
-              [uc.MediaPlayerAttributes.MediaTitle]: "",
+              [uc.MediaPlayerAttributes.MediaArtist]: nowPlaying.artist || "unknown",
+              [uc.MediaPlayerAttributes.MediaTitle]: nowPlaying.station || "unknown",
               [uc.MediaPlayerAttributes.MediaAlbum]: "",
               [uc.MediaPlayerAttributes.MediaImageUrl]: "",
               [uc.MediaPlayerAttributes.MediaPosition]: "",

@@ -110,7 +110,7 @@ function iscp_to_command(iscp_message: any) {
     };
   value = String(value).replace(/[\x00-\x1F]/g, ""); // remove weird characters like \x1A
 
-  console.log("%s RAW: %s %s", integrationName, command, value);
+  // console.log("%s RAW: %s %s", integrationName, command, value);
 
   if (command === "NTM") {
     let [position, duration] = value.toString().split("/");
@@ -150,6 +150,12 @@ function iscp_to_command(iscp_message: any) {
 
     result.command = "metadata";
     result.argument = { ...currentMetadata };
+    return result;
+  }
+
+  if (command === "DSN") {
+    result.command = "DSN";
+    result.argument = value;
     return result;
   }
 
@@ -198,7 +204,7 @@ function command_to_iscp(command: string, args: any, zone: string) {
   if (VALUE_MAPPINGS[prefix] && Object.prototype.hasOwnProperty.call(VALUE_MAPPINGS[prefix], args)) {
     value = VALUE_MAPPINGS[prefix][args].value;
   } else if (VALUE_MAPPINGS[prefix] && Object.prototype.hasOwnProperty.call(VALUE_MAPPINGS[prefix], "INTRANGES")) {
-    self.emit("debug", util.format("INTRANGES assumed for zone %s, command %s", zone, prefix));
+    // self.emit("debug", util.format("INTRANGES assumed for zone %s, command %s", zone, prefix));
 
     // Convert decimal number to hexadecimal since receiver doesn't understand decimal, Pad value if it is not 2 digits
     value = (+args).toString(16).toUpperCase();
@@ -251,9 +257,16 @@ self.discover = function () {
 
   client
     .on("error", function (err: any) {
-      self.emit(
-        "error",
-        util.format("ERROR (server_error) Server error on %s:%s - %s", options.address, options.port, err)
+      // self.emit(
+      //   "error",
+      //   util.format("ERROR (server_error) Server error on %s:%s - %s", options.address, options.port, err)
+      // );
+      console.log(
+        "%s ERROR (server_error) Server error on %s:%s - %s",
+        integrationName,
+        options.address,
+        options.port,
+        err
       );
       client.close();
       callback(err, null);
@@ -271,33 +284,40 @@ self.discover = function () {
           mac: data[3].slice(0, 12), // There's lots of null chars after MAC so we slice them off
           areacode: data[2]
         });
-        self.emit(
-          "debug",
-          util.format(
-            "DEBUG (received_discovery) Received discovery packet from %s:%s (%j)",
-            rinfo.address,
-            rinfo.port,
-            result
-          )
-        );
+        // self.emit(
+        //   "debug",
+        //   util.format(
+        //     "DEBUG (received_discovery) Received discovery packet from %s:%s (%j)",
+        //     rinfo.address,
+        //     rinfo.port,
+        //     result
+        //   )
+        // );
         if (result.length >= (options.devices ?? 1)) {
           clearTimeout(timeout_timer);
           close();
         }
       } else {
-        self.emit(
-          "debug",
-          util.format("DEBUG (received_data) Recevied data from %s:%s - %j", rinfo.address, rinfo.port, message)
+        // self.emit(
+        //   "debug",
+        //   util.format("DEBUG (received_data) Recevied data from %s:%s - %j", rinfo.address, rinfo.port, message)
+        // );
+        console.log(
+          "%s DEBUG (received_data) Recevied data from %s:%s - %j",
+          integrationName,
+          rinfo.address,
+          rinfo.port,
+          message
         );
       }
     })
     .on("listening", function () {
       client.setBroadcast(true);
       var buffer = eiscp_packet("!xECNQSTN");
-      self.emit(
-        "debug",
-        util.format("DEBUG (sent_discovery) Sent broadcast discovery packet to %s:%s", options.address, options.port)
-      );
+      // self.emit(
+      //   "debug",
+      //   util.format("DEBUG (sent_discovery) Sent broadcast discovery packet to %s:%s", options.address, options.port)
+      // );
       client.send(buffer, 0, buffer.length, options.port, options.address);
       timeout_timer = setTimeout(close, (options.timeout ?? 10) * 1000);
     })
@@ -373,10 +393,10 @@ self.connect = async function (options?: any): Promise<{ model: string; host: st
     }
   }
 
-  self.emit(
-    "debug",
-    util.format("INFO (connecting) Connecting to %s:%s (model: %s)", config.host, config.port, config.model)
-  );
+  // self.emit(
+  //   "debug",
+  //   util.format("INFO (connecting) Connecting to %s:%s (model: %s)", config.host, config.port, config.model)
+  // );
 
   // Prevent double connection
   if (self.is_connected && eiscp) {
