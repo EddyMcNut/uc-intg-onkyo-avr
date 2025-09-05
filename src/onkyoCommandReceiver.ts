@@ -1,0 +1,168 @@
+import * as uc from "@unfoldedcircle/integration-api";
+import eiscp from "./eiscp.js";
+import OnkyoDriver from "./onkyo.js";
+import { avrCurrentSource, setAvrCurrentSource } from "./state.js";
+// import fetch from "node-fetch";
+import crypto from "crypto";
+
+const integrationName = "Onkyo-Integration: ";
+
+export class OnkyoCommandReceiver {
+  private driver: uc.IntegrationAPI;
+  private avrPreset: string = "unknown";
+  private lastImageHash: string = "";
+  private lastTrackId: string = "";
+  private lastImageCheck: number = 0;
+
+  constructor(driver: uc.IntegrationAPI) {
+    this.driver = driver;
+  }
+
+  private async getImageHash(url: string): Promise<string> {
+    try {
+      const res = await fetch(url);
+      const arrayBuffer = await res.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
+      return crypto.createHash("md5").update(buffer).digest("hex");
+    } catch (err) {
+      console.warn("%s Failed to fetch or hash image: %s", integrationName, err);
+      return "";
+    }
+  }
+
+  async maybeUpdateImage(nowPlaying: { title?: string; album?: string; artist?: string }) {
+    const trackId = `${nowPlaying.title}|${nowPlaying.album}|${nowPlaying.artist}`;
+    if (OnkyoDriver.lastSetupAlbumArtURL === "na") return;
+    const imageUrl = `http://${OnkyoDriver.lastSetupIp}/${OnkyoDriver.lastSetupAlbumArtURL}`;
+    const now = Date.now();
+    if (trackId !== this.lastTrackId || now - this.lastImageCheck > 5000) {
+      // 5s throttle
+      this.lastTrackId = trackId;
+      this.lastImageCheck = now;
+      const newHash = await this.getImageHash(imageUrl);
+      if (newHash && this.lastImageHash !== newHash) {
+        this.lastImageHash = newHash;
+        this.driver.updateEntityAttributes(globalThis.selectedAvr, {
+          [uc.MediaPlayerAttributes.MediaImageUrl]: imageUrl
+        });
+      }
+    }
+  }
+
+  setupEiscpListener() {
+    const nowPlaying: { station?: string; artist?: string; album?: string; title?: string } = {};
+
+    eiscp.on("error", (err: any) => {
+      console.error("%s eiscp error: %s", integrationName, err);
+    });
+    eiscp.on(
+      "data",
+      async (avrUpdates: {
+        command: string;
+        argument: string | number | Record<string, string>;
+        zone: string;
+        iscpCommand: string;
+        host: string;
+        port: number;
+        model: string;
+      }) => {
+        const entity = this.driver.getConfiguredEntities().getEntity(globalThis.selectedAvr);
+        if (!entity) {
+          console.warn("%s Entity not found for: %s", integrationName, globalThis.selectedAvr);
+          return;
+        }
+
+        switch (avrUpdates.command) {
+          case "system-power":
+            this.driver.updateEntityAttributes(globalThis.selectedAvr, {
+              [uc.MediaPlayerAttributes.State]:
+                avrUpdates.argument === "on" ? uc.MediaPlayerStates.On : uc.MediaPlayerStates.Standby
+            });
+            console.log("%s power set to: %s", integrationName, entity.attributes?.state);
+            break;
+          case "audio-muting":
+            this.driver.updateEntityAttributes(globalThis.selectedAvr, {
+              [uc.MediaPlayerAttributes.Muted]: avrUpdates.argument === "on" ? true : false
+            });
+            console.log("%s audio-muting set to: %s", integrationName, entity.attributes?.muted);
+            break;
+          case "volume":
+            this.driver.updateEntityAttributes(globalThis.selectedAvr, {
+              [uc.MediaPlayerAttributes.Volume]: avrUpdates.argument.toString()
+            });
+            console.log("%s volume set to: %s", integrationName, entity.attributes?.volume);
+            break;
+          case "preset":
+            this.avrPreset = avrUpdates.argument.toString();
+            console.log("%s preset set to: %s", integrationName, this.avrPreset);
+            break;
+          case "input-selector":
+            setAvrCurrentSource(avrUpdates.argument.toString());
+            this.driver.updateEntityAttributes(globalThis.selectedAvr, {
+              [uc.MediaPlayerAttributes.Source]: avrUpdates.argument.toString()
+            });
+            console.log("%s input-selector (source) set to: %s", integrationName, avrUpdates.argument.toString());
+            break;
+          case "DSN":
+            setAvrCurrentSource("dab");
+            nowPlaying.station = avrUpdates.argument.toString();
+            nowPlaying.artist = "DAB Radio";
+            console.log("%s DAB station set to: %s", integrationName, avrUpdates.argument.toString());
+            break;
+          case "NTM":
+            let [position, duration] = avrUpdates.argument.toString().split("/");
+            this.driver.updateEntityAttributes(globalThis.selectedAvr, {
+              [uc.MediaPlayerAttributes.MediaPosition]: position || "0",
+              [uc.MediaPlayerAttributes.MediaDuration]: duration || "0"
+            });
+            break;
+          case "metadata":
+            if (typeof avrUpdates.argument === "object" && avrUpdates.argument !== null) {
+              nowPlaying.title = (avrUpdates.argument as Record<string, string>).title || "unknown";
+              nowPlaying.album = (avrUpdates.argument as Record<string, string>).album || "unknown";
+              nowPlaying.artist = (avrUpdates.argument as Record<string, string>).artist || "unknown";
+            }
+            break;
+          default:
+            break;
+        }
+        switch (avrCurrentSource) {
+          case "spotify":
+          case "airplay":
+          case "net":
+            const trackId = `${nowPlaying.title}|${nowPlaying.album}|${nowPlaying.artist}`;
+            if (trackId !== this.lastTrackId) {
+              this.lastTrackId = trackId;
+              this.driver.updateEntityAttributes(globalThis.selectedAvr, {
+                [uc.MediaPlayerAttributes.MediaArtist]: nowPlaying.artist + " (" + nowPlaying.album + ")" || "unknown",
+                [uc.MediaPlayerAttributes.MediaTitle]: nowPlaying.title || "unknown",
+                [uc.MediaPlayerAttributes.MediaAlbum]: nowPlaying.album || "unknown"
+              });
+            }
+            await this.maybeUpdateImage(nowPlaying);
+            break;
+          case "dab":
+            this.driver.updateEntityAttributes(globalThis.selectedAvr, {
+              [uc.MediaPlayerAttributes.MediaArtist]: nowPlaying.artist || "unknown",
+              [uc.MediaPlayerAttributes.MediaTitle]: nowPlaying.station || "unknown",
+              [uc.MediaPlayerAttributes.MediaAlbum]: "",
+              [uc.MediaPlayerAttributes.MediaImageUrl]: "",
+              [uc.MediaPlayerAttributes.MediaPosition]: "",
+              [uc.MediaPlayerAttributes.MediaDuration]: ""
+            });
+            break;
+          default:
+            this.driver.updateEntityAttributes(globalThis.selectedAvr, {
+              [uc.MediaPlayerAttributes.MediaArtist]: "",
+              [uc.MediaPlayerAttributes.MediaTitle]: "",
+              [uc.MediaPlayerAttributes.MediaAlbum]: "",
+              [uc.MediaPlayerAttributes.MediaImageUrl]: "",
+              [uc.MediaPlayerAttributes.MediaPosition]: "",
+              [uc.MediaPlayerAttributes.MediaDuration]: ""
+            });
+            break;
+        }
+      }
+    );
+  }
+}

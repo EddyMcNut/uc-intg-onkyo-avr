@@ -6,6 +6,7 @@ import util from "util";
 import async from "async";
 import events from "events";
 import eiscp_commands = require("./eiscp-commands.json");
+import { avrCurrentSource, setAvrCurrentSource } from "./state.js";
 
 ("use strict");
 var self: any,
@@ -26,11 +27,13 @@ var self: any,
     reconnect: true,
     reconnect_sleep: 5,
     modelsets: [] as string[],
-    send_delay: 500,
+    send_delay: 250,
     verify_commands: true
   };
 
 const integrationName = "Onkyo-Integration: ";
+
+let currentMetadata = { title: "", artist: "", album: "" };
 
 self = new events.EventEmitter();
 export default self;
@@ -80,17 +83,82 @@ function eiscp_packet_extract(packet: any) {
   return packet.toString("ascii", 18, packet.length - 2);
 }
 
+function timeToSeconds(timeStr: string): number {
+  if (!timeStr) return 0;
+  const parts = timeStr.split(":").map(Number);
+  if (parts.length === 3) {
+    // hh:mm:ss
+    return parts[0] * 3600 + parts[1] * 60 + parts[2];
+  } else if (parts.length === 2) {
+    // mm:ss
+    return parts[0] * 60 + parts[1];
+  } else if (parts.length === 1) {
+    // seconds
+    return parts[0];
+  }
+  return 0;
+}
+
 function iscp_to_command(iscp_message: any) {
   // Transform a low-level ISCP message to a high-level command
   var command = iscp_message.slice(0, 3),
     value = iscp_message.slice(3),
-    result: { command: string; argument: string | number; zone: string } = {
+    result: { command: string; argument: string | number | string[] | Record<string, string>; zone: string } = {
       command: "undefined",
       argument: "undefined",
       zone: "main"
     };
   value = String(value).replace(/[\x00-\x1F]/g, ""); // remove weird characters like \x1A
-  console.log("%s RAW: %s %s", integrationName, command, value);
+
+  // console.log("%s RAW: %s %s", integrationName, command, value);
+
+  if (command === "NTM") {
+    let [position, duration] = value.toString().split("/");
+    position = timeToSeconds(position).toString();
+    duration = timeToSeconds(duration).toString();
+    result.command = "NTM";
+    result.argument = position + "/" + duration;
+    return result;
+  }
+
+  if (["NAT", "NTI", "NAL"].includes(command)) {
+    setAvrCurrentSource("net");
+    value = command + value;
+    const parts = value.split(/ISCP(?:[$.!]1|\$!1)/);
+    for (const part of parts) {
+      if (!part.trim()) continue; // skip empty parts
+      const match = part.trim().match(/^([A-Z]{3})\s*(.*)$/s);
+      if (match) {
+        // Parse all metadata fields from the value, regardless of command, handles cases like: "NATTitle\nNTIArtist\nNALAlbum"
+        const metaMatches = value.match(/(NAT|NTI|NAL)[^\n\r]*/g);
+        if (metaMatches) {
+          for (const meta of metaMatches) {
+            const type = match[1];
+            const val = match[2].trim();
+            if (type === "NAT") currentMetadata.title = val;
+            if (type === "NTI") currentMetadata.artist = val;
+            if (type === "NAL") currentMetadata.album = val;
+          }
+        } else {
+          // Fallback: assign the value to the current command type
+          if (command === "NAT") currentMetadata.title = value;
+          if (command === "NTI") currentMetadata.artist = value;
+          if (command === "NAL") currentMetadata.album = value;
+        }
+      }
+    }
+
+    result.command = "metadata";
+    result.argument = { ...currentMetadata };
+    return result;
+  }
+
+  if (command === "DSN") {
+    result.command = "DSN";
+    result.argument = value;
+    return result;
+  }
+
   type CommandType = {
     name: string;
     values: { [key: string]: { name: string } };
@@ -108,6 +176,19 @@ function iscp_to_command(iscp_message: any) {
         result.argument = valuesObj[value]?.name;
       } else if (Object.prototype.hasOwnProperty.call(VALUE_MAPPINGS[command], "INTRANGES")) {
         result.argument = parseInt(value, 16);
+      } else if (typeof value === "string" && value.match(/^([0-9A-F]{2})+(,([0-9A-F]{2})+)*$/i)) {
+        // Handle hex-encoded string(s), possibly comma-separated
+        result.argument = value.split(",").map((hexStr) => {
+          hexStr = hexStr.trim();
+          let str = "";
+          for (let i = 0; i < hexStr.length; i += 2) {
+            str += String.fromCharCode(parseInt(hexStr.substring(i, i + 2), 16));
+          }
+          return str;
+        });
+        if (result.argument.length === 1) {
+          result.argument = result.argument[0];
+        }
       }
     }
   });
@@ -123,7 +204,7 @@ function command_to_iscp(command: string, args: any, zone: string) {
   if (VALUE_MAPPINGS[prefix] && Object.prototype.hasOwnProperty.call(VALUE_MAPPINGS[prefix], args)) {
     value = VALUE_MAPPINGS[prefix][args].value;
   } else if (VALUE_MAPPINGS[prefix] && Object.prototype.hasOwnProperty.call(VALUE_MAPPINGS[prefix], "INTRANGES")) {
-    self.emit("debug", util.format("INTRANGES assumed for zone %s, command %s", zone, prefix));
+    // self.emit("debug", util.format("INTRANGES assumed for zone %s, command %s", zone, prefix));
 
     // Convert decimal number to hexadecimal since receiver doesn't understand decimal, Pad value if it is not 2 digits
     value = (+args).toString(16).toUpperCase();
@@ -133,7 +214,7 @@ function command_to_iscp(command: string, args: any, zone: string) {
     value = args;
   }
 
-  self.emit("debug", util.format('DEBUG (command_to_iscp) raw command "%s"', prefix + value));
+  // self.emit("debug", util.format('DEBUG (command_to_iscp) raw command "%s"', prefix + value));
 
   return prefix + value;
 }
@@ -176,9 +257,16 @@ self.discover = function () {
 
   client
     .on("error", function (err: any) {
-      self.emit(
-        "error",
-        util.format("ERROR (server_error) Server error on %s:%s - %s", options.address, options.port, err)
+      // self.emit(
+      //   "error",
+      //   util.format("ERROR (server_error) Server error on %s:%s - %s", options.address, options.port, err)
+      // );
+      console.log(
+        "%s ERROR (server_error) Server error on %s:%s - %s",
+        integrationName,
+        options.address,
+        options.port,
+        err
       );
       client.close();
       callback(err, null);
@@ -196,33 +284,40 @@ self.discover = function () {
           mac: data[3].slice(0, 12), // There's lots of null chars after MAC so we slice them off
           areacode: data[2]
         });
-        self.emit(
-          "debug",
-          util.format(
-            "DEBUG (received_discovery) Received discovery packet from %s:%s (%j)",
-            rinfo.address,
-            rinfo.port,
-            result
-          )
-        );
+        // self.emit(
+        //   "debug",
+        //   util.format(
+        //     "DEBUG (received_discovery) Received discovery packet from %s:%s (%j)",
+        //     rinfo.address,
+        //     rinfo.port,
+        //     result
+        //   )
+        // );
         if (result.length >= (options.devices ?? 1)) {
           clearTimeout(timeout_timer);
           close();
         }
       } else {
-        self.emit(
-          "debug",
-          util.format("DEBUG (received_data) Recevied data from %s:%s - %j", rinfo.address, rinfo.port, message)
+        // self.emit(
+        //   "debug",
+        //   util.format("DEBUG (received_data) Recevied data from %s:%s - %j", rinfo.address, rinfo.port, message)
+        // );
+        console.log(
+          "%s DEBUG (received_data) Recevied data from %s:%s - %j",
+          integrationName,
+          rinfo.address,
+          rinfo.port,
+          message
         );
       }
     })
     .on("listening", function () {
       client.setBroadcast(true);
       var buffer = eiscp_packet("!xECNQSTN");
-      self.emit(
-        "debug",
-        util.format("DEBUG (sent_discovery) Sent broadcast discovery packet to %s:%s", options.address, options.port)
-      );
+      // self.emit(
+      //   "debug",
+      //   util.format("DEBUG (sent_discovery) Sent broadcast discovery packet to %s:%s", options.address, options.port)
+      // );
       client.send(buffer, 0, buffer.length, options.port, options.address);
       timeout_timer = setTimeout(close, (options.timeout ?? 10) * 1000);
     })
@@ -298,10 +393,10 @@ self.connect = async function (options?: any): Promise<{ model: string; host: st
     }
   }
 
-  self.emit(
-    "debug",
-    util.format("INFO (connecting) Connecting to %s:%s (model: %s)", config.host, config.port, config.model)
-  );
+  // self.emit(
+  //   "debug",
+  //   util.format("INFO (connecting) Connecting to %s:%s (model: %s)", config.host, config.port, config.model)
+  // );
 
   // Prevent double connection
   if (self.is_connected && eiscp) {
@@ -331,28 +426,35 @@ self.connect = async function (options?: any): Promise<{ model: string; host: st
         setTimeout(() => self.connect(), config.reconnect_sleep * 1000);
       }
     })
-    .on("error", function (err: any) {
+    .on("error", function () {
       self.is_connected = false;
       eiscp.destroy();
     })
     .on("data", function (data: any) {
-      var iscp_message = eiscp_packet_extract(data),
-        result: {
-          command: string | undefined;
-          argument: string | number | undefined;
-          zone: string;
-          iscp_command?: string;
-          host?: string;
-          port?: number;
-          model?: string;
-        } = iscp_to_command(iscp_message);
+      var iscp_message = eiscp_packet_extract(data);
+      const command = iscp_message.slice(0, 3);
 
-      result.iscp_command = iscp_message;
-      result.host = config.host;
-      result.port = config.port;
-      result.model = config.model;
+      // Ignore these messages
+      if (["FLD", "NMS", "NPB"].includes(command)) {
+        return;
+      }
 
-      self.emit("data", result);
+      const rawResult = iscp_to_command(iscp_message);
+
+      // Only emit if rawResult is defined
+      if (!rawResult) {
+        return;
+      }
+
+      self.emit("data", {
+        command: rawResult.command ?? undefined,
+        argument: rawResult.argument ?? undefined,
+        zone: rawResult.zone ?? undefined,
+        iscpCommand: iscp_message,
+        host: config.host,
+        port: config.port,
+        model: config.model
+      });
     });
 
   return { model: config.model, host: config.host, port: config.port };
