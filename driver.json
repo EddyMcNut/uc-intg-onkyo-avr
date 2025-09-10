@@ -42,7 +42,7 @@
       {
         "id": "ipAddress",
         "label": {
-          "en": "AVR IP Address (for example 192.168.1.100)"
+          "en": "AVR IP Address (for example `192.168.1.100`)"
         },
         "field": {
           "text": {
@@ -53,7 +53,7 @@
       {
         "id": "port",
         "label": {
-          "en": "AVR Port (default 60128)"
+          "en": "AVR Port (default `60128`)"
         },
         "field": {
           "number": {
@@ -62,24 +62,24 @@
         }
       },
       {
-        "id": "longPressThreshold",
-        "label": {
-          "en": "Long Press Threshold to prevent overshoots on button long-press. Default 333"
-        },
-        "field": {
-          "number": {
-            "value": 333
-          }
-        }
-      },
-      {
         "id": "albumArtURL",
         "label": {
-          "en": "AVR AlbumArt endpoint"
+          "en": "AVR AlbumArt endpoint. Default `album_art.cgi`, if not known set to `na`."
         },
         "field": {
           "text": {
             "value": "album_art.cgi"
+          }
+        }
+      },
+      {
+        "id": "longPressThreshold",
+        "label": {
+          "en": "Long Press Threshold to prevent overshoots on button long-press. Default `300`"
+        },
+        "field": {
+          "number": {
+            "value": 300
           }
         }
       },

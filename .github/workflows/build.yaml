@@ -13,7 +13,6 @@ on:
 
 env:
   INTG_NAME: onkyo-avr
-  VERSION: 0.5.0
 
 jobs:
   build:
@@ -22,9 +21,13 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Fetch all tags to determine version
+      - name: Read version from package.json
+        id: pkg
+        run: echo "VERSION=$(jq -r .version package.json)" >> $GITHUB_ENV
+
+      - name: Sync driver.json version with package.json
         run: |
-          echo "VERSION=0.5.0" >> $GITHUB_ENV
+          jq --arg ver "$VERSION" '.version = $ver' driver.json > driver.json.tmp && mv driver.json.tmp driver.json
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
