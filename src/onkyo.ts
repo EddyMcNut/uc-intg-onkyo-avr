@@ -206,12 +206,6 @@ export default class OnkyoDriver {
           `${integrationName} Subscribed entity: ${entityId}, long-press threshold set to: ${this.config.longPressThreshold}ms`
         );
       });
-      // eiscp.command("system-power query");
-      // eiscp.command("audio-muting query");
-      // eiscp.command("volume query");
-      // eiscp.command("input-selector query");
-      // eiscp.command("preset query");
-      // eiscp.raw("DSNQSTN");
     });
 
     this.driver.on(uc.Events.UnsubscribeEntities, async (entityIds: string[]) => {
