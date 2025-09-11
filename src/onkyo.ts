@@ -113,13 +113,22 @@ export default class OnkyoDriver {
             throw new Error("AVR connection failed or returned null");
           }
 
-          // Update config with discovered IP
+
+          // Update config with discovered model, IP, and port
+          this.config.model = avr.model;
           this.config.ip = avr.host;
-          ConfigManager.save({ ip: avr.host });
+          this.config.port = avr.port;
+          ConfigManager.save({
+            model: avr.model,
+            ip: avr.host,
+            port: avr.port,
+            longPressThreshold: this.config.longPressThreshold,
+            albumArtURL: this.config.albumArtURL,
+            selectedAvr: `${avr.model} ${avr.host}`
+          });
 
           const selectedAvr = `${avr.model} ${avr.host}`;
           globalThis.selectedAvr = selectedAvr;
-          ConfigManager.save({ selectedAvr });
 
           console.log("%s RECOVERY: Connected to AVR: %s (%s:%s)", integrationName, avr.model, avr.host, avr.port);
 
