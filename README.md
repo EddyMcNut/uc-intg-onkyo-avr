@@ -22,10 +22,6 @@ This integration has been made possible by:
 - [mase1981](https://github.com/mase1981): for helping out when I got stuck packaging this first version.
 - [harvey28](https://unfolded.community/u/harvey28/summary): for testing and feedback.
 
-## Breaking changes are to be expected
-
-As this is in early development.
-
 ## Prerequisites
 
 Read this readme completely, it contains some tips for known issues and it also explains how to use `Input source` in a flexibale way so you can send a lot of different commands to your AVR.
@@ -47,19 +43,24 @@ Users report it also to work with:
 - Pioneer VSX-932
 - Integra (model unknown)
 
-## In case of issues during the 'on requence' of an Activity
+## Known issues and solutions
+### In case of issues during the 'on requence' of an Activity
 
 Some AVR models temporarily disconnect when powering on, in that case the next command that the Remote tries to send ends up in an error or time out because the Remote cannot re-connect yet. If you encounter that kind of issue, add a delay step between the Switch ON and the next AVR command of approximately 5 seconds, then lower it and try again to find the sweet spot:
 
 ![](./screenshots/delay-onsequence.png)
 
-## In case the AVR overshoots on long-press
+### In case the AVR overshoots on long-press
 
-When you long-press a button, for example volume up, and the AVR overshoots then increase the `Long Press Threshold` in the setup step of this integration. The setup step can be run again and again by selecting the integration in de webconfigurator of the Remote. Just assign the volume command to the short-press in webconfigurator.
+When you long-press a button, for example volume up, and the AVR overshoots then increase the `Long Press Threshold` in the setup step of this integration. The setup step can be run again and again by selecting the integration in de webconfigurator of the Remote. 
 
 ![](./screenshots/longpress-threshold.png)
 
-![](./screenshots/short-press.png) ![](./screenshots/volume-up.png)
+Just assign the volume command to the short-press in webconfigurator, **don't** assign to long-press.
+
+![](./screenshots/short-press.png) 
+
+![](./screenshots/volume-up.png)
 
 ## Installation and usage
 
@@ -97,9 +98,14 @@ When you long-press a button, for example volume up, and the AVR overshoots then
 
 - During setup the endpoint for album art is set.
 - If for example the endpoint of your AVR is "http://192.168.2.103/album_art.cgi" then the value for endpoint in the setup is `album_art.cgi`.
+
+  ![](./screenshots/albumArtYes.png)
+
 - The album art endpoint is used for specific cases, for example when you listen to Spotify.
 - Album art is refreshed every 5 seconds.
 - **If your AVR does not have an endpoint for Album Art, set the value to `na` to prevent errors.**
+
+  ![](./screenshots/albumArtNo.png)
 
 ## Spotify
 
@@ -171,8 +177,6 @@ Please let me know in [Discord](https://discord.com/channels/553671366411288576/
 
 ## Stuff to do / backlog
 
-- Have to do a real release in GitHub workflows.
 - Align and improve logging.
 - Refactor the code for easier debugging.
 - The code is partly ready to deal with different zones, but that still needs some attention before that will actually work.
-- Deal with multilple Onkyo AVRs in the network.
