@@ -2,6 +2,7 @@
 "use strict";
 import * as uc from "@unfoldedcircle/integration-api";
 import eiscp from "./eiscp.js";
+import { ConfigManager, OnkyoConfig } from "./configManager.js";
 import { OnkyoCommandSender } from "./onkyoCommandSender.js";
 import { OnkyoCommandReceiver } from "./onkyoCommandReceiver.js";
 
@@ -17,28 +18,26 @@ export default class OnkyoDriver {
   private driver: uc.IntegrationAPI;
   private commandSender: OnkyoCommandSender;
   private commandReceiver: OnkyoCommandReceiver;
-
-  // Persist setup fields as static properties
-  private static lastSetupModel: string | undefined;
-  static lastSetupIp: string | undefined;
-  private static lastSetupPort: number | undefined;
-  static lastSetupLongPressThreshold: number;
-  static lastSetupAlbumArtURL: string = "na";
-
-  private setupModel: string | undefined;
-  private setupIp: string | undefined;
-  private setupPort: number | undefined;
-  private setupLongPressThreshold: number = 333;
-  private setupAlbumArtURL: string = "na";
+  private config: OnkyoConfig;
 
   constructor() {
-    this.driver = new uc.IntegrationAPI();
-    this.commandSender = new OnkyoCommandSender(this.driver);
-    this.commandReceiver = new OnkyoCommandReceiver(this.driver);
-    this.driver.init("driver.json", this.handleDriverSetup.bind(this));
-    this.setupEventHandlers();
-    this.commandReceiver.setupEiscpListener();
-    this.setupDriverEvents();
+      this.driver = new uc.IntegrationAPI();
+      this.config = ConfigManager.load(); // <-- Load config first!
+      this.commandSender = new OnkyoCommandSender(this.driver, this.config);
+      this.commandReceiver = new OnkyoCommandReceiver(this.driver, this.config);
+      this.driver.init("driver.json", this.handleDriverSetup.bind(this));
+      this.setupEventHandlers();
+      this.commandReceiver.setupEiscpListener();
+      this.setupDriverEvents();
+      console.log("Loaded config at startup:", this.config);
+
+      // Auto-register entity after startup if config is present
+      if (this.config && this.config.model && this.config.ip && this.config.port) {
+        this.handleConnect();
+      } else {
+        // Optionally, auto-run setup if config is missing
+        console.log("Config missing or incomplete, waiting for setup.");
+      }
   }
 
   private async handleDriverSetup(msg: uc.SetupDriver): Promise<uc.SetupAction> {
@@ -48,28 +47,30 @@ export default class OnkyoDriver {
     const longPressThreshold = (msg as any).setupData?.longPressThreshold;
     const albumArtURL = (msg as any).setupData?.albumArtURL;
 
-    this.setupModel = typeof model === "string" && model.trim() !== "" ? model.trim() : undefined;
-    this.setupIp = typeof ipAddress === "string" && ipAddress.trim() !== "" ? ipAddress.trim() : undefined;
+    this.config.model = typeof model === "string" && model.trim() !== "" ? model.trim() : undefined;
+    this.config.ip = typeof ipAddress === "string" && ipAddress.trim() !== "" ? ipAddress.trim() : undefined;
     if (port && port.toString().trim() !== "") {
       const portNum = parseInt(port, 10);
-      this.setupPort = isNaN(portNum) ? undefined : portNum;
+      this.config.port = isNaN(portNum) ? undefined : portNum;
     } else {
-      this.setupPort = undefined;
+      this.config.port = undefined;
     }
     if (longPressThreshold && longPressThreshold.toString().trim() !== "") {
       const longPressNum = parseInt(longPressThreshold, 10);
-      this.setupLongPressThreshold = isNaN(longPressNum) ? 333 : longPressNum;
+      this.config.longPressThreshold = isNaN(longPressNum) ? 300 : longPressNum;
     } else {
-      this.setupLongPressThreshold = 333;
+      this.config.longPressThreshold = 300;
     }
-    this.setupAlbumArtURL = typeof albumArtURL === "string" && albumArtURL.trim() !== "" ? albumArtURL.trim() : "";
+    this.config.albumArtURL = typeof albumArtURL === "string" && albumArtURL.trim() !== "" ? albumArtURL.trim() : "";
 
-    // Store in static fields for reconnects
-    OnkyoDriver.lastSetupModel = this.setupModel;
-    OnkyoDriver.lastSetupIp = this.setupIp;
-    OnkyoDriver.lastSetupPort = this.setupPort;
-    OnkyoDriver.lastSetupLongPressThreshold = this.setupLongPressThreshold;
-    OnkyoDriver.lastSetupAlbumArtURL = this.setupAlbumArtURL;
+    // Save to config file
+    ConfigManager.save({
+      model: this.config.model,
+      ip: this.config.ip,
+      port: this.config.port,
+      longPressThreshold: this.config.longPressThreshold,
+      albumArtURL: this.config.albumArtURL
+    });
 
     // Re-trigger connection after setup
     await this.handleConnect();
@@ -94,17 +95,17 @@ export default class OnkyoDriver {
           console.log(
             "%s Connecting with model: %s, ip: %s, port: %s",
             integrationName,
-            OnkyoDriver.lastSetupModel,
-            OnkyoDriver.lastSetupIp,
-            OnkyoDriver.lastSetupPort
+            this.config.model,
+            this.config.ip,
+            this.config.port
           );
 
           const avr =
-            OnkyoDriver.lastSetupModel !== undefined
+            this.config.model !== undefined
               ? await eiscp.connect({
-                  model: OnkyoDriver.lastSetupModel,
-                  host: OnkyoDriver.lastSetupIp,
-                  port: OnkyoDriver.lastSetupPort
+                  model: this.config.model,
+                  host: this.config.ip,
+                  port: this.config.port
                 })
               : await eiscp.connect();
 
@@ -112,12 +113,32 @@ export default class OnkyoDriver {
             throw new Error("AVR connection failed or returned null");
           }
 
-          // Update lastSetupIp with discovered IP
-          OnkyoDriver.lastSetupIp = avr.host;
+
+          // Update config with discovered model, IP, and port
+          this.config.model = avr.model;
+          this.config.ip = avr.host;
+          this.config.port = avr.port;
+          ConfigManager.save({
+            model: avr.model,
+            ip: avr.host,
+            port: avr.port,
+            longPressThreshold: this.config.longPressThreshold,
+            albumArtURL: this.config.albumArtURL,
+            selectedAvr: `${avr.model} ${avr.host}`
+          });
 
           const selectedAvr = `${avr.model} ${avr.host}`;
           globalThis.selectedAvr = selectedAvr;
+
           console.log("%s RECOVERY: Connected to AVR: %s (%s:%s)", integrationName, avr.model, avr.host, avr.port);
+
+          // Query AVR state after successful connection
+          eiscp.command("system-power query");
+          eiscp.command("audio-muting query");
+          eiscp.command("volume query");
+          eiscp.command("input-selector query");
+          eiscp.command("preset query");
+          eiscp.raw("DSNQSTN");
 
           // Create and register entity after connection
           const mediaPlayerEntity = new uc.MediaPlayer(
@@ -191,15 +212,9 @@ export default class OnkyoDriver {
     this.driver.on(uc.Events.SubscribeEntities, async (entityIds: string[]) => {
       entityIds.forEach((entityId: string) => {
         console.log(
-          `${integrationName} Subscribed entity: ${entityId}, long-press threshold set to: ${OnkyoDriver.lastSetupLongPressThreshold}ms`
+          `${integrationName} Subscribed entity: ${entityId}, long-press threshold set to: ${this.config.longPressThreshold}ms`
         );
       });
-      eiscp.command("system-power query");
-      eiscp.command("audio-muting query");
-      eiscp.command("volume query");
-      eiscp.command("input-selector query");
-      eiscp.command("preset query");
-      eiscp.raw("DSNQSTN");
     });
 
     this.driver.on(uc.Events.UnsubscribeEntities, async (entityIds: string[]) => {
@@ -209,7 +224,7 @@ export default class OnkyoDriver {
     });
   }
 
-  // Use the sender class for command handling
+  // Use the sender class for command handling 
   private async sharedCmdHandler(
     entity: uc.Entity,
     cmdId: string,

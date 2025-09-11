@@ -1,19 +1,22 @@
-name: Build dist
+name: Build and Release
 
 on:
   push:
+    branches:
+      - '**'
     paths:
-      - "**/*.js"
-      - "**/*.ts"
-      - ".github/**/*.yml"
-      - "package-lock.json"
+      - '**/*.js'
+      - '**/*.ts'
+      - '.github/**/*.yml'
+      - 'package-lock.json'
+    tags:
+      - 'v*.*.*'
   pull_request:
     branches: ["main"]
     types: [opened, synchronize, reopened]
 
 env:
   INTG_NAME: onkyo-avr
-  VERSION: 0.5.0
 
 jobs:
   build:
@@ -22,16 +25,15 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Fetch all tags to determine version
+      - name: Read version from package.json
+        id: pkg
+        run: echo "VERSION=$(jq -r .version package.json)" >> $GITHUB_ENV
+
+      - name: Sync driver.json version with package.json
         run: |
-          echo "VERSION=0.5.0" >> $GITHUB_ENV
+          jq --arg ver "$VERSION" '.version = $ver' driver.json > driver.json.tmp && mv driver.json.tmp driver.json
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version-file: ".nvmrc"
-
-      - name: Setup node
         uses: actions/setup-node@v4
         with:
           node-version-file: ".nvmrc"
@@ -81,3 +83,19 @@ jobs:
           path: ${{ env.ARTIFACT_NAME }}.tar.gz
           if-no-files-found: error
           retention-days: 3
+
+  release:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ env.ARTIFACT_NAME }}
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ env.ARTIFACT_NAME }}.tar.gz
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

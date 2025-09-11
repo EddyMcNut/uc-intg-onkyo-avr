@@ -1,15 +1,17 @@
 import * as uc from "@unfoldedcircle/integration-api";
 import eiscp from "./eiscp.js";
-import OnkyoDriver from "./onkyo.js";
+import { OnkyoConfig } from "./configManager.js";
 
 const integrationName = "Onkyo-Integration: ";
 let lastCommandTime = 0;
 
 export class OnkyoCommandSender {
   private driver: uc.IntegrationAPI;
+  private config: OnkyoConfig;
 
-  constructor(driver: uc.IntegrationAPI) {
+  constructor(driver: uc.IntegrationAPI, config: OnkyoConfig) {
     this.driver = driver;
+    this.config = config;
   }
 
   async sharedCmdHandler(
@@ -37,7 +39,7 @@ export class OnkyoCommandSender {
 
     const onkyoEntity = this.driver.getConfiguredEntities().getEntity(globalThis.selectedAvr);
     if (onkyoEntity) {
-      console.log("%s Got %s media-player command request: %s", integrationName, entity.id, cmdId, params || "");
+      console.log("%s %s media-player command request: %s", integrationName, entity.id, cmdId, params || "");
       if (entity.id === globalThis.selectedAvr) {
         const now = Date.now();
         switch (cmdId) {
@@ -56,13 +58,13 @@ export class OnkyoCommandSender {
             await eiscp.command("audio-muting toggle");
             break;
           case uc.MediaPlayerCommands.VolumeUp:
-            if (now - lastCommandTime > OnkyoDriver.lastSetupLongPressThreshold) {
+            if (now - lastCommandTime > (this.config.longPressThreshold ?? 333)) {
               lastCommandTime = now;
               await eiscp.command("volume level-up-1db-step");
             }
             break;
           case uc.MediaPlayerCommands.VolumeDown:
-            if (now - lastCommandTime > OnkyoDriver.lastSetupLongPressThreshold) {
+            if (now - lastCommandTime > (this.config.longPressThreshold ?? 333)) {
               lastCommandTime = now;
               await eiscp.command("volume level-down-1db-step");
             }

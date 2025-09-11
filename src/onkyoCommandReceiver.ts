@@ -4,18 +4,21 @@ import OnkyoDriver from "./onkyo.js";
 import { avrCurrentSource, setAvrCurrentSource } from "./state.js";
 // import fetch from "node-fetch";
 import crypto from "crypto";
+import { OnkyoConfig } from "./configManager.js";
 
 const integrationName = "Onkyo-Integration: ";
 
 export class OnkyoCommandReceiver {
   private driver: uc.IntegrationAPI;
+  private config: OnkyoConfig;
   private avrPreset: string = "unknown";
   private lastImageHash: string = "";
   private lastTrackId: string = "";
   private lastImageCheck: number = 0;
 
-  constructor(driver: uc.IntegrationAPI) {
+  constructor(driver: uc.IntegrationAPI, config: OnkyoConfig) {
     this.driver = driver;
+    this.config = config;
   }
 
   private async getImageHash(url: string): Promise<string> {
@@ -32,8 +35,9 @@ export class OnkyoCommandReceiver {
 
   async maybeUpdateImage(nowPlaying: { title?: string; album?: string; artist?: string }) {
     const trackId = `${nowPlaying.title}|${nowPlaying.album}|${nowPlaying.artist}`;
-    if (OnkyoDriver.lastSetupAlbumArtURL === "na") return;
-    const imageUrl = `http://${OnkyoDriver.lastSetupIp}/${OnkyoDriver.lastSetupAlbumArtURL}`;
+    // Use config instead of static property
+    if (!this.config.albumArtURL || this.config.albumArtURL === "na") return;
+    const imageUrl = `http://${this.config.ip}/${this.config.albumArtURL}`;
     const now = Date.now();
     if (trackId !== this.lastTrackId || now - this.lastImageCheck > 5000) {
       // 5s throttle
