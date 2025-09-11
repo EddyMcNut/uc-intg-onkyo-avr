@@ -10,8 +10,7 @@ on:
     tags:
       - 'v*.*.*'
   pull_request:
-    branches:
-      - main
+    branches: ["main"]
     types: [opened, synchronize, reopened]
 
 env:

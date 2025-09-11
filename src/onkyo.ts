@@ -215,7 +215,7 @@ export default class OnkyoDriver {
     });
   }
 
-  // Use the sender class for command handling
+  // Use the sender class for command handling 
   private async sharedCmdHandler(
     entity: uc.Entity,
     cmdId: string,
