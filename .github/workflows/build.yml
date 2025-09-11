@@ -2,6 +2,8 @@ name: Build and Release
 
 on:
   push:
+    branches:
+      - '**'
     paths:
       - '**/*.js'
       - '**/*.ts'
@@ -32,11 +34,6 @@ jobs:
           jq --arg ver "$VERSION" '.version = $ver' driver.json > driver.json.tmp && mv driver.json.tmp driver.json
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version-file: ".nvmrc"
-
-      - name: Setup node
         uses: actions/setup-node@v4
         with:
           node-version-file: ".nvmrc"
