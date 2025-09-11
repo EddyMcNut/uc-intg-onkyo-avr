@@ -21,15 +21,23 @@ export default class OnkyoDriver {
   private config: OnkyoConfig;
 
   constructor() {
-    this.driver = new uc.IntegrationAPI();
-    this.config = ConfigManager.load(); // <-- Load config first!
-    this.commandSender = new OnkyoCommandSender(this.driver, this.config);
-    this.commandReceiver = new OnkyoCommandReceiver(this.driver, this.config);
-    this.driver.init("driver.json", this.handleDriverSetup.bind(this));
-    this.setupEventHandlers();
-    this.commandReceiver.setupEiscpListener();
-    this.setupDriverEvents();
-    console.log("Loaded config at startup:", this.config);
+      this.driver = new uc.IntegrationAPI();
+      this.config = ConfigManager.load(); // <-- Load config first!
+      this.commandSender = new OnkyoCommandSender(this.driver, this.config);
+      this.commandReceiver = new OnkyoCommandReceiver(this.driver, this.config);
+      this.driver.init("driver.json", this.handleDriverSetup.bind(this));
+      this.setupEventHandlers();
+      this.commandReceiver.setupEiscpListener();
+      this.setupDriverEvents();
+      console.log("Loaded config at startup:", this.config);
+
+      // Auto-register entity after startup if config is present
+      if (this.config && this.config.model && this.config.ip && this.config.port) {
+        this.handleConnect();
+      } else {
+        // Optionally, auto-run setup if config is missing
+        console.log("Config missing or incomplete, waiting for setup.");
+      }
   }
 
   private async handleDriverSetup(msg: uc.SetupDriver): Promise<uc.SetupAction> {
