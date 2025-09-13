@@ -1,6 +1,7 @@
 import * as uc from "@unfoldedcircle/integration-api";
 import eiscp from "./eiscp.js";
 import { OnkyoConfig } from "./configManager.js";
+import { DEFAULT_LONG_PRESS_THRESHOLD } from "./configManager.js";
 
 const integrationName = "Onkyo-Integration: ";
 let lastCommandTime = 0;
@@ -58,13 +59,13 @@ export class OnkyoCommandSender {
             await eiscp.command("audio-muting toggle");
             break;
           case uc.MediaPlayerCommands.VolumeUp:
-            if (now - lastCommandTime > (this.config.longPressThreshold ?? 333)) {
+            if (now - lastCommandTime > (this.config.longPressThreshold ?? DEFAULT_LONG_PRESS_THRESHOLD)) {
               lastCommandTime = now;
               await eiscp.command("volume level-up-1db-step");
             }
             break;
           case uc.MediaPlayerCommands.VolumeDown:
-            if (now - lastCommandTime > (this.config.longPressThreshold ?? 333)) {
+            if (now - lastCommandTime > (this.config.longPressThreshold ?? DEFAULT_LONG_PRESS_THRESHOLD)) {
               lastCommandTime = now;
               await eiscp.command("volume level-down-1db-step");
             }

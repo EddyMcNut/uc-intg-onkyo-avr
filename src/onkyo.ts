@@ -3,6 +3,7 @@
 import * as uc from "@unfoldedcircle/integration-api";
 import eiscp from "./eiscp.js";
 import { ConfigManager, OnkyoConfig } from "./configManager.js";
+import { DEFAULT_LONG_PRESS_THRESHOLD } from "./configManager.js";
 import { OnkyoCommandSender } from "./onkyoCommandSender.js";
 import { OnkyoCommandReceiver } from "./onkyoCommandReceiver.js";
 
@@ -57,9 +58,9 @@ export default class OnkyoDriver {
     }
     if (longPressThreshold && longPressThreshold.toString().trim() !== "") {
       const longPressNum = parseInt(longPressThreshold, 10);
-      this.config.longPressThreshold = isNaN(longPressNum) ? 300 : longPressNum;
+      this.config.longPressThreshold = isNaN(longPressNum) ? DEFAULT_LONG_PRESS_THRESHOLD : longPressNum;
     } else {
-      this.config.longPressThreshold = 300;
+      this.config.longPressThreshold = DEFAULT_LONG_PRESS_THRESHOLD;
     }
     this.config.albumArtURL = typeof albumArtURL === "string" && albumArtURL.trim() !== "" ? albumArtURL.trim() : "";
 

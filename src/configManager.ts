@@ -1,3 +1,4 @@
+export const DEFAULT_LONG_PRESS_THRESHOLD = 300;
 import path from "path";
 import fs from "fs";
 
