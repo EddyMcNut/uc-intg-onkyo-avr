@@ -3,14 +3,14 @@ name: Build and Release
 on:
   push:
     branches:
-      - '**'
+      - "**"
     paths:
-      - '**/*.js'
-      - '**/*.ts'
-      - '.github/**/*.yml'
-      - 'package-lock.json'
+      - "**/*.js"
+      - "**/*.ts"
+      - ".github/**/*.yml"
+      - "package-lock.json"
     tags:
-      - 'v*.*.*'
+      - "v*.*.*"
   pull_request:
     branches: ["main"]
     types: [opened, synchronize, reopened]
