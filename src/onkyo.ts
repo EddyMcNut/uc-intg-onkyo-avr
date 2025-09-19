@@ -141,12 +141,12 @@ export default class OnkyoDriver {
           console.log("%s Connected to AVR: model=%s, ip=%s, port=%s", integrationName, avr.model, avr.host, avr.port);
 
           // Query AVR state after successful connection
-          this.eiscpInstance.command("system-power query");
-          this.eiscpInstance.command("audio-muting query");
-          this.eiscpInstance.command("volume query");
-          this.eiscpInstance.command("input-selector query");
-          this.eiscpInstance.command("preset query");
-          this.eiscpInstance.raw("DSNQSTN");
+          // this.eiscpInstance.command("system-power query");
+          // this.eiscpInstance.command("audio-muting query");
+          // this.eiscpInstance.command("volume query");
+          // this.eiscpInstance.command("input-selector query");
+          // this.eiscpInstance.command("preset query");
+          // this.eiscpInstance.raw("DSNQSTN");
 
           // Register entity directly in configured entities (legacy behavior)
           // Use addAvailableEntity for registration (legacy behavior)
@@ -187,10 +187,6 @@ export default class OnkyoDriver {
           );
           mediaPlayerEntity.setCmdHandler(this.sharedCmdHandler.bind(this));
           this.driver.addAvailableEntity(mediaPlayerEntity);
-          console.log("%s Registered entity (legacy): %s", integrationName, globalThis.selectedAvr);
-          console.log("%s Entity attributes after registration:", integrationName, mediaPlayerEntity.attributes);
-          console.log("%s addAvailableEntity called for: %s", integrationName, globalThis.selectedAvr);
-          console.log("%s Entity attributes at registration:", integrationName, mediaPlayerEntity.attributes);
           // Set initial default values for key attributes so remote sees valid options
           this.driver.updateEntityAttributes(globalThis.selectedAvr, {
             [uc.MediaPlayerAttributes.State]: uc.MediaPlayerStates.Standby,
@@ -205,14 +201,14 @@ export default class OnkyoDriver {
             [uc.MediaPlayerAttributes.MediaPosition]: "0",
             [uc.MediaPlayerAttributes.MediaDuration]: "0"
           });
-          console.log("%s Initial entity attributes set for remote visibility.", integrationName);
+          // console.log("%s Initial entity attributes set for remote visibility.", integrationName);
         } else {
           console.log("%s Already connected to AVR, skipping connect()", integrationName);
         }
         await this.driver.setDeviceState(uc.DeviceStates.Connected);
         if (typeof this.driver.getAvailableEntities === "function") {
           const entities = this.driver.getAvailableEntities();
-          console.log("%s getAvailableEntities():", integrationName, entities);
+          // console.log("%s getAvailableEntities():", integrationName, entities);
         }
         return;
       } catch (err) {
@@ -246,6 +242,13 @@ export default class OnkyoDriver {
         console.log(
           `${integrationName} Subscribed entity: ${entityId}, long-press threshold set to: ${this.config.longPressThreshold}ms`
         );
+        // Query AVR state after successful connection
+        this.eiscpInstance.command("system-power query");
+        this.eiscpInstance.command("audio-muting query");
+        this.eiscpInstance.command("volume query");
+        this.eiscpInstance.command("input-selector query");
+        this.eiscpInstance.command("preset query");
+        this.eiscpInstance.raw("DSNQSTN");
       });
     });
 

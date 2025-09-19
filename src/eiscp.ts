@@ -13,9 +13,16 @@ import async from "async";
 
 import EventEmitter from "events";
 import { eiscpCommands } from "./eiscp-commands.js";
+import { avrCurrentSource, setAvrCurrentSource } from "./state.js";
 const COMMANDS = eiscpCommands.commands;
 const COMMAND_MAPPINGS = eiscpCommands.command_mappings;
 const VALUE_MAPPINGS = eiscpCommands.value_mappings;
+// const VALUE_MAPPINGS: {
+// [prefix: string]: {
+// [arg: string]: any;
+// intgrRange?: any;
+// };
+// } = eiscpCommands.value_mappings;
 
 const integrationName = "Onkyo-Integration: ";
 
@@ -58,8 +65,24 @@ export class EiscpDriver extends EventEmitter {
     }
   }
 
+  private timeToSeconds(timeStr: string): number {
+    if (!timeStr) return 0;
+    const parts = timeStr.split(":").map(Number);
+    if (parts.length === 3) {
+      // hh:mm:ss
+      return parts[0] * 3600 + parts[1] * 60 + parts[2];
+    } else if (parts.length === 2) {
+      // mm:ss
+      return parts[0] * 60 + parts[1];
+    } else if (parts.length === 1) {
+      // seconds
+      return parts[0];
+    }
+    return 0;
+  }
+
   // Create a proper eISCP packet for UDP broadcast (discovery)
-  private eiscp_packet(data: string): Buffer {
+  private eiscp_packet(data: any): Buffer {
     // Add ISCP header if not already present
     if (data.charAt(0) !== "!") {
       data = "!1" + data;
@@ -96,67 +119,117 @@ export class EiscpDriver extends EventEmitter {
     return packet.toString("ascii", 18, packet.length - 2);
   }
 
-  private iscp_to_command(message: string) {
-    // Support both ISCP payloads with '!1' and raw command replies (e.g., DSNR10...)
-    let payload: string;
-    let cmd: string;
-    let arg: string;
-    if (message.indexOf("!1") !== -1) {
-      // ISCP format
-      const payloadIdx = message.indexOf("!1");
-      payload = message.slice(payloadIdx).replace(/[\r\n]/g, "");
-      cmd = payload.slice(2, 5);
-      arg = payload.slice(5);
-    } else {
-      // Raw command format (e.g., DSNR10...)
-      payload = message.replace(/[\r\n]/g, "");
-      cmd = payload.slice(0, 3);
-      arg = payload.slice(3);
-    }
-    // Remove trailing control characters (e.g., \x1A, \r, \n)
-    arg = arg.replace(/[\x00-\x1F\x7F]+$/g, "");
+  private iscp_to_command(iscp_message: any) {
+    // Transform a low-level ISCP message to a high-level command
+    var command = iscp_message.slice(0, 3),
+      value = iscp_message.slice(3),
+      result: { command: string; argument: string | number | string[] | Record<string, string>; zone: string } = {
+        command: "undefined",
+        argument: "undefined",
+        zone: "main"
+      };
+    value = String(value).replace(/[\x00-\x1F]/g, ""); // remove weird characters like \x1A
 
-    // Handle metadata and DAB station info explicitly
-    if (cmd === "DSN") {
-      // DAB station info
-      return { command: "DSN", argument: arg };
-    }
-    if (cmd === "NTM") {
-      // Now playing time info
-      return { command: "NTM", argument: arg };
-    }
-    if (["NAT", "NTI", "NAL"].includes(cmd)) {
-      // Metadata fields: Title, Artist, Album
-      // Return as metadata object
-      if (!this.currentMetadata) this.currentMetadata = {};
-      if (cmd === "NAT") this.currentMetadata.title = arg;
-      if (cmd === "NTI") this.currentMetadata.artist = arg;
-      if (cmd === "NAL") this.currentMetadata.album = arg;
-      return { command: "metadata", argument: { ...this.currentMetadata } };
-    }
-
-    // Translate command and argument using eiscp-commands.ts
-    let friendlyCommand = cmd;
-    let friendlyArgument = arg || "";
-    // Debug log for volume parsing
-    if (cmd === "MVL") {
-      console.debug(`[EiscpDriver DEBUG] Parsed volume reply: command=MVL, argument=${friendlyArgument}`);
-    }
-    // Use correct mapping for command translation
-    const cmdMap = (COMMANDS as any)[cmd] || (COMMANDS as any)[cmd.toUpperCase()];
-    if (cmdMap) {
-      friendlyCommand = cmdMap.name || cmd;
-      // Try to map argument to friendly name if possible
-      const values = cmdMap.values;
-      if (values && values[arg] && values[arg].name) {
-        friendlyArgument = values[arg].name;
-      } else if (values && values[arg]) {
-        friendlyArgument = arg;
-      } else if (values && values.QSTN && arg === "QSTN") {
-        friendlyArgument = values.QSTN.name || "query";
+    // Strip trailing ISCP messages for certain commands
+    if (["SLI", "PRS", "AMT", "MVL"].includes(command)) {
+      const idx = value.indexOf("ISCP");
+      if (idx !== -1) {
+        value = value.substring(0, idx);
       }
+      value = value.trim();
     }
-    return { command: friendlyCommand, argument: friendlyArgument };
+
+    console.log("%s RAW: %s %s", integrationName, command, value);
+
+    if (command === "NTM") {
+      let [position, duration] = value.toString().split("/");
+      position = this.timeToSeconds(position).toString();
+      duration = this.timeToSeconds(duration).toString();
+      result.command = "NTM";
+      result.argument = position + "/" + duration;
+      return result;
+    }
+
+    if (["NAT", "NTI", "NAL"].includes(command)) {
+      setAvrCurrentSource("net");
+      value = command + value;
+      const parts = value.split(/ISCP(?:[$.!]1|\$!1)/);
+      for (const part of parts) {
+        if (!part.trim()) continue; // skip empty parts
+        const match = part.trim().match(/^([A-Z]{3})\s*(.*)$/s);
+        if (match) {
+          // Parse all metadata fields from the value, regardless of command, handles cases like: "NATTitle\nNTIArtist\nNALAlbum"
+          const metaMatches = value.match(/(NAT|NTI|NAL)[^\n\r]*/g);
+          if (metaMatches) {
+            for (const meta of metaMatches) {
+              const type = match[1];
+              const val = match[2].trim();
+              if (type === "NAT") this.currentMetadata.title = val;
+              if (type === "NTI") this.currentMetadata.artist = val;
+              if (type === "NAL") this.currentMetadata.album = val;
+            }
+          } else {
+            // Fallback: assign the value to the current command type
+            if (command === "NAT") this.currentMetadata.title = value;
+            if (command === "NTI") this.currentMetadata.artist = value;
+            if (command === "NAL") this.currentMetadata.album = value;
+          }
+        }
+      }
+
+      result.command = "metadata";
+      result.argument = { ...this.currentMetadata };
+      return result;
+    }
+
+    if (command === "DSN") {
+      result.command = "DSN";
+      result.argument = value;
+      return result;
+    }
+
+    type CommandType = {
+      name: string;
+      values: { [key: string]: { name: string } };
+    };
+
+    (Object.keys(COMMANDS) as Array<keyof typeof COMMANDS>).forEach(function () {
+      const commansList = COMMANDS as unknown as { [key: string]: CommandType };
+
+      if (typeof commansList[command] !== "undefined") {
+        result.command = commansList[command].name;
+
+        // console.log("******* %s", command);
+
+        const cmdObj = COMMANDS[command as keyof typeof COMMANDS];
+        const valuesObj = cmdObj.values as { [key: string]: { name: string } };
+        if (valuesObj[value]?.name !== undefined) {
+          result.argument = valuesObj[value]?.name;
+
+          // return result;
+        } else if (
+          VALUE_MAPPINGS.hasOwnProperty(command as keyof typeof VALUE_MAPPINGS) &&
+          Object.prototype.hasOwnProperty.call(VALUE_MAPPINGS[command as keyof typeof VALUE_MAPPINGS], "intgrRange")
+        ) {
+          result.argument = parseInt(value, 16);
+        } else if (typeof value === "string" && value.match(/^([0-9A-F]{2})+(,([0-9A-F]{2})+)*$/i)) {
+          // Handle hex-encoded string(s), possibly comma-separated
+          result.argument = value.split(",").map((hexStr) => {
+            hexStr = hexStr.trim();
+            let str = "";
+            for (let i = 0; i < hexStr.length; i += 2) {
+              str += String.fromCharCode(parseInt(hexStr.substring(i, i + 2), 16));
+            }
+            return str;
+          });
+          if (result.argument.length === 1) {
+            result.argument = result.argument[0];
+          }
+        }
+      }
+    });
+    // console.log("******3* %s", result.argument);
+    return result;
   }
 
   async discover(options?: {
@@ -266,16 +339,16 @@ export class EiscpDriver extends EventEmitter {
         this.is_connected = true;
         this.emit("connect", this.config.host, this.config.port, this.config.model);
         // Send initial queries after connection established
-        this.command("system-power query");
-        this.command("audio-muting query");
-        this.command("volume query");
-        this.command("input-selector query");
-        this.command("preset query");
-        this.raw("DSNQSTN");
-        this.emit(
-          "debug",
-          `[EiscpDriver] Connected to AVR at ${this.config.host}:${this.config.port} (model: ${this.config.model})`
-        );
+        // this.command("system-power query");
+        // this.command("audio-muting query");
+        // this.command("volume query");
+        // this.command("input-selector query");
+        // this.command("preset query");
+        // this.raw("DSNQSTN");
+        // this.emit(
+        // "debug",
+        // // `[EiscpDriver] Connected to AVR at ${this.config.host}:${this.config.port} (model: ${this.config.model})`
+        // );
       })
       .on("close", () => {
         this.is_connected = false;
@@ -289,32 +362,30 @@ export class EiscpDriver extends EventEmitter {
         this.eiscp?.destroy();
       })
       .on("data", (data: any) => {
-        this.emit("debug", `[EiscpDriver] Received data: ${data.toString("hex")} | ${data.toString()}`);
-        const iscp_message = this.eiscp_packet_extract(data);
+        var iscp_message = this.eiscp_packet_extract(data);
         const command = iscp_message.slice(0, 3);
-        // Log ALL received messages, even those filtered out
-        this.emit("debug", `[EiscpDriver] Raw TCP message: ${iscp_message.replace(/\r|\n/g, "↵")}`);
+
+        // Ignore these messages
         if (["FLD", "NMS", "NPB"].includes(command)) {
-          this.emit("debug", `[EiscpDriver] Ignored command: ${command}`);
           return;
         }
+
         const rawResult = this.iscp_to_command(iscp_message);
+
+        // Only emit if rawResult is defined
         if (!rawResult) {
-          this.emit("debug", `[EiscpDriver] Could not parse ISCP message: ${iscp_message}`);
           return;
         }
+
         this.emit("data", {
           command: rawResult.command ?? undefined,
           argument: rawResult.argument ?? undefined,
+          zone: rawResult.zone ?? undefined,
           iscpCommand: iscp_message,
           host: this.config.host,
           port: this.config.port,
           model: this.config.model
         });
-        this.emit(
-          "debug",
-          `[EiscpDriver] Emitted data event: command=${rawResult.command}, argument=${rawResult.argument}, iscpCommand=${iscp_message}`
-        );
       });
     return { model: this.config.model!, host: this.config.host!, port: this.config.port! };
   }
@@ -387,7 +458,7 @@ export class EiscpDriver extends EventEmitter {
     const valueMap = (VALUE_MAPPINGS as Record<string, any>)[prefix];
     if (valueMap && Object.prototype.hasOwnProperty.call(valueMap, args)) {
       value = valueMap[args].value;
-    } else if (valueMap && Object.prototype.hasOwnProperty.call(valueMap, "INTRANGES")) {
+    } else if (valueMap && Object.prototype.hasOwnProperty.call(valueMap, "intgrRange")) {
       value = (+args).toString(16).toUpperCase();
       value = value.length < 2 ? "0" + value : value;
     } else {

@@ -1848,7 +1848,7 @@ export const eiscpCommands = {
       query: { value: "QSTN" }
     },
     MVL: {
-      INTRANGES: [{ range: "0,100" }],
+      intgrRange: [{ range: "0,100" }],
       "level-up": { value: "UP" },
       "level-down": { value: "DOWN" },
       "level-up-1db-step": { value: "UP1" },
@@ -2275,7 +2275,7 @@ export const eiscpCommands = {
       query: { value: "QSTN" }
     },
     PRS: {
-      INTRANGES: { value: "1,40" },
+      intgrRange: { value: "1,40" },
       up: { value: "UP" },
       down: { value: "DOWN" },
       query: { value: "QSTN" }
@@ -2293,7 +2293,7 @@ export const eiscpCommands = {
     XAT: { query: { value: "QSTN" } },
     XTI: { query: { value: "QSTN" } },
     XCH: {
-      INTRANGES: [{ range: "0,597" }],
+      intgrRange: [{ range: "0,597" }],
       up: { value: "UP" },
       down: { value: "DOWN" },
       query: { value: "QSTN" }
@@ -2307,7 +2307,7 @@ export const eiscpCommands = {
     SAT: { query: { value: "QSTN" } },
     STI: { query: { value: "QSTN" } },
     SCH: {
-      INTRANGES: [{ range: "0,597" }],
+      intgrRange: [{ range: "0,597" }],
       up: { value: "UP" },
       down: { value: "DOWN" },
       query: { value: "QSTN" }
@@ -2667,7 +2667,7 @@ export const eiscpCommands = {
       down: { value: "DOWN" },
       query: { value: "QSTN" }
     },
-    UPM: { INTRANGES: [{ range: "1,40" }] },
+    UPM: { intgrRange: [{ range: "1,40" }] },
     UHP: { directly: { value: "1,8" } },
     UHB: {
       auto: { value: "00" },

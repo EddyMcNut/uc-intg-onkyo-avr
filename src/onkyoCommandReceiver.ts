@@ -21,6 +21,7 @@ import { avrCurrentSource, setAvrCurrentSource } from "./state.js";
 // import fetch from "node-fetch";
 import crypto from "crypto";
 import { OnkyoConfig } from "./configManager.js";
+import { log } from "console";
 
 const integrationName = "Onkyo-Integration: ";
 
@@ -101,13 +102,19 @@ export class OnkyoCommandReceiver {
 
         switch (avrUpdates.command) {
           case "system-power": {
+            log("******* %s %s", avrUpdates.command, avrUpdates.argument);
+            console.log("11111:", entity);
+            console.log("1111111:", entity?.attributes);
             this.driver.updateEntityAttributes(globalThis.selectedAvr, {
               [uc.MediaPlayerAttributes.State]:
                 avrUpdates.argument === "on" ? uc.MediaPlayerStates.On : uc.MediaPlayerStates.Standby
             });
+            console.log("222222:", entity);
+            console.log("2222222:", entity?.attributes);
             entity = this.driver.getConfiguredEntities().getEntity(globalThis.selectedAvr);
+            console.log("Entity after update:", entity);
+            console.log("Entity attributes:", entity?.attributes);
             console.log("%s power set to: %s", integrationName, entity?.attributes?.state);
-            console.log("%s Entity attributes after power update:", integrationName, entity?.attributes);
             break;
           }
           case "audio-muting": {
@@ -116,7 +123,6 @@ export class OnkyoCommandReceiver {
             });
             entity = this.driver.getConfiguredEntities().getEntity(globalThis.selectedAvr);
             console.log("%s audio-muting set to: %s", integrationName, entity?.attributes?.muted);
-            console.log("%s Entity attributes after muting update:", integrationName, entity?.attributes);
             break;
           }
           case "volume": {
@@ -125,7 +131,6 @@ export class OnkyoCommandReceiver {
             });
             entity = this.driver.getConfiguredEntities().getEntity(globalThis.selectedAvr);
             console.log("%s volume set to: %s", integrationName, entity?.attributes?.volume);
-            console.log("%s Entity attributes after volume update:", integrationName, entity?.attributes);
             break;
           }
           case "preset": {
@@ -140,7 +145,6 @@ export class OnkyoCommandReceiver {
             });
             entity = this.driver.getConfiguredEntities().getEntity(globalThis.selectedAvr);
             console.log("%s input-selector (source) set to: %s", integrationName, avrUpdates.argument.toString());
-            console.log("%s Entity attributes after source update:", integrationName, entity?.attributes);
             break;
           }
           case "DSN": {
@@ -157,11 +161,6 @@ export class OnkyoCommandReceiver {
               [uc.MediaPlayerAttributes.MediaDuration]: duration || "0"
             });
             entity = this.driver.getConfiguredEntities().getEntity(globalThis.selectedAvr);
-            console.log(
-              "%s Entity attributes after media position/duration update:",
-              integrationName,
-              entity?.attributes
-            );
             break;
           }
           case "metadata": {
@@ -170,7 +169,6 @@ export class OnkyoCommandReceiver {
               nowPlaying.album = (avrUpdates.argument as Record<string, string>).album || "unknown";
               nowPlaying.artist = (avrUpdates.argument as Record<string, string>).artist || "unknown";
               entity = this.driver.getConfiguredEntities().getEntity(globalThis.selectedAvr);
-              console.log("%s Entity attributes after metadata update:", integrationName, entity?.attributes);
             }
             break;
           }
