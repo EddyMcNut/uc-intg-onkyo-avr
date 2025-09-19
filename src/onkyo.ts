@@ -140,16 +140,6 @@ export default class OnkyoDriver {
 
           console.log("%s Connected to AVR: model=%s, ip=%s, port=%s", integrationName, avr.model, avr.host, avr.port);
 
-          // Query AVR state after successful connection
-          // this.eiscpInstance.command("system-power query");
-          // this.eiscpInstance.command("audio-muting query");
-          // this.eiscpInstance.command("volume query");
-          // this.eiscpInstance.command("input-selector query");
-          // this.eiscpInstance.command("preset query");
-          // this.eiscpInstance.raw("DSNQSTN");
-
-          // Register entity directly in configured entities (legacy behavior)
-          // Use addAvailableEntity for registration (legacy behavior)
           const mediaPlayerEntity = new uc.MediaPlayer(
             globalThis.selectedAvr,
             { en: globalThis.selectedAvr },
@@ -171,7 +161,6 @@ export default class OnkyoDriver {
                 uc.MediaPlayerFeatures.Dpad,
                 uc.MediaPlayerFeatures.Settings,
                 uc.MediaPlayerFeatures.Home,
-                uc.MediaPlayerFeatures.PlayPause,
                 uc.MediaPlayerFeatures.Next,
                 uc.MediaPlayerFeatures.Previous
               ],
@@ -188,19 +177,19 @@ export default class OnkyoDriver {
           mediaPlayerEntity.setCmdHandler(this.sharedCmdHandler.bind(this));
           this.driver.addAvailableEntity(mediaPlayerEntity);
           // Set initial default values for key attributes so remote sees valid options
-          this.driver.updateEntityAttributes(globalThis.selectedAvr, {
-            [uc.MediaPlayerAttributes.State]: uc.MediaPlayerStates.Standby,
-            [uc.MediaPlayerAttributes.Muted]: false,
-            [uc.MediaPlayerAttributes.Volume]: "0",
-            [uc.MediaPlayerAttributes.Source]: "unknown",
-            [uc.MediaPlayerAttributes.MediaType]: "audio",
-            [uc.MediaPlayerAttributes.MediaArtist]: "",
-            [uc.MediaPlayerAttributes.MediaTitle]: "",
-            [uc.MediaPlayerAttributes.MediaAlbum]: "",
-            [uc.MediaPlayerAttributes.MediaImageUrl]: "",
-            [uc.MediaPlayerAttributes.MediaPosition]: "0",
-            [uc.MediaPlayerAttributes.MediaDuration]: "0"
-          });
+          // this.driver.updateEntityAttributes(globalThis.selectedAvr, {
+          //   [uc.MediaPlayerAttributes.State]: uc.MediaPlayerStates.Standby,
+          //   [uc.MediaPlayerAttributes.Muted]: false,
+          //   [uc.MediaPlayerAttributes.Volume]: "0",
+          //   [uc.MediaPlayerAttributes.Source]: "unknown",
+          //   [uc.MediaPlayerAttributes.MediaType]: "audio",
+          //   [uc.MediaPlayerAttributes.MediaArtist]: "",
+          //   [uc.MediaPlayerAttributes.MediaTitle]: "",
+          //   [uc.MediaPlayerAttributes.MediaAlbum]: "",
+          //   [uc.MediaPlayerAttributes.MediaImageUrl]: "",
+          //   [uc.MediaPlayerAttributes.MediaPosition]: "0",
+          //   [uc.MediaPlayerAttributes.MediaDuration]: "0"
+          // });
         } else {
           console.log("%s Already connected to AVR, skipping connect()", integrationName);
         }
