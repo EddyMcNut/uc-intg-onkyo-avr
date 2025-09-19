@@ -201,14 +201,12 @@ export default class OnkyoDriver {
             [uc.MediaPlayerAttributes.MediaPosition]: "0",
             [uc.MediaPlayerAttributes.MediaDuration]: "0"
           });
-          // console.log("%s Initial entity attributes set for remote visibility.", integrationName);
         } else {
           console.log("%s Already connected to AVR, skipping connect()", integrationName);
         }
         await this.driver.setDeviceState(uc.DeviceStates.Connected);
         if (typeof this.driver.getAvailableEntities === "function") {
           const entities = this.driver.getAvailableEntities();
-          // console.log("%s getAvailableEntities():", integrationName, entities);
         }
         return;
       } catch (err) {

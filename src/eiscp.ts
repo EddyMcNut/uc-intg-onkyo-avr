@@ -139,7 +139,7 @@ export class EiscpDriver extends EventEmitter {
       value = value.trim();
     }
 
-    console.log("%s RAW: %s %s", integrationName, command, value);
+    // console.log("%s RAW: %s %s", integrationName, command, value);
 
     if (command === "NTM") {
       let [position, duration] = value.toString().split("/");
@@ -268,7 +268,6 @@ export class EiscpDriver extends EventEmitter {
           // Log ALL UDP packets, not just ECN
           const raw = packet.toString("hex");
           const ascii = packet.toString("ascii");
-          console.log(`[EiscpDriver] UDP packet from ${rinfo.address}:${rinfo.port} | HEX: ${raw} | ASCII: ${ascii}`);
           const message = this.eiscp_packet_extract(packet);
           const command = message.slice(0, 3);
           if (command === "ECN") {
@@ -289,7 +288,6 @@ export class EiscpDriver extends EventEmitter {
         .on("listening", () => {
           client.setBroadcast(true);
           const buffer = this.eiscp_packet("!xECNQSTN");
-          console.log(`[EiscpDriver] UDP sending to ${opts.address}:${opts.port} | Buffer:`, buffer.toString("hex"));
           client.send(buffer, 0, buffer.length, opts.port, opts.address, (err) => {
             if (err) console.error(`[EiscpDriver] UDP send error:`, err);
           });
@@ -324,7 +322,6 @@ export class EiscpDriver extends EventEmitter {
     const port = typeof this.config.port === "number" ? this.config.port : 60128;
     // If already connected, return info
     if (this.is_connected && this.eiscp) {
-      this.emit("debug", "Already connected, skipping connect()");
       return { model: this.config.model!, host: this.config.host!, port };
     }
     // If socket exists, try to connect
@@ -337,22 +334,9 @@ export class EiscpDriver extends EventEmitter {
     this.eiscp
       .on("connect", () => {
         this.is_connected = true;
-        this.emit("connect", this.config.host, this.config.port, this.config.model);
-        // Send initial queries after connection established
-        // this.command("system-power query");
-        // this.command("audio-muting query");
-        // this.command("volume query");
-        // this.command("input-selector query");
-        // this.command("preset query");
-        // this.raw("DSNQSTN");
-        // this.emit(
-        // "debug",
-        // // `[EiscpDriver] Connected to AVR at ${this.config.host}:${this.config.port} (model: ${this.config.model})`
-        // );
       })
       .on("close", () => {
         this.is_connected = false;
-        this.emit("close", this.config.host, this.config.port);
         if (this.config.reconnect) {
           setTimeout(() => this.connect(), this.config.reconnect_sleep! * 1000);
         }
@@ -407,7 +391,6 @@ export class EiscpDriver extends EventEmitter {
 
   raw(data: any, callback?: any) {
     if (typeof data !== "undefined" && data !== "") {
-      this.emit("debug", `[EiscpDriver] Sending raw command: ${data}`);
       this.send_queue.push(data, (err: any) => {
         if (typeof callback === "function") {
           callback(err, null);
@@ -435,7 +418,6 @@ export class EiscpDriver extends EventEmitter {
         command = parts[0];
         args = parts[1];
       } else {
-        this.emit("debug", `[EiscpDriver] Sending command: ${data}`);
         this.raw(this.command_to_iscp(data, undefined, "main"), callback);
         return;
       }
@@ -444,11 +426,9 @@ export class EiscpDriver extends EventEmitter {
       command = data.command;
       args = data.args;
     } else {
-      this.emit("debug", `[EiscpDriver] Sending command: ${JSON.stringify(data)}`);
       this.raw(this.command_to_iscp(data, undefined, "main"), callback);
       return;
     }
-    this.emit("debug", `[EiscpDriver] Sending command: zone=${zone}, command=${command}, args=${args}`);
     this.raw(this.command_to_iscp(command, args, zone), callback);
   }
 

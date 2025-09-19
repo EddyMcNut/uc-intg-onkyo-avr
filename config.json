@@ -1,1 +1,6 @@
-{}
+{
+  "port": 60128,
+  "longPressThreshold": 300,
+  "albumArtURL": "album_art.cgi",
+  "selectedAvr": "TX-RZ50 192.168.2.103"
+}

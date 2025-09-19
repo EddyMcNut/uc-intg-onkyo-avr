@@ -102,18 +102,11 @@ export class OnkyoCommandReceiver {
 
         switch (avrUpdates.command) {
           case "system-power": {
-            log("******* %s %s", avrUpdates.command, avrUpdates.argument);
-            console.log("11111:", entity);
-            console.log("1111111:", entity?.attributes);
             this.driver.updateEntityAttributes(globalThis.selectedAvr, {
               [uc.MediaPlayerAttributes.State]:
                 avrUpdates.argument === "on" ? uc.MediaPlayerStates.On : uc.MediaPlayerStates.Standby
             });
-            console.log("222222:", entity);
-            console.log("2222222:", entity?.attributes);
             entity = this.driver.getConfiguredEntities().getEntity(globalThis.selectedAvr);
-            console.log("Entity after update:", entity);
-            console.log("Entity attributes:", entity?.attributes);
             console.log("%s power set to: %s", integrationName, entity?.attributes?.state);
             break;
           }
