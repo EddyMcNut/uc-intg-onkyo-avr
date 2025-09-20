@@ -3,14 +3,14 @@ name: Build and Release
 on:
   push:
     branches:
-      - '**'
+      - "**"
     paths:
-      - '**/*.js'
-      - '**/*.ts'
-      - '.github/**/*.yml'
-      - 'package-lock.json'
+      - "**/*.js"
+      - "**/*.ts"
+      - ".github/**/*.yml"
+      - "package-lock.json"
     tags:
-      - 'v*.*.*'
+      - "v*.*.*"
   pull_request:
     branches: ["main"]
     types: [opened, synchronize, reopened]
@@ -42,6 +42,9 @@ jobs:
         run: |
           npm install
           npm run build
+
+      - name: Remove config.json
+        run: rm -f config.json
 
       - name: Get production modules
         run: |

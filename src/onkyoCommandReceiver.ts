@@ -1,10 +1,11 @@
 import * as uc from "@unfoldedcircle/integration-api";
-import eiscp from "./eiscp.js";
-import OnkyoDriver from "./onkyo.js";
+// import { EiscpDriver } from "./eiscp.js";
+// import OnkyoDriver from "./onkyo.js";
 import { avrCurrentSource, setAvrCurrentSource } from "./state.js";
 // import fetch from "node-fetch";
 import crypto from "crypto";
 import { OnkyoConfig } from "./configManager.js";
+
 
 const integrationName = "Onkyo-Integration: ";
 
@@ -20,6 +21,23 @@ export class OnkyoCommandReceiver {
     this.driver = driver;
     this.config = config;
   }
+
+// Utility: Convert Entities collection to array
+private entitiesToArray(entities: any): any[] {
+  const arr: any[] = [];
+  if (entities && typeof entities === "object") {
+    for (const key in entities) {
+      if (Object.prototype.hasOwnProperty.call(entities, key)) {
+        const ent = entities[key];
+        // Heuristic: skip non-entity keys (e.g., methods)
+        if (ent && typeof ent === "object" && ent.name) {
+          arr.push(ent);
+        }
+      }
+    }
+  }
+  return arr;
+}
 
   private async getImageHash(url: string): Promise<string> {
     try {
@@ -53,7 +71,7 @@ export class OnkyoCommandReceiver {
     }
   }
 
-  setupEiscpListener() {
+  setupEiscpListener(eiscp: any) {
     const nowPlaying: { station?: string; artist?: string; album?: string; title?: string } = {};
 
     eiscp.on("error", (err: any) => {
@@ -70,63 +88,84 @@ export class OnkyoCommandReceiver {
         port: number;
         model: string;
       }) => {
-        const entity = this.driver.getConfiguredEntities().getEntity(globalThis.selectedAvr);
+        // Legacy: allow updates even if entity is not in configuredEntities
+        let entity = this.driver.getConfiguredEntities().getEntity(globalThis.selectedAvr);
         if (!entity) {
-          console.warn("%s Entity not found for: %s", integrationName, globalThis.selectedAvr);
-          return;
+          // Try availableEntities as fallback using utility
+          const availableEntitiesArr = this.entitiesToArray(this.driver.getAvailableEntities());
+          for (const e of availableEntitiesArr) {
+            if (e.name === globalThis.selectedAvr) {
+              entity = e;
+              break;
+            }
+          }
         }
 
         switch (avrUpdates.command) {
-          case "system-power":
+          case "system-power": {
             this.driver.updateEntityAttributes(globalThis.selectedAvr, {
               [uc.MediaPlayerAttributes.State]:
                 avrUpdates.argument === "on" ? uc.MediaPlayerStates.On : uc.MediaPlayerStates.Standby
             });
-            console.log("%s power set to: %s", integrationName, entity.attributes?.state);
+            entity = this.driver.getConfiguredEntities().getEntity(globalThis.selectedAvr);
+            console.log("%s power set to: %s", integrationName, entity?.attributes?.state);
             break;
-          case "audio-muting":
+          }
+          case "audio-muting": {
             this.driver.updateEntityAttributes(globalThis.selectedAvr, {
               [uc.MediaPlayerAttributes.Muted]: avrUpdates.argument === "on" ? true : false
             });
-            console.log("%s audio-muting set to: %s", integrationName, entity.attributes?.muted);
+            entity = this.driver.getConfiguredEntities().getEntity(globalThis.selectedAvr);
+            console.log("%s audio-muting set to: %s", integrationName, entity?.attributes?.muted);
             break;
-          case "volume":
+          }
+          case "volume": {
             this.driver.updateEntityAttributes(globalThis.selectedAvr, {
               [uc.MediaPlayerAttributes.Volume]: avrUpdates.argument.toString()
             });
-            console.log("%s volume set to: %s", integrationName, entity.attributes?.volume);
+            entity = this.driver.getConfiguredEntities().getEntity(globalThis.selectedAvr);
+            console.log("%s volume set to: %s", integrationName, entity?.attributes?.volume);
             break;
-          case "preset":
+          }
+          case "preset": {
             this.avrPreset = avrUpdates.argument.toString();
             console.log("%s preset set to: %s", integrationName, this.avrPreset);
             break;
-          case "input-selector":
+          }
+          case "input-selector": {
             setAvrCurrentSource(avrUpdates.argument.toString());
             this.driver.updateEntityAttributes(globalThis.selectedAvr, {
               [uc.MediaPlayerAttributes.Source]: avrUpdates.argument.toString()
             });
+            entity = this.driver.getConfiguredEntities().getEntity(globalThis.selectedAvr);
             console.log("%s input-selector (source) set to: %s", integrationName, avrUpdates.argument.toString());
             break;
-          case "DSN":
+          }
+          case "DSN": {
             setAvrCurrentSource("dab");
             nowPlaying.station = avrUpdates.argument.toString();
             nowPlaying.artist = "DAB Radio";
             console.log("%s DAB station set to: %s", integrationName, avrUpdates.argument.toString());
             break;
-          case "NTM":
+          }
+          case "NTM": {
             let [position, duration] = avrUpdates.argument.toString().split("/");
             this.driver.updateEntityAttributes(globalThis.selectedAvr, {
               [uc.MediaPlayerAttributes.MediaPosition]: position || "0",
               [uc.MediaPlayerAttributes.MediaDuration]: duration || "0"
             });
+            entity = this.driver.getConfiguredEntities().getEntity(globalThis.selectedAvr);
             break;
-          case "metadata":
+          }
+          case "metadata": {
             if (typeof avrUpdates.argument === "object" && avrUpdates.argument !== null) {
               nowPlaying.title = (avrUpdates.argument as Record<string, string>).title || "unknown";
               nowPlaying.album = (avrUpdates.argument as Record<string, string>).album || "unknown";
               nowPlaying.artist = (avrUpdates.argument as Record<string, string>).artist || "unknown";
+              entity = this.driver.getConfiguredEntities().getEntity(globalThis.selectedAvr);
             }
             break;
+          }
           default:
             break;
         }

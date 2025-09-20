@@ -1,12 +1,12 @@
 /*jslint node:true nomen:true*/
 "use strict";
 import * as uc from "@unfoldedcircle/integration-api";
-import eiscp from "./eiscp.js";
+import EiscpDriver from "./eiscp.js";
 import { ConfigManager, OnkyoConfig } from "./configManager.js";
+import { DEFAULT_LONG_PRESS_THRESHOLD } from "./configManager.js";
 import { OnkyoCommandSender } from "./onkyoCommandSender.js";
 import { OnkyoCommandReceiver } from "./onkyoCommandReceiver.js";
 
-// Augment globalThis to include selectedAvr
 declare global {
   // eslint-disable-next-line no-var
   var selectedAvr: string;
@@ -19,25 +19,34 @@ export default class OnkyoDriver {
   private commandSender: OnkyoCommandSender;
   private commandReceiver: OnkyoCommandReceiver;
   private config: OnkyoConfig;
+  private eiscpInstance: EiscpDriver;
 
   constructor() {
-      this.driver = new uc.IntegrationAPI();
-      this.config = ConfigManager.load(); // <-- Load config first!
-      this.commandSender = new OnkyoCommandSender(this.driver, this.config);
-      this.commandReceiver = new OnkyoCommandReceiver(this.driver, this.config);
-      this.driver.init("driver.json", this.handleDriverSetup.bind(this));
-      this.setupEventHandlers();
-      this.commandReceiver.setupEiscpListener();
-      this.setupDriverEvents();
-      console.log("Loaded config at startup:", this.config);
+    this.driver = new uc.IntegrationAPI();
+    this.config = ConfigManager.load();
+    this.eiscpInstance = new EiscpDriver({
+      host: this.config.ip,
+      port: this.config.port,
+      model: this.config.model
+    });
+    this.commandSender = new OnkyoCommandSender(this.driver, this.config, this.eiscpInstance);
+    this.commandReceiver = new OnkyoCommandReceiver(this.driver, this.config);
+    this.driver.init("driver.json", this.handleDriverSetup.bind(this));
+    this.setupEventHandlers();
+    this.commandReceiver.setupEiscpListener(this.eiscpInstance);
+    this.setupDriverEvents();
+    console.log("Loaded config at startup:", this.config);
 
-      // Auto-register entity after startup if config is present
-      if (this.config && this.config.model && this.config.ip && this.config.port) {
-        this.handleConnect();
-      } else {
-        // Optionally, auto-run setup if config is missing
-        console.log("Config missing or incomplete, waiting for setup.");
-      }
+    // Auto-register entity after startup if config is present
+    if (this.config && this.config.model && this.config.ip && this.config.port) {
+      this.handleConnect();
+    } else {
+      console.log("Config missing or incomplete, waiting for setup.");
+    }
+
+    this.eiscpInstance.on("error", (err: any) => {
+      console.error("%s EiscpDriver error:", integrationName, err);
+    });
   }
 
   private async handleDriverSetup(msg: uc.SetupDriver): Promise<uc.SetupAction> {
@@ -57,9 +66,9 @@ export default class OnkyoDriver {
     }
     if (longPressThreshold && longPressThreshold.toString().trim() !== "") {
       const longPressNum = parseInt(longPressThreshold, 10);
-      this.config.longPressThreshold = isNaN(longPressNum) ? 300 : longPressNum;
+      this.config.longPressThreshold = isNaN(longPressNum) ? DEFAULT_LONG_PRESS_THRESHOLD : longPressNum;
     } else {
-      this.config.longPressThreshold = 300;
+      this.config.longPressThreshold = DEFAULT_LONG_PRESS_THRESHOLD;
     }
     this.config.albumArtURL = typeof albumArtURL === "string" && albumArtURL.trim() !== "" ? albumArtURL.trim() : "";
 
@@ -72,7 +81,6 @@ export default class OnkyoDriver {
       albumArtURL: this.config.albumArtURL
     });
 
-    // Re-trigger connection after setup
     await this.handleConnect();
 
     return new uc.SetupComplete();
@@ -89,30 +97,21 @@ export default class OnkyoDriver {
 
     while (attempts < maxAttempts) {
       try {
-        if (!eiscp.connected) {
+        if (!this.eiscpInstance.connected) {
           console.log("%s Attempting to connect to AVR... (attempt %d)", integrationName, attempts + 1);
-
-          console.log(
-            "%s Connecting with model: %s, ip: %s, port: %s",
-            integrationName,
-            this.config.model,
-            this.config.ip,
-            this.config.port
-          );
 
           const avr =
             this.config.model !== undefined
-              ? await eiscp.connect({
+              ? await this.eiscpInstance.connect({
                   model: this.config.model,
                   host: this.config.ip,
                   port: this.config.port
                 })
-              : await eiscp.connect();
+              : await this.eiscpInstance.connect();
 
           if (!avr || !avr.model) {
             throw new Error("AVR connection failed or returned null");
           }
-
 
           // Update config with discovered model, IP, and port
           this.config.model = avr.model;
@@ -130,17 +129,8 @@ export default class OnkyoDriver {
           const selectedAvr = `${avr.model} ${avr.host}`;
           globalThis.selectedAvr = selectedAvr;
 
-          console.log("%s RECOVERY: Connected to AVR: %s (%s:%s)", integrationName, avr.model, avr.host, avr.port);
+          console.log("%s Connected to AVR: model=%s, ip=%s, port=%s", integrationName, avr.model, avr.host, avr.port);
 
-          // Query AVR state after successful connection
-          eiscp.command("system-power query");
-          eiscp.command("audio-muting query");
-          eiscp.command("volume query");
-          eiscp.command("input-selector query");
-          eiscp.command("preset query");
-          eiscp.raw("DSNQSTN");
-
-          // Create and register entity after connection
           const mediaPlayerEntity = new uc.MediaPlayer(
             globalThis.selectedAvr,
             { en: globalThis.selectedAvr },
@@ -162,7 +152,6 @@ export default class OnkyoDriver {
                 uc.MediaPlayerFeatures.Dpad,
                 uc.MediaPlayerFeatures.Settings,
                 uc.MediaPlayerFeatures.Home,
-                uc.MediaPlayerFeatures.PlayPause,
                 uc.MediaPlayerFeatures.Next,
                 uc.MediaPlayerFeatures.Previous
               ],
@@ -182,13 +171,16 @@ export default class OnkyoDriver {
           console.log("%s Already connected to AVR, skipping connect()", integrationName);
         }
         await this.driver.setDeviceState(uc.DeviceStates.Connected);
+        if (typeof this.driver.getAvailableEntities === "function") {
+          const entities = this.driver.getAvailableEntities();
+        }
         return;
       } catch (err) {
         attempts++;
         console.error("%s RECOVERY: Failed to connect to AVR (attempt %d):", integrationName, attempts, err);
-        if (typeof eiscp.disconnect === "function") {
+        if (typeof this.eiscpInstance.disconnect === "function") {
           try {
-            await eiscp.disconnect();
+            await this.eiscpInstance.disconnect();
             console.log("%s AVR connection cleaned up after failure.", integrationName);
           } catch (cleanupErr) {
             console.error("%s Failed to clean up AVR connection:", integrationName, cleanupErr);
@@ -214,6 +206,13 @@ export default class OnkyoDriver {
         console.log(
           `${integrationName} Subscribed entity: ${entityId}, long-press threshold set to: ${this.config.longPressThreshold}ms`
         );
+        // Query AVR state after successful connection
+        this.eiscpInstance.command("system-power query");
+        this.eiscpInstance.command("audio-muting query");
+        this.eiscpInstance.command("volume query");
+        this.eiscpInstance.command("input-selector query");
+        this.eiscpInstance.command("preset query");
+        this.eiscpInstance.raw("DSNQSTN");
       });
     });
 
@@ -224,7 +223,7 @@ export default class OnkyoDriver {
     });
   }
 
-  // Use the sender class for command handling 
+  // Use the sender class for command handling
   private async sharedCmdHandler(
     entity: uc.Entity,
     cmdId: string,

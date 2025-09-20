@@ -1,6 +1,7 @@
 import * as uc from "@unfoldedcircle/integration-api";
-import eiscp from "./eiscp.js";
+import eiscp, { EiscpDriver } from "./eiscp.js";
 import { OnkyoConfig } from "./configManager.js";
+import { DEFAULT_LONG_PRESS_THRESHOLD } from "./configManager.js";
 
 const integrationName = "Onkyo-Integration: ";
 let lastCommandTime = 0;
@@ -8,10 +9,12 @@ let lastCommandTime = 0;
 export class OnkyoCommandSender {
   private driver: uc.IntegrationAPI;
   private config: OnkyoConfig;
+  private eiscp: EiscpDriver;
 
-  constructor(driver: uc.IntegrationAPI, config: OnkyoConfig) {
+  constructor(driver: uc.IntegrationAPI, config: OnkyoConfig, eiscp: EiscpDriver) {
     this.driver = driver;
     this.config = config;
+    this.eiscp = eiscp;
   }
 
   async sharedCmdHandler(
@@ -20,13 +23,13 @@ export class OnkyoCommandSender {
     params?: { [key: string]: string | number | boolean }
   ): Promise<uc.StatusCodes> {
     try {
-      await eiscp.waitForConnect();
+      await this.eiscp.waitForConnect();
     } catch (err) {
       console.warn("%s Could not send command, AVR not connected: %s", integrationName, err);
       for (let attempt = 1; attempt <= 5; attempt++) {
         await new Promise((resolve) => setTimeout(resolve, 1000));
         try {
-          await eiscp.waitForConnect();
+          await this.eiscp.waitForConnect();
           break;
         } catch (retryErr) {
           if (attempt === 5) {
@@ -44,77 +47,77 @@ export class OnkyoCommandSender {
         const now = Date.now();
         switch (cmdId) {
           case uc.MediaPlayerCommands.On:
-            await eiscp.command("system-power on");
+            await this.eiscp.command("system-power on");
             break;
           case uc.MediaPlayerCommands.Off:
-            await eiscp.command("system-power standby");
+            await this.eiscp.command("system-power standby");
             break;
           case uc.MediaPlayerCommands.Toggle:
             entity.attributes?.state === uc.MediaPlayerStates.On
-              ? await eiscp.command("system-power standby")
-              : await eiscp.command("system-power on");
+              ? await this.eiscp.command("system-power standby")
+              : await this.eiscp.command("system-power on");
             break;
           case uc.MediaPlayerCommands.MuteToggle:
-            await eiscp.command("audio-muting toggle");
+            await this.eiscp.command("audio-muting toggle");
             break;
           case uc.MediaPlayerCommands.VolumeUp:
             if (now - lastCommandTime > (this.config.longPressThreshold ?? 333)) {
               lastCommandTime = now;
-              await eiscp.command("volume level-up-1db-step");
+              await this.eiscp.command("volume level-up-1db-step");
             }
             break;
           case uc.MediaPlayerCommands.VolumeDown:
             if (now - lastCommandTime > (this.config.longPressThreshold ?? 333)) {
               lastCommandTime = now;
-              await eiscp.command("volume level-down-1db-step");
+              await this.eiscp.command("volume level-down-1db-step");
             }
             break;
           case uc.MediaPlayerCommands.ChannelUp:
-            await eiscp.command("preset up");
+            await this.eiscp.command("preset up");
             break;
           case uc.MediaPlayerCommands.ChannelDown:
-            await eiscp.command("preset down");
+            await this.eiscp.command("preset down");
             break;
           case uc.MediaPlayerCommands.SelectSource:
             if (params?.source) {
               if (typeof params.source === "string" && params.source.toLowerCase().startsWith("raw")) {
                 const rawCmd = (params.source as string).substring(3).trim().toUpperCase();
                 console.error("%s sending raw command: %s", integrationName, rawCmd);
-                await eiscp.raw(rawCmd);
+                await this.eiscp.raw(rawCmd);
               } else if (typeof params.source === "string") {
-                await eiscp.command(`${params.source.toLowerCase()}`);
+                await this.eiscp.command(`${params.source.toLowerCase()}`);
               }
             }
             break;
           case uc.MediaPlayerCommands.PlayPause:
-            await eiscp.command("network-usb play");
+            await this.eiscp.command("network-usb play");
             break;
           case uc.MediaPlayerCommands.Next:
-            await eiscp.command("network-usb trup");
+            await this.eiscp.command("network-usb trup");
             break;
           case uc.MediaPlayerCommands.Previous:
-            await eiscp.command("network-usb trdn");
+            await this.eiscp.command("network-usb trdn");
             break;
           case uc.MediaPlayerCommands.Settings:
-            await eiscp.command("setup menu");
+            await this.eiscp.command("setup menu");
             break;
           case uc.MediaPlayerCommands.Home:
-            await eiscp.command("setup exit");
+            await this.eiscp.command("setup exit");
             break;
           case uc.MediaPlayerCommands.CursorEnter:
-            await eiscp.command("setup enter");
+            await this.eiscp.command("setup enter");
             break;
           case uc.MediaPlayerCommands.CursorUp:
-            await eiscp.command("setup up");
+            await this.eiscp.command("setup up");
             break;
           case uc.MediaPlayerCommands.CursorDown:
-            await eiscp.command("setup down");
+            await this.eiscp.command("setup down");
             break;
           case uc.MediaPlayerCommands.CursorLeft:
-            await eiscp.command("setup left");
+            await this.eiscp.command("setup left");
             break;
           case uc.MediaPlayerCommands.CursorRight:
-            await eiscp.command("setup right");
+            await this.eiscp.command("setup right");
             break;
           default:
             return uc.StatusCodes.NotImplemented;
