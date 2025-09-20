@@ -56,8 +56,14 @@ export default class OnkyoDriver {
     const longPressThreshold = (msg as any).setupData?.longPressThreshold;
     const albumArtURL = (msg as any).setupData?.albumArtURL;
 
-    this.config.model = typeof model === "string" && model.trim() !== "" ? model.trim() : undefined;
-    this.config.ip = typeof ipAddress === "string" && ipAddress.trim() !== "" ? ipAddress.trim() : undefined;
+    // Only overwrite if provided, else keep existing
+    if (typeof model === "string" && model.trim() !== "") {
+      this.config.model = model.trim();
+    }
+    if (typeof ipAddress === "string" && ipAddress.trim() !== "") {
+      this.config.ip = ipAddress.trim();
+    }
+
     if (port && port.toString().trim() !== "") {
       const portNum = parseInt(port, 10);
       this.config.port = isNaN(portNum) ? undefined : portNum;
