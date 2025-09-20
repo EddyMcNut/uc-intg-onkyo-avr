@@ -1,5 +1,5 @@
 import * as uc from "@unfoldedcircle/integration-api";
-import { EiscpDriver } from "./eiscp.js";
+import eiscp, { EiscpDriver } from "./eiscp.js";
 import { OnkyoConfig } from "./configManager.js";
 import { DEFAULT_LONG_PRESS_THRESHOLD } from "./configManager.js";
 
@@ -46,39 +46,39 @@ export class OnkyoCommandSender {
       if (entity.id === globalThis.selectedAvr) {
         const now = Date.now();
         switch (cmdId) {
-          case "on":
+          case uc.MediaPlayerCommands.On:
             await this.eiscp.command("system-power on");
             break;
-          case "off":
+          case uc.MediaPlayerCommands.Off:
             await this.eiscp.command("system-power standby");
             break;
-          case "toggle":
+          case uc.MediaPlayerCommands.Toggle:
             entity.attributes?.state === uc.MediaPlayerStates.On
               ? await this.eiscp.command("system-power standby")
               : await this.eiscp.command("system-power on");
             break;
-          case "mutetoggle":
+          case uc.MediaPlayerCommands.MuteToggle:
             await this.eiscp.command("audio-muting toggle");
             break;
-          case "volumeup":
-            if (now - lastCommandTime > (this.config.longPressThreshold ?? DEFAULT_LONG_PRESS_THRESHOLD)) {
+          case uc.MediaPlayerCommands.VolumeUp:
+            if (now - lastCommandTime > (this.config.longPressThreshold ?? 333)) {
               lastCommandTime = now;
               await this.eiscp.command("volume level-up-1db-step");
             }
             break;
-          case "volumedown":
-            if (now - lastCommandTime > (this.config.longPressThreshold ?? DEFAULT_LONG_PRESS_THRESHOLD)) {
+          case uc.MediaPlayerCommands.VolumeDown:
+            if (now - lastCommandTime > (this.config.longPressThreshold ?? 333)) {
               lastCommandTime = now;
               await this.eiscp.command("volume level-down-1db-step");
             }
             break;
-          case "channelup":
+          case uc.MediaPlayerCommands.ChannelUp:
             await this.eiscp.command("preset up");
             break;
-          case "channeldown":
+          case uc.MediaPlayerCommands.ChannelDown:
             await this.eiscp.command("preset down");
             break;
-          case "selectsource":
+          case uc.MediaPlayerCommands.SelectSource:
             if (params?.source) {
               if (typeof params.source === "string" && params.source.toLowerCase().startsWith("raw")) {
                 const rawCmd = (params.source as string).substring(3).trim().toUpperCase();
@@ -89,34 +89,34 @@ export class OnkyoCommandSender {
               }
             }
             break;
-          case "playpause":
+          case uc.MediaPlayerCommands.PlayPause:
             await this.eiscp.command("network-usb play");
             break;
-          case "next":
+          case uc.MediaPlayerCommands.Next:
             await this.eiscp.command("network-usb trup");
             break;
-          case "previous":
+          case uc.MediaPlayerCommands.Previous:
             await this.eiscp.command("network-usb trdn");
             break;
-          case "settings":
+          case uc.MediaPlayerCommands.Settings:
             await this.eiscp.command("setup menu");
             break;
-          case "home":
+          case uc.MediaPlayerCommands.Home:
             await this.eiscp.command("setup exit");
             break;
-          case "cursorenter":
+          case uc.MediaPlayerCommands.CursorEnter:
             await this.eiscp.command("setup enter");
             break;
-          case "cursorup":
+          case uc.MediaPlayerCommands.CursorUp:
             await this.eiscp.command("setup up");
             break;
-          case "cursordown":
+          case uc.MediaPlayerCommands.CursorDown:
             await this.eiscp.command("setup down");
             break;
-          case "cursorleft":
+          case uc.MediaPlayerCommands.CursorLeft:
             await this.eiscp.command("setup left");
             break;
-          case "cursorright":
+          case uc.MediaPlayerCommands.CursorRight:
             await this.eiscp.command("setup right");
             break;
           default:

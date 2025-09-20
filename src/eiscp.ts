@@ -139,7 +139,7 @@ export class EiscpDriver extends EventEmitter {
       value = value.trim();
     }
 
-    // console.log("%s RAW: %s %s", integrationName, command, value); 
+    // console.log("%s RAW: %s %s", integrationName, command, value);
 
     if (command === "NTM") {
       let [position, duration] = value.toString().split("/");
