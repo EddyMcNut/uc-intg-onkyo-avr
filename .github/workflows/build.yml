@@ -43,6 +43,9 @@ jobs:
           npm install
           npm run build
 
+      - name: Remove config.json
+        run: rm -f config.json
+
       - name: Get production modules
         run: |
           rm -Rf node_modules
