@@ -1,3 +1,6 @@
+[![GitHub release](https://img.shields.io/github/v/release/Ed/uc-intg-onkyo-avr)](https://github.com/Ed/uc-intg-onkyo-avr/releases)
+[![GitHub all releases](https://img.shields.io/github/downloads/Ed/uc-intg-onkyo-avr/total)](https://github.com/Ed/uc-intg-onkyo-avr/releases) 
+[![Discord](https://img.shields.io/discord/553671366411288576?label=Discord)](https://discord.com/channels/553671366411288576/1405962064521855127)
 # uc-intg-onkyo-avr
 
 Onkyo AVR custom integration for Unfolded Circle remotes.
