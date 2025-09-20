@@ -124,7 +124,7 @@ In the new Activity, `User interface`, add `Text Button` and select `Input sourc
 
 ![](./screenshots/preset15.png)
 
-- As the code uses the impressive JSON mentioned in the Kudos section, you can cheat a bit with it to give commands which are mentioned in the JSON. For example in the [JSON](./src/eiscp-commands.json) is mentioned `dimmer-level` with possible value `dim`, let's give it a try: yes the AVR display dims to the next level!
+- As the code uses the impressive JSON mentioned in the Kudos section, you can cheat a bit with it to give commands which are mentioned in the JSON. For example in the [JSON](./src/eiscp-commands.ts) is mentioned `dimmer-level` with possible value `dim`, let's give it a try: yes the AVR display dims to the next level!
 
   ![](./screenshots/dimmer.png)
 
@@ -140,9 +140,9 @@ The AVR itself may display the volume as dB (relative) or as an absolute number,
 
 ## Listening modes
 
-Like descibed in the Cheats section, you can send a lot of different commands which are all mentioned in the [JSON](./src/eiscp-commands.json) file.
+Like descibed in the Cheats section, you can send a lot of different commands which are all mentioned in the [JSON](./src/eiscp-commands.ts) file.
 
-Probably you have your AVR set to automatically select the best listening mode, but sometimes you might want to set a favorite mode, see the listening-mode section in the [JSON](./src/eiscp-commands.json), for the correct command. A few examples from that JSON:
+Probably you have your AVR set to automatically select the best listening mode, but sometimes you might want to set a favorite mode, see the listening-mode section in the [JSON](./src/eiscp-commands.ts), for the correct command. A few examples from that JSON:
 
 | Listening mode                      | value in `Input source`                            |
 | ----------------------------------- | -------------------------------------------------- |
@@ -153,7 +153,7 @@ Probably you have your AVR set to automatically select the best listening mode, 
 
 ![](./screenshots/stereo.png)
 
-## But what about the more modern stuff like `Dolby Atmos`, `DTS:X`, `Auro-3D`, `IMAX Enhanced`?
+## What about `Dolby Atmos`, `DTS:X`, `Auro-3D`, `IMAX Enhanced`?
 
 eISCP codes for Atmos, DTS:X, Auro-3D, and IMAX Enhanced are not standardized and may vary by receiver model and firmware.
 
