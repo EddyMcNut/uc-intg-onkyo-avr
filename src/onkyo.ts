@@ -7,7 +7,6 @@ import { DEFAULT_LONG_PRESS_THRESHOLD } from "./configManager.js";
 import { OnkyoCommandSender } from "./onkyoCommandSender.js";
 import { OnkyoCommandReceiver } from "./onkyoCommandReceiver.js";
 
-// Augment globalThis to include selectedAvr
 declare global {
   // eslint-disable-next-line no-var
   var selectedAvr: string;
@@ -24,7 +23,7 @@ export default class OnkyoDriver {
 
   constructor() {
     this.driver = new uc.IntegrationAPI();
-    this.config = ConfigManager.load(); // <-- Load config first!
+    this.config = ConfigManager.load();
     this.eiscpInstance = new EiscpDriver({
       host: this.config.ip,
       port: this.config.port,
@@ -42,19 +41,12 @@ export default class OnkyoDriver {
     if (this.config && this.config.model && this.config.ip && this.config.port) {
       this.handleConnect();
     } else {
-      // Optionally, auto-run setup if config is missing
       console.log("Config missing or incomplete, waiting for setup.");
     }
 
     this.eiscpInstance.on("error", (err: any) => {
       console.error("%s EiscpDriver error:", integrationName, err);
     });
-    // this.eiscpInstance.on("data", (data) => {
-    //   console.log("Received data from AVR:", data);
-    // });
-    // this.eiscpInstance.on("debug", (msg: string) => {
-    //   console.log("[EiscpDriver DEBUG]", msg);
-    // });
   }
 
   private async handleDriverSetup(msg: uc.SetupDriver): Promise<uc.SetupAction> {
@@ -89,7 +81,6 @@ export default class OnkyoDriver {
       albumArtURL: this.config.albumArtURL
     });
 
-    // Re-trigger connection after setup
     await this.handleConnect();
 
     return new uc.SetupComplete();

@@ -1,27 +1,11 @@
-// Utility: Convert Entities collection to array
-function entitiesToArray(entities: any): any[] {
-  const arr: any[] = [];
-  if (entities && typeof entities === "object") {
-    for (const key in entities) {
-      if (Object.prototype.hasOwnProperty.call(entities, key)) {
-        const ent = entities[key];
-        // Heuristic: skip non-entity keys (e.g., methods)
-        if (ent && typeof ent === "object" && ent.name) {
-          arr.push(ent);
-        }
-      }
-    }
-  }
-  return arr;
-}
 import * as uc from "@unfoldedcircle/integration-api";
 // import { EiscpDriver } from "./eiscp.js";
-import OnkyoDriver from "./onkyo.js";
+// import OnkyoDriver from "./onkyo.js";
 import { avrCurrentSource, setAvrCurrentSource } from "./state.js";
 // import fetch from "node-fetch";
 import crypto from "crypto";
 import { OnkyoConfig } from "./configManager.js";
-import { log } from "console";
+
 
 const integrationName = "Onkyo-Integration: ";
 
@@ -37,6 +21,23 @@ export class OnkyoCommandReceiver {
     this.driver = driver;
     this.config = config;
   }
+
+// Utility: Convert Entities collection to array
+private entitiesToArray(entities: any): any[] {
+  const arr: any[] = [];
+  if (entities && typeof entities === "object") {
+    for (const key in entities) {
+      if (Object.prototype.hasOwnProperty.call(entities, key)) {
+        const ent = entities[key];
+        // Heuristic: skip non-entity keys (e.g., methods)
+        if (ent && typeof ent === "object" && ent.name) {
+          arr.push(ent);
+        }
+      }
+    }
+  }
+  return arr;
+}
 
   private async getImageHash(url: string): Promise<string> {
     try {
@@ -91,7 +92,7 @@ export class OnkyoCommandReceiver {
         let entity = this.driver.getConfiguredEntities().getEntity(globalThis.selectedAvr);
         if (!entity) {
           // Try availableEntities as fallback using utility
-          const availableEntitiesArr = entitiesToArray(this.driver.getAvailableEntities());
+          const availableEntitiesArr = this.entitiesToArray(this.driver.getAvailableEntities());
           for (const e of availableEntitiesArr) {
             if (e.name === globalThis.selectedAvr) {
               entity = e;
