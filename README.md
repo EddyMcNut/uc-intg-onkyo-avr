@@ -112,6 +112,29 @@ Just assign the volume command to the short-press in webconfigurator, **don't** 
 
 Let's say that you select the AVR in the Spotify app on your phone and your AVR switches source to Spotify, the remote will sense that and will try to collect the album art, artist, title and album. All this is collected from the AVR, this integration does not communicate with Spotify directly. Also `play/pause`, `next` and `previous` will be send to the AVR, the AVR will handle the communicatio with your Spotify app.
 
+### Spotify activity
+
+To set up an Activity for Spotify, have a look at these screenshots:
+- Create activity and prevent sleep
+
+  ![](./screenshots/prevent-sleep.png)
+
+- On sequence, Input source: `input-selector net`
+
+  ![](./screenshots/spotify-on.png)
+
+- User inerface, add mediawidget for the AVR with maximum size
+
+    ![](./screenshots/spotify-mediawidget.png)
+
+- Button mapping, map to the buttons you prefer (for example previous/next can be mapped to channel up/down):
+  - volume up/down
+  - play/pause
+  - previous/next
+  - mute
+
+    ![](./screenshots/spotify-next.png)
+
 ## Cheats
 
 In the new Activity, `User interface`, add `Text Button` and select `Input source`, because there is a text field where you can type anything, we can give all kinds of commands, like presets or input sources:
