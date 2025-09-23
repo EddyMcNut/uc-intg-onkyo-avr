@@ -34,10 +34,10 @@ RUN addgroup -g 1001 -S nodejs && \
 RUN chown -R nextjs:nodejs /app
 USER nextjs
 
-# Health check
+# Health check - Fixed: Use process.env instead of shell variable expansion
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD node -e "const http = require('http'); \
-    const options = { hostname: 'localhost', port: ${UC_INTEGRATION_HTTP_PORT}, path: '/', timeout: 2000 }; \
+    const options = { hostname: 'localhost', port: process.env.UC_INTEGRATION_HTTP_PORT || 9090, path: '/', timeout: 2000 }; \
     const req = http.request(options, (res) => { \
       if (res.statusCode === 200) process.exit(0); \
       else process.exit(1); \
