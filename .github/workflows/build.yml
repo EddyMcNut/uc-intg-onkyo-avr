@@ -16,7 +16,7 @@ on:
     types: [opened, synchronize, reopened]
 
 env:
-  INTG_NAME: onkyo-avr
+  INTG_NAME: uc-onkyo-avr
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
 
