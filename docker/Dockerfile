@@ -6,14 +6,18 @@ WORKDIR /app
 
 # Install dependencies first for better caching
 COPY package*.json ./
-RUN npm ci --only=production
+RUN npm ci
 
 # Copy TypeScript config and source code
 COPY tsconfig.json ./
 COPY src/ ./src/
+COPY driver.json ./
 
 # Build the TypeScript code
 RUN npm run build
+
+# Remove dev dependencies for smaller image
+RUN npm ci --only=production && npm cache clean --force
 
 # Create config directory
 RUN mkdir -p /app/config
@@ -46,5 +50,5 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
     req.on('timeout', () => process.exit(1)); \
     req.end();"
 
-# Start the application
-CMD ["npm", "start"]
+# Start the application directly from built code
+CMD ["node", "dist/index.js"]
