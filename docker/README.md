@@ -7,8 +7,6 @@ This Docker configuration allows you to run the Onkyo AVR Integration in a conta
 - `Dockerfile` - Docker image definition
 - `docker-compose.yml` - Docker Compose configuration
 - `.dockerignore` - Exclusion of files during build
-- `build-and-run.sh` - Build and start script (Linux/Mac)
-- `build-and-run.bat` - Build and start script (Windows)
 
 ## Usage
 
@@ -58,21 +56,6 @@ docker-compose logs -f onkyo-avr-integration
 docker-compose down
 ```
 
-### With the provided scripts
-
-#### Linux/Mac:
-```bash
-cd docker
-chmod +x build-and-run.sh
-./build-and-run.sh
-```
-
-#### Windows:
-```cmd
-cd docker
-build-and-run.bat
-```
-
 ### Manually with Docker
 
 ```bash
@@ -106,8 +89,6 @@ docker run -d \
 
 The container uses `network_mode: host` for automatic network discovery of Onkyo AVR devices.
 
-If you want to use a custom network, uncomment the corresponding lines in the `docker-compose.yml`.
-
 ## Directory Structure
 
 ```
@@ -116,8 +97,6 @@ project-root/
 │   ├── Dockerfile
 │   ├── docker-compose.yml
 │   ├── .dockerignore
-│   ├── build-and-run.sh
-│   ├── build-and-run.bat
 │   └── README.md
 ├── config/           # Mounted as volume
 └── logs/            # Optional for logs
