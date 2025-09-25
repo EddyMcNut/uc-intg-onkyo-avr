@@ -1,8 +1,6 @@
 services:
   onkyo-avr-integration:
-    build: 
-      context: ..
-      dockerfile: docker/Dockerfile
+    image: ghcr.io/eddymcnut/uc-intg-onkyo-avr:latest
     container_name: onkyo-avr-integration
     restart: unless-stopped
     network_mode: host  # Required for network discovery and Onkyo AVR communication
@@ -14,13 +12,3 @@ services:
       - ../config:/app/config
       # Optional: Mount logs directory
       - ../logs:/app/logs
-    # Alternative port mapping if not using host network
-    # ports:
-    #   - "9090:9090"
-    # networks:
-    #   - onkyo-network
-
-# Optional: Custom network for non-host networking
-# networks:
-#   onkyo-network:
-#     driver: bridge
