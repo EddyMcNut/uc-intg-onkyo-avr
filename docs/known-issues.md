@@ -12,7 +12,7 @@ Some AVR models temporarily disconnect when powering on, in that case the next c
 
 When you long-press a button, for example volume up, and the AVR overshoots then increase the `Message queue Threshold` in the setup step of this integration. The setup step can be run again and again by selecting the integration in de webconfigurator of the Remote.
 
-![](../screenshots/longpress-threshold.png)
+![](../screenshots/queue-threshold.png)
 
 Just assign the volume command to the short-press in webconfigurator, **don't** assign to long-press.
 
