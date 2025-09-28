@@ -3,7 +3,7 @@
 import * as uc from "@unfoldedcircle/integration-api";
 import EiscpDriver from "./eiscp.js";
 import { ConfigManager, OnkyoConfig } from "./configManager.js";
-import { DEFAULT_LONG_PRESS_THRESHOLD } from "./configManager.js";
+import { DEFAULT_QUEUE_THRESHOLD } from "./configManager.js";
 import { OnkyoCommandSender } from "./onkyoCommandSender.js";
 import { OnkyoCommandReceiver } from "./onkyoCommandReceiver.js";
 
@@ -27,13 +27,14 @@ export default class OnkyoDriver {
     this.eiscpInstance = new EiscpDriver({
       host: this.config.ip,
       port: this.config.port,
-      model: this.config.model
+      model: this.config.model,
+      send_delay: this.config.queueThreshold
     });
     this.commandSender = new OnkyoCommandSender(this.driver, this.config, this.eiscpInstance);
-    this.commandReceiver = new OnkyoCommandReceiver(this.driver, this.config);
+    this.commandReceiver = new OnkyoCommandReceiver(this.driver, this.config, this.eiscpInstance);
     this.driver.init("driver.json", this.handleDriverSetup.bind(this));
     this.setupEventHandlers();
-    this.commandReceiver.setupEiscpListener(this.eiscpInstance);
+    this.commandReceiver.setupEiscpListener();
     this.setupDriverEvents();
     console.log("Loaded config at startup:", this.config);
 
@@ -53,7 +54,7 @@ export default class OnkyoDriver {
     const model = (msg as any).setupData?.model;
     const ipAddress = (msg as any).setupData?.ipAddress;
     const port = (msg as any).setupData?.port;
-    const longPressThreshold = (msg as any).setupData?.longPressThreshold;
+    const queueThreshold = (msg as any).setupData?.queueThreshold;
     const albumArtURL = (msg as any).setupData?.albumArtURL;
 
     // Only overwrite if provided, else keep existing
@@ -70,11 +71,11 @@ export default class OnkyoDriver {
     } else {
       this.config.port = undefined;
     }
-    if (longPressThreshold && longPressThreshold.toString().trim() !== "") {
-      const longPressNum = parseInt(longPressThreshold, 10);
-      this.config.longPressThreshold = isNaN(longPressNum) ? DEFAULT_LONG_PRESS_THRESHOLD : longPressNum;
+    if (queueThreshold && queueThreshold.toString().trim() !== "") {
+      const longPressNum = parseInt(queueThreshold, 10);
+      this.config.queueThreshold = isNaN(longPressNum) ? DEFAULT_QUEUE_THRESHOLD : longPressNum;
     } else {
-      this.config.longPressThreshold = DEFAULT_LONG_PRESS_THRESHOLD;
+      this.config.queueThreshold = DEFAULT_QUEUE_THRESHOLD;
     }
     this.config.albumArtURL = typeof albumArtURL === "string" && albumArtURL.trim() !== "" ? albumArtURL.trim() : "";
 
@@ -83,7 +84,7 @@ export default class OnkyoDriver {
       model: this.config.model,
       ip: this.config.ip,
       port: this.config.port,
-      longPressThreshold: this.config.longPressThreshold,
+      queueThreshold: this.config.queueThreshold,
       albumArtURL: this.config.albumArtURL
     });
 
@@ -94,6 +95,7 @@ export default class OnkyoDriver {
 
   private setupDriverEvents() {
     this.driver.on(uc.Events.Connect, this.handleConnect.bind(this));
+    this.driver.on(uc.Events.ExitStandby, this.handleConnect.bind(this));
   }
 
   private async handleConnect() {
@@ -127,7 +129,7 @@ export default class OnkyoDriver {
             model: avr.model,
             ip: avr.host,
             port: avr.port,
-            longPressThreshold: this.config.longPressThreshold,
+            queueThreshold: this.config.queueThreshold,
             albumArtURL: this.config.albumArtURL,
             selectedAvr: `${avr.model} ${avr.host}`
           });
@@ -210,15 +212,11 @@ export default class OnkyoDriver {
     this.driver.on(uc.Events.SubscribeEntities, async (entityIds: string[]) => {
       entityIds.forEach((entityId: string) => {
         console.log(
-          `${integrationName} Subscribed entity: ${entityId}, long-press threshold set to: ${this.config.longPressThreshold}ms`
+          `${integrationName} Subscribed entity: ${entityId}, queue threshold set to: ${this.config.queueThreshold}ms`
         );
         // Query AVR state after successful connection
         this.eiscpInstance.command("system-power query");
-        this.eiscpInstance.command("audio-muting query");
-        this.eiscpInstance.command("volume query");
         this.eiscpInstance.command("input-selector query");
-        this.eiscpInstance.command("preset query");
-        this.eiscpInstance.raw("DSNQSTN");
       });
     });
 

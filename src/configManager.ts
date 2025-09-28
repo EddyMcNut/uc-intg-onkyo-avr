@@ -1,4 +1,4 @@
-export const DEFAULT_LONG_PRESS_THRESHOLD = 300;
+export const DEFAULT_QUEUE_THRESHOLD = 100;
 import path from "path";
 import fs from "fs";
 
@@ -10,7 +10,7 @@ export interface OnkyoConfig {
   model?: string;
   ip?: string;
   port?: number;
-  longPressThreshold?: number;
+  queueThreshold?: number;
   albumArtURL?: string;
   selectedAvr?: string;
 }

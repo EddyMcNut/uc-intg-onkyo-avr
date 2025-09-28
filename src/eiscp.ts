@@ -14,6 +14,7 @@ import async from "async";
 import EventEmitter from "events";
 import { eiscpCommands } from "./eiscp-commands.js";
 import { avrCurrentSource, setAvrCurrentSource } from "./state.js";
+import { DEFAULT_QUEUE_THRESHOLD } from "./configManager.js";
 const COMMANDS = eiscpCommands.commands;
 const COMMAND_MAPPINGS = eiscpCommands.command_mappings;
 const VALUE_MAPPINGS = eiscpCommands.value_mappings;
@@ -51,7 +52,7 @@ export class EiscpDriver extends EventEmitter {
       reconnect: config?.reconnect ?? false,
       reconnect_sleep: config?.reconnect_sleep ?? 5,
       verify_commands: config?.verify_commands ?? false,
-      send_delay: config?.send_delay ?? 500
+      send_delay: config?.send_delay ?? DEFAULT_QUEUE_THRESHOLD
     };
     this.send_queue = async.queue(this.sendCommand.bind(this), 1);
     this.setupErrorHandler();
@@ -130,7 +131,7 @@ export class EiscpDriver extends EventEmitter {
       };
     value = String(value).replace(/[\x00-\x1F]/g, ""); // remove weird characters like \x1A
 
-    // Strip trailing ISCP messages for certain commands
+    // Strip trailing ISCP messages for certain commands, move this to ondata?
     if (["SLI", "PRS", "AMT", "MVL"].includes(command)) {
       const idx = value.indexOf("ISCP");
       if (idx !== -1) {
@@ -151,7 +152,6 @@ export class EiscpDriver extends EventEmitter {
     }
 
     if (["NAT", "NTI", "NAL"].includes(command)) {
-      setAvrCurrentSource("net");
       value = command + value;
       const parts = value.split(/ISCP(?:[$.!]1|\$!1)/);
       for (const part of parts) {
@@ -185,6 +185,14 @@ export class EiscpDriver extends EventEmitter {
     if (command === "DSN") {
       result.command = "DSN";
       result.argument = value;
+      return result;
+    }
+
+    // move filter to ondata?
+    if (avrCurrentSource === "fm" && command === "FLD" && value.slice(0, 12) !== "566F6C756D65") {
+      let ascii = Buffer.from(value, "hex").toString("ascii");
+      result.command = "RDS";
+      result.argument = ascii;
       return result;
     }
 
@@ -350,7 +358,7 @@ export class EiscpDriver extends EventEmitter {
         const command = iscp_message.slice(0, 3);
 
         // Ignore these messages
-        if (["FLD", "NMS", "NPB"].includes(command)) {
+        if (["NMS", "NPB"].includes(command)) {
           return;
         }
 
