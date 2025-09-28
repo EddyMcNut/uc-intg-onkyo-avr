@@ -2,20 +2,23 @@ import * as uc from "@unfoldedcircle/integration-api";
 import { avrCurrentSource, setAvrCurrentSource } from "./state.js";
 import crypto from "crypto";
 import { OnkyoConfig } from "./configManager.js";
+import { EiscpDriver } from "./eiscp.js";
 
-const integrationName = "Onkyo-Integration: ";
+const integrationName = "Onkyo-Integration (receiver): ";
 
 export class OnkyoCommandReceiver {
   private driver: uc.IntegrationAPI;
   private config: OnkyoConfig;
+  private eiscpInstance: EiscpDriver;
   private avrPreset: string = "unknown";
   private lastImageHash: string = "";
   private lastTrackId: string = "";
   private lastImageCheck: number = 0;
 
-  constructor(driver: uc.IntegrationAPI, config: OnkyoConfig) {
+  constructor(driver: uc.IntegrationAPI, config: OnkyoConfig, eiscpInstance: EiscpDriver) {
     this.driver = driver;
     this.config = config;
+    this.eiscpInstance = eiscpInstance;
   }
 
   // Utility: Convert Entities collection to array
@@ -67,13 +70,13 @@ export class OnkyoCommandReceiver {
     }
   }
 
-  setupEiscpListener(eiscp: any) {
+  setupEiscpListener() {
     const nowPlaying: { station?: string; artist?: string; album?: string; title?: string } = {};
 
-    eiscp.on("error", (err: any) => {
+    this.eiscpInstance.on("error", (err: any) => {
       console.error("%s eiscp error: %s", integrationName, err);
     });
-    eiscp.on(
+    this.eiscpInstance.on(
       "data",
       async (avrUpdates: {
         command: string;
@@ -126,6 +129,7 @@ export class OnkyoCommandReceiver {
           case "preset": {
             this.avrPreset = avrUpdates.argument.toString();
             console.log("%s preset set to: %s", integrationName, this.avrPreset);
+            this.eiscpInstance.command("input-selector query");
             break;
           }
           case "input-selector": {
@@ -135,6 +139,16 @@ export class OnkyoCommandReceiver {
             });
             entity = this.driver.getConfiguredEntities().getEntity(globalThis.selectedAvr);
             console.log("%s input-selector (source) set to: %s", integrationName, avrUpdates.argument.toString());
+            switch (avrUpdates.argument.toString()) {
+              case "dab":
+                this.eiscpInstance.raw("DSNQSTN");
+                break;
+              case "fm":
+                this.eiscpInstance.raw("RDS01");
+                break;
+              default:
+                break;
+            }
             break;
           }
           case "DSN": {
@@ -142,6 +156,13 @@ export class OnkyoCommandReceiver {
             nowPlaying.station = avrUpdates.argument.toString();
             nowPlaying.artist = "DAB Radio";
             console.log("%s DAB station set to: %s", integrationName, avrUpdates.argument.toString());
+            break;
+          }
+          case "RDS": {
+            setAvrCurrentSource("fm");
+            nowPlaying.station = avrUpdates.argument.toString();
+            nowPlaying.artist = "FM Radio";
+            console.log("%s RDS set to: %s", integrationName, avrUpdates.argument.toString());
             break;
           }
           case "NTM": {
@@ -154,6 +175,7 @@ export class OnkyoCommandReceiver {
             break;
           }
           case "metadata": {
+            setAvrCurrentSource("net");
             if (typeof avrUpdates.argument === "object" && avrUpdates.argument !== null) {
               nowPlaying.title = (avrUpdates.argument as Record<string, string>).title || "unknown";
               nowPlaying.album = (avrUpdates.argument as Record<string, string>).album || "unknown";
@@ -180,6 +202,8 @@ export class OnkyoCommandReceiver {
             }
             await this.maybeUpdateImage(nowPlaying);
             break;
+          case "tuner":
+          case "fm":
           case "dab":
             this.driver.updateEntityAttributes(globalThis.selectedAvr, {
               [uc.MediaPlayerAttributes.MediaArtist]: nowPlaying.artist || "unknown",

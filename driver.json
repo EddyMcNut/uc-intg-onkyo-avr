@@ -73,13 +73,13 @@
         }
       },
       {
-        "id": "longPressThreshold",
+        "id": "queueThreshold",
         "label": {
-          "en": "Long Press Threshold to prevent overshoots on button long-press. Default `300`"
+          "en": "Message queue threshold. Default `100`"
         },
         "field": {
           "number": {
-            "value": 300
+            "value": 100
           }
         }
       },
