@@ -14,7 +14,7 @@ To set up an Activity for DAB, have a look at these screenshots:
 
   ![](../screenshots/dab-on.png)
 
-- User interface, add mediawidget for the AVR: 
+- User interface, add mediawidget for the AVR:
 
   ![](../screenshots/dab-mediawidget.png)
 

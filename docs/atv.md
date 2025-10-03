@@ -24,5 +24,4 @@ To set up an Activity for AppleTV, have a look at these screenshots:
   - rewind/fastforward
   - mute
 
-
 [back to main README](../README.md#example-activities)

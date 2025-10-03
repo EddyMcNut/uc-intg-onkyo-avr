@@ -3,6 +3,7 @@
 Onkyo AVR custom integration for Unfolded Circle remotes.
 
 ## Kudos
+
 [Kudos](./docs/kudos.md)
 
 ## Prerequisites
@@ -28,30 +29,39 @@ Users report it also to work with:
 - Integra (model unknown)
 
 ## Known issues and solutions
+
 [Known issues and solutions](./docs/known-issues.md)
 
 ## Installation and usage
+
 [Installation and usage](./docs/installation.md)
 
 ## Install new version
+
 [Install new version](./docs/new-version.md)
 
 ## Album Art
+
 [Album art](./docs/album-art.md)
 
 ## Cheats
+
 [Cheats](./docs/cheats.md)
 
 ## Volume
+
 [Volume](./docs/volume.md)
 
 ## Listening modes
+
 [Listening modes](./docs/listening-modes.md)
 
 ## Raw messages
+
 [Raw messages](./docs/raw.md)
 
 ## Example activities
+
 - [Spotify](./docs/spotify.md)
 - [AppleTV](./docs/atv.md)
 - [DAB Radio](./docs/dab.md)

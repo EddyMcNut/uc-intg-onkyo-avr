@@ -1,0 +1,8 @@
+{
+  "model": "temp",
+  "ip": "192.168.2.103",
+  "port": 60128,
+  "queueThreshold": 100,
+  "albumArtURL": "album_art.cgi",
+  "selectedAvr": "temp 192.168.2.103"
+}
