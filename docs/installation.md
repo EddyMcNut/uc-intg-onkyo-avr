@@ -2,6 +2,7 @@
 
 [back to main README](../README.md#installation-and-usage)
 
+### Installation
 - Make sure your AVR is ON or STANDBY.
 - Download `uc-intg-onkyo-avr-x.x.x.tar.gz` from this page.
 - In webconfigurator, go to `Integrations`, `Add new`, `Install custom`, select the `uc-intg-onkyo-avr-x.x.x.tar.gz` and then `Upload`.
@@ -22,6 +23,7 @@
 
   ![](../screenshots/select-entity.png)
 
+### Usage
 - In webconfigurator, go to `Activities & macros`
 - Add new Activity
 - Give it a name, `Next`, Select your AVR, `Done`

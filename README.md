@@ -33,6 +33,9 @@ Users report it also to work with:
 ## Installation and usage
 [Installation and usage](./docs/installation.md)
 
+## Install new version
+[Install new version](./docs/new-version.md)
+
 ## Album Art
 [Album art](./docs/album-art.md)
 
