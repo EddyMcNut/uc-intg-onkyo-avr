@@ -18,13 +18,6 @@ import { DEFAULT_QUEUE_THRESHOLD } from "./configManager.js";
 const COMMANDS = eiscpCommands.commands;
 const COMMAND_MAPPINGS = eiscpCommands.command_mappings;
 const VALUE_MAPPINGS = eiscpCommands.value_mappings;
-// const VALUE_MAPPINGS: {
-// [prefix: string]: {
-// [arg: string]: any;
-// intgrRange?: any;
-// };
-// } = eiscpCommands.value_mappings;
-
 const integrationName = "Onkyo-Integration: ";
 
 interface Metadata {

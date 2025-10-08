@@ -12,8 +12,8 @@ export class OnkyoCommandReceiver {
   private eiscpInstance: EiscpDriver;
   private avrPreset: string = "unknown";
   private lastImageHash: string = "";
+  private currentTrackId: string = "";
   private lastTrackId: string = "";
-  private lastImageCheck: number = 0;
 
   constructor(driver: uc.IntegrationAPI, config: OnkyoConfig, eiscpInstance: EiscpDriver) {
     this.driver = driver;
@@ -50,18 +50,19 @@ export class OnkyoCommandReceiver {
     }
   }
 
-  async maybeUpdateImage(nowPlaying: { title?: string; album?: string; artist?: string }) {
-    const trackId = `${nowPlaying.title}|${nowPlaying.album}|${nowPlaying.artist}`;
-    // Use config instead of static property
+  async maybeUpdateImage() {
     if (!this.config.albumArtURL || this.config.albumArtURL === "na") return;
-    const imageUrl = `http://${this.config.ip}/${this.config.albumArtURL}`;
-    const now = Date.now();
-    if (trackId !== this.lastTrackId || now - this.lastImageCheck > 5000) {
-      // 5s throttle
-      this.lastTrackId = trackId;
-      this.lastImageCheck = now;
-      const newHash = await this.getImageHash(imageUrl);
-      if (newHash && this.lastImageHash !== newHash) {
+    let imageUrl = `http://${this.config.ip}/${this.config.albumArtURL}`;
+    if (this.lastTrackId !== this.currentTrackId) {
+      this.lastTrackId = this.currentTrackId;
+      let newHash = await this.getImageHash(imageUrl);
+      let attempts = 0;
+      while (newHash === this.lastImageHash && attempts < 3) {
+        attempts++;
+        await new Promise((resolve) => setTimeout(resolve, 500));
+        newHash = await this.getImageHash(imageUrl);
+      }
+      if (newHash !== this.lastImageHash) {
         this.lastImageHash = newHash;
         this.driver.updateEntityAttributes(globalThis.selectedAvr, {
           [uc.MediaPlayerAttributes.MediaImageUrl]: imageUrl
@@ -191,16 +192,16 @@ export class OnkyoCommandReceiver {
           case "spotify":
           case "airplay":
           case "net":
-            const trackId = `${nowPlaying.title}|${nowPlaying.album}|${nowPlaying.artist}`;
-            if (trackId !== this.lastTrackId) {
-              this.lastTrackId = trackId;
+            let trackId = `${nowPlaying.title}|${nowPlaying.album}|${nowPlaying.artist}`;
+            if (trackId !== this.currentTrackId) {
+              this.currentTrackId = trackId;
               this.driver.updateEntityAttributes(globalThis.selectedAvr, {
                 [uc.MediaPlayerAttributes.MediaArtist]: nowPlaying.artist + " (" + nowPlaying.album + ")" || "unknown",
                 [uc.MediaPlayerAttributes.MediaTitle]: nowPlaying.title || "unknown",
                 [uc.MediaPlayerAttributes.MediaAlbum]: nowPlaying.album || "unknown"
               });
             }
-            await this.maybeUpdateImage(nowPlaying);
+            await this.maybeUpdateImage();
             break;
           case "tuner":
           case "fm":
