@@ -2,7 +2,7 @@
 "use strict";
 import * as uc from "@unfoldedcircle/integration-api";
 import EiscpDriver from "./eiscp.js";
-import { ConfigManager, OnkyoConfig } from "./configManager.js";
+import { ConfigManager, OnkyoConfig, AvrConfig } from "./configManager.js";
 import { DEFAULT_QUEUE_THRESHOLD } from "./configManager.js";
 import { OnkyoCommandSender } from "./onkyoCommandSender.js";
 import { OnkyoCommandReceiver } from "./onkyoCommandReceiver.js";
@@ -14,40 +14,32 @@ declare global {
 
 const integrationName = "Onkyo-Integration: ";
 
+interface AvrInstance {
+  config: AvrConfig;
+  eiscp: EiscpDriver;
+  commandSender: OnkyoCommandSender;
+  commandReceiver: OnkyoCommandReceiver;
+}
+
 export default class OnkyoDriver {
   private driver: uc.IntegrationAPI;
-  private commandSender: OnkyoCommandSender;
-  private commandReceiver: OnkyoCommandReceiver;
   private config: OnkyoConfig;
-  private eiscpInstance: EiscpDriver;
+  private avrInstances: Map<string, AvrInstance> = new Map();
 
   constructor() {
     this.driver = new uc.IntegrationAPI();
     this.config = ConfigManager.load();
-    this.eiscpInstance = new EiscpDriver({
-      host: this.config.ip,
-      port: this.config.port,
-      model: this.config.model,
-      send_delay: this.config.queueThreshold
-    });
-    this.commandSender = new OnkyoCommandSender(this.driver, this.config, this.eiscpInstance);
-    this.commandReceiver = new OnkyoCommandReceiver(this.driver, this.config, this.eiscpInstance);
     this.driver.init("driver.json", this.handleDriverSetup.bind(this));
-    this.setupEventHandlers();
-    this.commandReceiver.setupEiscpListener();
     this.setupDriverEvents();
+    this.setupEventHandlers();
     console.log("Loaded config at startup:", this.config);
 
-    // Auto-register entity after startup if config is present
-    if (this.config && this.config.model && this.config.ip && this.config.port) {
+    // Auto-register entities after startup if config has AVRs
+    if (this.config.avrs && this.config.avrs.length > 0) {
       this.handleConnect();
     } else {
       console.log("Config missing or incomplete, waiting for setup.");
     }
-
-    this.eiscpInstance.on("error", (err: any) => {
-      console.error("%s EiscpDriver error:", integrationName, err);
-    });
   }
 
   private async handleDriverSetup(msg: uc.SetupDriver): Promise<uc.SetupAction> {
@@ -57,36 +49,26 @@ export default class OnkyoDriver {
     const queueThreshold = (msg as any).setupData?.queueThreshold;
     const albumArtURL = (msg as any).setupData?.albumArtURL;
 
-    // Only overwrite if provided, else keep existing
-    if (typeof model === "string" && model.trim() !== "") {
-      this.config.model = model.trim();
-    }
-    if (typeof ipAddress === "string" && ipAddress.trim() !== "") {
-      this.config.ip = ipAddress.trim();
-    }
+    // Parse settings for this AVR
+    const queueThresholdValue =
+      queueThreshold && queueThreshold.toString().trim() !== ""
+        ? parseInt(queueThreshold, 10)
+        : DEFAULT_QUEUE_THRESHOLD;
+    const albumArtURLValue =
+      typeof albumArtURL === "string" && albumArtURL.trim() !== "" ? albumArtURL.trim() : "album_art.cgi";
 
-    if (port && port.toString().trim() !== "") {
-      const portNum = parseInt(port, 10);
-      this.config.port = isNaN(portNum) ? undefined : portNum;
-    } else {
-      this.config.port = undefined;
+    // Add manually configured AVR if provided
+    if (typeof model === "string" && model.trim() !== "" && typeof ipAddress === "string" && ipAddress.trim() !== "") {
+      const portNum = port && port.toString().trim() !== "" ? parseInt(port, 10) : 60128;
+      const avrConfig: AvrConfig = {
+        model: model.trim(),
+        ip: ipAddress.trim(),
+        port: isNaN(portNum) ? 60128 : portNum,
+        queueThreshold: isNaN(queueThresholdValue) ? DEFAULT_QUEUE_THRESHOLD : queueThresholdValue,
+        albumArtURL: albumArtURLValue
+      };
+      ConfigManager.addAvr(avrConfig);
     }
-    if (queueThreshold && queueThreshold.toString().trim() !== "") {
-      const longPressNum = parseInt(queueThreshold, 10);
-      this.config.queueThreshold = isNaN(longPressNum) ? DEFAULT_QUEUE_THRESHOLD : longPressNum;
-    } else {
-      this.config.queueThreshold = DEFAULT_QUEUE_THRESHOLD;
-    }
-    this.config.albumArtURL = typeof albumArtURL === "string" && albumArtURL.trim() !== "" ? albumArtURL.trim() : "";
-
-    // Save to config file
-    ConfigManager.save({
-      model: this.config.model,
-      ip: this.config.ip,
-      port: this.config.port,
-      queueThreshold: this.config.queueThreshold,
-      albumArtURL: this.config.albumArtURL
-    });
 
     await this.handleConnect();
 
@@ -99,108 +81,161 @@ export default class OnkyoDriver {
   }
 
   private async handleConnect() {
-    let attempts = 0;
-    const maxAttempts = 5;
-    const retryDelayMs = 2000;
+    // Reload config to get latest AVR list
+    this.config = ConfigManager.load();
 
-    while (attempts < maxAttempts) {
-      try {
-        if (!this.eiscpInstance.connected) {
-          console.log("%s Attempting to connect to AVR... (attempt %d)", integrationName, attempts + 1);
+    // First, try to discover auto-discoverable AVRs
+    const tempEiscp = new EiscpDriver({ send_delay: DEFAULT_QUEUE_THRESHOLD });
+    let discoveredAvrs: any[] = [];
+    try {
+      discoveredAvrs = await tempEiscp.discover({ timeout: 5 });
+      console.log("%s Discovered %d AVR(s) via autodiscovery", integrationName, discoveredAvrs.length);
+    } catch (err) {
+      console.log("%s Autodiscovery failed or found no AVRs:", integrationName, err);
+    }
 
-          const avr =
-            this.config.model !== undefined
-              ? await this.eiscpInstance.connect({
-                  model: this.config.model,
-                  host: this.config.ip,
-                  port: this.config.port
-                })
-              : await this.eiscpInstance.connect();
+    // Add discovered AVRs to config if not already present
+    for (const discovered of discoveredAvrs) {
+      const avrConfig: AvrConfig = {
+        model: discovered.model,
+        ip: discovered.host,
+        port: parseInt(discovered.port, 10) || 60128,
+        queueThreshold: DEFAULT_QUEUE_THRESHOLD,
+        albumArtURL: "album_art.cgi"
+      };
+      ConfigManager.addAvr(avrConfig);
+    }
 
-          if (!avr || !avr.model) {
-            throw new Error("AVR connection failed or returned null");
-          }
+    // Reload config after adding discovered AVRs
+    this.config = ConfigManager.load();
 
-          // Update config with discovered model, IP, and port
-          this.config.model = avr.model;
-          this.config.ip = avr.host;
-          this.config.port = avr.port;
-          ConfigManager.save({
-            model: avr.model,
-            ip: avr.host,
-            port: avr.port,
-            queueThreshold: this.config.queueThreshold,
-            albumArtURL: this.config.albumArtURL,
-            selectedAvr: `${avr.model} ${avr.host}`
-          });
+    // Connect to all configured AVRs
+    if (!this.config.avrs || this.config.avrs.length === 0) {
+      console.log("%s No AVRs configured", integrationName);
+      await this.driver.setDeviceState(uc.DeviceStates.Disconnected);
+      return;
+    }
 
-          const selectedAvr = `${avr.model} ${avr.host}`;
-          globalThis.selectedAvr = selectedAvr;
+    for (const avrConfig of this.config.avrs) {
+      const avrKey = `${avrConfig.model} ${avrConfig.ip}`;
 
-          console.log("%s Connected to AVR: model=%s, ip=%s, port=%s", integrationName, avr.model, avr.host, avr.port);
-
-          const mediaPlayerEntity = new uc.MediaPlayer(
-            globalThis.selectedAvr,
-            { en: globalThis.selectedAvr },
-            {
-              features: [
-                uc.MediaPlayerFeatures.OnOff,
-                uc.MediaPlayerFeatures.Toggle,
-                uc.MediaPlayerFeatures.PlayPause,
-                uc.MediaPlayerFeatures.MuteToggle,
-                uc.MediaPlayerFeatures.VolumeUpDown,
-                uc.MediaPlayerFeatures.ChannelSwitcher,
-                uc.MediaPlayerFeatures.SelectSource,
-                uc.MediaPlayerFeatures.MediaTitle,
-                uc.MediaPlayerFeatures.MediaArtist,
-                uc.MediaPlayerFeatures.MediaAlbum,
-                uc.MediaPlayerFeatures.MediaPosition,
-                uc.MediaPlayerFeatures.MediaDuration,
-                uc.MediaPlayerFeatures.MediaImageUrl,
-                uc.MediaPlayerFeatures.Dpad,
-                uc.MediaPlayerFeatures.Settings,
-                uc.MediaPlayerFeatures.Home,
-                uc.MediaPlayerFeatures.Next,
-                uc.MediaPlayerFeatures.Previous
-              ],
-              attributes: {
-                [uc.MediaPlayerAttributes.State]: uc.MediaPlayerStates.Unknown,
-                [uc.MediaPlayerAttributes.Muted]: uc.MediaPlayerStates.Unknown,
-                [uc.MediaPlayerAttributes.Volume]: uc.MediaPlayerStates.Unknown,
-                [uc.MediaPlayerAttributes.Source]: uc.MediaPlayerStates.Unknown,
-                [uc.MediaPlayerAttributes.MediaType]: uc.MediaPlayerStates.Unknown
-              },
-              deviceClass: uc.MediaPlayerDeviceClasses.Receiver
-            }
-          );
-          mediaPlayerEntity.setCmdHandler(this.sharedCmdHandler.bind(this));
-          this.driver.addAvailableEntity(mediaPlayerEntity);
-        } else {
-          console.log("%s Already connected to AVR, skipping connect()", integrationName);
-        }
-        await this.driver.setDeviceState(uc.DeviceStates.Connected);
-        if (typeof this.driver.getAvailableEntities === "function") {
-          const entities = this.driver.getAvailableEntities();
-        }
-        return;
-      } catch (err) {
-        attempts++;
-        console.error("%s RECOVERY: Failed to connect to AVR (attempt %d):", integrationName, attempts, err);
-        if (typeof this.eiscpInstance.disconnect === "function") {
-          try {
-            await this.eiscpInstance.disconnect();
-            console.log("%s AVR connection cleaned up after failure.", integrationName);
-          } catch (cleanupErr) {
-            console.error("%s Failed to clean up AVR connection:", integrationName, cleanupErr);
-          }
-        }
-        if (attempts < maxAttempts) {
-          await new Promise((resolve) => setTimeout(resolve, retryDelayMs));
-          continue;
-        }
-        await this.driver.setDeviceState(uc.DeviceStates.Disconnected);
-        return;
+      // Skip if already connected
+      if (this.avrInstances.has(avrKey)) {
+        console.log("%s Already connected to AVR: %s", integrationName, avrKey);
+        continue;
       }
+
+      try {
+        console.log(
+          "%s Connecting to AVR: %s at %s:%d",
+          integrationName,
+          avrConfig.model,
+          avrConfig.ip,
+          avrConfig.port
+        );
+
+        // Create EiscpDriver instance for this AVR
+        const eiscpInstance = new EiscpDriver({
+          host: avrConfig.ip,
+          port: avrConfig.port,
+          model: avrConfig.model,
+          send_delay: avrConfig.queueThreshold ?? DEFAULT_QUEUE_THRESHOLD
+        });
+
+        // Connect to the AVR
+        const result = await eiscpInstance.connect({
+          model: avrConfig.model,
+          host: avrConfig.ip,
+          port: avrConfig.port
+        });
+
+        if (!result || !result.model) {
+          throw new Error("AVR connection failed or returned null");
+        }
+
+        // Create per-AVR config for command handlers (including backward compatibility fields)
+        const avrSpecificConfig: OnkyoConfig = {
+          avrs: [avrConfig],
+          queueThreshold: avrConfig.queueThreshold ?? DEFAULT_QUEUE_THRESHOLD,
+          albumArtURL: avrConfig.albumArtURL ?? "album_art.cgi",
+          // Backward compatibility fields for existing code
+          model: avrConfig.model,
+          ip: avrConfig.ip,
+          port: avrConfig.port
+        };
+
+        // Create command sender and receiver for this AVR
+        const commandSender = new OnkyoCommandSender(this.driver, avrSpecificConfig, eiscpInstance);
+        const commandReceiver = new OnkyoCommandReceiver(this.driver, avrSpecificConfig, eiscpInstance);
+        commandReceiver.setupEiscpListener();
+
+        // Store instance
+        this.avrInstances.set(avrKey, {
+          config: avrConfig,
+          eiscp: eiscpInstance,
+          commandSender,
+          commandReceiver
+        });
+
+        console.log(
+          "%s Connected to AVR: model=%s, ip=%s, port=%s",
+          integrationName,
+          result.model,
+          result.host,
+          result.port
+        );
+
+        // Create media player entity for this AVR
+        const mediaPlayerEntity = new uc.MediaPlayer(
+          avrKey,
+          { en: avrKey },
+          {
+            features: [
+              uc.MediaPlayerFeatures.OnOff,
+              uc.MediaPlayerFeatures.Toggle,
+              uc.MediaPlayerFeatures.PlayPause,
+              uc.MediaPlayerFeatures.MuteToggle,
+              uc.MediaPlayerFeatures.VolumeUpDown,
+              uc.MediaPlayerFeatures.ChannelSwitcher,
+              uc.MediaPlayerFeatures.SelectSource,
+              uc.MediaPlayerFeatures.MediaTitle,
+              uc.MediaPlayerFeatures.MediaArtist,
+              uc.MediaPlayerFeatures.MediaAlbum,
+              uc.MediaPlayerFeatures.MediaPosition,
+              uc.MediaPlayerFeatures.MediaDuration,
+              uc.MediaPlayerFeatures.MediaImageUrl,
+              uc.MediaPlayerFeatures.Dpad,
+              uc.MediaPlayerFeatures.Settings,
+              uc.MediaPlayerFeatures.Home,
+              uc.MediaPlayerFeatures.Next,
+              uc.MediaPlayerFeatures.Previous
+            ],
+            attributes: {
+              [uc.MediaPlayerAttributes.State]: uc.MediaPlayerStates.Unknown,
+              [uc.MediaPlayerAttributes.Muted]: uc.MediaPlayerStates.Unknown,
+              [uc.MediaPlayerAttributes.Volume]: uc.MediaPlayerStates.Unknown,
+              [uc.MediaPlayerAttributes.Source]: uc.MediaPlayerStates.Unknown,
+              [uc.MediaPlayerAttributes.MediaType]: uc.MediaPlayerStates.Unknown
+            },
+            deviceClass: uc.MediaPlayerDeviceClasses.Receiver
+          }
+        );
+        mediaPlayerEntity.setCmdHandler(this.sharedCmdHandler.bind(this));
+        this.driver.addAvailableEntity(mediaPlayerEntity);
+
+        // Setup error handler
+        eiscpInstance.on("error", (err: any) => {
+          console.error("%s EiscpDriver error for %s:", integrationName, avrKey, err);
+        });
+      } catch (err) {
+        console.error("%s Failed to connect to AVR %s:", integrationName, avrKey, err);
+      }
+    }
+
+    if (this.avrInstances.size > 0) {
+      await this.driver.setDeviceState(uc.DeviceStates.Connected);
+    } else {
+      await this.driver.setDeviceState(uc.DeviceStates.Disconnected);
     }
   }
 
@@ -211,12 +246,14 @@ export default class OnkyoDriver {
 
     this.driver.on(uc.Events.SubscribeEntities, async (entityIds: string[]) => {
       entityIds.forEach((entityId: string) => {
-        console.log(
-          `${integrationName} Subscribed entity: ${entityId}, queue threshold set to: ${this.config.queueThreshold}ms`
-        );
         // Query AVR state after successful connection
-        this.eiscpInstance.command("system-power query");
-        this.eiscpInstance.command("input-selector query");
+        const instance = this.avrInstances.get(entityId);
+        if (instance) {
+          const queueThreshold = instance.config.queueThreshold ?? DEFAULT_QUEUE_THRESHOLD;
+          console.log(`${integrationName} Subscribed entity: ${entityId}, queue threshold set to: ${queueThreshold}ms`);
+          instance.eiscp.command("system-power query");
+          instance.eiscp.command("input-selector query");
+        }
       });
     });
 
@@ -233,7 +270,13 @@ export default class OnkyoDriver {
     cmdId: string,
     params?: { [key: string]: string | number | boolean }
   ): Promise<uc.StatusCodes> {
-    return this.commandSender.sharedCmdHandler(entity, cmdId, params);
+    // Get the AVR instance for this entity
+    const instance = this.avrInstances.get(entity.id);
+    if (!instance) {
+      console.error("%s No AVR instance found for entity: %s", integrationName, entity.id);
+      return uc.StatusCodes.NotFound;
+    }
+    return instance.commandSender.sharedCmdHandler(entity, cmdId, params);
   }
 
   async init() {

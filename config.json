@@ -1,0 +1,18 @@
+{
+  "avrs": [
+    {
+      "model": "TX-RZ50",
+      "ip": "192.168.2.103",
+      "port": 60128,
+      "queueThreshold": 100,
+      "albumArtURL": "album_art.cgi"
+    },
+    {
+      "model": "TX-NR807",
+      "ip": "192.168.2.188",
+      "port": 60129,
+      "queueThreshold": 100,
+      "albumArtURL": "album_art.cgi"
+    }
+  ]
+}
