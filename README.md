@@ -16,9 +16,7 @@ Onkyo AVR custom integration for Unfolded Circle remotes.
 
 Read this readme completely, it contains some tips for known issues and it also explains how to use `Input source` in a flexibale way so you can send a lot of different commands to your AVR.
 
-Your Onkyo AVR needs to be ON or STANDBY, if it is disconnected from power (off) this integration will fail. If your AVR has been disconnected from power, it could be that you first have to switch on your AVR manually one time before network commands work again (depends on the model), waking up after STANDBY should then work again.
-
-This integration can only work well when there is just one AVR in the network.
+Your Onkyo AVR(s) needs to be ON or STANDBY, if it is disconnected from power (off) this integration will fail. If your AVR has been disconnected from power, it could be that you first have to switch on your AVR manually one time before network commands work again (depends on the model), waking up after STANDBY should then work again.
 
 ## Reported to work on different brands and models
 
@@ -45,6 +43,10 @@ Users report it also to work with:
 ## Install new version
 
 [Install new version](./docs/new-version.md)
+
+## Multilpe AVRs
+
+[Multiple AVRs](./docs/multiple-avrs.md)
 
 ## Album Art
 
