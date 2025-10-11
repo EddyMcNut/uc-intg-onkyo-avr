@@ -7,11 +7,6 @@ import { DEFAULT_QUEUE_THRESHOLD } from "./configManager.js";
 import { OnkyoCommandSender } from "./onkyoCommandSender.js";
 import { OnkyoCommandReceiver } from "./onkyoCommandReceiver.js";
 
-declare global {
-  // eslint-disable-next-line no-var
-  var selectedAvr: string;
-}
-
 const integrationName = "Onkyo-Integration: ";
 
 interface AvrInstance {
@@ -119,15 +114,54 @@ export default class OnkyoDriver {
     for (const avrConfig of this.config.avrs) {
       const avrKey = `${avrConfig.model} ${avrConfig.ip}`;
 
-      // Skip if already connected
+      // If already connected, re-register the entity for remote reconnect scenarios
       if (this.avrInstances.has(avrKey)) {
-        console.log("%s Already connected to AVR: %s", integrationName, avrKey);
+        console.log("%s [%s] Already connected to AVR, re-registering entity", integrationName, avrKey);
+        const instance = this.avrInstances.get(avrKey)!;
+
+        // Re-create and re-add the entity (in case remote rebooted)
+        const mediaPlayerEntity = new uc.MediaPlayer(
+          avrKey,
+          { en: avrKey },
+          {
+            features: [
+              uc.MediaPlayerFeatures.OnOff,
+              uc.MediaPlayerFeatures.Toggle,
+              uc.MediaPlayerFeatures.PlayPause,
+              uc.MediaPlayerFeatures.MuteToggle,
+              uc.MediaPlayerFeatures.VolumeUpDown,
+              uc.MediaPlayerFeatures.ChannelSwitcher,
+              uc.MediaPlayerFeatures.SelectSource,
+              uc.MediaPlayerFeatures.MediaTitle,
+              uc.MediaPlayerFeatures.MediaArtist,
+              uc.MediaPlayerFeatures.MediaAlbum,
+              uc.MediaPlayerFeatures.MediaPosition,
+              uc.MediaPlayerFeatures.MediaDuration,
+              uc.MediaPlayerFeatures.MediaImageUrl,
+              uc.MediaPlayerFeatures.Dpad,
+              uc.MediaPlayerFeatures.Settings,
+              uc.MediaPlayerFeatures.Home,
+              uc.MediaPlayerFeatures.Next,
+              uc.MediaPlayerFeatures.Previous
+            ],
+            attributes: {
+              [uc.MediaPlayerAttributes.State]: uc.MediaPlayerStates.Unknown,
+              [uc.MediaPlayerAttributes.Muted]: uc.MediaPlayerStates.Unknown,
+              [uc.MediaPlayerAttributes.Volume]: uc.MediaPlayerStates.Unknown,
+              [uc.MediaPlayerAttributes.Source]: uc.MediaPlayerStates.Unknown,
+              [uc.MediaPlayerAttributes.MediaType]: uc.MediaPlayerStates.Unknown
+            },
+            deviceClass: uc.MediaPlayerDeviceClasses.Receiver
+          }
+        );
+        mediaPlayerEntity.setCmdHandler(this.sharedCmdHandler.bind(this));
+        this.driver.addAvailableEntity(mediaPlayerEntity);
         continue;
       }
 
       try {
         console.log(
-          "%s Connecting to AVR: %s at %s:%d",
+          "%s [%s] Connecting to AVR at %s:%d",
           integrationName,
           avrConfig.model,
           avrConfig.ip,
@@ -178,8 +212,9 @@ export default class OnkyoDriver {
         });
 
         console.log(
-          "%s Connected to AVR: model=%s, ip=%s, port=%s",
+          "%s [%s] Connected to AVR: model=%s, ip=%s, port=%s",
           integrationName,
+          avrKey,
           result.model,
           result.host,
           result.port
@@ -225,10 +260,10 @@ export default class OnkyoDriver {
 
         // Setup error handler
         eiscpInstance.on("error", (err: any) => {
-          console.error("%s EiscpDriver error for %s:", integrationName, avrKey, err);
+          console.error("%s [%s] EiscpDriver error:", integrationName, avrKey, err);
         });
       } catch (err) {
-        console.error("%s Failed to connect to AVR %s:", integrationName, avrKey, err);
+        console.error("%s [%s] Failed to connect to AVR:", integrationName, avrKey, err);
       }
     }
 
@@ -250,7 +285,9 @@ export default class OnkyoDriver {
         const instance = this.avrInstances.get(entityId);
         if (instance) {
           const queueThreshold = instance.config.queueThreshold ?? DEFAULT_QUEUE_THRESHOLD;
-          console.log(`${integrationName} Subscribed entity: ${entityId}, queue threshold set to: ${queueThreshold}ms`);
+          console.log(
+            `${integrationName} [${entityId}] Subscribed entity, queue threshold set to: ${queueThreshold}ms`
+          );
           instance.eiscp.command("system-power query");
           instance.eiscp.command("input-selector query");
         }
@@ -259,7 +296,7 @@ export default class OnkyoDriver {
 
     this.driver.on(uc.Events.UnsubscribeEntities, async (entityIds: string[]) => {
       entityIds.forEach((entityId: string) => {
-        console.log(`${integrationName} Unsubscribed entity: ${entityId}`);
+        console.log(`${integrationName} [${entityId}] Unsubscribed entity`);
       });
     });
   }
@@ -273,7 +310,7 @@ export default class OnkyoDriver {
     // Get the AVR instance for this entity
     const instance = this.avrInstances.get(entity.id);
     if (!instance) {
-      console.error("%s No AVR instance found for entity: %s", integrationName, entity.id);
+      console.error("%s [%s] No AVR instance found for entity", integrationName, entity.id);
       return uc.StatusCodes.NotFound;
     }
     return instance.commandSender.sharedCmdHandler(entity, cmdId, params);

@@ -45,6 +45,7 @@ export class OnkyoCommandReceiver {
       const buffer = Buffer.from(arrayBuffer);
       return crypto.createHash("md5").update(buffer).digest("hex");
     } catch (err) {
+      // Note: entityId not available in this utility function
       console.warn("%s Failed to fetch or hash image: %s", integrationName, err);
       return "";
     }
@@ -75,6 +76,7 @@ export class OnkyoCommandReceiver {
     const nowPlaying: { station?: string; artist?: string; album?: string; title?: string } = {};
 
     this.eiscpInstance.on("error", (err: any) => {
+      // Note: entityId not available in generic error handler
       console.error("%s eiscp error: %s", integrationName, err);
     });
     this.eiscpInstance.on(
@@ -111,7 +113,7 @@ export class OnkyoCommandReceiver {
                 avrUpdates.argument === "on" ? uc.MediaPlayerStates.On : uc.MediaPlayerStates.Standby
             });
             entity = this.driver.getConfiguredEntities().getEntity(entityId);
-            console.log("%s power set to: %s", integrationName, entity?.attributes?.state);
+            console.log("%s [%s] power set to: %s", integrationName, entityId, entity?.attributes?.state);
             break;
           }
           case "audio-muting": {
@@ -119,7 +121,7 @@ export class OnkyoCommandReceiver {
               [uc.MediaPlayerAttributes.Muted]: avrUpdates.argument === "on" ? true : false
             });
             entity = this.driver.getConfiguredEntities().getEntity(entityId);
-            console.log("%s audio-muting set to: %s", integrationName, entity?.attributes?.muted);
+            console.log("%s [%s] audio-muting set to: %s", integrationName, entityId, entity?.attributes?.muted);
             break;
           }
           case "volume": {
@@ -127,12 +129,12 @@ export class OnkyoCommandReceiver {
               [uc.MediaPlayerAttributes.Volume]: avrUpdates.argument.toString()
             });
             entity = this.driver.getConfiguredEntities().getEntity(entityId);
-            console.log("%s volume set to: %s", integrationName, entity?.attributes?.volume);
+            console.log("%s [%s] volume set to: %s", integrationName, entityId, entity?.attributes?.volume);
             break;
           }
           case "preset": {
             this.avrPreset = avrUpdates.argument.toString();
-            console.log("%s preset set to: %s", integrationName, this.avrPreset);
+            console.log("%s [%s] preset set to: %s", integrationName, entityId, this.avrPreset);
             this.eiscpInstance.command("input-selector query");
             break;
           }
@@ -142,7 +144,12 @@ export class OnkyoCommandReceiver {
               [uc.MediaPlayerAttributes.Source]: avrUpdates.argument.toString()
             });
             entity = this.driver.getConfiguredEntities().getEntity(entityId);
-            console.log("%s input-selector (source) set to: %s", integrationName, avrUpdates.argument.toString());
+            console.log(
+              "%s [%s] input-selector (source) set to: %s",
+              integrationName,
+              entityId,
+              avrUpdates.argument.toString()
+            );
             switch (avrUpdates.argument.toString()) {
               case "dab":
                 this.eiscpInstance.raw("DSNQSTN");
@@ -159,14 +166,14 @@ export class OnkyoCommandReceiver {
             setAvrCurrentSource("dab");
             nowPlaying.station = avrUpdates.argument.toString();
             nowPlaying.artist = "DAB Radio";
-            console.log("%s DAB station set to: %s", integrationName, avrUpdates.argument.toString());
+            console.log("%s [%s] DAB station set to: %s", integrationName, entityId, avrUpdates.argument.toString());
             break;
           }
           case "RDS": {
             setAvrCurrentSource("fm");
             nowPlaying.station = avrUpdates.argument.toString();
             nowPlaying.artist = "FM Radio";
-            console.log("%s RDS set to: %s", integrationName, avrUpdates.argument.toString());
+            console.log("%s [%s] RDS set to: %s", integrationName, entityId, avrUpdates.argument.toString());
             break;
           }
           case "NTM": {
