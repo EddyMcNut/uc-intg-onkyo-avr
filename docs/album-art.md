@@ -8,7 +8,6 @@
   ![](../screenshots/albumArtYes.png)
 
 - The album art endpoint is used for specific cases, for example when you listen to Spotify.
-- Album art is refreshed every 5 seconds.
 - **If your AVR does not have an endpoint for Album Art, set the value to `na` to prevent errors.**
 
   ![](../screenshots/albumArtNo.png)
