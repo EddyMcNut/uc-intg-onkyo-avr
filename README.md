@@ -2,8 +2,7 @@
 
 Onkyo AVR custom integration for Unfolded Circle remotes.
 
-[![GitHub Release](https://img.shields.io/github/v/release/EddyMcNut/uc-intg-onkyo-av)](https://github.com/EddyMcNut/uc-intg-onkyo-avr/releases)
-[![GitHub Downloads](https://img.shields.io/github/downloads/EddyMcNut/uc-intg-onkyo-avr/total)](https://github.com/EddyMcNut/uc-intg-onkyo-avr/releases)
+[![GitHub Release](https://img.shields.io/github/v/release/EddyMcNut/uc-intg-onkyo-avr)](https://github.com/EddyMcNut/uc-intg-onkyo-avr/releases)
 [![License](https://img.shields.io/badge/license-MPL--2.0-blue.svg)](https://github.com/EddyMcNut/uc-intg-onkyo-avr/blob/main/LICENSE)
 [![Discord](https://img.shields.io/badge/Discord-Join%20Chat-5865F2?logo=discord&logoColor=white)](https://discord.gg/zGVYf58)
 [![Unfolded Community](https://img.shields.io/badge/Unfolded-Community-orange?logo=discourse&logoColor=white)](https://unfolded.community/)

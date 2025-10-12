@@ -5,8 +5,15 @@
 ### Installation
 
 - Make sure your AVR is ON or STANDBY.
-- Download `Latest` `uc-intg-onkyo-avr-x.x.x.tar.gz` from the `Releases` section.
-- In webconfigurator, go to `Integrations`, `Add new`, `Install custom`, select the `uc-intg-onkyo-avr-x.x.x.tar.gz` and then `Upload`.
+- Go to the `Releases` section
+
+  ![](../screenshots/releases.png)
+
+- Download `Latest` `uc-intg-onkyo-avr-x.y.z.tar.gz` from the `Assets` section.
+
+  ![](../screenshots/assets.png)
+
+- In webconfigurator, go to `Integrations`, `Add new`, `Install custom`, select the `uc-intg-onkyo-avr-x.y.z.tar.gz` and then `Upload`.
 - Uploading can take a few seconds.
 - For the next step, it depends on your AVR model if it supports autodiscover, if it does:
   - In `Integrations` select `Onkyo AVR custom`.
