@@ -15,19 +15,28 @@ on:
     branches: ["main"]
     types: [opened, synchronize, reopened]
 
+permissions:
+  contents: write
+
 env:
   INTG_NAME: onkyo-avr
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    outputs:
+      artifact-name: ${{ steps.set-artifact.outputs.artifact-name }}
+      version: ${{ steps.pkg.outputs.version }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
       - name: Read version from package.json
         id: pkg
-        run: echo "VERSION=$(jq -r .version package.json)" >> $GITHUB_ENV
+        run: |
+          VERSION=$(jq -r .version package.json)
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
 
       - name: Sync driver.json version with package.json
         run: |
@@ -58,6 +67,7 @@ jobs:
           echo ${{ env.VERSION }} > version.txt
 
       - name: Create custom intg archive
+        id: set-artifact
         shell: bash
         run: |
           mv dist artifacts/
@@ -68,7 +78,9 @@ jobs:
           cp driver.json artifacts/
           # patch metadata to not conflict with pre-installed driver
           jq '.driver_id = "uc_onkyo-avr_driver_custom" | .name.en = "Onkyo AVR custom"' driver.json > artifacts/driver.json
-          echo "ARTIFACT_NAME=uc-intg-${{ env.INTG_NAME }}-${{ env.VERSION }}" >> $GITHUB_ENV
+          ARTIFACT_NAME="uc-intg-${{ env.INTG_NAME }}-${{ env.VERSION }}"
+          echo "ARTIFACT_NAME=$ARTIFACT_NAME" >> $GITHUB_ENV
+          echo "artifact-name=$ARTIFACT_NAME" >> $GITHUB_OUTPUT
 
       - name: Set driver.js as executable
         run: chmod +x artifacts/bin/driver.js
@@ -95,10 +107,11 @@ jobs:
       - name: Download build artifact
         uses: actions/download-artifact@v4
         with:
-          name: ${{ env.ARTIFACT_NAME }}
+          name: ${{ needs.build.outputs.artifact-name }}
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: ${{ env.ARTIFACT_NAME }}.tar.gz
+          files: ${{ needs.build.outputs.artifact-name }}.tar.gz
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

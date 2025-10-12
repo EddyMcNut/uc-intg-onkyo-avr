@@ -45,12 +45,13 @@ export class OnkyoCommandReceiver {
       const buffer = Buffer.from(arrayBuffer);
       return crypto.createHash("md5").update(buffer).digest("hex");
     } catch (err) {
+      // Note: entityId not available in this utility function
       console.warn("%s Failed to fetch or hash image: %s", integrationName, err);
       return "";
     }
   }
 
-  async maybeUpdateImage() {
+  async maybeUpdateImage(entityId: string) {
     if (!this.config.albumArtURL || this.config.albumArtURL === "na") return;
     let imageUrl = `http://${this.config.ip}/${this.config.albumArtURL}`;
     if (this.lastTrackId !== this.currentTrackId) {
@@ -64,7 +65,7 @@ export class OnkyoCommandReceiver {
       }
       if (newHash !== this.lastImageHash) {
         this.lastImageHash = newHash;
-        this.driver.updateEntityAttributes(globalThis.selectedAvr, {
+        this.driver.updateEntityAttributes(entityId, {
           [uc.MediaPlayerAttributes.MediaImageUrl]: imageUrl
         });
       }
@@ -75,6 +76,7 @@ export class OnkyoCommandReceiver {
     const nowPlaying: { station?: string; artist?: string; album?: string; title?: string } = {};
 
     this.eiscpInstance.on("error", (err: any) => {
+      // Note: entityId not available in generic error handler
       console.error("%s eiscp error: %s", integrationName, err);
     });
     this.eiscpInstance.on(
@@ -88,13 +90,16 @@ export class OnkyoCommandReceiver {
         port: number;
         model: string;
       }) => {
-        // Legacy: allow updates even if entity is not in configuredEntities
-        let entity = this.driver.getConfiguredEntities().getEntity(globalThis.selectedAvr);
+        // Construct entity ID from model and host (matches the format used in onkyo.ts)
+        const entityId = `${avrUpdates.model} ${avrUpdates.host}`;
+
+        // Get the entity for this specific AVR
+        let entity = this.driver.getConfiguredEntities().getEntity(entityId);
         if (!entity) {
           // Try availableEntities as fallback using utility
           const availableEntitiesArr = this.entitiesToArray(this.driver.getAvailableEntities());
           for (const e of availableEntitiesArr) {
-            if (e.name === globalThis.selectedAvr) {
+            if (e.id === entityId) {
               entity = e;
               break;
             }
@@ -103,43 +108,48 @@ export class OnkyoCommandReceiver {
 
         switch (avrUpdates.command) {
           case "system-power": {
-            this.driver.updateEntityAttributes(globalThis.selectedAvr, {
+            this.driver.updateEntityAttributes(entityId, {
               [uc.MediaPlayerAttributes.State]:
                 avrUpdates.argument === "on" ? uc.MediaPlayerStates.On : uc.MediaPlayerStates.Standby
             });
-            entity = this.driver.getConfiguredEntities().getEntity(globalThis.selectedAvr);
-            console.log("%s power set to: %s", integrationName, entity?.attributes?.state);
+            entity = this.driver.getConfiguredEntities().getEntity(entityId);
+            console.log("%s [%s] power set to: %s", integrationName, entityId, entity?.attributes?.state);
             break;
           }
           case "audio-muting": {
-            this.driver.updateEntityAttributes(globalThis.selectedAvr, {
+            this.driver.updateEntityAttributes(entityId, {
               [uc.MediaPlayerAttributes.Muted]: avrUpdates.argument === "on" ? true : false
             });
-            entity = this.driver.getConfiguredEntities().getEntity(globalThis.selectedAvr);
-            console.log("%s audio-muting set to: %s", integrationName, entity?.attributes?.muted);
+            entity = this.driver.getConfiguredEntities().getEntity(entityId);
+            console.log("%s [%s] audio-muting set to: %s", integrationName, entityId, entity?.attributes?.muted);
             break;
           }
           case "volume": {
-            this.driver.updateEntityAttributes(globalThis.selectedAvr, {
+            this.driver.updateEntityAttributes(entityId, {
               [uc.MediaPlayerAttributes.Volume]: avrUpdates.argument.toString()
             });
-            entity = this.driver.getConfiguredEntities().getEntity(globalThis.selectedAvr);
-            console.log("%s volume set to: %s", integrationName, entity?.attributes?.volume);
+            entity = this.driver.getConfiguredEntities().getEntity(entityId);
+            console.log("%s [%s] volume set to: %s", integrationName, entityId, entity?.attributes?.volume);
             break;
           }
           case "preset": {
             this.avrPreset = avrUpdates.argument.toString();
-            console.log("%s preset set to: %s", integrationName, this.avrPreset);
+            console.log("%s [%s] preset set to: %s", integrationName, entityId, this.avrPreset);
             this.eiscpInstance.command("input-selector query");
             break;
           }
           case "input-selector": {
             setAvrCurrentSource(avrUpdates.argument.toString());
-            this.driver.updateEntityAttributes(globalThis.selectedAvr, {
+            this.driver.updateEntityAttributes(entityId, {
               [uc.MediaPlayerAttributes.Source]: avrUpdates.argument.toString()
             });
-            entity = this.driver.getConfiguredEntities().getEntity(globalThis.selectedAvr);
-            console.log("%s input-selector (source) set to: %s", integrationName, avrUpdates.argument.toString());
+            entity = this.driver.getConfiguredEntities().getEntity(entityId);
+            console.log(
+              "%s [%s] input-selector (source) set to: %s",
+              integrationName,
+              entityId,
+              avrUpdates.argument.toString()
+            );
             switch (avrUpdates.argument.toString()) {
               case "dab":
                 this.eiscpInstance.raw("DSNQSTN");
@@ -156,23 +166,23 @@ export class OnkyoCommandReceiver {
             setAvrCurrentSource("dab");
             nowPlaying.station = avrUpdates.argument.toString();
             nowPlaying.artist = "DAB Radio";
-            console.log("%s DAB station set to: %s", integrationName, avrUpdates.argument.toString());
+            console.log("%s [%s] DAB station set to: %s", integrationName, entityId, avrUpdates.argument.toString());
             break;
           }
           case "RDS": {
             setAvrCurrentSource("fm");
             nowPlaying.station = avrUpdates.argument.toString();
             nowPlaying.artist = "FM Radio";
-            console.log("%s RDS set to: %s", integrationName, avrUpdates.argument.toString());
+            console.log("%s [%s] RDS set to: %s", integrationName, entityId, avrUpdates.argument.toString());
             break;
           }
           case "NTM": {
             let [position, duration] = avrUpdates.argument.toString().split("/");
-            this.driver.updateEntityAttributes(globalThis.selectedAvr, {
+            this.driver.updateEntityAttributes(entityId, {
               [uc.MediaPlayerAttributes.MediaPosition]: position || "0",
               [uc.MediaPlayerAttributes.MediaDuration]: duration || "0"
             });
-            entity = this.driver.getConfiguredEntities().getEntity(globalThis.selectedAvr);
+            entity = this.driver.getConfiguredEntities().getEntity(entityId);
             break;
           }
           case "metadata": {
@@ -181,7 +191,7 @@ export class OnkyoCommandReceiver {
               nowPlaying.title = (avrUpdates.argument as Record<string, string>).title || "unknown";
               nowPlaying.album = (avrUpdates.argument as Record<string, string>).album || "unknown";
               nowPlaying.artist = (avrUpdates.argument as Record<string, string>).artist || "unknown";
-              entity = this.driver.getConfiguredEntities().getEntity(globalThis.selectedAvr);
+              entity = this.driver.getConfiguredEntities().getEntity(entityId);
             }
             break;
           }
@@ -195,18 +205,18 @@ export class OnkyoCommandReceiver {
             let trackId = `${nowPlaying.title}|${nowPlaying.album}|${nowPlaying.artist}`;
             if (trackId !== this.currentTrackId) {
               this.currentTrackId = trackId;
-              this.driver.updateEntityAttributes(globalThis.selectedAvr, {
+              this.driver.updateEntityAttributes(entityId, {
                 [uc.MediaPlayerAttributes.MediaArtist]: nowPlaying.artist + " (" + nowPlaying.album + ")" || "unknown",
                 [uc.MediaPlayerAttributes.MediaTitle]: nowPlaying.title || "unknown",
                 [uc.MediaPlayerAttributes.MediaAlbum]: nowPlaying.album || "unknown"
               });
             }
-            await this.maybeUpdateImage();
+            await this.maybeUpdateImage(entityId);
             break;
           case "tuner":
           case "fm":
           case "dab":
-            this.driver.updateEntityAttributes(globalThis.selectedAvr, {
+            this.driver.updateEntityAttributes(entityId, {
               [uc.MediaPlayerAttributes.MediaArtist]: nowPlaying.artist || "unknown",
               [uc.MediaPlayerAttributes.MediaTitle]: nowPlaying.station || "unknown",
               [uc.MediaPlayerAttributes.MediaAlbum]: "",
@@ -216,7 +226,7 @@ export class OnkyoCommandReceiver {
             });
             break;
           default:
-            this.driver.updateEntityAttributes(globalThis.selectedAvr, {
+            this.driver.updateEntityAttributes(entityId, {
               [uc.MediaPlayerAttributes.MediaArtist]: "",
               [uc.MediaPlayerAttributes.MediaTitle]: "",
               [uc.MediaPlayerAttributes.MediaAlbum]: "",
