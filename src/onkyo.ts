@@ -43,6 +43,7 @@ export default class OnkyoDriver {
     const port = (msg as any).setupData?.port;
     const queueThreshold = (msg as any).setupData?.queueThreshold;
     const albumArtURL = (msg as any).setupData?.albumArtURL;
+    const volumeScale = (msg as any).setupData?.volumeScale;
 
     // Parse settings for this AVR
     const queueThresholdValue =
@@ -51,6 +52,7 @@ export default class OnkyoDriver {
         : DEFAULT_QUEUE_THRESHOLD;
     const albumArtURLValue =
       typeof albumArtURL === "string" && albumArtURL.trim() !== "" ? albumArtURL.trim() : "album_art.cgi";
+    const volumeScaleValue = volumeScale && volumeScale.toString().trim() !== "" ? parseInt(volumeScale, 10) : 100;
 
     // Add manually configured AVR if provided
     if (typeof model === "string" && model.trim() !== "" && typeof ipAddress === "string" && ipAddress.trim() !== "") {
@@ -60,7 +62,8 @@ export default class OnkyoDriver {
         ip: ipAddress.trim(),
         port: isNaN(portNum) ? 60128 : portNum,
         queueThreshold: isNaN(queueThresholdValue) ? DEFAULT_QUEUE_THRESHOLD : queueThresholdValue,
-        albumArtURL: albumArtURLValue
+        albumArtURL: albumArtURLValue,
+        volumeScale: [80, 100].includes(volumeScaleValue) ? volumeScaleValue : 100
       };
       ConfigManager.addAvr(avrConfig);
     }
@@ -96,7 +99,8 @@ export default class OnkyoDriver {
         ip: discovered.host,
         port: parseInt(discovered.port, 10) || 60128,
         queueThreshold: DEFAULT_QUEUE_THRESHOLD,
-        albumArtURL: "album_art.cgi"
+        albumArtURL: "album_art.cgi",
+        volumeScale: 100 // Default for auto-discovered AVRs
       };
       ConfigManager.addAvr(avrConfig);
     }
@@ -152,10 +156,10 @@ export default class OnkyoDriver {
               [uc.MediaPlayerAttributes.Source]: uc.MediaPlayerStates.Unknown,
               [uc.MediaPlayerAttributes.MediaType]: uc.MediaPlayerStates.Unknown
             },
-            deviceClass: uc.MediaPlayerDeviceClasses.Receiver
-            // options: {
-            //   volume_steps: 100
-            // }
+            deviceClass: uc.MediaPlayerDeviceClasses.Receiver,
+            options: {
+              volume_steps: instance.config.volumeScale ?? 100
+            }
           }
         );
         mediaPlayerEntity.setCmdHandler(this.sharedCmdHandler.bind(this));
@@ -259,7 +263,7 @@ export default class OnkyoDriver {
             },
             deviceClass: uc.MediaPlayerDeviceClasses.Receiver,
             options: {
-              volume_steps: 100
+              volume_steps: avrConfig.volumeScale ?? 100
             }
           }
         );

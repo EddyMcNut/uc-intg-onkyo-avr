@@ -12,6 +12,7 @@ export interface AvrConfig {
   port: number;
   queueThreshold?: number;
   albumArtURL?: string;
+  volumeScale?: number; // 80 or 100
 }
 
 export interface OnkyoConfig {
@@ -42,7 +43,8 @@ export class ConfigManager {
               ip: this.config.ip,
               port: this.config.port,
               queueThreshold: this.config.queueThreshold ?? DEFAULT_QUEUE_THRESHOLD,
-              albumArtURL: this.config.albumArtURL ?? "album_art.cgi"
+              albumArtURL: this.config.albumArtURL ?? "album_art.cgi",
+              volumeScale: 100 // Default for legacy configs
             }
           ];
         }
@@ -52,12 +54,21 @@ export class ConfigManager {
           this.config.avrs = this.config.avrs.map((avr) => ({
             ...avr,
             queueThreshold: avr.queueThreshold ?? this.config.queueThreshold ?? DEFAULT_QUEUE_THRESHOLD,
-            albumArtURL: avr.albumArtURL ?? this.config.albumArtURL ?? "album_art.cgi"
+            albumArtURL: avr.albumArtURL ?? this.config.albumArtURL ?? "album_art.cgi",
+            volumeScale: avr.volumeScale ?? 100 // Default to 100 if not set
           }));
           // Remove global settings after migration
           delete this.config.queueThreshold;
           delete this.config.albumArtURL;
           this.save(this.config);
+        }
+
+        // Ensure all AVRs have volumeScale set
+        if (this.config.avrs) {
+          this.config.avrs = this.config.avrs.map((avr) => ({
+            ...avr,
+            volumeScale: avr.volumeScale ?? 100 // Default to 100 for existing configs
+          }));
         }
       }
     } catch (err) {

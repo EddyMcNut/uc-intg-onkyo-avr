@@ -84,6 +84,31 @@
         }
       },
       {
+        "id": "volumeScale",
+        "label": {
+          "en": "Volume scale (0-80 or 0-100)"
+        },
+        "field": {
+          "dropdown": {
+            "value": "100",
+            "items": [
+              {
+                "id": "100",
+                "label": {
+                  "en": "0-100"
+                }
+              },
+              {
+                "id": "80",
+                "label": {
+                  "en": "0-80"
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
         "id": "infoTwo",
         "label": {
           "en": "Not auto discoverable? Adjust on-sequence!"
