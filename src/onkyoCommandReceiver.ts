@@ -125,11 +125,14 @@ export class OnkyoCommandReceiver {
             break;
           }
           case "volume": {
+            // eiscp.ts already converts hex to decimal for us (line 215: parseInt(value, 16))
+            // So the argument we receive is already the correct decimal volume value (0-100)
+            const volumeValue = Number(avrUpdates.argument);
             this.driver.updateEntityAttributes(entityId, {
-              [uc.MediaPlayerAttributes.Volume]: avrUpdates.argument.toString()
+              [uc.MediaPlayerAttributes.Volume]: volumeValue
             });
             entity = this.driver.getConfiguredEntities().getEntity(entityId);
-            console.log("%s [%s] volume set to: %s", integrationName, entityId, entity?.attributes?.volume);
+            console.log("%s [%s] volume set to: %d", integrationName, entityId, volumeValue);
             break;
           }
           case "preset": {

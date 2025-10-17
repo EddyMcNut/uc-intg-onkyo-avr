@@ -69,6 +69,23 @@ export class OnkyoCommandSender {
           await this.eiscp.command("volume level-down-1db-step");
         }
         break;
+      case uc.MediaPlayerCommands.Volume:
+        if (params?.volume !== undefined) {
+          // Onkyo volume protocol: send volume as hex-formatted decimal
+          // Volume 32 is sent as "32" (hex digits representing decimal value)
+          // Volume 100 is sent as "64" (hex representation of 100 decimal)
+          const volumeLevel = Math.max(0, Math.min(100, Number(params.volume)));
+          const hexVolume = volumeLevel.toString(16).toUpperCase().padStart(2, "0");
+          console.log(
+            "%s [%s] Setting volume to %d (hex format: %s)",
+            integrationName,
+            entity.id,
+            volumeLevel,
+            hexVolume
+          );
+          await this.eiscp.raw(`MVL${hexVolume}`);
+        }
+        break;
       case uc.MediaPlayerCommands.ChannelUp:
         await this.eiscp.command("preset up");
         break;

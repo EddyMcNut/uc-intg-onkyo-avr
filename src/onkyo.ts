@@ -129,6 +129,7 @@ export default class OnkyoDriver {
               uc.MediaPlayerFeatures.Toggle,
               uc.MediaPlayerFeatures.PlayPause,
               uc.MediaPlayerFeatures.MuteToggle,
+              uc.MediaPlayerFeatures.Volume,
               uc.MediaPlayerFeatures.VolumeUpDown,
               uc.MediaPlayerFeatures.ChannelSwitcher,
               uc.MediaPlayerFeatures.SelectSource,
@@ -147,11 +148,14 @@ export default class OnkyoDriver {
             attributes: {
               [uc.MediaPlayerAttributes.State]: uc.MediaPlayerStates.Unknown,
               [uc.MediaPlayerAttributes.Muted]: uc.MediaPlayerStates.Unknown,
-              [uc.MediaPlayerAttributes.Volume]: uc.MediaPlayerStates.Unknown,
+              [uc.MediaPlayerAttributes.Volume]: 0,
               [uc.MediaPlayerAttributes.Source]: uc.MediaPlayerStates.Unknown,
               [uc.MediaPlayerAttributes.MediaType]: uc.MediaPlayerStates.Unknown
             },
             deviceClass: uc.MediaPlayerDeviceClasses.Receiver
+            // options: {
+            //   volume_steps: 100
+            // }
           }
         );
         mediaPlayerEntity.setCmdHandler(this.sharedCmdHandler.bind(this));
@@ -230,6 +234,7 @@ export default class OnkyoDriver {
               uc.MediaPlayerFeatures.Toggle,
               uc.MediaPlayerFeatures.PlayPause,
               uc.MediaPlayerFeatures.MuteToggle,
+              uc.MediaPlayerFeatures.Volume,
               uc.MediaPlayerFeatures.VolumeUpDown,
               uc.MediaPlayerFeatures.ChannelSwitcher,
               uc.MediaPlayerFeatures.SelectSource,
@@ -248,11 +253,14 @@ export default class OnkyoDriver {
             attributes: {
               [uc.MediaPlayerAttributes.State]: uc.MediaPlayerStates.Unknown,
               [uc.MediaPlayerAttributes.Muted]: uc.MediaPlayerStates.Unknown,
-              [uc.MediaPlayerAttributes.Volume]: uc.MediaPlayerStates.Unknown,
+              [uc.MediaPlayerAttributes.Volume]: 0,
               [uc.MediaPlayerAttributes.Source]: uc.MediaPlayerStates.Unknown,
               [uc.MediaPlayerAttributes.MediaType]: uc.MediaPlayerStates.Unknown
             },
-            deviceClass: uc.MediaPlayerDeviceClasses.Receiver
+            deviceClass: uc.MediaPlayerDeviceClasses.Receiver,
+            options: {
+              volume_steps: 100
+            }
           }
         );
         mediaPlayerEntity.setCmdHandler(this.sharedCmdHandler.bind(this));
@@ -290,6 +298,8 @@ export default class OnkyoDriver {
           );
           instance.eiscp.command("system-power query");
           instance.eiscp.command("input-selector query");
+          instance.eiscp.command("volume query");
+          instance.eiscp.command("audio-muting query");
         }
       });
     });
