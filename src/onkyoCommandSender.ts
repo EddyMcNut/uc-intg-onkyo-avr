@@ -71,16 +71,21 @@ export class OnkyoCommandSender {
         break;
       case uc.MediaPlayerCommands.Volume:
         if (params?.volume !== undefined) {
-          // Onkyo volume protocol: send volume as hex-formatted decimal
-          // Volume 32 is sent as "32" (hex digits representing decimal value)
-          // Volume 100 is sent as "64" (hex representation of 100 decimal)
-          const volumeLevel = Math.max(0, Math.min(100, Number(params.volume)));
-          const hexVolume = volumeLevel.toString(16).toUpperCase().padStart(2, "0");
+          // Remote slider sends 0-100, but AVR might use 0-80 or 0-100 scale
+          const sliderValue = Math.max(0, Math.min(100, Number(params.volume)));
+          const volumeScale = this.config.volumeScale || 100;
+
+          // Scale the slider value to match AVR's volume scale
+          const avrVolume = Math.round((sliderValue * volumeScale) / 100);
+          const hexVolume = avrVolume.toString(16).toUpperCase().padStart(2, "0");
+
           console.log(
-            "%s [%s] Setting volume to %d (hex format: %s)",
+            "%s [%s] Setting volume: slider=%d, scaled=%d/%d, hex=%s",
             integrationName,
             entity.id,
-            volumeLevel,
+            sliderValue,
+            avrVolume,
+            volumeScale,
             hexVolume
           );
           await this.eiscp.raw(`MVL${hexVolume}`);

@@ -125,14 +125,26 @@ export class OnkyoCommandReceiver {
             break;
           }
           case "volume": {
-            // eiscp.ts already converts hex to decimal for us (line 215: parseInt(value, 16))
-            // So the argument we receive is already the correct decimal volume value (0-100)
-            const volumeValue = Number(avrUpdates.argument);
+            // AVR sends volume in its native scale (0-80 or 0-100)
+            // eiscp.ts already converts hex to decimal
+            const avrVolume = Number(avrUpdates.argument);
+            // const volumeScale = this.config.volumeScale || 100;
+
+            // // Scale AVR volume to 0-100 range for Remote slider
+            // const sliderValue = Math.round((avrVolume * 100) / volumeScale);
+            const sliderValue = avrVolume / 2;
             this.driver.updateEntityAttributes(entityId, {
-              [uc.MediaPlayerAttributes.Volume]: volumeValue
+              [uc.MediaPlayerAttributes.Volume]: sliderValue
             });
             entity = this.driver.getConfiguredEntities().getEntity(entityId);
-            console.log("%s [%s] volume set to: %d", integrationName, entityId, volumeValue);
+            console.log(
+              "%s [%s] volume: avr=%d/%d, slider=%d",
+              integrationName,
+              entityId,
+              avrVolume //,
+              // volumeScale,
+              // sliderValue
+            );
             break;
           }
           case "preset": {

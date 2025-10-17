@@ -20,6 +20,15 @@ export default class OnkyoDriver {
   private driver: uc.IntegrationAPI;
   private config: OnkyoConfig;
   private avrInstances: Map<string, AvrInstance> = new Map();
+  private lastSetupData: {
+    queueThreshold: number;
+    albumArtURL: string;
+    volumeScale: number;
+  } = {
+    queueThreshold: DEFAULT_QUEUE_THRESHOLD,
+    albumArtURL: "album_art.cgi",
+    volumeScale: 100
+  };
 
   constructor() {
     this.driver = new uc.IntegrationAPI();
@@ -38,12 +47,22 @@ export default class OnkyoDriver {
   }
 
   private async handleDriverSetup(msg: uc.SetupDriver): Promise<uc.SetupAction> {
+    console.log("%s ===== SETUP HANDLER CALLED =====", integrationName);
+    console.log("%s Setup message:", integrationName, JSON.stringify(msg, null, 2));
+
     const model = (msg as any).setupData?.model;
     const ipAddress = (msg as any).setupData?.ipAddress;
     const port = (msg as any).setupData?.port;
     const queueThreshold = (msg as any).setupData?.queueThreshold;
     const albumArtURL = (msg as any).setupData?.albumArtURL;
     const volumeScale = (msg as any).setupData?.volumeScale;
+
+    console.log(
+      "%s Setup data received - volumeScale raw value: '%s' (type: %s)",
+      integrationName,
+      volumeScale,
+      typeof volumeScale
+    );
 
     // Parse settings for this AVR
     const queueThresholdValue =
@@ -52,7 +71,36 @@ export default class OnkyoDriver {
         : DEFAULT_QUEUE_THRESHOLD;
     const albumArtURLValue =
       typeof albumArtURL === "string" && albumArtURL.trim() !== "" ? albumArtURL.trim() : "album_art.cgi";
-    const volumeScaleValue = volumeScale && volumeScale.toString().trim() !== "" ? parseInt(volumeScale, 10) : 100;
+
+    // Parse volumeScale - handle both string and number types
+    let volumeScaleValue = 100; // Default
+    if (volumeScale !== undefined && volumeScale !== null && volumeScale !== "") {
+      const parsed = parseInt(volumeScale.toString(), 10);
+      volumeScaleValue = !isNaN(parsed) && [80, 100].includes(parsed) ? parsed : 100;
+    }
+
+    console.log("%s Setup data parsed - volumeScale value: %d", integrationName, volumeScaleValue);
+
+    // Store setup data for use when adding autodiscovered AVRs
+    this.lastSetupData = {
+      queueThreshold: queueThresholdValue,
+      albumArtURL: albumArtURLValue,
+      volumeScale: volumeScaleValue
+    };
+    console.log("%s Stored setup data for autodiscovery:", integrationName, this.lastSetupData);
+
+    // Update existing AVRs with new settings (for when user re-runs setup)
+    const currentConfig = ConfigManager.load();
+    if (currentConfig.avrs && currentConfig.avrs.length > 0) {
+      console.log("%s Updating existing AVR configurations with new settings", integrationName);
+      currentConfig.avrs = currentConfig.avrs.map((avr) => ({
+        ...avr,
+        queueThreshold: queueThresholdValue,
+        albumArtURL: albumArtURLValue,
+        volumeScale: volumeScaleValue
+      }));
+      ConfigManager.save(currentConfig);
+    }
 
     // Add manually configured AVR if provided
     if (typeof model === "string" && model.trim() !== "" && typeof ipAddress === "string" && ipAddress.trim() !== "") {
@@ -61,10 +109,11 @@ export default class OnkyoDriver {
         model: model.trim(),
         ip: ipAddress.trim(),
         port: isNaN(portNum) ? 60128 : portNum,
-        queueThreshold: isNaN(queueThresholdValue) ? DEFAULT_QUEUE_THRESHOLD : queueThresholdValue,
+        queueThreshold: queueThresholdValue,
         albumArtURL: albumArtURLValue,
-        volumeScale: [80, 100].includes(volumeScaleValue) ? volumeScaleValue : 100
+        volumeScale: volumeScaleValue
       };
+      console.log("%s Adding AVR config with volumeScale: %d", integrationName, avrConfig.volumeScale);
       ConfigManager.addAvr(avrConfig);
     }
 
@@ -98,10 +147,11 @@ export default class OnkyoDriver {
         model: discovered.model,
         ip: discovered.host,
         port: parseInt(discovered.port, 10) || 60128,
-        queueThreshold: DEFAULT_QUEUE_THRESHOLD,
-        albumArtURL: "album_art.cgi",
-        volumeScale: 100 // Default for auto-discovered AVRs
+        queueThreshold: this.lastSetupData.queueThreshold,
+        albumArtURL: this.lastSetupData.albumArtURL,
+        volumeScale: this.lastSetupData.volumeScale
       };
+      console.log("%s Adding autodiscovered AVR with volumeScale: %d", integrationName, avrConfig.volumeScale);
       ConfigManager.addAvr(avrConfig);
     }
 
@@ -200,6 +250,7 @@ export default class OnkyoDriver {
           avrs: [avrConfig],
           queueThreshold: avrConfig.queueThreshold ?? DEFAULT_QUEUE_THRESHOLD,
           albumArtURL: avrConfig.albumArtURL ?? "album_art.cgi",
+          volumeScale: avrConfig.volumeScale ?? 100,
           // Backward compatibility fields for existing code
           model: avrConfig.model,
           ip: avrConfig.ip,

@@ -19,6 +19,7 @@ export interface OnkyoConfig {
   avrs?: AvrConfig[];
   queueThreshold?: number;
   albumArtURL?: string;
+  volumeScale?: number; // 80 or 100
   // Legacy fields for backward compatibility
   model?: string;
   ip?: string;
