@@ -127,6 +127,49 @@ export default class OnkyoDriver {
     this.driver.on(uc.Events.ExitStandby, this.handleConnect.bind(this));
   }
 
+  private createMediaPlayerEntity(avrKey: string, volumeScale: number): uc.MediaPlayer {
+    const mediaPlayerEntity = new uc.MediaPlayer(
+      avrKey,
+      { en: avrKey },
+      {
+        features: [
+          uc.MediaPlayerFeatures.OnOff,
+          uc.MediaPlayerFeatures.Toggle,
+          uc.MediaPlayerFeatures.PlayPause,
+          uc.MediaPlayerFeatures.MuteToggle,
+          uc.MediaPlayerFeatures.Volume,
+          uc.MediaPlayerFeatures.VolumeUpDown,
+          uc.MediaPlayerFeatures.ChannelSwitcher,
+          uc.MediaPlayerFeatures.SelectSource,
+          uc.MediaPlayerFeatures.MediaTitle,
+          uc.MediaPlayerFeatures.MediaArtist,
+          uc.MediaPlayerFeatures.MediaAlbum,
+          uc.MediaPlayerFeatures.MediaPosition,
+          uc.MediaPlayerFeatures.MediaDuration,
+          uc.MediaPlayerFeatures.MediaImageUrl,
+          uc.MediaPlayerFeatures.Dpad,
+          uc.MediaPlayerFeatures.Settings,
+          uc.MediaPlayerFeatures.Home,
+          uc.MediaPlayerFeatures.Next,
+          uc.MediaPlayerFeatures.Previous
+        ],
+        attributes: {
+          [uc.MediaPlayerAttributes.State]: uc.MediaPlayerStates.Unknown,
+          [uc.MediaPlayerAttributes.Muted]: uc.MediaPlayerStates.Unknown,
+          [uc.MediaPlayerAttributes.Volume]: 0,
+          [uc.MediaPlayerAttributes.Source]: uc.MediaPlayerStates.Unknown,
+          [uc.MediaPlayerAttributes.MediaType]: uc.MediaPlayerStates.Unknown
+        },
+        deviceClass: uc.MediaPlayerDeviceClasses.Receiver,
+        options: {
+          volume_steps: volumeScale
+        }
+      }
+    );
+    mediaPlayerEntity.setCmdHandler(this.sharedCmdHandler.bind(this));
+    return mediaPlayerEntity;
+  }
+
   private async handleConnect() {
     // Reload config to get latest AVR list
     this.config = ConfigManager.load();
@@ -174,45 +217,7 @@ export default class OnkyoDriver {
         const instance = this.avrInstances.get(avrKey)!;
 
         // Re-create and re-add the entity (in case remote rebooted)
-        const mediaPlayerEntity = new uc.MediaPlayer(
-          avrKey,
-          { en: avrKey },
-          {
-            features: [
-              uc.MediaPlayerFeatures.OnOff,
-              uc.MediaPlayerFeatures.Toggle,
-              uc.MediaPlayerFeatures.PlayPause,
-              uc.MediaPlayerFeatures.MuteToggle,
-              uc.MediaPlayerFeatures.Volume,
-              uc.MediaPlayerFeatures.VolumeUpDown,
-              uc.MediaPlayerFeatures.ChannelSwitcher,
-              uc.MediaPlayerFeatures.SelectSource,
-              uc.MediaPlayerFeatures.MediaTitle,
-              uc.MediaPlayerFeatures.MediaArtist,
-              uc.MediaPlayerFeatures.MediaAlbum,
-              uc.MediaPlayerFeatures.MediaPosition,
-              uc.MediaPlayerFeatures.MediaDuration,
-              uc.MediaPlayerFeatures.MediaImageUrl,
-              uc.MediaPlayerFeatures.Dpad,
-              uc.MediaPlayerFeatures.Settings,
-              uc.MediaPlayerFeatures.Home,
-              uc.MediaPlayerFeatures.Next,
-              uc.MediaPlayerFeatures.Previous
-            ],
-            attributes: {
-              [uc.MediaPlayerAttributes.State]: uc.MediaPlayerStates.Unknown,
-              [uc.MediaPlayerAttributes.Muted]: uc.MediaPlayerStates.Unknown,
-              [uc.MediaPlayerAttributes.Volume]: 0,
-              [uc.MediaPlayerAttributes.Source]: uc.MediaPlayerStates.Unknown,
-              [uc.MediaPlayerAttributes.MediaType]: uc.MediaPlayerStates.Unknown
-            },
-            deviceClass: uc.MediaPlayerDeviceClasses.Receiver,
-            options: {
-              volume_steps: instance.config.volumeScale ?? 100
-            }
-          }
-        );
-        mediaPlayerEntity.setCmdHandler(this.sharedCmdHandler.bind(this));
+        const mediaPlayerEntity = this.createMediaPlayerEntity(avrKey, instance.config.volumeScale ?? 100);
         this.driver.addAvailableEntity(mediaPlayerEntity);
         continue;
       }
@@ -280,45 +285,7 @@ export default class OnkyoDriver {
         );
 
         // Create media player entity for this AVR
-        const mediaPlayerEntity = new uc.MediaPlayer(
-          avrKey,
-          { en: avrKey },
-          {
-            features: [
-              uc.MediaPlayerFeatures.OnOff,
-              uc.MediaPlayerFeatures.Toggle,
-              uc.MediaPlayerFeatures.PlayPause,
-              uc.MediaPlayerFeatures.MuteToggle,
-              uc.MediaPlayerFeatures.Volume,
-              uc.MediaPlayerFeatures.VolumeUpDown,
-              uc.MediaPlayerFeatures.ChannelSwitcher,
-              uc.MediaPlayerFeatures.SelectSource,
-              uc.MediaPlayerFeatures.MediaTitle,
-              uc.MediaPlayerFeatures.MediaArtist,
-              uc.MediaPlayerFeatures.MediaAlbum,
-              uc.MediaPlayerFeatures.MediaPosition,
-              uc.MediaPlayerFeatures.MediaDuration,
-              uc.MediaPlayerFeatures.MediaImageUrl,
-              uc.MediaPlayerFeatures.Dpad,
-              uc.MediaPlayerFeatures.Settings,
-              uc.MediaPlayerFeatures.Home,
-              uc.MediaPlayerFeatures.Next,
-              uc.MediaPlayerFeatures.Previous
-            ],
-            attributes: {
-              [uc.MediaPlayerAttributes.State]: uc.MediaPlayerStates.Unknown,
-              [uc.MediaPlayerAttributes.Muted]: uc.MediaPlayerStates.Unknown,
-              [uc.MediaPlayerAttributes.Volume]: 0,
-              [uc.MediaPlayerAttributes.Source]: uc.MediaPlayerStates.Unknown,
-              [uc.MediaPlayerAttributes.MediaType]: uc.MediaPlayerStates.Unknown
-            },
-            deviceClass: uc.MediaPlayerDeviceClasses.Receiver,
-            options: {
-              volume_steps: avrConfig.volumeScale ?? 100
-            }
-          }
-        );
-        mediaPlayerEntity.setCmdHandler(this.sharedCmdHandler.bind(this));
+        const mediaPlayerEntity = this.createMediaPlayerEntity(avrKey, avrConfig.volumeScale ?? 100);
         this.driver.addAvailableEntity(mediaPlayerEntity);
 
         // Setup error handler
