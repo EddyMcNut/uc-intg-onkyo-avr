@@ -24,10 +24,12 @@ export default class OnkyoDriver {
     queueThreshold: number;
     albumArtURL: string;
     volumeScale: number;
+    useHalfDbSteps: boolean;
   } = {
     queueThreshold: DEFAULT_QUEUE_THRESHOLD,
     albumArtURL: "album_art.cgi",
-    volumeScale: 100
+    volumeScale: 100,
+    useHalfDbSteps: true
   };
 
   constructor() {
@@ -56,12 +58,15 @@ export default class OnkyoDriver {
     const queueThreshold = (msg as any).setupData?.queueThreshold;
     const albumArtURL = (msg as any).setupData?.albumArtURL;
     const volumeScale = (msg as any).setupData?.volumeScale;
+    const useHalfDbSteps = (msg as any).setupData?.useHalfDbSteps;
 
     console.log(
-      "%s Setup data received - volumeScale raw value: '%s' (type: %s)",
+      "%s Setup data received - volumeScale raw value: '%s' (type: %s), useHalfDbSteps: '%s' (type: %s)",
       integrationName,
       volumeScale,
-      typeof volumeScale
+      typeof volumeScale,
+      useHalfDbSteps,
+      typeof useHalfDbSteps
     );
 
     // Parse settings for this AVR
@@ -79,28 +84,31 @@ export default class OnkyoDriver {
       volumeScaleValue = !isNaN(parsed) && [80, 100].includes(parsed) ? parsed : 100;
     }
 
-    console.log("%s Setup data parsed - volumeScale value: %d", integrationName, volumeScaleValue);
+    // Parse useHalfDbSteps - handle both string and boolean types
+    let useHalfDbStepsValue = true; // Default to true for backward compatibility
+    if (useHalfDbSteps !== undefined && useHalfDbSteps !== null && useHalfDbSteps !== "") {
+      if (typeof useHalfDbSteps === "boolean") {
+        useHalfDbStepsValue = useHalfDbSteps;
+      } else if (typeof useHalfDbSteps === "string") {
+        useHalfDbStepsValue = useHalfDbSteps.toLowerCase() === "true";
+      }
+    }
+
+    console.log(
+      "%s Setup data parsed - volumeScale: %d, useHalfDbSteps: %s",
+      integrationName,
+      volumeScaleValue,
+      useHalfDbStepsValue
+    );
 
     // Store setup data for use when adding autodiscovered AVRs
     this.lastSetupData = {
       queueThreshold: queueThresholdValue,
       albumArtURL: albumArtURLValue,
-      volumeScale: volumeScaleValue
+      volumeScale: volumeScaleValue,
+      useHalfDbSteps: useHalfDbStepsValue
     };
     console.log("%s Stored setup data for autodiscovery:", integrationName, this.lastSetupData);
-
-    // Update existing AVRs with new settings (for when user re-runs setup)
-    const currentConfig = ConfigManager.load();
-    if (currentConfig.avrs && currentConfig.avrs.length > 0) {
-      console.log("%s Updating existing AVR configurations with new settings", integrationName);
-      currentConfig.avrs = currentConfig.avrs.map((avr) => ({
-        ...avr,
-        queueThreshold: queueThresholdValue,
-        albumArtURL: albumArtURLValue,
-        volumeScale: volumeScaleValue
-      }));
-      ConfigManager.save(currentConfig);
-    }
 
     // Add manually configured AVR if provided
     if (typeof model === "string" && model.trim() !== "" && typeof ipAddress === "string" && ipAddress.trim() !== "") {
@@ -111,9 +119,15 @@ export default class OnkyoDriver {
         port: isNaN(portNum) ? 60128 : portNum,
         queueThreshold: queueThresholdValue,
         albumArtURL: albumArtURLValue,
-        volumeScale: volumeScaleValue
+        volumeScale: volumeScaleValue,
+        useHalfDbSteps: useHalfDbStepsValue
       };
-      console.log("%s Adding AVR config with volumeScale: %d", integrationName, avrConfig.volumeScale);
+      console.log(
+        "%s Adding AVR config with volumeScale: %d, useHalfDbSteps: %s",
+        integrationName,
+        avrConfig.volumeScale,
+        avrConfig.useHalfDbSteps
+      );
       ConfigManager.addAvr(avrConfig);
     }
 
@@ -192,9 +206,15 @@ export default class OnkyoDriver {
         port: parseInt(discovered.port, 10) || 60128,
         queueThreshold: this.lastSetupData.queueThreshold,
         albumArtURL: this.lastSetupData.albumArtURL,
-        volumeScale: this.lastSetupData.volumeScale
+        volumeScale: this.lastSetupData.volumeScale,
+        useHalfDbSteps: this.lastSetupData.useHalfDbSteps
       };
-      console.log("%s Adding autodiscovered AVR with volumeScale: %d", integrationName, avrConfig.volumeScale);
+      console.log(
+        "%s Adding autodiscovered AVR with volumeScale: %d, useHalfDbSteps: %s",
+        integrationName,
+        avrConfig.volumeScale,
+        avrConfig.useHalfDbSteps
+      );
       ConfigManager.addAvr(avrConfig);
     }
 
@@ -256,6 +276,7 @@ export default class OnkyoDriver {
           queueThreshold: avrConfig.queueThreshold ?? DEFAULT_QUEUE_THRESHOLD,
           albumArtURL: avrConfig.albumArtURL ?? "album_art.cgi",
           volumeScale: avrConfig.volumeScale ?? 100,
+          useHalfDbSteps: avrConfig.useHalfDbSteps ?? true,
           // Backward compatibility fields for existing code
           model: avrConfig.model,
           ip: avrConfig.ip,

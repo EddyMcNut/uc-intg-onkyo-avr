@@ -6,7 +6,8 @@
       "port": 60128,
       "queueThreshold": 100,
       "albumArtURL": "album_art.cgi",
-      "volumeScale": 100
+      "volumeScale": 100,
+      "useHalfDbSteps": true
     }
   ]
 }

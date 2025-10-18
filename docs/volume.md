@@ -6,14 +6,18 @@ The AVR itself may display the volume as dB (relative) or as an absolute number,
 
 ### Volume Encoding in eISCP:
 
-(this piece of the documentation is AI generated)
-The volume command uses a range of 0-200 to represent volume levels from 0.0 to 100.0 in 0.5 dB steps. This means each integer value in the EISCP protocol represents 0.5 dB. So when your AVR display shows `20`, the EISCP protocol sends `40`.
-
-Why This Design?
-
+The volume command uses a range of 0-200 to represent volume levels from 0.0 to 100.0 in 0.5 steps. Why This Design?
 - AVR Precision: Many Onkyo/Integra receivers can be configured to adjust volume in 0.5 dB increments for finer control.
 - Protocol Flexibility: Using 0-200 range allows the protocol to handle both 0.5 dB and 1 dB step configurations with a single integer-based command.
 - Backward Compatibility: The protocol can support different AVR models with different volume ranges and step sizes.
+
+Some models show the value as is on their display, some models show the values divided by 2, some models let you select between the two options.
+
+To be able to align the value on the remote to match the value that is showing on the display of your AVR, during setup you can select wether the value needs to be adjusted
+
+![](../screenshots/adjust-volume-display.png)
+
+When the EISCP protocol sends `40`, your AVR display may show `20`, this setting makes sure that you can let the value that is showing on the remote match the value that is showing on the display of your AVR.
 
 ### Set specific level
 

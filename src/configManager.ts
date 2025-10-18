@@ -13,6 +13,7 @@ export interface AvrConfig {
   queueThreshold?: number;
   albumArtURL?: string;
   volumeScale?: number; // 80 or 100
+  useHalfDbSteps?: boolean; // true = use 0.5 dB steps (×2 / ÷2), false = direct EISCP value
 }
 
 export interface OnkyoConfig {
@@ -20,6 +21,7 @@ export interface OnkyoConfig {
   queueThreshold?: number;
   albumArtURL?: string;
   volumeScale?: number; // 80 or 100
+  useHalfDbSteps?: boolean; // true = use 0.5 dB steps (×2 / ÷2), false = direct EISCP value
   // Legacy fields for backward compatibility
   model?: string;
   ip?: string;
@@ -45,7 +47,8 @@ export class ConfigManager {
               port: this.config.port,
               queueThreshold: this.config.queueThreshold ?? DEFAULT_QUEUE_THRESHOLD,
               albumArtURL: this.config.albumArtURL ?? "album_art.cgi",
-              volumeScale: 100 // Default for legacy configs
+              volumeScale: 100, // Default for legacy configs
+              useHalfDbSteps: true // Default for legacy configs (original behavior)
             }
           ];
         }
@@ -56,7 +59,8 @@ export class ConfigManager {
             ...avr,
             queueThreshold: avr.queueThreshold ?? this.config.queueThreshold ?? DEFAULT_QUEUE_THRESHOLD,
             albumArtURL: avr.albumArtURL ?? this.config.albumArtURL ?? "album_art.cgi",
-            volumeScale: avr.volumeScale ?? 100 // Default to 100 if not set
+            volumeScale: avr.volumeScale ?? 100, // Default to 100 if not set
+            useHalfDbSteps: avr.useHalfDbSteps ?? true // Default to true (original behavior)
           }));
           // Remove global settings after migration
           delete this.config.queueThreshold;
@@ -68,7 +72,8 @@ export class ConfigManager {
         if (this.config.avrs) {
           this.config.avrs = this.config.avrs.map((avr) => ({
             ...avr,
-            volumeScale: avr.volumeScale ?? 100 // Default to 100 for existing configs
+            volumeScale: avr.volumeScale ?? 100, // Default to 100 for existing configs
+            useHalfDbSteps: avr.useHalfDbSteps ?? true // Default to true (original behavior)
           }));
         }
       }
@@ -95,8 +100,9 @@ export class ConfigManager {
     // Check if AVR already exists (by IP)
     const existingIndex = this.config.avrs.findIndex((a) => a.ip === avr.ip);
     if (existingIndex >= 0) {
-      // Update existing AVR
-      this.config.avrs[existingIndex] = avr;
+      // AVR already exists, don't update it to preserve per-AVR settings
+      console.log(`ConfigManager: AVR at ${avr.ip} already exists, skipping update`);
+      return;
     } else {
       // Add new AVR
       this.config.avrs.push(avr);

@@ -125,28 +125,19 @@ export class OnkyoCommandReceiver {
             break;
           }
           case "volume": {
-            // EISCP protocol: 0-200 for 0.5 dB steps, AVR display: 0-volumeScale, Remote slider: 0-100
+            // EISCP protocol: 0-200 or 0-100 depending on model, AVR display: 0-volumeScale, Remote slider: 0-100
             const eiscpValue = Number(avrUpdates.argument);
             const volumeScale = this.config.volumeScale || 100;
+            const useHalfDbSteps = this.config.useHalfDbSteps ?? true; // Default to true for backward compatibility
 
-            // Convert: EISCP → AVR display scale (÷2 for 0.5 dB steps) → slider
-            const avrDisplayValue = Math.round(eiscpValue / 2);
+            // Convert: EISCP → AVR display scale (÷2 for 0.5 dB steps if enabled) → slider
+            const avrDisplayValue = useHalfDbSteps ? Math.round(eiscpValue / 2) : eiscpValue;
             const sliderValue = Math.round((avrDisplayValue * 100) / volumeScale);
 
             this.driver.updateEntityAttributes(entityId, {
               [uc.MediaPlayerAttributes.Volume]: sliderValue
             });
             entity = this.driver.getConfiguredEntities().getEntity(entityId);
-            console.log(
-              "%s [%s] volume: eiscp=%d (0x%s), avr=%d/%d, slider=%d",
-              integrationName,
-              entityId,
-              eiscpValue,
-              eiscpValue.toString(16).toUpperCase().padStart(2, "0"),
-              avrDisplayValue,
-              volumeScale,
-              sliderValue
-            );
             break;
           }
           case "preset": {

@@ -109,6 +109,31 @@
         }
       },
       {
+        "id": "useHalfDbSteps",
+        "label": {
+          "en": "Adjust volume display"
+        },
+        "field": {
+          "dropdown": {
+            "value": "true",
+            "items": [
+              {
+                "id": "true",
+                "label": {
+                  "en": "Yes - eISCP divided by 2"
+                }
+              },
+              {
+                "id": "false",
+                "label": {
+                  "en": "No - just eISCP"
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
         "id": "infoTwo",
         "label": {
           "en": "Not auto discoverable? Adjust on-sequence!"
