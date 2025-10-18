@@ -1,7 +1,5 @@
 ## Installation and usage
 
-[back to main README](../README.md#installation-and-usage)
-
 ### Installation
 
 - Make sure your AVR is ON or STANDBY.

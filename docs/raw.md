@@ -1,7 +1,5 @@
 ## Raw messages
 
-[back to main README](../README.md#raw-messages)
-
 This integration aims to use human readable commands, like `listening-mode straight-decode`. But let's say you have figured out a command for your AVR that does not exist yet in the [JSON](../src/eiscp-commands.ts), then you can try to send it in raw format:
 
 ![](../screenshots/raw.png)

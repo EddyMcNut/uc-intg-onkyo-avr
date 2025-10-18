@@ -1,7 +1,5 @@
 ## Kudos
 
-[back to main README](../README.md#kudos)
-
 This integration has been made possible by:
 
 - [unfoldedcircle/integration-ts-example](https://github.com/unfoldedcircle/integration-ts-example):

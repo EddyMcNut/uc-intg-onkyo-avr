@@ -1,7 +1,5 @@
 ## Multilpe AVRs
 
-[back to main README](../README.md#multilpe-avrs)
-
 As from v0.6.0, this integration can handle multiple AVRs in the network.
 
 You can run the setup steps multiple times to add extra AVRs, for example:

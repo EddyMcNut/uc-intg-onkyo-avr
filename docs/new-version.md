@@ -1,7 +1,5 @@
 ## Install new version
 
-[back to main README](../README.md#install-new-version)
-
 At this moment installing a new version is only possible by removing the current version. **As long as you make sure that during setup of the new version the selected AVR has the exact name and IP as in the current version, all your mappings in your activities will be preserved.**
 If your AVR was autodiscovered, the name will be the same when you let it be autodiscovered again, as long as the IP address stays the same.
 

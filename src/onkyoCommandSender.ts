@@ -71,21 +71,23 @@ export class OnkyoCommandSender {
         break;
       case uc.MediaPlayerCommands.Volume:
         if (params?.volume !== undefined) {
-          // Remote slider sends 0-100, but AVR might use 0-80 or 0-100 scale
+          // Remote slider: 0-100, AVR display: 0-volumeScale, EISCP protocol: always 0-200 for 0.5 dB steps
           const sliderValue = Math.max(0, Math.min(100, Number(params.volume)));
           const volumeScale = this.config.volumeScale || 100;
 
-          // Scale the slider value to match AVR's volume scale
-          const avrVolume = Math.round((sliderValue * volumeScale) / 100);
-          const hexVolume = avrVolume.toString(16).toUpperCase().padStart(2, "0");
+          // Convert: slider → AVR display scale → EISCP (×2 for 0.5 dB steps)
+          const avrDisplayValue = Math.round((sliderValue * volumeScale) / 100);
+          const eiscpValue = avrDisplayValue * 2;
+          const hexVolume = eiscpValue.toString(16).toUpperCase().padStart(2, "0");
 
           console.log(
-            "%s [%s] Setting volume: slider=%d, scaled=%d/%d, hex=%s",
+            "%s [%s] Setting volume: slider=%d, avr=%d/%d, eiscp=%d (0x%s)",
             integrationName,
             entity.id,
             sliderValue,
-            avrVolume,
+            avrDisplayValue,
             volumeScale,
+            eiscpValue,
             hexVolume
           );
           await this.eiscp.raw(`MVL${hexVolume}`);

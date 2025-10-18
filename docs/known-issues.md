@@ -1,7 +1,5 @@
 ## Known issues and solutions
 
-[back to main README](../README.md#known-issues-and-solutions)
-
 ### In case of issues during the 'on requence' of an Activity
 
 Some AVR models temporarily disconnect when powering on, in that case the next command that the Remote tries to send ends up in an error or time out because the Remote cannot re-connect yet. If you encounter that kind of issue, add a delay step between the Switch ON and the next AVR command of approximately 5 seconds, then lower it and try again to find the sweet spot:
