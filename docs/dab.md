@@ -1,7 +1,5 @@
 ## DAB Radio
 
-[back to main README](../README.md#example-activities)
-
 ### DAB Radio activity
 
 To set up an Activity for DAB, have a look at these screenshots:

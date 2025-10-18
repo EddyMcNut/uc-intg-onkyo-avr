@@ -69,6 +69,22 @@ export class OnkyoCommandSender {
           await this.eiscp.command("volume level-down-1db-step");
         }
         break;
+      case uc.MediaPlayerCommands.Volume:
+        if (params?.volume !== undefined) {
+          // Remote slider: 0-100, AVR display: 0-volumeScale, EISCP protocol: 0-200 or 0-100 depending on model
+          const sliderValue = Math.max(0, Math.min(100, Number(params.volume)));
+          const volumeScale = this.config.volumeScale || 100;
+          const useHalfDbSteps = this.config.useHalfDbSteps ?? true; // Default to true for backward compatibility
+
+          // Convert: slider → AVR display scale
+          const avrDisplayValue = Math.round((sliderValue * volumeScale) / 100);
+
+          // Convert to EISCP: some models use 0.5 dB steps (×2), others show EISCP value directly
+          const eiscpValue = useHalfDbSteps ? avrDisplayValue * 2 : avrDisplayValue;
+          const hexVolume = eiscpValue.toString(16).toUpperCase().padStart(2, "0");
+          await this.eiscp.raw(`MVL${hexVolume}`);
+        }
+        break;
       case uc.MediaPlayerCommands.ChannelUp:
         await this.eiscp.command("preset up");
         break;

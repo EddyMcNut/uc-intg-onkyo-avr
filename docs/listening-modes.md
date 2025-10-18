@@ -1,7 +1,5 @@
 ## Listening modes
 
-[back to main README](../README.md#listening-modes)
-
 Like descibed in the Cheats section, you can send a lot of different commands which are all mentioned in the [JSON](../src/eiscp-commands.ts) file.
 
 Probably you have your AVR set to automatically select the best listening mode, but sometimes you might want to set a favorite mode, see the listening-mode section in the [JSON](../src/eiscp-commands.ts), for the correct command. A few examples from that JSON:

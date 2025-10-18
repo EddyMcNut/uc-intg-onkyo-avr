@@ -1,6 +1,6 @@
 {
   "driver_id": "onkyo-avr",
-  "version": "0.5.0",
+  "version": "0.6.1",
   "min_core_api": "0.20.0",
   "name": { "en": "Onkyo AVR" },
   "icon": "uc:music",
@@ -80,6 +80,56 @@
         "field": {
           "number": {
             "value": 100
+          }
+        }
+      },
+      {
+        "id": "volumeScale",
+        "label": {
+          "en": "Volume scale (0-80 or 0-100)"
+        },
+        "field": {
+          "dropdown": {
+            "value": "100",
+            "items": [
+              {
+                "id": "100",
+                "label": {
+                  "en": "0-100"
+                }
+              },
+              {
+                "id": "80",
+                "label": {
+                  "en": "0-80"
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "useHalfDbSteps",
+        "label": {
+          "en": "Adjust volume display"
+        },
+        "field": {
+          "dropdown": {
+            "value": "true",
+            "items": [
+              {
+                "id": "true",
+                "label": {
+                  "en": "Yes - eISCP divided by 2"
+                }
+              },
+              {
+                "id": "false",
+                "label": {
+                  "en": "No - just eISCP"
+                }
+              }
+            ]
           }
         }
       },

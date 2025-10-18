@@ -17,6 +17,8 @@ Read this readme completely, it contains some tips for known issues and it also 
 
 Your Onkyo AVR(s) needs to be ON or STANDBY, if it is disconnected from power (off) this integration will fail. If your AVR has been disconnected from power, it could be that you first have to switch on your AVR manually one time before network commands work again (depends on the model), waking up after STANDBY should then work again.
 
+Make sure your AVR has a fixed IP address.
+
 ## Reported to work on different brands and models
 
 I have tested it with my Onkyo TX-RZ50. I gave it a fixed IP address (a while ago to solve Spotify hickups) and it has a wired connection to my network.
@@ -75,6 +77,10 @@ Users report it also to work with:
 - Make sure that you add your Activities to an [Activity Group](./docs/activitygroup.md).
 - `Home` \ `Customise your remote` Add your new Activity to a page and now you can give it a try on the awesome Unfolded Circle Remote!
 - or, when not created an activity yet: `Home` \ `Customise your remote` and just add your AVR, in that case physical buttons are mapped.
+
+## Collect logs
+
+[Collect logs](./docs/collect-logs.md)
 
 ## Stuff to do / backlog
 
