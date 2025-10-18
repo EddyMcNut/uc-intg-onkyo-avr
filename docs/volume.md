@@ -39,7 +39,7 @@ The integration will deal with [Volume Encoding in eISCP](#volume-encoding-in-ei
 
 In the Activity, User interface, add a `Media Widget` for your Onkyo AVR and you can then control the volume with the slider.
 
-If you already have a Media Widget in that activity for a different device, let's say an AppleTV, just add a new widget for your AVR. The slider will work if the Media Widget for the AVR last Media Widget on that page. In other words the Media Widget that is closest to the Slider on the remote.
+If you already have a Media Widget in that activity for a different device, let's say an AppleTV, just add a new widget for your AVR. The slider will work if the Media Widget for the AVR is the last Media Widget on that page. In other words the Media Widget that is closest to the Slider on the remote.
 
 ![](../screenshots//slider-widget.png)
 
