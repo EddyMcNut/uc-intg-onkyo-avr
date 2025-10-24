@@ -107,14 +107,14 @@ export class OnkyoCommandReceiver {
               [uc.MediaPlayerAttributes.State]:
                 avrUpdates.argument === "on" ? uc.MediaPlayerStates.On : uc.MediaPlayerStates.Standby
             });
-            console.log("%s [%s] power set to: %s", integrationName, entityId, entity?.attributes?.state);
+            console.log("%s [%s] [%s] power set to: %s", integrationName, entityId, avrUpdates.zone, entity?.attributes?.state);
             break;
           }
           case "audio-muting": {
             this.driver.updateEntityAttributes(entityId, {
               [uc.MediaPlayerAttributes.Muted]: avrUpdates.argument === "on" ? true : false
             });
-            console.log("%s [%s] audio-muting set to: %s", integrationName, entityId, entity?.attributes?.muted);
+            console.log("%s [%s] [%s] audio-muting set to: %s", integrationName, entityId, avrUpdates.zone, entity?.attributes?.muted);
             break;
           }
           case "volume": {
@@ -130,12 +130,12 @@ export class OnkyoCommandReceiver {
             this.driver.updateEntityAttributes(entityId, {
               [uc.MediaPlayerAttributes.Volume]: sliderValue
             });
-            console.log("%s [%s] volume set to: %s", integrationName, entityId, sliderValue);
+            console.log("%s [%s] [%s] volume set to: %s", integrationName, entityId, avrUpdates.zone, sliderValue);
             break;
           }
           case "preset": {
             this.avrPreset = avrUpdates.argument.toString();
-            console.log("%s [%s] preset set to: %s", integrationName, entityId, this.avrPreset);
+            console.log("%s [%s] [%s] preset set to: %s", integrationName, entityId, avrUpdates.zone, this.avrPreset);
             // this.eiscpInstance.command("input-selector query");
             break;
           }
@@ -144,7 +144,7 @@ export class OnkyoCommandReceiver {
             this.driver.updateEntityAttributes(entityId, {
               [uc.MediaPlayerAttributes.Source]: avrUpdates.argument.toString()
             });
-            console.log("%s [%s] input-selector (source) set to: %s", integrationName, entityId, avrUpdates.argument.toString());
+            console.log("%s [%s] [%s] input-selector (source) set to: %s", integrationName, entityId, avrUpdates.zone, avrUpdates.argument.toString());
             switch (avrUpdates.argument.toString()) {
               case "dab":
                 this.eiscpInstance.raw("DSNQSTN");
@@ -161,14 +161,14 @@ export class OnkyoCommandReceiver {
             setAvrCurrentSource("dab");
             nowPlaying.station = avrUpdates.argument.toString();
             nowPlaying.artist = "DAB Radio";
-            console.log("%s [%s] DAB station set to: %s", integrationName, entityId, avrUpdates.argument.toString());
+            console.log("%s [%s] [%s] DAB station set to: %s", integrationName, entityId, avrUpdates.zone, avrUpdates.argument.toString());
             break;
           }
           case "RDS": {
             setAvrCurrentSource("fm");
             nowPlaying.station = avrUpdates.argument.toString();
             nowPlaying.artist = "FM Radio";
-            console.log("%s [%s] RDS set to: %s", integrationName, entityId, avrUpdates.argument.toString());
+            console.log("%s [%s] [%s] RDS set to: %s", integrationName, entityId, avrUpdates.zone, avrUpdates.argument.toString());
             break;
           }
           case "NTM": {
