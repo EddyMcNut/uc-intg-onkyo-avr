@@ -26,6 +26,8 @@ I have tested it with my Onkyo TX-RZ50. I gave it a fixed IP address (a while ag
 Users report it also to work with:
 
 - TX-RZ70
+- TX-RZ1100
+- TX RZ-730
 - TX-NR656
 - TX-NR807
 - TX-NR6050
@@ -45,7 +47,7 @@ Users report it also to work with:
 
 [Install new version](./docs/new-version.md)
 
-## Multilpe AVRs
+## Multiple AVRs
 
 [Multiple AVRs](./docs/multiple-avrs.md)
 
