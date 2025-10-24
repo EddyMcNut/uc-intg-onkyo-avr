@@ -17,7 +17,7 @@ If your AVR was autodiscovered, the name will be the same when you let it be aut
    ![](../screenshots/delete2x.png)
 
 5. upload the new version (see [installation procedure](./installation.md#installation))
-6. make sure that the selected AVR entity has the exact same name as in the previous version (see step 3)
+6. in the new version, **start setup** and make sure that the selected AVR entity has the exact same name as in the previous version (see step 3)
 7. done!
 
 [back to main README](../README.md#install-new-version)

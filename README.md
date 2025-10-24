@@ -57,6 +57,10 @@ Users report it also to work with:
 
 [Cheats](./docs/cheats.md)
 
+## Input source
+
+[Input source](./docs/input-selector.md)
+
 ## Volume
 
 [Volume](./docs/volume.md)

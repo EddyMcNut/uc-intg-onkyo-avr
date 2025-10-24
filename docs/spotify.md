@@ -30,4 +30,6 @@ To set up an Activity for Spotify, have a look at these screenshots:
 
     ![](../screenshots/spotify-next.png)
 
+Previous/Next on the remote will only work if you can also use previous/next directly in your Spotify app, that depends on the subscription you have for Spotify.
+
 [back to main README](../README.md#example-activities)
