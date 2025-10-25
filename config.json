@@ -1,0 +1,54 @@
+{
+  "avrs": [
+    {
+      "model": "temp",
+      "ip": "192.168.2.103",
+      "port": 60128,
+      "zone": "main",
+      "queueThreshold": 100,
+      "albumArtURL": "album_art.cgi",
+      "volumeScale": 100,
+      "useHalfDbSteps": true
+    },
+    {
+      "model": "temp",
+      "ip": "192.168.2.103",
+      "port": 60128,
+      "zone": "zone2",
+      "queueThreshold": 100,
+      "albumArtURL": "album_art.cgi",
+      "volumeScale": 100,
+      "useHalfDbSteps": true
+    },
+    {
+      "model": "TX-NR807",
+      "ip": "192.168.2.188",
+      "port": 60128,
+      "zone": "main",
+      "queueThreshold": 100,
+      "albumArtURL": "album_art.cgi",
+      "volumeScale": 100,
+      "useHalfDbSteps": true
+    },
+    {
+      "model": "TX-NR807",
+      "ip": "192.168.2.188",
+      "port": 60128,
+      "zone": "zone2",
+      "queueThreshold": 100,
+      "albumArtURL": "album_art.cgi",
+      "volumeScale": 100,
+      "useHalfDbSteps": true
+    },
+    {
+      "model": "TX-NR807",
+      "ip": "192.168.2.188",
+      "port": 60128,
+      "zone": "zone3",
+      "queueThreshold": 100,
+      "albumArtURL": "album_art.cgi",
+      "volumeScale": 100,
+      "useHalfDbSteps": true
+    }
+  ]
+}

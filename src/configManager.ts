@@ -10,6 +10,7 @@ export interface AvrConfig {
   model: string;
   ip: string;
   port: number;
+  zone: string; // 'main', 'zone2', 'zone3'
   queueThreshold?: number;
   albumArtURL?: string;
   volumeScale?: number; // 80 or 100
@@ -45,6 +46,7 @@ export class ConfigManager {
               model: this.config.model,
               ip: this.config.ip,
               port: this.config.port,
+              zone: "main", // Legacy configs default to main zone
               queueThreshold: this.config.queueThreshold ?? DEFAULT_QUEUE_THRESHOLD,
               albumArtURL: this.config.albumArtURL ?? "album_art.cgi",
               volumeScale: 100, // Default for legacy configs
@@ -97,11 +99,11 @@ export class ConfigManager {
     if (!this.config.avrs) {
       this.config.avrs = [];
     }
-    // Check if AVR already exists (by IP)
-    const existingIndex = this.config.avrs.findIndex((a) => a.ip === avr.ip);
+    // Check if AVR already exists (by IP and zone)
+    const existingIndex = this.config.avrs.findIndex((a) => a.ip === avr.ip && a.zone === avr.zone);
     if (existingIndex >= 0) {
       // AVR already exists, don't update it to preserve per-AVR settings
-      console.log(`ConfigManager: AVR at ${avr.ip} already exists, skipping update`);
+      console.log(`ConfigManager: AVR at ${avr.ip} zone ${avr.zone} already exists, skipping update`);
       return;
     } else {
       // Add new AVR

@@ -134,6 +134,37 @@
         }
       },
       {
+        "id": "zoneCount",
+        "label": {
+          "en": "Number of zones to configure"
+        },
+        "field": {
+          "dropdown": {
+            "value": "1",
+            "items": [
+              {
+                "id": "1",
+                "label": {
+                  "en": "1 zone (Main only)"
+                }
+              },
+              {
+                "id": "2",
+                "label": {
+                  "en": "2 zones (Main + Zone 2)"
+                }
+              },
+              {
+                "id": "3",
+                "label": {
+                  "en": "3 zones (Main + Zone 2 + Zone 3)"
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
         "id": "infoTwo",
         "label": {
           "en": "Not auto discoverable? Adjust on-sequence!"
