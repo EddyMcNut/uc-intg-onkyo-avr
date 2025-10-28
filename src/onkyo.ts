@@ -232,6 +232,18 @@ export default class OnkyoDriver {
     for (const avrConfig of this.config.avrs) {
       const avrKey = `${avrConfig.model} ${avrConfig.ip}`;
 
+      // Ensure there's an available entity placeholder so the Core doesn't wait/times out
+      try {
+        const existingAvailable = this.driver.getAvailableEntities().getEntity(avrKey);
+        if (!existingAvailable) {
+          console.log("%s [%s] Adding placeholder available entity to avoid timeouts", integrationName, avrKey);
+          const placeholder = this.createMediaPlayerEntity(avrKey, avrConfig.volumeScale ?? 100);
+          this.driver.addAvailableEntity(placeholder);
+        }
+      } catch (err) {
+        console.warn("%s [%s] Failed to add placeholder entity (non-fatal):", integrationName, avrKey, err);
+      }
+
       // If already connected, re-register the entity for remote reconnect scenarios
       if (this.avrInstances.has(avrKey)) {
         console.log("%s [%s] Already connected to AVR, re-registering entity", integrationName, avrKey);
