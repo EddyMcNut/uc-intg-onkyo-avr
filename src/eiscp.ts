@@ -146,7 +146,7 @@ export class EiscpDriver extends EventEmitter {
       value = value.trim();
     }
 
-    console.log("%s RAW RECEIVE: [%s] %s %s", integrationName, result.zone, command, value);
+    // console.log("%s RAW RECEIVE: [%s] %s %s", integrationName, result.zone, command, value);
 
     if (command === "NTM") {
       let [position, duration] = value.toString().split("/");
@@ -441,7 +441,7 @@ export class EiscpDriver extends EventEmitter {
         zone = "zone3";
       }
 
-      console.log("%s RAW SEND: [%s] %s %s", integrationName, zone, command, value);
+      // console.log("%s RAW SEND: [%s] %s %s", integrationName, zone, command, value);
 
       this.eiscp.write(this.eiscp_packet(data));
       setTimeout(callback, this.config.send_delay, false);
