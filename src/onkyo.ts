@@ -196,6 +196,7 @@ export default class OnkyoDriver {
       console.log("%s Discovered %d AVR(s) via autodiscovery", integrationName, discoveredAvrs.length);
     } catch (err) {
       console.log("%s Autodiscovery failed or found no AVRs:", integrationName, err);
+      // Autodiscovery failure is not fatal - we can still connect to configured AVRs
     }
 
     // Add discovered AVRs to config if not already present
@@ -239,6 +240,17 @@ export default class OnkyoDriver {
         // Re-create and re-add the entity (in case remote rebooted)
         const mediaPlayerEntity = this.createMediaPlayerEntity(avrKey, instance.config.volumeScale ?? 100);
         this.driver.addAvailableEntity(mediaPlayerEntity);
+        
+        // Query initial AVR state immediately after re-registration
+        console.log("%s [%s] Querying AVR state after re-registration...", integrationName, avrKey);
+        try {
+          instance.eiscp.command("system-power query");
+          instance.eiscp.command("input-selector query");
+          instance.eiscp.command("volume query");
+          instance.eiscp.command("audio-muting query");
+        } catch (queryErr) {
+          console.warn("%s [%s] Failed to query AVR state:", integrationName, avrKey, queryErr);
+        }
         continue;
       }
 
@@ -308,6 +320,18 @@ export default class OnkyoDriver {
         // Create media player entity for this AVR
         const mediaPlayerEntity = this.createMediaPlayerEntity(avrKey, avrConfig.volumeScale ?? 100);
         this.driver.addAvailableEntity(mediaPlayerEntity);
+
+        // Query initial AVR state immediately after registration
+        // This ensures entity attributes are populated before Remote tries to use them
+        console.log("%s [%s] Querying initial AVR state...", integrationName, avrKey);
+        try {
+          eiscpInstance.command("system-power query");
+          eiscpInstance.command("input-selector query");
+          eiscpInstance.command("volume query");
+          eiscpInstance.command("audio-muting query");
+        } catch (queryErr) {
+          console.warn("%s [%s] Failed to query initial AVR state:", integrationName, avrKey, queryErr);
+        }
 
         // Setup error handler
         eiscpInstance.on("error", (err: any) => {
