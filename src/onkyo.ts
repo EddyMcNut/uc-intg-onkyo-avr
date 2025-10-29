@@ -232,22 +232,26 @@ export default class OnkyoDriver {
     for (const avrConfig of this.config.avrs) {
       const avrKey = `${avrConfig.model} ${avrConfig.ip}`;
 
-      // Ensure there's an available entity placeholder so the Core doesn't wait/times out
-      try {
-        const existingAvailable = this.driver.getAvailableEntities().getEntity(avrKey);
-        if (!existingAvailable) {
-          console.log("%s [%s] Adding placeholder available entity to avoid timeouts", integrationName, avrKey);
-          const placeholder = this.createMediaPlayerEntity(avrKey, avrConfig.volumeScale ?? 100);
-          this.driver.addAvailableEntity(placeholder);
-        }
-      } catch (err) {
-        console.warn("%s [%s] Failed to add placeholder entity (non-fatal):", integrationName, avrKey, err);
-      }
-
       // If already connected, re-register the entity for remote reconnect scenarios
       if (this.avrInstances.has(avrKey)) {
         console.log("%s [%s] Already connected to AVR, re-registering entity", integrationName, avrKey);
         const instance = this.avrInstances.get(avrKey)!;
+
+        // Check if eiscp connection is actually still alive, if not, reconnect
+        if (!instance.eiscp.connected) {
+          console.log("%s [%s] TCP connection lost, reconnecting to AVR...", integrationName, avrKey);
+          try {
+            await instance.eiscp.connect({
+              model: instance.config.model,
+              host: instance.config.ip,
+              port: instance.config.port
+            });
+            console.log("%s [%s] Successfully reconnected to AVR", integrationName, avrKey);
+          } catch (reconnectErr) {
+            console.error("%s [%s] Failed to reconnect to AVR:", integrationName, avrKey, reconnectErr);
+            // Fall through to re-register anyway - may recover later
+          }
+        }
 
         // Re-create and re-add the entity (in case remote rebooted)
         const mediaPlayerEntity = this.createMediaPlayerEntity(avrKey, instance.config.volumeScale ?? 100);
@@ -336,6 +340,8 @@ export default class OnkyoDriver {
         // Query initial AVR state immediately after registration
         // This ensures entity attributes are populated before Remote tries to use them
         console.log("%s [%s] Querying initial AVR state...", integrationName, avrKey);
+        // Note: We can't use updateEntityAttributes yet as entity isn't in configured pool
+        // The state updates will come via the command receiver's eiscp listener
         try {
           eiscpInstance.command("system-power query");
           eiscpInstance.command("input-selector query");
