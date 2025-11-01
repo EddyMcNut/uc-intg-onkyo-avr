@@ -257,12 +257,15 @@ export default class OnkyoDriver {
       return;
     }
 
+    // Collect entities to register after all connections are established
+    const entitiesToRegister: uc.MediaPlayer[] = [];
+
     for (const avrConfig of this.config.avrs) {
       const avrKey = `${avrConfig.model} ${avrConfig.ip}`;
 
       // If already connected, re-register the entity for remote reconnect scenarios
       if (this.avrInstances.has(avrKey)) {
-        console.log("%s [%s] Already connected to AVR, re-registering entity", integrationName, avrKey);
+        console.log("%s [%s] Already connected to AVR, preparing for re-registration", integrationName, avrKey);
         const instance = this.avrInstances.get(avrKey)!;
 
         // Check if eiscp connection is actually still alive, if not, reconnect
@@ -276,20 +279,21 @@ export default class OnkyoDriver {
             });
             console.log("%s [%s] Successfully reconnected to AVR", integrationName, avrKey);
             
-            // Wait for connection to be fully established before sending commands
-            await instance.eiscp.waitForConnect(3000);
+            // If connect() succeeded, the connection is already established
+            // Only wait if not yet connected (shouldn't happen, but defensive)
+            if (!instance.eiscp.connected) {
+              console.log("%s [%s] Waiting for connection to be established...", integrationName, avrKey);
+              await instance.eiscp.waitForConnect(3000);
+            }
           } catch (reconnectErr) {
             console.error("%s [%s] Failed to reconnect to AVR:", integrationName, avrKey, reconnectErr);
             // Fall through to re-register anyway - may recover later
           }
         }
 
-        // Re-create and re-add the entity (in case remote rebooted)
+        // Re-create entity and add to registration list
         const mediaPlayerEntity = this.createMediaPlayerEntity(avrKey, instance.config.volumeScale ?? 100);
-        this.driver.addAvailableEntity(mediaPlayerEntity);
-        
-        // Query initial AVR state immediately after re-registration
-        await this.queryAvrState(avrKey, instance.eiscp, "after re-registration");
+        entitiesToRegister.push(mediaPlayerEntity);
         continue;
       }
 
@@ -356,15 +360,9 @@ export default class OnkyoDriver {
           result.port
         );
 
-        // Create media player entity for this AVR
+        // Create media player entity for this AVR and add to registration list
         const mediaPlayerEntity = this.createMediaPlayerEntity(avrKey, avrConfig.volumeScale ?? 100);
-        this.driver.addAvailableEntity(mediaPlayerEntity);
-
-        // Query initial AVR state immediately after registration
-        // This ensures entity attributes are populated before Remote tries to use them
-        // Note: We can't use updateEntityAttributes yet as entity isn't in configured pool
-        // The state updates will come via the command receiver's eiscp listener
-        await this.queryAvrState(avrKey, eiscpInstance, "initial connection");
+        entitiesToRegister.push(mediaPlayerEntity);
 
         // Setup error handler
         eiscpInstance.on("error", (err: any) => {
@@ -373,6 +371,17 @@ export default class OnkyoDriver {
       } catch (err) {
         console.error("%s [%s] Failed to connect to AVR:", integrationName, avrKey, err);
       }
+    }
+
+    // Register all entities at once after all AVRs are connected
+    console.log("%s Registering %d AVR entity(ies)", integrationName, entitiesToRegister.length);
+    for (const entity of entitiesToRegister) {
+      this.driver.addAvailableEntity(entity);
+    }
+
+    // Query state for all connected AVRs after entity registration
+    for (const [avrKey, instance] of this.avrInstances) {
+      await this.queryAvrState(avrKey, instance.eiscp, "after entity registration");
     }
 
     if (this.avrInstances.size > 0) {
