@@ -110,25 +110,70 @@ export default class OnkyoDriver {
     };
     console.log("%s Stored setup data for autodiscovery:", integrationName, this.lastSetupData);
 
-    // Add manually configured AVR if provided
-    if (typeof model === "string" && model.trim() !== "" && typeof ipAddress === "string" && ipAddress.trim() !== "") {
-      const portNum = port && port.toString().trim() !== "" ? parseInt(port, 10) : 60128;
-      const avrConfig: AvrConfig = {
-        model: model.trim(),
-        ip: ipAddress.trim(),
-        port: isNaN(portNum) ? 60128 : portNum,
-        queueThreshold: queueThresholdValue,
-        albumArtURL: albumArtURLValue,
-        volumeScale: volumeScaleValue,
-        useHalfDbSteps: useHalfDbStepsValue
-      };
-      console.log(
-        "%s Adding AVR config with volumeScale: %d, useHalfDbSteps: %s",
-        integrationName,
-        avrConfig.volumeScale,
-        avrConfig.useHalfDbSteps
-      );
-      ConfigManager.addAvr(avrConfig);
+    // Check if manual configuration was provided
+    const hasManualConfig = typeof model === "string" && model.trim() !== "" && 
+                           typeof ipAddress === "string" && ipAddress.trim() !== "";
+
+    try {
+      if (hasManualConfig) {
+        // Add manually configured AVR
+        const portNum = port && port.toString().trim() !== "" ? parseInt(port, 10) : 60128;
+        const avrConfig: AvrConfig = {
+          model: model.trim(),
+          ip: ipAddress.trim(),
+          port: isNaN(portNum) ? 60128 : portNum,
+          queueThreshold: queueThresholdValue,
+          albumArtURL: albumArtURLValue,
+          volumeScale: volumeScaleValue,
+          useHalfDbSteps: useHalfDbStepsValue
+        };
+        console.log(
+          "%s Adding manually configured AVR with volumeScale: %d, useHalfDbSteps: %s",
+          integrationName,
+          avrConfig.volumeScale,
+          avrConfig.useHalfDbSteps
+        );
+        ConfigManager.addAvr(avrConfig);
+      } else {
+        // No manual config - run autodiscovery
+        console.log("%s No manual AVR config provided, running autodiscovery during setup", integrationName);
+        const tempEiscp = new EiscpDriver({ send_delay: DEFAULT_QUEUE_THRESHOLD });
+        try {
+          const discoveredAvrs = await tempEiscp.discover({ timeout: 5 });
+          console.log("%s Discovered %d AVR(s) via autodiscovery", integrationName, discoveredAvrs.length);
+          
+          if (discoveredAvrs.length === 0) {
+            console.error("%s No AVRs discovered during setup", integrationName);
+            return new uc.SetupError("NOT_FOUND");
+          }
+          
+          // Add discovered AVRs to config
+          for (const discovered of discoveredAvrs) {
+            const avrConfig: AvrConfig = {
+              model: discovered.model,
+              ip: discovered.host,
+              port: parseInt(discovered.port, 10) || 60128,
+              queueThreshold: queueThresholdValue,
+              albumArtURL: albumArtURLValue,
+              volumeScale: volumeScaleValue,
+              useHalfDbSteps: useHalfDbStepsValue
+            };
+            console.log(
+              "%s Adding autodiscovered AVR with volumeScale: %d, useHalfDbSteps: %s",
+              integrationName,
+              avrConfig.volumeScale,
+              avrConfig.useHalfDbSteps
+            );
+            ConfigManager.addAvr(avrConfig);
+          }
+        } catch (err) {
+          console.error("%s Autodiscovery failed:", integrationName, err);
+          return new uc.SetupError("NOT_FOUND");
+        }
+      }
+    } catch (err) {
+      console.error("%s Failed to save configuration:", integrationName, err);
+      return new uc.SetupError("OTHER");
     }
 
     await this.handleConnect();
@@ -186,40 +231,6 @@ export default class OnkyoDriver {
 
   private async handleConnect() {
     // Reload config to get latest AVR list
-    this.config = ConfigManager.load();
-
-    // First, try to discover auto-discoverable AVRs
-    const tempEiscp = new EiscpDriver({ send_delay: DEFAULT_QUEUE_THRESHOLD });
-    let discoveredAvrs: any[] = [];
-    try {
-      discoveredAvrs = await tempEiscp.discover({ timeout: 5 });
-      console.log("%s Discovered %d AVR(s) via autodiscovery", integrationName, discoveredAvrs.length);
-    } catch (err) {
-      console.log("%s Autodiscovery failed or found no AVRs:", integrationName, err);
-      // Autodiscovery failure is not fatal - we can still connect to configured AVRs
-    }
-
-    // Add discovered AVRs to config if not already present
-    for (const discovered of discoveredAvrs) {
-      const avrConfig: AvrConfig = {
-        model: discovered.model,
-        ip: discovered.host,
-        port: parseInt(discovered.port, 10) || 60128,
-        queueThreshold: this.lastSetupData.queueThreshold,
-        albumArtURL: this.lastSetupData.albumArtURL,
-        volumeScale: this.lastSetupData.volumeScale,
-        useHalfDbSteps: this.lastSetupData.useHalfDbSteps
-      };
-      console.log(
-        "%s Adding autodiscovered AVR with volumeScale: %d, useHalfDbSteps: %s",
-        integrationName,
-        avrConfig.volumeScale,
-        avrConfig.useHalfDbSteps
-      );
-      ConfigManager.addAvr(avrConfig);
-    }
-
-    // Reload config after adding discovered AVRs
     this.config = ConfigManager.load();
 
     // Connect to all configured AVRs
