@@ -229,6 +229,23 @@ export default class OnkyoDriver {
     return mediaPlayerEntity;
   }
 
+  private async queryAvrState(avrKey: string, eiscp: EiscpDriver, context: string): Promise<void> {
+    if (!eiscp.connected) {
+      console.warn(`${integrationName} [${avrKey}] Cannot query AVR state (${context}), not connected`);
+      return;
+    }
+
+    console.log(`${integrationName} [${avrKey}] Querying AVR state (${context})...`);
+    try {
+      await eiscp.command("system-power query");
+      await eiscp.command("input-selector query");
+      await eiscp.command("volume query");
+      await eiscp.command("audio-muting query");
+    } catch (queryErr) {
+      console.warn(`${integrationName} [${avrKey}] Failed to query AVR state (${context}):`, queryErr);
+    }
+  }
+
   private async handleConnect() {
     // Reload config to get latest AVR list
     this.config = ConfigManager.load();
@@ -258,6 +275,9 @@ export default class OnkyoDriver {
               port: instance.config.port
             });
             console.log("%s [%s] Successfully reconnected to AVR", integrationName, avrKey);
+            
+            // Wait for connection to be fully established before sending commands
+            await instance.eiscp.waitForConnect(3000);
           } catch (reconnectErr) {
             console.error("%s [%s] Failed to reconnect to AVR:", integrationName, avrKey, reconnectErr);
             // Fall through to re-register anyway - may recover later
@@ -269,15 +289,7 @@ export default class OnkyoDriver {
         this.driver.addAvailableEntity(mediaPlayerEntity);
         
         // Query initial AVR state immediately after re-registration
-        console.log("%s [%s] Querying AVR state after re-registration...", integrationName, avrKey);
-        try {
-          instance.eiscp.command("system-power query");
-          instance.eiscp.command("input-selector query");
-          instance.eiscp.command("volume query");
-          instance.eiscp.command("audio-muting query");
-        } catch (queryErr) {
-          console.warn("%s [%s] Failed to query AVR state:", integrationName, avrKey, queryErr);
-        }
+        await this.queryAvrState(avrKey, instance.eiscp, "after re-registration");
         continue;
       }
 
@@ -350,17 +362,9 @@ export default class OnkyoDriver {
 
         // Query initial AVR state immediately after registration
         // This ensures entity attributes are populated before Remote tries to use them
-        console.log("%s [%s] Querying initial AVR state...", integrationName, avrKey);
         // Note: We can't use updateEntityAttributes yet as entity isn't in configured pool
         // The state updates will come via the command receiver's eiscp listener
-        try {
-          eiscpInstance.command("system-power query");
-          eiscpInstance.command("input-selector query");
-          eiscpInstance.command("volume query");
-          eiscpInstance.command("audio-muting query");
-        } catch (queryErr) {
-          console.warn("%s [%s] Failed to query initial AVR state:", integrationName, avrKey, queryErr);
-        }
+        await this.queryAvrState(avrKey, eiscpInstance, "initial connection");
 
         // Setup error handler
         eiscpInstance.on("error", (err: any) => {
@@ -384,7 +388,7 @@ export default class OnkyoDriver {
     });
 
     this.driver.on(uc.Events.SubscribeEntities, async (entityIds: string[]) => {
-      entityIds.forEach((entityId: string) => {
+      for (const entityId of entityIds) {
         // Query AVR state after successful connection
         const instance = this.avrInstances.get(entityId);
         if (instance) {
@@ -392,12 +396,9 @@ export default class OnkyoDriver {
           console.log(
             `${integrationName} [${entityId}] Subscribed entity, queue threshold set to: ${queueThreshold}ms`
           );
-          instance.eiscp.command("system-power query");
-          instance.eiscp.command("input-selector query");
-          instance.eiscp.command("volume query");
-          instance.eiscp.command("audio-muting query");
+          await this.queryAvrState(entityId, instance.eiscp, "on subscribe");
         }
-      });
+      }
     });
 
     this.driver.on(uc.Events.UnsubscribeEntities, async (entityIds: string[]) => {
