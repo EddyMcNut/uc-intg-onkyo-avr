@@ -95,12 +95,14 @@ export class OnkyoCommandReceiver {
 
         // Get the entity for this specific AVR
         let entity = this.driver.getConfiguredEntities().getEntity(entityId);
+        let isAvailableOnly = false;
         if (!entity) {
           // Try availableEntities as fallback using utility
           const availableEntitiesArr = this.entitiesToArray(this.driver.getAvailableEntities());
           for (const e of availableEntitiesArr) {
             if (e.id === entityId) {
               entity = e;
+              isAvailableOnly = true;
               break;
             }
           }
@@ -108,20 +110,33 @@ export class OnkyoCommandReceiver {
 
         switch (avrUpdates.command) {
           case "system-power": {
-            this.driver.updateEntityAttributes(entityId, {
-              [uc.MediaPlayerAttributes.State]:
-                avrUpdates.argument === "on" ? uc.MediaPlayerStates.On : uc.MediaPlayerStates.Standby
-            });
-            entity = this.driver.getConfiguredEntities().getEntity(entityId);
-            console.log("%s [%s] power set to: %s", integrationName, entityId, entity?.attributes?.state);
+            const newState = avrUpdates.argument === "on" ? uc.MediaPlayerStates.On : uc.MediaPlayerStates.Standby;
+            
+            // Try updating configured entity first
+            if (this.driver.updateEntityAttributes(entityId, {
+              [uc.MediaPlayerAttributes.State]: newState
+            })) {
+              entity = this.driver.getConfiguredEntities().getEntity(entityId);
+              console.log("%s [%s] power set to: %s", integrationName, entityId, entity?.attributes?.state);
+            } else if (isAvailableOnly && entity?.attributes) {
+              // Entity not subscribed yet - update available entity directly
+              entity.attributes[uc.MediaPlayerAttributes.State] = newState;
+              console.log("%s [%s] power set to: %s (available entity)", integrationName, entityId, newState);
+            }
             break;
           }
           case "audio-muting": {
-            this.driver.updateEntityAttributes(entityId, {
-              [uc.MediaPlayerAttributes.Muted]: avrUpdates.argument === "on" ? true : false
-            });
-            entity = this.driver.getConfiguredEntities().getEntity(entityId);
-            console.log("%s [%s] audio-muting set to: %s", integrationName, entityId, entity?.attributes?.muted);
+            const muted = avrUpdates.argument === "on";
+            
+            if (this.driver.updateEntityAttributes(entityId, {
+              [uc.MediaPlayerAttributes.Muted]: muted
+            })) {
+              entity = this.driver.getConfiguredEntities().getEntity(entityId);
+              console.log("%s [%s] audio-muting set to: %s", integrationName, entityId, entity?.attributes?.muted);
+            } else if (isAvailableOnly && entity?.attributes) {
+              entity.attributes[uc.MediaPlayerAttributes.Muted] = muted;
+              console.log("%s [%s] audio-muting set to: %s (available entity)", integrationName, entityId, muted);
+            }
             break;
           }
           case "volume": {
@@ -134,10 +149,13 @@ export class OnkyoCommandReceiver {
             const avrDisplayValue = useHalfDbSteps ? Math.round(eiscpValue / 2) : eiscpValue;
             const sliderValue = Math.round((avrDisplayValue * 100) / volumeScale);
 
-            this.driver.updateEntityAttributes(entityId, {
+            if (this.driver.updateEntityAttributes(entityId, {
               [uc.MediaPlayerAttributes.Volume]: sliderValue
-            });
-            entity = this.driver.getConfiguredEntities().getEntity(entityId);
+            })) {
+              entity = this.driver.getConfiguredEntities().getEntity(entityId);
+            } else if (isAvailableOnly && entity?.attributes) {
+              entity.attributes[uc.MediaPlayerAttributes.Volume] = sliderValue;
+            }
             break;
           }
           case "preset": {

@@ -259,11 +259,15 @@ export class EiscpDriver extends EventEmitter {
       }
       client
         .on("error", (err: any) => {
-          console.error("[EiscpDriver] UDP error:", err);
+          console.error("[EiscpDriver] UDP socket error:", err);
           try {
             client.close();
           } catch {}
-          reject(err);
+          // Don't reject immediately - allow timeout to complete for graceful handling
+          // Only reject if timeout hasn't been set yet (meaning bind failed)
+          if (!timeout_timer) {
+            reject(err);
+          }
         })
         .on("message", (packet: any, rinfo: any) => {
           // Log ALL UDP packets, not just ECN
@@ -290,7 +294,13 @@ export class EiscpDriver extends EventEmitter {
           client.setBroadcast(true);
           const buffer = this.eiscp_packet("!xECNQSTN");
           client.send(buffer, 0, buffer.length, opts.port, opts.address, (err) => {
-            if (err) console.error(`[EiscpDriver] UDP send error:`, err);
+            if (err) {
+              // Log but don't fail - network might not be ready yet (ENETUNREACH)
+              console.error(`[EiscpDriver] UDP send error (network may not be ready):`, err);
+              // Close client and resolve with empty result - configured AVRs will still be tried
+              clearTimeout(timeout_timer);
+              close();
+            }
           });
           timeout_timer = setTimeout(close, opts.timeout * 1000);
         })
