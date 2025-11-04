@@ -500,6 +500,14 @@ export default class OnkyoDriver {
 
   private async setupEventHandlers() {
     this.driver.on(uc.Events.Disconnect, async () => {
+      // Clean up all reconnect timers when integration disconnects
+      for (const [avrKey, instance] of this.avrInstances) {
+        if (instance.reconnectTimer) {
+          console.log(`${integrationName} [${avrKey}] Clearing reconnect timer due to integration disconnect`);
+          clearTimeout(instance.reconnectTimer);
+          instance.reconnectTimer = undefined;
+        }
+      }
       await this.driver.setDeviceState(uc.DeviceStates.Disconnected);
     });
 
