@@ -14,6 +14,7 @@ interface AvrInstance {
   eiscp: EiscpDriver;
   commandSender: OnkyoCommandSender;
   commandReceiver: OnkyoCommandReceiver;
+  reconnectTimer?: NodeJS.Timeout;
 }
 
 export default class OnkyoDriver {
@@ -246,6 +247,76 @@ export default class OnkyoDriver {
     }
   }
 
+  private scheduleReconnect(avrKey: string, instance: AvrInstance): void {
+    // Clear any existing timer
+    if (instance.reconnectTimer) {
+      clearTimeout(instance.reconnectTimer);
+    }
+
+    console.log(`${integrationName} [${avrKey}] Scheduling reconnection attempt in 30 seconds...`);
+    
+    instance.reconnectTimer = setTimeout(async () => {
+      console.log(`${integrationName} [${avrKey}] Attempting scheduled reconnection...`);
+      
+      if (instance.eiscp.connected) {
+        console.log(`${integrationName} [${avrKey}] Already reconnected, canceling scheduled attempt`);
+        instance.reconnectTimer = undefined;
+        return;
+      }
+
+      // Try reconnecting with progressive timeout (3 attempts: 3s, 5s, 8s)
+      const timeouts = [3000, 5000, 8000];
+      let reconnected = false;
+      
+      for (let attempt = 0; attempt < timeouts.length; attempt++) {
+        try {
+          console.log(
+            "%s [%s] Scheduled reconnection attempt %d/%d (timeout: %dms)...",
+            integrationName,
+            avrKey,
+            attempt + 1,
+            timeouts.length,
+            timeouts[attempt]
+          );
+          
+          await instance.eiscp.connect({
+            model: instance.config.model,
+            host: instance.config.ip,
+            port: instance.config.port
+          });
+          
+          await instance.eiscp.waitForConnect(timeouts[attempt]);
+          
+          console.log("%s [%s] Successfully reconnected to AVR via scheduled attempt", integrationName, avrKey);
+          reconnected = true;
+          
+          // Query state after successful reconnection
+          await this.queryAvrState(avrKey, instance.eiscp, "after scheduled reconnection");
+          break;
+        } catch (reconnectErr) {
+          console.warn(
+            "%s [%s] Scheduled reconnection attempt %d/%d failed: %s",
+            integrationName,
+            avrKey,
+            attempt + 1,
+            timeouts.length,
+            reconnectErr
+          );
+          
+          // If this was the last attempt, schedule another retry
+          if (attempt === timeouts.length - 1) {
+            console.log("%s [%s] All scheduled reconnection attempts failed, will retry again in 30 seconds", integrationName, avrKey);
+            this.scheduleReconnect(avrKey, instance);
+          }
+        }
+      }
+      
+      if (reconnected) {
+        instance.reconnectTimer = undefined;
+      }
+    }, 30000); // 30 seconds
+  }
+
   private async handleConnect() {
     // Reload config to get latest AVR list
     this.config = ConfigManager.load();
@@ -271,23 +342,59 @@ export default class OnkyoDriver {
         // Check if eiscp connection is actually still alive, if not, reconnect
         if (!instance.eiscp.connected) {
           console.log("%s [%s] TCP connection lost, reconnecting to AVR...", integrationName, avrKey);
-          try {
-            await instance.eiscp.connect({
-              model: instance.config.model,
-              host: instance.config.ip,
-              port: instance.config.port
-            });
-            console.log("%s [%s] Successfully reconnected to AVR", integrationName, avrKey);
-            
-            // If connect() succeeded, the connection is already established
-            // Only wait if not yet connected (shouldn't happen, but defensive)
-            if (!instance.eiscp.connected) {
-              console.log("%s [%s] Waiting for connection to be established...", integrationName, avrKey);
-              await instance.eiscp.waitForConnect(3000);
+          
+          // Try reconnecting with progressive timeout (3 attempts: 3s, 5s, 8s)
+          const timeouts = [3000, 5000, 8000];
+          let reconnected = false;
+          
+          for (let attempt = 0; attempt < timeouts.length; attempt++) {
+            try {
+              console.log(
+                "%s [%s] Reconnection attempt %d/%d (timeout: %dms)...",
+                integrationName,
+                avrKey,
+                attempt + 1,
+                timeouts.length,
+                timeouts[attempt]
+              );
+              
+              // Start connection attempt
+              await instance.eiscp.connect({
+                model: instance.config.model,
+                host: instance.config.ip,
+                port: instance.config.port
+              });
+              
+              // Wait for the actual TCP connection to establish
+              // connect() returns immediately but the socket connects asynchronously
+              await instance.eiscp.waitForConnect(timeouts[attempt]);
+              
+              console.log("%s [%s] Successfully reconnected to AVR", integrationName, avrKey);
+              reconnected = true;
+              break;
+            } catch (reconnectErr) {
+              console.warn(
+                "%s [%s] Reconnection attempt %d/%d failed: %s",
+                integrationName,
+                avrKey,
+                attempt + 1,
+                timeouts.length,
+                reconnectErr
+              );
+              
+              // If this was the last attempt, log error
+              if (attempt === timeouts.length - 1) {
+                console.error("%s [%s] Failed to reconnect to AVR after %d attempts", integrationName, avrKey, timeouts.length);
+                // Schedule a retry in 30 seconds
+                this.scheduleReconnect(avrKey, instance);
+              }
             }
-          } catch (reconnectErr) {
-            console.error("%s [%s] Failed to reconnect to AVR:", integrationName, avrKey, reconnectErr);
-            // Fall through to re-register anyway - may recover later
+          }
+          
+          // Clear any existing reconnect timer if we successfully reconnected
+          if (reconnected && instance.reconnectTimer) {
+            clearTimeout(instance.reconnectTimer);
+            instance.reconnectTimer = undefined;
           }
         }
 
