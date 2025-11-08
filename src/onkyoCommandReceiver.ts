@@ -14,21 +14,22 @@ export class OnkyoCommandReceiver {
   private lastImageHash: string = "";
   private currentTrackId: string = "";
   private lastTrackId: string = "";
+  private zone: string = "main";
 
   constructor(driver: uc.IntegrationAPI, config: OnkyoConfig, eiscpInstance: EiscpDriver) {
     this.driver = driver;
     this.config = config;
     this.eiscpInstance = eiscpInstance;
+    // Determine which zone this receiver instance represents (config should contain a single avr entry)
+    this.zone = this.config.avrs && this.config.avrs.length > 0 ? this.config.avrs[0].zone || "main" : "main";
   }
 
-  // Utility: Convert Entities collection to array
   private entitiesToArray(entities: any): any[] {
     const arr: any[] = [];
     if (entities && typeof entities === "object") {
       for (const key in entities) {
         if (Object.prototype.hasOwnProperty.call(entities, key)) {
           const ent = entities[key];
-          // Heuristic: skip non-entity keys (e.g., methods)
           if (ent && typeof ent === "object" && ent.name) {
             arr.push(ent);
           }
@@ -45,7 +46,6 @@ export class OnkyoCommandReceiver {
       const buffer = Buffer.from(arrayBuffer);
       return crypto.createHash("md5").update(buffer).digest("hex");
     } catch (err) {
-      // Note: entityId not available in this utility function
       console.warn("%s Failed to fetch or hash image: %s", integrationName, err);
       return "";
     }
@@ -76,7 +76,6 @@ export class OnkyoCommandReceiver {
     const nowPlaying: { station?: string; artist?: string; album?: string; title?: string } = {};
 
     this.eiscpInstance.on("error", (err: any) => {
-      // Note: entityId not available in generic error handler
       console.error("%s eiscp error: %s", integrationName, err);
     });
     this.eiscpInstance.on(
@@ -90,19 +89,21 @@ export class OnkyoCommandReceiver {
         port: number;
         model: string;
       }) => {
-        // Construct entity ID from model and host (matches the format used in onkyo.ts)
-        const entityId = `${avrUpdates.model} ${avrUpdates.host}`;
+        // Ignore events for other zones — multiple receiver instances may be attached to the same EISCP connection
+        const eventZone = avrUpdates.zone || "main";
+        if (eventZone !== this.zone) return;
 
-        // Get the entity for this specific AVR
+        // Include zone in entity ID to match the entity created in onkyo.ts
+        const entityId = `${avrUpdates.model} ${avrUpdates.host} ${eventZone}`;
+
+        // Get the entity for this specific AVR zone
         let entity = this.driver.getConfiguredEntities().getEntity(entityId);
-        let isAvailableOnly = false;
         if (!entity) {
           // Try availableEntities as fallback using utility
           const availableEntitiesArr = this.entitiesToArray(this.driver.getAvailableEntities());
           for (const e of availableEntitiesArr) {
             if (e.id === entityId) {
               entity = e;
-              isAvailableOnly = true;
               break;
             }
           }
@@ -110,58 +111,52 @@ export class OnkyoCommandReceiver {
 
         switch (avrUpdates.command) {
           case "system-power": {
-            const newState = avrUpdates.argument === "on" ? uc.MediaPlayerStates.On : uc.MediaPlayerStates.Standby;
-            
-            // Try updating configured entity first
-            if (this.driver.updateEntityAttributes(entityId, {
-              [uc.MediaPlayerAttributes.State]: newState
-            })) {
-              entity = this.driver.getConfiguredEntities().getEntity(entityId);
-              console.log("%s [%s] power set to: %s", integrationName, entityId, entity?.attributes?.state);
-            } else if (isAvailableOnly && entity?.attributes) {
-              // Entity not subscribed yet - update available entity directly
-              entity.attributes[uc.MediaPlayerAttributes.State] = newState;
-              console.log("%s [%s] power set to: %s (available entity)", integrationName, entityId, newState);
-            }
+            this.driver.updateEntityAttributes(entityId, {
+              [uc.MediaPlayerAttributes.State]:
+                avrUpdates.argument === "on" ? uc.MediaPlayerStates.On : uc.MediaPlayerStates.Standby
+            });
+            console.log(
+              "%s [%s] [%s] power set to: %s",
+              integrationName,
+              entityId,
+              avrUpdates.zone,
+              entity?.attributes?.state
+            );
             break;
           }
           case "audio-muting": {
-            const muted = avrUpdates.argument === "on";
-            
-            if (this.driver.updateEntityAttributes(entityId, {
-              [uc.MediaPlayerAttributes.Muted]: muted
-            })) {
-              entity = this.driver.getConfiguredEntities().getEntity(entityId);
-              console.log("%s [%s] audio-muting set to: %s", integrationName, entityId, entity?.attributes?.muted);
-            } else if (isAvailableOnly && entity?.attributes) {
-              entity.attributes[uc.MediaPlayerAttributes.Muted] = muted;
-              console.log("%s [%s] audio-muting set to: %s (available entity)", integrationName, entityId, muted);
-            }
+            this.driver.updateEntityAttributes(entityId, {
+              [uc.MediaPlayerAttributes.Muted]: avrUpdates.argument === "on" ? true : false
+            });
+            console.log(
+              "%s [%s] [%s] audio-muting set to: %s",
+              integrationName,
+              entityId,
+              avrUpdates.zone,
+              entity?.attributes?.muted
+            );
             break;
           }
           case "volume": {
             // EISCP protocol: 0-200 or 0-100 depending on model, AVR display: 0-volumeScale, Remote slider: 0-100
             const eiscpValue = Number(avrUpdates.argument);
             const volumeScale = this.config.volumeScale || 100;
-            const useHalfDbSteps = this.config.useHalfDbSteps ?? true; // Default to true for backward compatibility
+            const useHalfDbSteps = this.config.useHalfDbSteps ?? true;
 
             // Convert: EISCP → AVR display scale (÷2 for 0.5 dB steps if enabled) → slider
             const avrDisplayValue = useHalfDbSteps ? Math.round(eiscpValue / 2) : eiscpValue;
             const sliderValue = Math.round((avrDisplayValue * 100) / volumeScale);
 
-            if (this.driver.updateEntityAttributes(entityId, {
+            this.driver.updateEntityAttributes(entityId, {
               [uc.MediaPlayerAttributes.Volume]: sliderValue
-            })) {
-              entity = this.driver.getConfiguredEntities().getEntity(entityId);
-            } else if (isAvailableOnly && entity?.attributes) {
-              entity.attributes[uc.MediaPlayerAttributes.Volume] = sliderValue;
-            }
+            });
+            console.log("%s [%s] [%s] volume set to: %s", integrationName, entityId, avrUpdates.zone, sliderValue);
             break;
           }
           case "preset": {
             this.avrPreset = avrUpdates.argument.toString();
-            console.log("%s [%s] preset set to: %s", integrationName, entityId, this.avrPreset);
-            this.eiscpInstance.command("input-selector query");
+            console.log("%s [%s] [%s] preset set to: %s", integrationName, entityId, avrUpdates.zone, this.avrPreset);
+            // this.eiscpInstance.command("input-selector query");
             break;
           }
           case "input-selector": {
@@ -169,11 +164,11 @@ export class OnkyoCommandReceiver {
             this.driver.updateEntityAttributes(entityId, {
               [uc.MediaPlayerAttributes.Source]: avrUpdates.argument.toString()
             });
-            entity = this.driver.getConfiguredEntities().getEntity(entityId);
             console.log(
-              "%s [%s] input-selector (source) set to: %s",
+              "%s [%s] [%s] input-selector (source) set to: %s",
               integrationName,
               entityId,
+              avrUpdates.zone,
               avrUpdates.argument.toString()
             );
             switch (avrUpdates.argument.toString()) {
@@ -192,14 +187,26 @@ export class OnkyoCommandReceiver {
             setAvrCurrentSource("dab");
             nowPlaying.station = avrUpdates.argument.toString();
             nowPlaying.artist = "DAB Radio";
-            console.log("%s [%s] DAB station set to: %s", integrationName, entityId, avrUpdates.argument.toString());
+            console.log(
+              "%s [%s] [%s] DAB station set to: %s",
+              integrationName,
+              entityId,
+              avrUpdates.zone,
+              avrUpdates.argument.toString()
+            );
             break;
           }
           case "RDS": {
             setAvrCurrentSource("fm");
             nowPlaying.station = avrUpdates.argument.toString();
             nowPlaying.artist = "FM Radio";
-            console.log("%s [%s] RDS set to: %s", integrationName, entityId, avrUpdates.argument.toString());
+            console.log(
+              "%s [%s] [%s] RDS set to: %s",
+              integrationName,
+              entityId,
+              avrUpdates.zone,
+              avrUpdates.argument.toString()
+            );
             break;
           }
           case "NTM": {
@@ -208,7 +215,6 @@ export class OnkyoCommandReceiver {
               [uc.MediaPlayerAttributes.MediaPosition]: position || "0",
               [uc.MediaPlayerAttributes.MediaDuration]: duration || "0"
             });
-            entity = this.driver.getConfiguredEntities().getEntity(entityId);
             break;
           }
           case "metadata": {
@@ -217,7 +223,6 @@ export class OnkyoCommandReceiver {
               nowPlaying.title = (avrUpdates.argument as Record<string, string>).title || "unknown";
               nowPlaying.album = (avrUpdates.argument as Record<string, string>).album || "unknown";
               nowPlaying.artist = (avrUpdates.argument as Record<string, string>).artist || "unknown";
-              entity = this.driver.getConfiguredEntities().getEntity(entityId);
             }
             break;
           }

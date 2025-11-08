@@ -1,6 +1,6 @@
 {
   "driver_id": "onkyo-avr",
-  "version": "0.6.5",
+  "version": "0.7.0",
   "min_core_api": "0.20.0",
   "name": { "en": "Onkyo AVR" },
   "icon": "uc:music",
@@ -127,6 +127,37 @@
                 "id": "false",
                 "label": {
                   "en": "No - just eISCP"
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "zoneCount",
+        "label": {
+          "en": "Number of zones to configure"
+        },
+        "field": {
+          "dropdown": {
+            "value": "1",
+            "items": [
+              {
+                "id": "1",
+                "label": {
+                  "en": "1 zone (Main only)"
+                }
+              },
+              {
+                "id": "2",
+                "label": {
+                  "en": "2 zones (Main + Zone 2)"
+                }
+              },
+              {
+                "id": "3",
+                "label": {
+                  "en": "3 zones (Main + Zone 2 + Zone 3)"
                 }
               }
             ]

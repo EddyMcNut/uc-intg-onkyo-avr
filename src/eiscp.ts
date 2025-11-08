@@ -122,10 +122,22 @@ export class EiscpDriver extends EventEmitter {
         argument: "undefined",
         zone: "main"
       };
+
+    // Detect zone from command prefix
+    // Zone 2 commands start with Z (ZPW, ZVL, ZMT, ZSL, etc.) or end with Z (TUZ)
+    // Zone 3 commands end with 3 (PW3, VL3, MT3, SL3, TU3, etc.)
+    if (command.charAt(0) === "Z" && command.length === 3) {
+      result.zone = "zone2";
+    } else if (command.charAt(2) === "Z" && command.length === 3) {
+      result.zone = "zone2";
+    } else if (command.charAt(2) === "3" && command.length === 3) {
+      result.zone = "zone3";
+    }
+
     value = String(value).replace(/[\x00-\x1F]/g, ""); // remove weird characters like \x1A
 
     // Strip trailing ISCP messages for certain commands, move this to ondata?
-    if (["SLI", "PRS", "AMT", "MVL"].includes(command)) {
+    if (["SLI", "SLZ", "SL3", "PRS", "AMT", "ZMT", "MT3", "MVL", "ZVL", "VL3"].includes(command)) {
       const idx = value.indexOf("ISCP");
       if (idx !== -1) {
         value = value.substring(0, idx);
@@ -133,7 +145,7 @@ export class EiscpDriver extends EventEmitter {
       value = value.trim();
     }
 
-    // console.log("%s RAW: %s %s", integrationName, command, value);
+    // console.log("%s RAW RECEIVE: [%s] %s %s", integrationName, result.zone, command, value);
 
     if (command === "NTM") {
       let [position, duration] = value.toString().split("/");
@@ -194,23 +206,53 @@ export class EiscpDriver extends EventEmitter {
       values: { [key: string]: { name: string } };
     };
 
+    // Map zone-specific command codes back to main zone for lookup
+    let lookupCommand = command;
+    if (result.zone === "zone2") {
+      // Zone 2: ZVL->MVL, ZPW->PWR, ZMT->AMT, SLZ->SLI, TUZ->TUN
+      const zone2ReverseMap: Record<string, string> = {
+        ZVL: "MVL",
+        ZPW: "PWR",
+        ZMT: "AMT",
+        SLZ: "SLI",
+        TUZ: "TUN"
+      };
+      lookupCommand = zone2ReverseMap[command] || command;
+    } else if (result.zone === "zone3") {
+      // Zone 3: VL3->MVL, PW3->PWR, MT3->AMT, SL3->SLI, TU3->TUN
+      const zone3ReverseMap: Record<string, string> = {
+        VL3: "MVL",
+        PW3: "PWR",
+        MT3: "AMT",
+        SL3: "SLI",
+        TU3: "TUN"
+      };
+      lookupCommand = zone3ReverseMap[command] || command;
+    }
+
     (Object.keys(COMMANDS) as Array<keyof typeof COMMANDS>).forEach(function () {
       const commansList = COMMANDS as unknown as { [key: string]: CommandType };
 
-      if (typeof commansList[command] !== "undefined") {
-        result.command = commansList[command].name;
+      if (typeof commansList[lookupCommand] !== "undefined") {
+        result.command = commansList[lookupCommand].name;
 
         // console.log("******* %s", command);
 
-        const cmdObj = COMMANDS[command as keyof typeof COMMANDS];
+        const cmdObj = COMMANDS[lookupCommand as keyof typeof COMMANDS];
         const valuesObj = cmdObj.values as { [key: string]: { name: string } };
         if (valuesObj[value]?.name !== undefined) {
           result.argument = valuesObj[value]?.name;
 
           // return result;
+        } else if (value === "N/A") {
+          // Skip N/A values (zone is off or unavailable)
+          return result;
         } else if (
-          VALUE_MAPPINGS.hasOwnProperty(command as keyof typeof VALUE_MAPPINGS) &&
-          Object.prototype.hasOwnProperty.call(VALUE_MAPPINGS[command as keyof typeof VALUE_MAPPINGS], "intgrRange")
+          VALUE_MAPPINGS.hasOwnProperty(lookupCommand as keyof typeof VALUE_MAPPINGS) &&
+          Object.prototype.hasOwnProperty.call(
+            VALUE_MAPPINGS[lookupCommand as keyof typeof VALUE_MAPPINGS],
+            "intgrRange"
+          )
         ) {
           result.argument = parseInt(value, 16);
         } else if (typeof value === "string" && value.match(/^([0-9A-F]{2})+(,([0-9A-F]{2})+)*$/i)) {
@@ -259,7 +301,7 @@ export class EiscpDriver extends EventEmitter {
       }
       client
         .on("error", (err: any) => {
-          console.error("[EiscpDriver] UDP socket error:", err);
+          console.error("[EiscpDriver] UDP error:", err);
           try {
             client.close();
           } catch {}
@@ -393,6 +435,23 @@ export class EiscpDriver extends EventEmitter {
 
   private async sendCommand(data: any, callback: any) {
     if (this.is_connected && this.eiscp) {
+      // Extract command and value for logging
+      const cleanData = data.replace(/^!1/, "");
+      const command = cleanData.slice(0, 3);
+      const value = cleanData.slice(3);
+
+      // Detect zone from command for logging
+      let zone = "main";
+      if (command.charAt(0) === "Z" && command.length === 3) {
+        zone = "zone2";
+      } else if (command.charAt(2) === "Z" && command.length === 3) {
+        zone = "zone2";
+      } else if (command.charAt(2) === "3" && command.length === 3) {
+        zone = "zone3";
+      }
+
+      // console.log("%s RAW SEND: [%s] %s %s", integrationName, zone, command, value);
+
       this.eiscp.write(this.eiscp_packet(data));
       setTimeout(callback, this.config.send_delay, false);
       return;
@@ -456,7 +515,32 @@ export class EiscpDriver extends EventEmitter {
       console.log("%s not found in JSON: %s %s", integrationName, command, args);
       value = args;
     }
-    return prefix + value;
+    
+    // Translate main zone command prefixes to zone-specific prefixes
+    let zonePrefix = prefix;
+    if (zone === "zone2") {
+      // Zone 2: MVL->ZVL, PWR->ZPW, AMT->ZMT, SLI->SLZ, TUN->TUZ
+      const zone2Map: Record<string, string> = {
+        MVL: "ZVL",
+        PWR: "ZPW",
+        AMT: "ZMT",
+        SLI: "SLZ",
+        TUN: "TUZ"
+      };
+      zonePrefix = zone2Map[prefix] || prefix;
+    } else if (zone === "zone3") {
+      // Zone 3: MVL->VL3, PWR->PW3, AMT->MT3, SLI->SL3, TUN->TU3
+      const zone3Map: Record<string, string> = {
+        MVL: "VL3",
+        PWR: "PW3",
+        AMT: "MT3",
+        SLI: "SL3",
+        TUN: "TU3"
+      };
+      zonePrefix = zone3Map[prefix] || prefix;
+    }
+
+    return zonePrefix + value;
   }
 
   get_commands(zone: string, callback: any) {
