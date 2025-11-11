@@ -9,18 +9,22 @@ import { OnkyoCommandReceiver } from "./onkyoCommandReceiver.js";
 
 const integrationName = "Onkyo-Integration: ";
 
-interface AvrInstance {
-  config: AvrConfig;
+interface PhysicalAvrConnection {
   eiscp: EiscpDriver;
-  commandSender: OnkyoCommandSender;
   commandReceiver: OnkyoCommandReceiver;
   reconnectTimer?: NodeJS.Timeout;
+}
+
+interface AvrInstance {
+  config: AvrConfig;
+  commandSender: OnkyoCommandSender;
 }
 
 export default class OnkyoDriver {
   private driver: uc.IntegrationAPI;
   private config: OnkyoConfig;
-  private avrInstances: Map<string, AvrInstance> = new Map();
+  private physicalConnections: Map<string, PhysicalAvrConnection> = new Map(); // One connection per physical AVR
+  private avrInstances: Map<string, AvrInstance> = new Map(); // One instance per zone
   private lastSetupData: {
     queueThreshold: number;
     albumArtURL: string;
@@ -73,12 +77,8 @@ export default class OnkyoDriver {
     );
 
     // Parse settings for this AVR
-    const queueThresholdValue =
-      queueThreshold && queueThreshold.toString().trim() !== ""
-        ? parseInt(queueThreshold, 10)
-        : DEFAULT_QUEUE_THRESHOLD;
-    const albumArtURLValue =
-      typeof albumArtURL === "string" && albumArtURL.trim() !== "" ? albumArtURL.trim() : "album_art.cgi";
+    const queueThresholdValue = queueThreshold && queueThreshold.toString().trim() !== "" ? parseInt(queueThreshold, 10) : DEFAULT_QUEUE_THRESHOLD;
+    const albumArtURLValue = typeof albumArtURL === "string" && albumArtURL.trim() !== "" ? albumArtURL.trim() : "album_art.cgi";
 
     // Parse volumeScale - handle both string and number types
     let volumeScaleValue = 100; // Default
@@ -97,12 +97,7 @@ export default class OnkyoDriver {
       }
     }
 
-    console.log(
-      "%s Setup data parsed - volumeScale: %d, useHalfDbSteps: %s",
-      integrationName,
-      volumeScaleValue,
-      useHalfDbStepsValue
-    );
+    console.log("%s Setup data parsed - volumeScale: %d, useHalfDbSteps: %s", integrationName, volumeScaleValue, useHalfDbStepsValue);
 
     // Parse zoneCount
     const zoneCountValue = zoneCount && !isNaN(parseInt(zoneCount, 10)) ? parseInt(zoneCount, 10) : 1;
@@ -118,37 +113,30 @@ export default class OnkyoDriver {
     console.log("%s Stored setup data for autodiscovery:", integrationName, this.lastSetupData);
 
     // Check if manual configuration was provided
-    const hasManualConfig = typeof model === "string" && model.trim() !== "" && 
-                           typeof ipAddress === "string" && ipAddress.trim() !== "";
+    const hasManualConfig = typeof model === "string" && model.trim() !== "" && typeof ipAddress === "string" && ipAddress.trim() !== "";
 
     try {
       if (hasManualConfig) {
         // Add manually configured AVR
         const portNum = port && port.toString().trim() !== "" ? parseInt(port, 10) : 60128;
-              const zones = ["main"];
-      if (zoneCountValue >= 2) zones.push("zone2");
-      if (zoneCountValue >= 3) zones.push("zone3");
+        const zones = ["main"];
+        if (zoneCountValue >= 2) zones.push("zone2");
+        if (zoneCountValue >= 3) zones.push("zone3");
 
-      for (const zone of zones) {
-        const avrConfig: AvrConfig = {
-          model: model.trim(),
-          ip: ipAddress.trim(),
-          port: isNaN(portNum) ? 60128 : portNum,
-          zone: zone,
-          queueThreshold: queueThresholdValue,
-          albumArtURL: albumArtURLValue,
-          volumeScale: volumeScaleValue,
-          useHalfDbSteps: useHalfDbStepsValue
-        };
-        console.log(
-          "%s Adding AVR config for zone %s with volumeScale: %d, useHalfDbSteps: %s",
-          integrationName,
-          zone,
-          avrConfig.volumeScale,
-          avrConfig.useHalfDbSteps
-        );
-        ConfigManager.addAvr(avrConfig);
-      }
+        for (const zone of zones) {
+          const avrConfig: AvrConfig = {
+            model: model.trim(),
+            ip: ipAddress.trim(),
+            port: isNaN(portNum) ? 60128 : portNum,
+            zone: zone,
+            queueThreshold: queueThresholdValue,
+            albumArtURL: albumArtURLValue,
+            volumeScale: volumeScaleValue,
+            useHalfDbSteps: useHalfDbStepsValue
+          };
+          console.log("%s Adding AVR config for zone %s with volumeScale: %d, useHalfDbSteps: %s", integrationName, zone, avrConfig.volumeScale, avrConfig.useHalfDbSteps);
+          ConfigManager.addAvr(avrConfig);
+        }
       } else {
         // No manual config - run autodiscovery
         console.log("%s No manual AVR config provided, running autodiscovery during setup", integrationName);
@@ -156,38 +144,32 @@ export default class OnkyoDriver {
         try {
           const discoveredAvrs = await tempEiscp.discover({ timeout: 5 });
           console.log("%s Discovered %d AVR(s) via autodiscovery", integrationName, discoveredAvrs.length);
-          
+
           if (discoveredAvrs.length === 0) {
             console.error("%s No AVRs discovered during setup", integrationName);
             return new uc.SetupError("NOT_FOUND");
           }
-          
-      const zones = ["main"];
-      if (zoneCountValue >= 2) zones.push("zone2");
-      if (zoneCountValue >= 3) zones.push("zone3");
+
+          const zones = ["main"];
+          if (zoneCountValue >= 2) zones.push("zone2");
+          if (zoneCountValue >= 3) zones.push("zone3");
 
           // Add discovered AVRs to config
           for (const discovered of discoveredAvrs) {
             for (const zone of zones) {
-            const avrConfig: AvrConfig = {
-              model: discovered.model,
-              ip: discovered.host,
-              port: parseInt(discovered.port, 10) || 60128,
-              zone: zone,
-              queueThreshold: queueThresholdValue,
-              albumArtURL: albumArtURLValue,
-              volumeScale: volumeScaleValue,
-              useHalfDbSteps: useHalfDbStepsValue
-            };
-        console.log(
-          "%s Adding AVR config for zone %s with volumeScale: %d, useHalfDbSteps: %s",
-          integrationName,
-          zone,
-          avrConfig.volumeScale,
-          avrConfig.useHalfDbSteps
-        );
-            ConfigManager.addAvr(avrConfig);
-          }
+              const avrConfig: AvrConfig = {
+                model: discovered.model,
+                ip: discovered.host,
+                port: parseInt(discovered.port, 10) || 60128,
+                zone: zone,
+                queueThreshold: queueThresholdValue,
+                albumArtURL: albumArtURLValue,
+                volumeScale: volumeScaleValue,
+                useHalfDbSteps: useHalfDbStepsValue
+              };
+              console.log("%s Adding AVR config for zone %s with volumeScale: %d, useHalfDbSteps: %s", integrationName, zone, avrConfig.volumeScale, avrConfig.useHalfDbSteps);
+              ConfigManager.addAvr(avrConfig);
+            }
           }
         } catch (err) {
           console.error("%s Autodiscovery failed:", integrationName, err);
@@ -199,7 +181,7 @@ export default class OnkyoDriver {
       return new uc.SetupError("OTHER");
     }
 
-    await this.handleConnect();
+    // Don't call handleConnect here - it will be called automatically by the Connect event after setup
 
     return new uc.SetupComplete();
   }
@@ -258,12 +240,21 @@ export default class OnkyoDriver {
       return;
     }
 
-    console.log(`${integrationName} [${avrEntry}] Querying AVR state (${context})...`);
+    // Extract zone from avrEntry (format: "model ip zone")
+    const instance = this.avrInstances.get(avrEntry);
+    const zone = instance?.config.zone || "main";
+    const queueThreshold = instance?.config.queueThreshold ?? DEFAULT_QUEUE_THRESHOLD;
+
+    console.log(`${integrationName} [${avrEntry}] Querying AVR state for zone ${zone} (${context})...`);
     try {
-      await eiscp.command("system-power query");
-      await eiscp.command("input-selector query");
-      await eiscp.command("volume query");
-      await eiscp.command("audio-muting query");
+      await eiscp.command({ zone, command: "system-power", args: "query" });
+      await new Promise((resolve) => setTimeout(resolve, queueThreshold));
+      await eiscp.command({ zone, command: "input-selector", args: "query" });
+      await new Promise((resolve) => setTimeout(resolve, queueThreshold));
+      await eiscp.command({ zone, command: "volume", args: "query" });
+      await new Promise((resolve) => setTimeout(resolve, queueThreshold));
+      await eiscp.command({ zone, command: "audio-muting", args: "query" });
+      await new Promise((resolve) => setTimeout(resolve, queueThreshold));
     } catch (queryErr) {
       console.warn(`${integrationName} [${avrEntry}] Failed to query AVR state (${context}):`, queryErr);
     }
@@ -276,10 +267,10 @@ export default class OnkyoDriver {
   //   }
 
   //   console.log(`${integrationName} [${avrEntry}] Scheduling reconnection attempt in 30 seconds...`);
-    
+
   //   instance.reconnectTimer = setTimeout(async () => {
   //     console.log(`${integrationName} [${avrEntry}] Attempting scheduled reconnection...`);
-      
+
   //     if (instance.eiscp.connected) {
   //       console.log(`${integrationName} [${avrEntry}] Already reconnected, canceling scheduled attempt`);
   //       instance.reconnectTimer = undefined;
@@ -289,7 +280,7 @@ export default class OnkyoDriver {
   //     // Try reconnecting with progressive timeout (3 attempts: 3s, 5s, 8s)
   //     const timeouts = [3000, 5000, 8000];
   //     let reconnected = false;
-      
+
   //     for (let attempt = 0; attempt < timeouts.length; attempt++) {
   //       try {
   //         console.log(
@@ -300,18 +291,18 @@ export default class OnkyoDriver {
   //           timeouts.length,
   //           timeouts[attempt]
   //         );
-          
+
   //         await instance.eiscp.connect({
   //           model: instance.config.model,
   //           host: instance.config.ip,
   //           port: instance.config.port
   //         });
-          
+
   //         await instance.eiscp.waitForConnect(timeouts[attempt]);
-          
+
   //         console.log("%s [%s] Successfully reconnected to AVR via scheduled attempt", integrationName, avrEntry);
   //         reconnected = true;
-          
+
   //         // Query state after successful reconnection
   //         await this.queryAvrState(avrEntry, instance.eiscp, "after scheduled reconnection");
   //         break;
@@ -324,7 +315,7 @@ export default class OnkyoDriver {
   //           timeouts.length,
   //           reconnectErr
   //         );
-          
+
   //         // If this was the last attempt, schedule another retry
   //         if (attempt === timeouts.length - 1) {
   //           console.log("%s [%s] All scheduled reconnection attempts failed, will retry again in 30 seconds", integrationName, avrEntry);
@@ -332,7 +323,7 @@ export default class OnkyoDriver {
   //         }
   //       }
   //     }
-      
+
   //     if (reconnected) {
   //       instance.reconnectTimer = undefined;
   //     }
@@ -357,105 +348,117 @@ export default class OnkyoDriver {
       const physicalAVR = `${avrConfig.model} ${avrConfig.ip}`;
       const avrEntry = `${avrConfig.model} ${avrConfig.ip} ${avrConfig.zone}`;
 
-      // If already connected, re-register the entity for remote reconnect scenarios
-      if (this.avrInstances.has(avrEntry)) {
-        console.log("%s [%s] Known instance, preparing for re-registration", integrationName, avrEntry);
-        const instance = this.avrInstances.get(avrEntry)!;
+      // Check if we already have a physical connection to this AVR
+      let physicalConnection = this.physicalConnections.get(physicalAVR);
 
-        // Check if eiscp connection is actually still alive, if not, reconnect
-        if (!instance.eiscp.connected) {
-          console.log("%s [%s] TCP connection lost, reconnecting to AVR...", integrationName, avrEntry);
-          
-          // Try reconnecting with progressive timeout (3 attempts: 3s, 5s, 8s)
-          const timeouts = [3000, 5000, 8000];
-          let reconnected = false;
-          
-          for (let attempt = 0; attempt < timeouts.length; attempt++) {
-            try {
-              console.log(
-                "%s [%s] Reconnection attempt %d/%d (timeout: %dms)...",
-                integrationName,
-                avrEntry,
-                attempt + 1,
-                timeouts.length,
-                timeouts[attempt]
-              );
-              
-              // Start connection attempt
-              await instance.eiscp.connect({
-                model: instance.config.model,
-                host: instance.config.ip,
-                port: instance.config.port
-              });
-              
-              // Wait for the actual TCP connection to establish
-              // connect() returns immediately but the socket connects asynchronously
-              await instance.eiscp.waitForConnect(timeouts[attempt]);
-              
-              console.log("%s [%s] Successfully reconnected to AVR", integrationName, physicalAVR);
-              reconnected = true;
-              break;
-            } catch (reconnectErr) {
-              console.warn(
-                "%s [%s] Reconnection attempt %d/%d failed: %s",
-                integrationName,
-                physicalAVR,
-                attempt + 1,
-                timeouts.length,
-                reconnectErr
-              );
-              
-              // // If this was the last attempt, log error
-              // if (attempt === timeouts.length - 1) {
-              //   console.error("%s [%s] Failed to reconnect to AVR after %d attempts", integrationName, physicalAVR, timeouts.length);
-              //   // Schedule a retry in 30 seconds
-              //   this.scheduleReconnect(physicalAVR, instance);
-              // }
-            }
+      if (!physicalConnection) {
+        // Need to create a new physical connection
+        try {
+          console.log("%s [%s] Connecting to AVR at %s:%d", integrationName, avrConfig.model, avrConfig.ip, avrConfig.port);
+
+          // Create EiscpDriver instance for this physical AVR (shared by all zones)
+          const eiscpInstance = new EiscpDriver({
+            host: avrConfig.ip,
+            port: avrConfig.port,
+            model: avrConfig.model,
+            send_delay: avrConfig.queueThreshold ?? DEFAULT_QUEUE_THRESHOLD
+          });
+
+          // Connect to the AVR
+          const result = await eiscpInstance.connect({
+            model: avrConfig.model,
+            host: avrConfig.ip,
+            port: avrConfig.port
+          });
+
+          if (!result || !result.model) {
+            throw new Error("AVR connection failed or returned null");
           }
-          
-          // Clear any existing reconnect timer if we successfully reconnected
-          if (reconnected && instance.reconnectTimer) {
-            clearTimeout(instance.reconnectTimer);
-            instance.reconnectTimer = undefined;
+
+          // Wait for connection to fully establish
+          await eiscpInstance.waitForConnect(3000);
+
+          // Create per-AVR config for command receiver (shared by all zones)
+          const avrSpecificConfig: OnkyoConfig = {
+            avrs: [avrConfig],
+            queueThreshold: avrConfig.queueThreshold ?? DEFAULT_QUEUE_THRESHOLD,
+            albumArtURL: avrConfig.albumArtURL ?? "album_art.cgi",
+            volumeScale: avrConfig.volumeScale ?? 100,
+            useHalfDbSteps: avrConfig.useHalfDbSteps ?? true,
+            // Backward compatibility fields for existing code
+            model: avrConfig.model,
+            ip: avrConfig.ip,
+            port: avrConfig.port
+          };
+
+          // Create command receiver for this physical AVR (shared by all zones)
+          const commandReceiver = new OnkyoCommandReceiver(this.driver, avrSpecificConfig, eiscpInstance);
+          commandReceiver.setupEiscpListener();
+
+          // Store physical connection
+          physicalConnection = {
+            eiscp: eiscpInstance,
+            commandReceiver
+          };
+          this.physicalConnections.set(physicalAVR, physicalConnection);
+
+          console.log("%s [%s] Connected to AVR", integrationName, physicalAVR);
+
+          // Setup error handler
+          eiscpInstance.on("error", (err: any) => {
+            console.error("%s [%s] EiscpDriver error:", integrationName, physicalAVR, err);
+          });
+        } catch (err) {
+          console.error("%s [%s] Failed to connect to AVR:", integrationName, physicalAVR, err);
+          continue;
+        }
+      } else if (!physicalConnection.eiscp.connected) {
+        // Physical connection exists but is disconnected, try to reconnect
+        console.log("%s [%s] TCP connection lost, reconnecting to AVR...", integrationName, physicalAVR);
+
+        // Try reconnecting with progressive timeout (3 attempts: 3s, 5s, 8s)
+        const timeouts = [3000, 5000, 8000];
+        let reconnected = false;
+
+        for (let attempt = 0; attempt < timeouts.length; attempt++) {
+          try {
+            console.log("%s [%s] Reconnection attempt %d/%d (timeout: %dms)...", integrationName, physicalAVR, attempt + 1, timeouts.length, timeouts[attempt]);
+
+            // Start connection attempt
+            await physicalConnection.eiscp.connect({
+              model: avrConfig.model,
+              host: avrConfig.ip,
+              port: avrConfig.port
+            });
+
+            // Wait for the actual TCP connection to establish
+            await physicalConnection.eiscp.waitForConnect(timeouts[attempt]);
+
+            console.log("%s [%s] Successfully reconnected to AVR", integrationName, physicalAVR);
+            reconnected = true;
+            break;
+          } catch (reconnectErr) {
+            console.warn("%s [%s] Reconnection attempt %d/%d failed: %s", integrationName, physicalAVR, attempt + 1, timeouts.length, reconnectErr);
           }
         }
 
-        // Re-create entity and add to registration list
-        const mediaPlayerEntity = this.createMediaPlayerEntity(avrEntry, instance.config.volumeScale ?? 100);
-        entitiesToRegister.push(mediaPlayerEntity);
-        continue;
+        // Clear any existing reconnect timer if we successfully reconnected
+        if (reconnected && physicalConnection.reconnectTimer) {
+          clearTimeout(physicalConnection.reconnectTimer);
+          physicalConnection.reconnectTimer = undefined;
+        }
+
+        if (!reconnected) {
+          console.error("%s [%s] Failed to reconnect after all attempts", integrationName, physicalAVR);
+          continue;
+        }
       }
 
-      try {
-        console.log(
-          "%s [%s] Connecting to AVR at %s:%d",
-          integrationName,
-          avrConfig.model,
-          avrConfig.ip,
-          avrConfig.port
-        );
-
-        // Create EiscpDriver instance for this AVR
-        const eiscpInstance = new EiscpDriver({
-          host: avrConfig.ip,
-          port: avrConfig.port,
-          model: avrConfig.model,
-          send_delay: avrConfig.queueThreshold ?? DEFAULT_QUEUE_THRESHOLD
-        });
-
-        // Connect to the AVR
-        const result = await eiscpInstance.connect({
-          model: avrConfig.model,
-          host: avrConfig.ip,
-          port: avrConfig.port
-        });
-
-        if (!result || !result.model) {
-          throw new Error("AVR connection failed or returned null");
-        }
-
-        // Create per-AVR config for command handlers (including backward compatibility fields)
+      // Now create or update the zone instance
+      if (this.avrInstances.has(avrEntry)) {
+        console.log("%s [%s] Known zone instance, preparing for re-registration", integrationName, avrEntry);
+      } else {
+        // Create per-zone config for command sender
         const avrSpecificConfig: OnkyoConfig = {
           avrs: [avrConfig],
           queueThreshold: avrConfig.queueThreshold ?? DEFAULT_QUEUE_THRESHOLD,
@@ -468,36 +471,22 @@ export default class OnkyoDriver {
           port: avrConfig.port
         };
 
-        // Create command sender and receiver for this AVR
-        const commandSender = new OnkyoCommandSender(this.driver, avrSpecificConfig, eiscpInstance);
-        const commandReceiver = new OnkyoCommandReceiver(this.driver, avrSpecificConfig, eiscpInstance);
-        commandReceiver.setupEiscpListener();
+        // Create command sender for this zone (uses shared eiscp)
+        const commandSender = new OnkyoCommandSender(this.driver, avrSpecificConfig, physicalConnection.eiscp);
 
-        // Store instance
-        this.avrInstances.set(physicalAVR, {
+        // Store zone instance (references shared connection)
+        this.avrInstances.set(avrEntry, {
           config: avrConfig,
-          eiscp: eiscpInstance,
-          commandSender,
-          commandReceiver
+          commandSender
         });
 
-        console.log(
-          "%s [%s] Connected to AVR: %s",
-          integrationName,
-          avrEntry
-        );
-
-        // Create media player entity for this AVR and add to registration list
-        const mediaPlayerEntity = this.createMediaPlayerEntity(avrEntry, avrConfig.volumeScale ?? 100);
-        entitiesToRegister.push(mediaPlayerEntity);
-
-        // Setup error handler
-        eiscpInstance.on("error", (err: any) => {
-          console.error("%s [%s] EiscpDriver error:", integrationName, avrEntry, err);
-        });
-      } catch (err) {
-        console.error("%s [%s] Failed to connect to AVR:", integrationName, avrEntry, err);
+        console.log("%s [%s] Zone configured", integrationName, avrEntry);
       }
+
+      // Create media player entity for this zone and add to registration list
+      const instance = this.avrInstances.get(avrEntry)!;
+      const mediaPlayerEntity = this.createMediaPlayerEntity(avrEntry, instance.config.volumeScale ?? 100);
+      entitiesToRegister.push(mediaPlayerEntity);
     }
 
     // Register all entities at once after all AVRs are connected
@@ -508,7 +497,11 @@ export default class OnkyoDriver {
 
     // Query state for all connected AVRs after entity registration
     for (const [avrEntry, instance] of this.avrInstances) {
-      await this.queryAvrState(avrEntry, instance.eiscp, "after entity registration");
+      const physicalAVR = `${instance.config.model} ${instance.config.ip}`;
+      const physicalConnection = this.physicalConnections.get(physicalAVR);
+      if (physicalConnection) {
+        await this.queryAvrState(avrEntry, physicalConnection.eiscp, "after entity registration");
+      }
     }
 
     if (this.avrInstances.size > 0) {
@@ -521,11 +514,11 @@ export default class OnkyoDriver {
   private async setupEventHandlers() {
     this.driver.on(uc.Events.Disconnect, async () => {
       // Clean up all reconnect timers when integration disconnects
-      for (const [avrEntry, instance] of this.avrInstances) {
-        if (instance.reconnectTimer) {
-          console.log(`${integrationName} [${avrEntry}] Clearing reconnect timer due to integration disconnect`);
-          clearTimeout(instance.reconnectTimer);
-          instance.reconnectTimer = undefined;
+      for (const [physicalAVR, connection] of this.physicalConnections) {
+        if (connection.reconnectTimer) {
+          console.log(`${integrationName} [${physicalAVR}] Clearing reconnect timer due to integration disconnect`);
+          clearTimeout(connection.reconnectTimer);
+          connection.reconnectTimer = undefined;
         }
       }
       await this.driver.setDeviceState(uc.DeviceStates.Disconnected);
@@ -536,11 +529,13 @@ export default class OnkyoDriver {
         // Query AVR state after successful connection
         const instance = this.avrInstances.get(entityId);
         if (instance) {
-          const queueThreshold = instance.config.queueThreshold ?? DEFAULT_QUEUE_THRESHOLD;
-          console.log(
-            `${integrationName} [${entityId}] Subscribed entity, queue threshold set to: ${queueThreshold}ms`
-          );
-          await this.queryAvrState(entityId, instance.eiscp, "on subscribe");
+          const physicalAVR = `${instance.config.model} ${instance.config.ip}`;
+          const physicalConnection = this.physicalConnections.get(physicalAVR);
+          if (physicalConnection) {
+            const queueThreshold = instance.config.queueThreshold ?? DEFAULT_QUEUE_THRESHOLD;
+            console.log(`${integrationName} [${entityId}] Subscribed entity, queue threshold set to: ${queueThreshold}ms`);
+            await this.queryAvrState(entityId, physicalConnection.eiscp, "on subscribe");
+          }
         }
       }
     });
@@ -553,11 +548,7 @@ export default class OnkyoDriver {
   }
 
   // Use the sender class for command handling
-  private async sharedCmdHandler(
-    entity: uc.Entity,
-    cmdId: string,
-    params?: { [key: string]: string | number | boolean }
-  ): Promise<uc.StatusCodes> {
+  private async sharedCmdHandler(entity: uc.Entity, cmdId: string, params?: { [key: string]: string | number | boolean }): Promise<uc.StatusCodes> {
     // Get the AVR instance for this entity
     const instance = this.avrInstances.get(entity.id);
     if (!instance) {

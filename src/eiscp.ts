@@ -249,10 +249,7 @@ export class EiscpDriver extends EventEmitter {
           return result;
         } else if (
           VALUE_MAPPINGS.hasOwnProperty(lookupCommand as keyof typeof VALUE_MAPPINGS) &&
-          Object.prototype.hasOwnProperty.call(
-            VALUE_MAPPINGS[lookupCommand as keyof typeof VALUE_MAPPINGS],
-            "intgrRange"
-          )
+          Object.prototype.hasOwnProperty.call(VALUE_MAPPINGS[lookupCommand as keyof typeof VALUE_MAPPINGS], "intgrRange")
         ) {
           result.argument = parseInt(value, 16);
         } else if (typeof value === "string" && value.match(/^([0-9A-F]{2})+(,([0-9A-F]{2})+)*$/i)) {
@@ -275,13 +272,7 @@ export class EiscpDriver extends EventEmitter {
     return result;
   }
 
-  async discover(options?: {
-    devices?: number;
-    timeout?: number;
-    address?: string;
-    port?: number;
-    subnetBroadcast?: string;
-  }): Promise<any[]> {
+  async discover(options?: { devices?: number; timeout?: number; address?: string; port?: number; subnetBroadcast?: string }): Promise<any[]> {
     return new Promise((resolve, reject) => {
       const result: any[] = [];
       // Always default to broadcast unless address is explicitly provided
@@ -387,6 +378,7 @@ export class EiscpDriver extends EventEmitter {
     this.eiscp
       .on("connect", () => {
         this.is_connected = true;
+        this.emit("connect"); // Emit connect event for waitForConnect()
       })
       .on("close", () => {
         this.is_connected = false;
@@ -515,7 +507,7 @@ export class EiscpDriver extends EventEmitter {
       console.log("%s not found in JSON: %s %s", integrationName, command, args);
       value = args;
     }
-    
+
     // Translate main zone command prefixes to zone-specific prefixes
     let zonePrefix = prefix;
     if (zone === "zone2") {

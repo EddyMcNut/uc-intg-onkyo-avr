@@ -2,7 +2,7 @@ import * as uc from "@unfoldedcircle/integration-api";
 import { EiscpDriver } from "./eiscp.js";
 import { DEFAULT_QUEUE_THRESHOLD, OnkyoConfig } from "./configManager.js";
 
-const integrationName = "Onkyo-Integration (sender): ";
+const integrationName = "Onkyo-Integration (sender):";
 let lastCommandTime = 0;
 
 export class OnkyoCommandSender {
@@ -16,18 +16,13 @@ export class OnkyoCommandSender {
     this.eiscp = eiscp;
   }
 
-  async sharedCmdHandler(
-    entity: uc.Entity,
-    cmdId: string,
-    params?: { [key: string]: string | number | boolean }
-  ): Promise<uc.StatusCodes> {
-    // Get zone from config (should have single AVR config per instance)
+  async sharedCmdHandler(entity: uc.Entity, cmdId: string, params?: { [key: string]: string | number | boolean }): Promise<uc.StatusCodes> {
     const zone = this.config.avrs?.[0]?.zone || "main";
 
     try {
       await this.eiscp.waitForConnect();
     } catch (err) {
-      console.warn("%s [%s] [%s] Could not send command, AVR not connected: %s", integrationName, entity.id, zone, err);
+      console.warn("%s [%s] Could not send command, AVR not connected: %s", integrationName, entity.id, err);
       for (let attempt = 1; attempt <= 5; attempt++) {
         await new Promise((resolve) => setTimeout(resolve, 1000));
         try {
@@ -35,20 +30,14 @@ export class OnkyoCommandSender {
           break;
         } catch (retryErr) {
           if (attempt === 5) {
-            console.warn(
-              "%s [%s] [%s] Could not connect to AVR after 5 attempts: %s",
-              integrationName,
-              entity.id,
-              zone,
-              retryErr
-            );
+            console.warn("%s [%s] Could not connect to AVR after 5 attempts: %s", integrationName, entity.id, retryErr);
             return uc.StatusCodes.Timeout;
           }
         }
       }
     }
 
-    console.log("%s [%s] [%s] media-player command request: %s", integrationName, entity.id, zone, cmdId, params || "");
+    console.log("%s [%s] media-player command request: %s", integrationName, entity.id, cmdId, params || "");
 
     // Helper function to format command with zone prefix
     const formatCommand = (cmd: string): string => {
@@ -64,9 +53,7 @@ export class OnkyoCommandSender {
         await this.eiscp.command(formatCommand("system-power standby"));
         break;
       case uc.MediaPlayerCommands.Toggle:
-        entity.attributes?.state === uc.MediaPlayerStates.On
-          ? await this.eiscp.command(formatCommand("system-power standby"))
-          : await this.eiscp.command(formatCommand("system-power on"));
+        entity.attributes?.state === uc.MediaPlayerStates.On ? await this.eiscp.command(formatCommand("system-power standby")) : await this.eiscp.command(formatCommand("system-power on"));
         break;
       case uc.MediaPlayerCommands.MuteToggle:
         await this.eiscp.command(formatCommand("audio-muting toggle"));
@@ -109,7 +96,7 @@ export class OnkyoCommandSender {
         if (params?.source) {
           if (typeof params.source === "string" && params.source.toLowerCase().startsWith("raw")) {
             const rawCmd = (params.source as string).substring(3).trim().toUpperCase();
-            console.error("%s [%s] [%s] sending raw command: %s", integrationName, entity.id, zone, rawCmd);
+            console.error("%s [%s] sending raw command: %s", integrationName, entity.id, rawCmd);
             await this.eiscp.raw(rawCmd);
           } else if (typeof params.source === "string") {
             await this.eiscp.command(formatCommand(`${params.source.toLowerCase()}`));
