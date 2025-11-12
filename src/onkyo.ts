@@ -260,75 +260,80 @@ export default class OnkyoDriver {
     }
   }
 
-  // private scheduleReconnect(avrEntry: string, instance: AvrInstance): void {
-  //   // Clear any existing timer
-  //   if (instance.reconnectTimer) {
-  //     clearTimeout(instance.reconnectTimer);
-  //   }
+  private scheduleReconnect(physicalAVR: string, physicalConnection: PhysicalAvrConnection, avrConfig: AvrConfig): void {
+    // Clear any existing timer
+    if (physicalConnection.reconnectTimer) {
+      clearTimeout(physicalConnection.reconnectTimer);
+    }
 
-  //   console.log(`${integrationName} [${avrEntry}] Scheduling reconnection attempt in 30 seconds...`);
+    console.log(`${integrationName} [${physicalAVR}] Scheduling reconnection attempt in 30 seconds...`);
 
-  //   instance.reconnectTimer = setTimeout(async () => {
-  //     console.log(`${integrationName} [${avrEntry}] Attempting scheduled reconnection...`);
+    physicalConnection.reconnectTimer = setTimeout(async () => {
+      console.log(`${integrationName} [${physicalAVR}] Attempting scheduled reconnection...`);
 
-  //     if (instance.eiscp.connected) {
-  //       console.log(`${integrationName} [${avrEntry}] Already reconnected, canceling scheduled attempt`);
-  //       instance.reconnectTimer = undefined;
-  //       return;
-  //     }
+      if (physicalConnection.eiscp.connected) {
+        console.log(`${integrationName} [${physicalAVR}] Already reconnected, canceling scheduled attempt`);
+        physicalConnection.reconnectTimer = undefined;
+        return;
+      }
 
-  //     // Try reconnecting with progressive timeout (3 attempts: 3s, 5s, 8s)
-  //     const timeouts = [3000, 5000, 8000];
-  //     let reconnected = false;
+      // Try reconnecting with progressive timeout (3 attempts: 3s, 5s, 8s)
+      const timeouts = [3000, 5000, 8000];
+      let reconnected = false;
 
-  //     for (let attempt = 0; attempt < timeouts.length; attempt++) {
-  //       try {
-  //         console.log(
-  //           "%s [%s] Scheduled reconnection attempt %d/%d (timeout: %dms)...",
-  //           integrationName,
-  //           avrEntry,
-  //           attempt + 1,
-  //           timeouts.length,
-  //           timeouts[attempt]
-  //         );
+      for (let attempt = 0; attempt < timeouts.length; attempt++) {
+        try {
+          console.log(
+            "%s [%s] Scheduled reconnection attempt %d/%d (timeout: %dms)...",
+            integrationName,
+            physicalAVR,
+            attempt + 1,
+            timeouts.length,
+            timeouts[attempt]
+          );
 
-  //         await instance.eiscp.connect({
-  //           model: instance.config.model,
-  //           host: instance.config.ip,
-  //           port: instance.config.port
-  //         });
+          await physicalConnection.eiscp.connect({
+            model: avrConfig.model,
+            host: avrConfig.ip,
+            port: avrConfig.port
+          });
 
-  //         await instance.eiscp.waitForConnect(timeouts[attempt]);
+          await physicalConnection.eiscp.waitForConnect(timeouts[attempt]);
 
-  //         console.log("%s [%s] Successfully reconnected to AVR via scheduled attempt", integrationName, avrEntry);
-  //         reconnected = true;
+          console.log("%s [%s] Successfully reconnected to AVR via scheduled attempt", integrationName, physicalAVR);
+          reconnected = true;
 
-  //         // Query state after successful reconnection
-  //         await this.queryAvrState(avrEntry, instance.eiscp, "after scheduled reconnection");
-  //         break;
-  //       } catch (reconnectErr) {
-  //         console.warn(
-  //           "%s [%s] Scheduled reconnection attempt %d/%d failed: %s",
-  //           integrationName,
-  //           avrEntry,
-  //           attempt + 1,
-  //           timeouts.length,
-  //           reconnectErr
-  //         );
+          // Query state for all zones of this AVR after successful reconnection
+          for (const [avrEntry, instance] of this.avrInstances) {
+            const entryPhysicalAVR = `${instance.config.model} ${instance.config.ip}`;
+            if (entryPhysicalAVR === physicalAVR) {
+              await this.queryAvrState(avrEntry, physicalConnection.eiscp, "after scheduled reconnection");
+            }
+          }
+          break;
+        } catch (reconnectErr) {
+          console.warn(
+            "%s [%s] Scheduled reconnection attempt %d/%d failed: %s",
+            integrationName,
+            physicalAVR,
+            attempt + 1,
+            timeouts.length,
+            reconnectErr
+          );
 
-  //         // If this was the last attempt, schedule another retry
-  //         if (attempt === timeouts.length - 1) {
-  //           console.log("%s [%s] All scheduled reconnection attempts failed, will retry again in 30 seconds", integrationName, avrEntry);
-  //           this.scheduleReconnect(avrEntry, instance);
-  //         }
-  //       }
-  //     }
+          // If this was the last attempt, schedule another retry
+          if (attempt === timeouts.length - 1) {
+            console.log("%s [%s] All scheduled reconnection attempts failed, will retry again in 30 seconds", integrationName, physicalAVR);
+            this.scheduleReconnect(physicalAVR, physicalConnection, avrConfig);
+          }
+        }
+      }
 
-  //     if (reconnected) {
-  //       instance.reconnectTimer = undefined;
-  //     }
-  //   }, 30000); // 30 seconds
-  // }
+      if (reconnected) {
+        physicalConnection.reconnectTimer = undefined;
+      }
+    }, 30000); // 30 seconds
+  }
 
   private async handleConnect() {
     // Reload config to get latest AVR list
