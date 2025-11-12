@@ -45,9 +45,9 @@ export default class OnkyoDriver {
     this.setupEventHandlers();
     console.log("Loaded config at startup:", this.config);
 
-    // Auto-register entities after startup if config has AVRs
+    // Register entities at startup if config has AVRs (so they persist across reboots)
     if (this.config.avrs && this.config.avrs.length > 0) {
-      this.handleConnect();
+      this.registerEntitiesFromConfig();
     } else {
       console.log("Config missing or incomplete, waiting for setup.");
     }
@@ -335,6 +335,25 @@ export default class OnkyoDriver {
     }, 30000); // 30 seconds
   }
 
+  private registerEntitiesFromConfig(): void {
+    console.log("%s Registering entities from config (pre-connect)", integrationName);
+    
+    if (!this.config.avrs || this.config.avrs.length === 0) {
+      console.log("%s No AVRs in config to register", integrationName);
+      return;
+    }
+    
+    for (const avrConfig of this.config.avrs) {
+      const avrEntry = `${avrConfig.model} ${avrConfig.ip} ${avrConfig.zone}`;
+      
+      // Create media player entity for this zone
+      const mediaPlayerEntity = this.createMediaPlayerEntity(avrEntry, avrConfig.volumeScale ?? 100);
+      this.driver.addAvailableEntity(mediaPlayerEntity);
+      
+      console.log("%s [%s] Entity registered", integrationName, avrEntry);
+    }
+  }
+
   private async handleConnect() {
     // Reload config to get latest AVR list
     this.config = ConfigManager.load();
@@ -345,9 +364,6 @@ export default class OnkyoDriver {
       await this.driver.setDeviceState(uc.DeviceStates.Disconnected);
       return;
     }
-
-    // Collect entities to register after all connections are established
-    const entitiesToRegister: uc.MediaPlayer[] = [];
 
     for (const avrConfig of this.config.avrs) {
       const physicalAVR = `${avrConfig.model} ${avrConfig.ip}`;
@@ -488,24 +504,15 @@ export default class OnkyoDriver {
         console.log("%s [%s] Zone configured", integrationName, avrEntry);
       }
 
-      // Create media player entity for this zone and add to registration list
-      const instance = this.avrInstances.get(avrEntry)!;
-      const mediaPlayerEntity = this.createMediaPlayerEntity(avrEntry, instance.config.volumeScale ?? 100);
-      entitiesToRegister.push(mediaPlayerEntity);
+      console.log("%s [%s] Zone connected and ready", integrationName, avrEntry);
     }
 
-    // Register all entities at once after all AVRs are connected
-    console.log("%s Registering %d AVR entity(ies)", integrationName, entitiesToRegister.length);
-    for (const entity of entitiesToRegister) {
-      this.driver.addAvailableEntity(entity);
-    }
-
-    // Query state for all connected AVRs after entity registration
+    // Query state for all connected AVRs
     for (const [avrEntry, instance] of this.avrInstances) {
       const physicalAVR = `${instance.config.model} ${instance.config.ip}`;
       const physicalConnection = this.physicalConnections.get(physicalAVR);
       if (physicalConnection) {
-        await this.queryAvrState(avrEntry, physicalConnection.eiscp, "after entity registration");
+        await this.queryAvrState(avrEntry, physicalConnection.eiscp, "after connection");
       }
     }
 
