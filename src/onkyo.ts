@@ -339,6 +339,17 @@ export default class OnkyoDriver {
       return;
     }
 
+    // STEP 1: Register ALL entities from config (even if not yet connected)
+    // This ensures entities persist across reboots
+    console.log("%s Registering %d entity(ies) from config", integrationName, this.config.avrs.length);
+    for (const avrConfig of this.config.avrs) {
+      const avrEntry = `${avrConfig.model} ${avrConfig.ip} ${avrConfig.zone}`;
+      const mediaPlayerEntity = this.createMediaPlayerEntity(avrEntry, avrConfig.volumeScale ?? 100);
+      this.driver.addAvailableEntity(mediaPlayerEntity);
+      console.log("%s [%s] Entity registered", integrationName, avrEntry);
+    }
+
+    // STEP 2: Attempt to connect to AVRs and create instances
     for (const avrConfig of this.config.avrs) {
       const physicalAVR = `${avrConfig.model} ${avrConfig.ip}`;
       const avrEntry = `${avrConfig.model} ${avrConfig.ip} ${avrConfig.zone}`;
@@ -404,8 +415,9 @@ export default class OnkyoDriver {
             console.error("%s [%s] EiscpDriver error:", integrationName, physicalAVR, err);
           });
         } catch (err) {
-          console.error("%s [%s] Failed to connect to AVR:", integrationName, physicalAVR, err);
-          continue;
+          console.error("%s [%s] Failed to connect to AVR (entity still registered):", integrationName, physicalAVR, err);
+          // Don't continue - we still want to create zone instances even without connection
+          // The entity is already registered, it just won't be available until connected
         }
       } else if (!physicalConnection.eiscp.connected) {
         // Physical connection exists but is disconnected, try to reconnect
@@ -444,15 +456,15 @@ export default class OnkyoDriver {
         }
 
         if (!reconnected) {
-          console.error("%s [%s] Failed to reconnect after all attempts", integrationName, physicalAVR);
-          continue;
+          console.error("%s [%s] Failed to reconnect after all attempts (entity still registered)", integrationName, physicalAVR);
+          // Don't continue - we still want zone instances even without connection
         }
       }
 
-      // Now create or update the zone instance
+      // Now create or update the zone instance (only if we have a physical connection)
       if (this.avrInstances.has(avrEntry)) {
-        console.log("%s [%s] Known zone instance, preparing for re-registration", integrationName, avrEntry);
-      } else {
+        console.log("%s [%s] Zone instance already exists", integrationName, avrEntry);
+      } else if (physicalConnection) {
         // Create per-zone config for command sender
         const avrSpecificConfig: OnkyoConfig = {
           avrs: [avrConfig],
@@ -475,17 +487,14 @@ export default class OnkyoDriver {
           commandSender
         });
 
-        console.log("%s [%s] Zone configured", integrationName, avrEntry);
+        console.log("%s [%s] Zone instance created", integrationName, avrEntry);
+      } else {
+        console.log("%s [%s] Zone entity registered but no connection available (will retry on next Connect)", integrationName, avrEntry);
       }
 
-      console.log("%s [%s] Zone connected and ready", integrationName, avrEntry);
-    }
-
-    // Register all entities - this makes them available to the Remote
-    console.log("%s Registering %d entity(ies) with the Remote", integrationName, this.avrInstances.size);
-    for (const [avrEntry, instance] of this.avrInstances) {
-      const mediaPlayerEntity = this.createMediaPlayerEntity(avrEntry, instance.config.volumeScale ?? 100);
-      this.driver.addAvailableEntity(mediaPlayerEntity);
+      if (physicalConnection?.eiscp.connected) {
+        console.log("%s [%s] Zone connected and available", integrationName, avrEntry);
+      }
     }
 
     // Query state for all connected AVRs
