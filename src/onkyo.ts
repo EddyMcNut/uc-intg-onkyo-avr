@@ -44,13 +44,6 @@ export default class OnkyoDriver {
     this.setupDriverEvents();
     this.setupEventHandlers();
     console.log("Loaded config at startup:", this.config);
-
-    // Register entities at startup if config has AVRs (so they persist across reboots)
-    if (this.config.avrs && this.config.avrs.length > 0) {
-      this.registerEntitiesFromConfig();
-    } else {
-      console.log("Config missing or incomplete, waiting for setup.");
-    }
   }
 
   private async handleDriverSetup(msg: uc.SetupDriver): Promise<uc.SetupAction> {
@@ -335,25 +328,6 @@ export default class OnkyoDriver {
     }, 30000); // 30 seconds
   }
 
-  private registerEntitiesFromConfig(): void {
-    console.log("%s Registering entities from config (pre-connect)", integrationName);
-    
-    if (!this.config.avrs || this.config.avrs.length === 0) {
-      console.log("%s No AVRs in config to register", integrationName);
-      return;
-    }
-    
-    for (const avrConfig of this.config.avrs) {
-      const avrEntry = `${avrConfig.model} ${avrConfig.ip} ${avrConfig.zone}`;
-      
-      // Create media player entity for this zone
-      const mediaPlayerEntity = this.createMediaPlayerEntity(avrEntry, avrConfig.volumeScale ?? 100);
-      this.driver.addAvailableEntity(mediaPlayerEntity);
-      
-      console.log("%s [%s] Entity registered", integrationName, avrEntry);
-    }
-  }
-
   private async handleConnect() {
     // Reload config to get latest AVR list
     this.config = ConfigManager.load();
@@ -505,6 +479,13 @@ export default class OnkyoDriver {
       }
 
       console.log("%s [%s] Zone connected and ready", integrationName, avrEntry);
+    }
+
+    // Register all entities - this makes them available to the Remote
+    console.log("%s Registering %d entity(ies) with the Remote", integrationName, this.avrInstances.size);
+    for (const [avrEntry, instance] of this.avrInstances) {
+      const mediaPlayerEntity = this.createMediaPlayerEntity(avrEntry, instance.config.volumeScale ?? 100);
+      this.driver.addAvailableEntity(mediaPlayerEntity);
     }
 
     // Query state for all connected AVRs
