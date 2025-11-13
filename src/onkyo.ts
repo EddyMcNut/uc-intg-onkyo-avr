@@ -360,11 +360,16 @@ export default class OnkyoDriver {
       return;
     }
 
-    // Connect to AVRs (entities already registered in constructor/setup)
+    // STEP 1: Create physical connections (one per unique IP)
+    const uniqueAvrs = new Map<string, AvrConfig>();
     for (const avrConfig of this.config.avrs) {
       const physicalAVR = `${avrConfig.model} ${avrConfig.ip}`;
-      const avrEntry = `${avrConfig.model} ${avrConfig.ip} ${avrConfig.zone}`;
+      if (!uniqueAvrs.has(physicalAVR)) {
+        uniqueAvrs.set(physicalAVR, avrConfig);
+      }
+    }
 
+    for (const [physicalAVR, avrConfig] of uniqueAvrs) {
       // Check if we already have a physical connection to this AVR
       let physicalConnection = this.physicalConnections.get(physicalAVR);
 
@@ -467,12 +472,18 @@ export default class OnkyoDriver {
         }
 
         if (!reconnected) {
-          console.error("%s [%s] Failed to reconnect after all attempts (entity still registered)", integrationName, physicalAVR);
-          // Don't continue - we still want zone instances even without connection
+          console.error("%s [%s] Failed to reconnect after all attempts", integrationName, physicalAVR);
         }
       }
+    }
 
-      // Now create or update the zone instance (only if we have a physical connection)
+    // STEP 2: Create zone instances for all zones (now that physical connections are ready)
+    for (const avrConfig of this.config.avrs) {
+      const physicalAVR = `${avrConfig.model} ${avrConfig.ip}`;
+      const avrEntry = `${avrConfig.model} ${avrConfig.ip} ${avrConfig.zone}`;
+      const physicalConnection = this.physicalConnections.get(physicalAVR);
+
+      // Create or update the zone instance (only if we have a physical connection)
       if (this.avrInstances.has(avrEntry)) {
         console.log("%s [%s] Zone instance already exists", integrationName, avrEntry);
       } else if (physicalConnection) {
