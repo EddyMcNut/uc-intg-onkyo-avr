@@ -174,7 +174,7 @@ export default class OnkyoDriver {
       return new uc.SetupError("OTHER");
     }
 
-    // Don't call handleConnect here - it will be called automatically by the Connect event after setup
+    await this.handleConnect();
 
     return new uc.SetupComplete();
   }
@@ -339,17 +339,8 @@ export default class OnkyoDriver {
       return;
     }
 
-    // STEP 1: Register ALL entities from config (even if not yet connected)
-    // This ensures entities persist across reboots
-    console.log("%s Registering %d entity(ies) from config", integrationName, this.config.avrs.length);
-    for (const avrConfig of this.config.avrs) {
-      const avrEntry = `${avrConfig.model} ${avrConfig.ip} ${avrConfig.zone}`;
-      const mediaPlayerEntity = this.createMediaPlayerEntity(avrEntry, avrConfig.volumeScale ?? 100);
-      this.driver.addAvailableEntity(mediaPlayerEntity);
-      console.log("%s [%s] Entity registered", integrationName, avrEntry);
-    }
-
-    // STEP 2: Attempt to connect to AVRs and create instances
+    // Collect entities to register after all connections are established
+    const entitiesToRegister: uc.MediaPlayer[] = [];
     for (const avrConfig of this.config.avrs) {
       const physicalAVR = `${avrConfig.model} ${avrConfig.ip}`;
       const avrEntry = `${avrConfig.model} ${avrConfig.ip} ${avrConfig.zone}`;
@@ -494,7 +485,20 @@ export default class OnkyoDriver {
 
       if (physicalConnection?.eiscp.connected) {
         console.log("%s [%s] Zone connected and available", integrationName, avrEntry);
+
+        // Create media player entity for this zone and add to registration list
+        const instance = this.avrInstances.get(avrEntry);
+        if (instance) {
+          const mediaPlayerEntity = this.createMediaPlayerEntity(avrEntry, instance.config.volumeScale ?? 100);
+          entitiesToRegister.push(mediaPlayerEntity);
+        }
       }
+    }
+
+    // Register all entities at once after all AVRs are connected
+    console.log("%s Registering %d AVR entity(ies)", integrationName, entitiesToRegister.length);
+    for (const entity of entitiesToRegister) {
+      this.driver.addAvailableEntity(entity);
     }
 
     // Query state for all connected AVRs
