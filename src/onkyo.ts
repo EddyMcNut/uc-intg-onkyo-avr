@@ -201,8 +201,14 @@ export default class OnkyoDriver {
   }
 
   private setupDriverEvents() {
-    this.driver.on(uc.Events.Connect, this.handleConnect.bind(this));
-    this.driver.on(uc.Events.ExitStandby, this.handleConnect.bind(this));
+    this.driver.on(uc.Events.Connect, async () => {
+      console.log(`${integrationName} ===== CONNECT EVENT RECEIVED =====`);
+      await this.handleConnect();
+    });
+    this.driver.on(uc.Events.ExitStandby, async () => {
+      console.log(`${integrationName} ===== EXIT STANDBY EVENT RECEIVED =====`);
+      await this.handleConnect();
+    });
   }
 
   private createMediaPlayerEntity(avrEntry: string, volumeScale: number): uc.MediaPlayer {
