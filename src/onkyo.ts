@@ -549,16 +549,9 @@ export default class OnkyoDriver {
     });
 
     this.driver.on(uc.Events.SubscribeEntities, async (entityIds: string[]) => {
-      // Check if any subscribed entities don't have instances yet
-      const needsConnection = entityIds.some(entityId => !this.avrInstances.has(entityId));
+      console.log(`${integrationName} Entities subscribed: ${entityIds.join(', ')}`);
       
-      if (needsConnection) {
-        // Entities exist but instances don't - trigger connection via handleConnect
-        console.log(`${integrationName} Entities subscribed but not connected, triggering connection...`);
-        await this.handleConnect();
-      }
-      
-      // Now query state for all subscribed entities
+      // Query state for all subscribed entities that are connected
       for (const entityId of entityIds) {
         const instance = this.avrInstances.get(entityId);
         if (instance) {
@@ -566,9 +559,13 @@ export default class OnkyoDriver {
           const physicalConnection = this.physicalConnections.get(physicalAVR);
           if (physicalConnection?.eiscp.connected) {
             const queueThreshold = instance.config.queueThreshold ?? DEFAULT_QUEUE_THRESHOLD;
-            console.log(`${integrationName} [${entityId}] Subscribed entity, queue threshold: ${queueThreshold}ms`);
+            console.log(`${integrationName} [${entityId}] Subscribed entity connected, querying state (threshold: ${queueThreshold}ms)`);
             await this.queryAvrState(entityId, physicalConnection.eiscp, "on subscribe");
+          } else {
+            console.log(`${integrationName} [${entityId}] Subscribed entity not yet connected, waiting for Connect event`);
           }
+        } else {
+          console.log(`${integrationName} [${entityId}] Subscribed entity has no instance yet, waiting for Connect event`);
         }
       }
     });
