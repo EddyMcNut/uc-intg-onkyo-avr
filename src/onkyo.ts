@@ -381,17 +381,48 @@ export default class OnkyoDriver {
 
       if (!physicalConnection) {
         // Need to create a new physical connection
+        console.log("%s [%s] Connecting to AVR at %s:%d", integrationName, avrConfig.model, avrConfig.ip, avrConfig.port);
+
+        // Create EiscpDriver instance for this physical AVR (shared by all zones)
+        const eiscpInstance = new EiscpDriver({
+          host: avrConfig.ip,
+          port: avrConfig.port,
+          model: avrConfig.model,
+          send_delay: avrConfig.queueThreshold ?? DEFAULT_QUEUE_THRESHOLD
+        });
+
+        // Create per-AVR config for command receiver (shared by all zones)
+        const avrSpecificConfig: OnkyoConfig = {
+          avrs: [avrConfig],
+          queueThreshold: avrConfig.queueThreshold ?? DEFAULT_QUEUE_THRESHOLD,
+          albumArtURL: avrConfig.albumArtURL ?? "album_art.cgi",
+          volumeScale: avrConfig.volumeScale ?? 100,
+          useHalfDbSteps: avrConfig.useHalfDbSteps ?? true,
+          // Backward compatibility fields for existing code
+          model: avrConfig.model,
+          ip: avrConfig.ip,
+          port: avrConfig.port
+        };
+
+        // Create command receiver for this physical AVR (shared by all zones)
+        const commandReceiver = new OnkyoCommandReceiver(this.driver, avrSpecificConfig, eiscpInstance);
+        commandReceiver.setupEiscpListener();
+
+        // ALWAYS store physical connection object (even if connection fails)
+        // Zone instances need this object to reference the shared eiscp
+        physicalConnection = {
+          eiscp: eiscpInstance,
+          commandReceiver
+        };
+        this.physicalConnections.set(physicalAVR, physicalConnection);
+
+        // Setup error handler
+        eiscpInstance.on("error", (err: any) => {
+          console.error("%s [%s] EiscpDriver error:", integrationName, physicalAVR, err);
+        });
+
+        // Now try to connect (but don't block zone instance creation if this fails)
         try {
-          console.log("%s [%s] Connecting to AVR at %s:%d", integrationName, avrConfig.model, avrConfig.ip, avrConfig.port);
-
-          // Create EiscpDriver instance for this physical AVR (shared by all zones)
-          const eiscpInstance = new EiscpDriver({
-            host: avrConfig.ip,
-            port: avrConfig.port,
-            model: avrConfig.model,
-            send_delay: avrConfig.queueThreshold ?? DEFAULT_QUEUE_THRESHOLD
-          });
-
           // Connect to the AVR
           const result = await eiscpInstance.connect({
             model: avrConfig.model,
@@ -406,40 +437,13 @@ export default class OnkyoDriver {
           // Wait for connection to fully establish
           await eiscpInstance.waitForConnect(3000);
 
-          // Create per-AVR config for command receiver (shared by all zones)
-          const avrSpecificConfig: OnkyoConfig = {
-            avrs: [avrConfig],
-            queueThreshold: avrConfig.queueThreshold ?? DEFAULT_QUEUE_THRESHOLD,
-            albumArtURL: avrConfig.albumArtURL ?? "album_art.cgi",
-            volumeScale: avrConfig.volumeScale ?? 100,
-            useHalfDbSteps: avrConfig.useHalfDbSteps ?? true,
-            // Backward compatibility fields for existing code
-            model: avrConfig.model,
-            ip: avrConfig.ip,
-            port: avrConfig.port
-          };
-
-          // Create command receiver for this physical AVR (shared by all zones)
-          const commandReceiver = new OnkyoCommandReceiver(this.driver, avrSpecificConfig, eiscpInstance);
-          commandReceiver.setupEiscpListener();
-
-          // Store physical connection
-          physicalConnection = {
-            eiscp: eiscpInstance,
-            commandReceiver
-          };
-          this.physicalConnections.set(physicalAVR, physicalConnection);
-
           console.log("%s [%s] Connected to AVR", integrationName, physicalAVR);
-
-          // Setup error handler
-          eiscpInstance.on("error", (err: any) => {
-            console.error("%s [%s] EiscpDriver error:", integrationName, physicalAVR, err);
-          });
         } catch (err) {
-          console.error("%s [%s] Failed to connect to AVR (entity still registered):", integrationName, physicalAVR, err);
-          // Don't continue - we still want to create zone instances even without connection
-          // The entity is already registered, it just won't be available until connected
+          console.error("%s [%s] Failed to connect to AVR:", integrationName, physicalAVR, err);
+          console.log("%s [%s] Zone instances will be created but unavailable until connection succeeds", integrationName, physicalAVR);
+          // Connection failed, but physicalConnection object exists so zone instances can be created
+          // scheduleReconnect will retry the connection
+          this.scheduleReconnect(physicalAVR, physicalConnection, avrConfig);
         }
       } else if (!physicalConnection.eiscp.connected) {
         // Physical connection exists but is disconnected, try to reconnect
@@ -483,42 +487,53 @@ export default class OnkyoDriver {
       }
     }
 
-    // STEP 2: Create zone instances for all zones (now that physical connections are ready)
+    // STEP 2: Create zone instances for all zones
+    // NOTE: We need physical connections created first (even if they failed to connect)
+    // because zone instances reference the shared eiscp from physical connection
     for (const avrConfig of this.config.avrs) {
       const physicalAVR = `${avrConfig.model} ${avrConfig.ip}`;
       const avrEntry = `${avrConfig.model} ${avrConfig.ip} ${avrConfig.zone}`;
-      const physicalConnection = this.physicalConnections.get(physicalAVR);
-
-      // Create or update the zone instance (only if we have a physical connection)
+      
+      // Skip if zone instance already exists
       if (this.avrInstances.has(avrEntry)) {
         console.log("%s [%s] Zone instance already exists", integrationName, avrEntry);
-      } else if (physicalConnection) {
-        // Create per-zone config for command sender
-        const avrSpecificConfig: OnkyoConfig = {
-          avrs: [avrConfig],
-          queueThreshold: avrConfig.queueThreshold ?? DEFAULT_QUEUE_THRESHOLD,
-          albumArtURL: avrConfig.albumArtURL ?? "album_art.cgi",
-          volumeScale: avrConfig.volumeScale ?? 100,
-          useHalfDbSteps: avrConfig.useHalfDbSteps ?? true,
-          // Backward compatibility fields for existing code
-          model: avrConfig.model,
-          ip: avrConfig.ip,
-          port: avrConfig.port
-        };
-
-        // Create command sender for this zone (uses shared eiscp)
-        const commandSender = new OnkyoCommandSender(this.driver, avrSpecificConfig, physicalConnection.eiscp);
-
-        // Store zone instance (references shared connection)
-        this.avrInstances.set(avrEntry, {
-          config: avrConfig,
-          commandSender
-        });
-
-        console.log("%s [%s] Zone instance created", integrationName, avrEntry);
-      } else {
-        console.log("%s [%s] Zone entity registered but no connection available (will retry on next Connect)", integrationName, avrEntry);
+        continue;
       }
+
+      // Get the physical connection (it should exist from Phase 1, even if connection failed)
+      const physicalConnection = this.physicalConnections.get(physicalAVR);
+      
+      if (!physicalConnection) {
+        // This shouldn't happen since Phase 1 creates physicalConnection objects even on failure
+        // But if it does, we can't create zone instance without the shared eiscp
+        console.warn("%s [%s] Cannot create zone instance - no physical connection object exists", integrationName, avrEntry);
+        continue;
+      }
+
+      // Create per-zone config for command sender
+      const avrSpecificConfig: OnkyoConfig = {
+        avrs: [avrConfig],
+        queueThreshold: avrConfig.queueThreshold ?? DEFAULT_QUEUE_THRESHOLD,
+        albumArtURL: avrConfig.albumArtURL ?? "album_art.cgi",
+        volumeScale: avrConfig.volumeScale ?? 100,
+        useHalfDbSteps: avrConfig.useHalfDbSteps ?? true,
+        // Backward compatibility fields for existing code
+        model: avrConfig.model,
+        ip: avrConfig.ip,
+        port: avrConfig.port
+      };
+
+      // Create command sender for this zone (uses shared eiscp from physical connection)
+      const commandSender = new OnkyoCommandSender(this.driver, avrSpecificConfig, physicalConnection.eiscp);
+
+      // Store zone instance (references shared eiscp)
+      this.avrInstances.set(avrEntry, {
+        config: avrConfig,
+        commandSender
+      });
+
+      console.log("%s [%s] Zone instance created%s", integrationName, avrEntry, 
+        physicalConnection.eiscp.connected ? " (connected)" : " (will connect when AVR available)");
 
       if (physicalConnection?.eiscp.connected) {
         console.log("%s [%s] Zone connected and available", integrationName, avrEntry);
