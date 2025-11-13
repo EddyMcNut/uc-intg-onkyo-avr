@@ -538,101 +538,24 @@ export default class OnkyoDriver {
     });
 
     this.driver.on(uc.Events.SubscribeEntities, async (entityIds: string[]) => {
+      // Check if any subscribed entities don't have instances yet
+      const needsConnection = entityIds.some(entityId => !this.avrInstances.has(entityId));
+      
+      if (needsConnection) {
+        // Entities exist but instances don't - trigger connection via handleConnect
+        console.log(`${integrationName} Entities subscribed but not connected, triggering connection...`);
+        await this.handleConnect();
+      }
+      
+      // Now query state for all subscribed entities
       for (const entityId of entityIds) {
-        // Check if instance already exists
-        let instance = this.avrInstances.get(entityId);
-        
-        if (!instance) {
-          // Instance doesn't exist - create it from config (like Denon/AppleTV integrations)
-          // This handles the reboot scenario where entities are registered but not connected
-          const avrConfig = this.config.avrs?.find(cfg => 
-            `${cfg.model} ${cfg.ip} ${cfg.zone}` === entityId
-          );
-          
-          if (avrConfig) {
-            console.log(`${integrationName} [${entityId}] Entity subscribed but not connected, connecting now...`);
-            
-            const physicalAVR = `${avrConfig.model} ${avrConfig.ip}`;
-            let physicalConnection = this.physicalConnections.get(physicalAVR);
-            
-            // Create physical connection if needed
-            if (!physicalConnection) {
-              try {
-                const eiscpInstance = new EiscpDriver({
-                  host: avrConfig.ip,
-                  port: avrConfig.port,
-                  model: avrConfig.model,
-                  send_delay: avrConfig.queueThreshold ?? DEFAULT_QUEUE_THRESHOLD
-                });
-                
-                await eiscpInstance.connect({
-                  model: avrConfig.model,
-                  host: avrConfig.ip,
-                  port: avrConfig.port
-                });
-                
-                await eiscpInstance.waitForConnect(3000);
-                
-                const avrSpecificConfig: OnkyoConfig = {
-                  avrs: [avrConfig],
-                  queueThreshold: avrConfig.queueThreshold ?? DEFAULT_QUEUE_THRESHOLD,
-                  albumArtURL: avrConfig.albumArtURL ?? "album_art.cgi",
-                  volumeScale: avrConfig.volumeScale ?? 100,
-                  useHalfDbSteps: avrConfig.useHalfDbSteps ?? true,
-                  model: avrConfig.model,
-                  ip: avrConfig.ip,
-                  port: avrConfig.port
-                };
-                
-                const commandReceiver = new OnkyoCommandReceiver(this.driver, avrSpecificConfig, eiscpInstance);
-                commandReceiver.setupEiscpListener();
-                
-                physicalConnection = {
-                  eiscp: eiscpInstance,
-                  commandReceiver
-                };
-                this.physicalConnections.set(physicalAVR, physicalConnection);
-                
-                eiscpInstance.on("error", (err: any) => {
-                  console.error("%s [%s] EiscpDriver error:", integrationName, physicalAVR, err);
-                });
-              } catch (err) {
-                console.error(`${integrationName} [${entityId}] Failed to connect on subscribe:`, err);
-                continue;
-              }
-            }
-            
-            // Create zone instance
-            if (physicalConnection) {
-              const avrSpecificConfig: OnkyoConfig = {
-                avrs: [avrConfig],
-                queueThreshold: avrConfig.queueThreshold ?? DEFAULT_QUEUE_THRESHOLD,
-                albumArtURL: avrConfig.albumArtURL ?? "album_art.cgi",
-                volumeScale: avrConfig.volumeScale ?? 100,
-                useHalfDbSteps: avrConfig.useHalfDbSteps ?? true,
-                model: avrConfig.model,
-                ip: avrConfig.ip,
-                port: avrConfig.port
-              };
-              
-              const commandSender = new OnkyoCommandSender(this.driver, avrSpecificConfig, physicalConnection.eiscp);
-              
-              instance = {
-                config: avrConfig,
-                commandSender
-              };
-              this.avrInstances.set(entityId, instance);
-            }
-          }
-        }
-        
-        // Query AVR state after connection
+        const instance = this.avrInstances.get(entityId);
         if (instance) {
           const physicalAVR = `${instance.config.model} ${instance.config.ip}`;
           const physicalConnection = this.physicalConnections.get(physicalAVR);
           if (physicalConnection?.eiscp.connected) {
             const queueThreshold = instance.config.queueThreshold ?? DEFAULT_QUEUE_THRESHOLD;
-            console.log(`${integrationName} [${entityId}] Subscribed entity connected, queue threshold: ${queueThreshold}ms`);
+            console.log(`${integrationName} [${entityId}] Subscribed entity, queue threshold: ${queueThreshold}ms`);
             await this.queryAvrState(entityId, physicalConnection.eiscp, "on subscribe");
           }
         }
