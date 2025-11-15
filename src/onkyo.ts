@@ -6,6 +6,7 @@ import { ConfigManager, OnkyoConfig, AvrConfig } from "./configManager.js";
 import { DEFAULT_QUEUE_THRESHOLD } from "./configManager.js";
 import { OnkyoCommandSender } from "./onkyoCommandSender.js";
 import { OnkyoCommandReceiver } from "./onkyoCommandReceiver.js";
+import { EntityMigration } from "./entityMigration.js";
 
 const integrationName = "Onkyo-Integration: ";
 
@@ -184,6 +185,9 @@ export default class OnkyoDriver {
     this.config = ConfigManager.load();
     this.registerAvailableEntities();
 
+    // Perform entity migration if needed
+    await this.performEntityMigration();
+
     // Now connect to the AVRs
     await this.handleConnect();
 
@@ -197,6 +201,26 @@ export default class OnkyoDriver {
       const mediaPlayerEntity = this.createMediaPlayerEntity(avrEntry, avrConfig.volumeScale ?? 100);
       this.driver.addAvailableEntity(mediaPlayerEntity);
       console.log("%s [%s] Entity registered as available", integrationName, avrEntry);
+    }
+  }
+
+  private async performEntityMigration(): Promise<void> {
+    console.log("%s Checking for entity migrations...", integrationName);
+    
+    // EntityMigration automatically determines Remote URL and token from environment
+    const migration = new EntityMigration(
+      this.driver,
+      this.config,
+      "onkyo-avr" // integration ID
+    );
+
+    migration.logMigrationStatus();
+
+    if (migration.needsMigration()) {
+      console.log("%s Migration needed, performing entity replacement in activities...", integrationName);
+      await migration.migrate();
+    } else {
+      console.log("%s No migration needed", integrationName);
     }
   }
 

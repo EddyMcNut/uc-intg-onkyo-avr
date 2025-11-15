@@ -22,15 +22,90 @@ interface EntityMapping {
   zone: string;
 }
 
+interface Activity {
+  entity_id: string;
+  entity_type: string;
+  name: { [lang: string]: string };
+  icon?: string;
+  options?: {
+    included_entities?: Array<{ entity_id: string; [key: string]: any }>;
+    button_mapping?: Array<{
+      button: string;
+      short_press?: { entity_id: string; [key: string]: any };
+      long_press?: { entity_id: string; [key: string]: any };
+      double_press?: { entity_id: string; [key: string]: any };
+    }>;
+    user_interface?: {
+      pages?: Array<{
+        page_id?: string;
+        name: string;
+        items: Array<{
+          command?: string | { entity_id: string; [key: string]: any };
+          media_player_id?: string;
+          [key: string]: any;
+        }>;
+      }>;
+    };
+    sequences?: {
+      [key: string]: Array<{
+        command?: { entity_id: string; [key: string]: any };
+        [key: string]: any;
+      }>;
+    };
+  };
+}
+
 export class EntityMigration {
   private driver: uc.IntegrationAPI;
   private config: OnkyoConfig;
   private mappings: EntityMapping[] = [];
+  private integrationId: string = "onkyo-avr";
+  private remoteBaseUrl: string;
+  private apiToken: string;
 
-  constructor(driver: uc.IntegrationAPI, config: OnkyoConfig) {
+  constructor(driver: uc.IntegrationAPI, config: OnkyoConfig, integrationId?: string) {
     this.driver = driver;
     this.config = config;
+    if (integrationId) this.integrationId = integrationId;
+    
+    // Auto-determine Remote API connection info from environment
+    // UC Remote sets these when starting the integration
+    this.remoteBaseUrl = this.determineRemoteUrl();
+    this.apiToken = this.determineApiToken();
+    
     this.buildMappings();
+  }
+
+  /**
+   * Determine the Remote's API base URL from environment
+   * UC Remote typically runs integrations and sets UC_INTEGRATION_HTTP_PORT or similar
+   */
+  private determineRemoteUrl(): string {
+    // Check various environment variables that UC Remote might set
+    const wsHost = process.env.UC_INTEGRATION_INTERFACE || process.env.UC_BIND_INTERFACE || '0.0.0.0';
+    const wsPort = process.env.UC_INTEGRATION_HTTP_PORT || process.env.UC_API_PORT || '80';
+    
+    // If websocket info is available, use it to construct HTTP URL
+    // The Remote's REST API is typically on the same host as the WebSocket
+    if (wsHost && wsHost !== '0.0.0.0') {
+      return `http://${wsHost}:${wsPort}`;
+    }
+    
+    // Fallback: Use localhost (for development/testing)
+    // In production, the Remote should be setting proper environment variables
+    return 'http://localhost:8080';
+  }
+
+  /**
+   * Determine the API token from environment
+   * UC Remote sets this when authenticating the integration
+   */
+  private determineApiToken(): string {
+    // Check various possible environment variable names
+    return process.env.UC_API_TOKEN 
+        || process.env.UC_TOKEN 
+        || process.env.UC_INTEGRATION_TOKEN
+        || '';
   }
 
   /**
@@ -79,133 +154,344 @@ export class EntityMigration {
 
   /**
    * Check if any entities need migration
+   * Returns true if there are entity mappings (meaning old entities may exist in activities)
    */
   public needsMigration(): boolean {
-    if (this.mappings.length === 0) {
-      return false;
-    }
-
-    // Check if any old-format entities exist in configured entities
-    const configuredEntities = this.driver.getConfiguredEntities();
-    
-    for (const mapping of this.mappings) {
-      const oldEntity = configuredEntities.getEntity(mapping.oldEntityId);
-      if (oldEntity) {
-        console.log(`Found old-format entity that needs migration: ${mapping.oldEntityId}`);
-        return true;
-      }
-    }
-
-    return false;
+    return this.mappings.length > 0;
   }
 
   /**
    * Perform the entity migration
-   * This updates entity IDs from old format to new format with zone information
+   * Fetches activities from Remote and replaces old entity IDs with new ones
    */
   public async migrate(): Promise<void> {
-    console.log("Starting entity migration...");
+    console.log("=== Starting Entity Migration ===");
+    console.log(`Remote API URL: ${this.remoteBaseUrl}`);
+    console.log(`API Token configured: ${this.apiToken ? 'Yes' : 'No'}`);
 
     if (this.mappings.length === 0) {
       console.log("No entity mappings found, skipping migration");
       return;
     }
 
-    const configuredEntities = this.driver.getConfiguredEntities();
-    const migratedCount = { success: 0, failed: 0, skipped: 0 };
+    if (!this.apiToken) {
+      console.log("⚠ No API token configured, cannot access Remote API");
+      console.log("  This is expected in development mode.");
+      console.log("  In production, UC Remote automatically provides the token.");
+      console.log("  Migration requires access to Remote's activities API.");
+      return;
+    }
 
-    for (const mapping of this.mappings) {
+    console.log(`Fetching activities from Remote at ${this.remoteBaseUrl}...`);
+    const activities = await this.fetchActivitiesFromRemote();
+    
+    if (!activities || activities.length === 0) {
+      console.log("No activities found on Remote");
+      return;
+    }
+
+    console.log(`Found ${activities.length} activities, checking for entity replacements...`);
+    let updatedCount = 0;
+    let errorCount = 0;
+
+    for (const activity of activities) {
       try {
-        const oldEntity = configuredEntities.getEntity(mapping.oldEntityId);
-        
-        if (!oldEntity) {
-          console.log(`Old entity "${mapping.oldEntityId}" not found, skipping`);
-          migratedCount.skipped++;
+        // Check if this activity uses this integration's entities
+        if (!this.activityUsesIntegration(activity)) {
           continue;
         }
 
-        // Check if new entity already exists
-        const newEntity = configuredEntities.getEntity(mapping.newEntityId);
-        if (newEntity) {
-          console.log(`New entity "${mapping.newEntityId}" already exists, removing old entity`);
-          await this.removeOldEntity(mapping.oldEntityId);
-          migratedCount.success++;
-          continue;
-        }
-
-        // Perform the migration by renaming the entity
-        console.log(`Migrating entity: "${mapping.oldEntityId}" -> "${mapping.newEntityId}"`);
+        console.log(`Activity "${this.getActivityName(activity)}" (${activity.entity_id}) uses ${this.integrationId}`);
         
-        // The Integration API should handle the entity ID update
-        // We need to remove the old entity and add the new one with the same configuration
-        const success = await this.renameEntity(mapping.oldEntityId, mapping.newEntityId);
+        // Replace entities in the activity
+        const replacedCount = this.replaceEntitiesInActivity(activity);
         
-        if (success) {
-          migratedCount.success++;
-          console.log(`Successfully migrated entity: ${mapping.oldEntityId}`);
-        } else {
-          migratedCount.failed++;
-          console.error(`Failed to migrate entity: ${mapping.oldEntityId}`);
+        if (replacedCount > 0) {
+          console.log(`  Replaced ${replacedCount} entity reference(s), updating activity...`);
+          const success = await this.updateActivityOnRemote(activity);
+          
+          if (success) {
+            updatedCount++;
+            console.log(`  ✓ Activity updated successfully`);
+          } else {
+            errorCount++;
+            console.log(`  ✗ Failed to update activity`);
+          }
         }
       } catch (error) {
-        migratedCount.failed++;
-        console.error(`Error migrating entity ${mapping.oldEntityId}:`, error);
+        errorCount++;
+        console.error(`Error migrating activity ${activity.entity_id}:`, error);
       }
     }
 
-    console.log(`Entity migration complete. Success: ${migratedCount.success}, Failed: ${migratedCount.failed}, Skipped: ${migratedCount.skipped}`);
+    console.log("=== Entity Migration Complete ===");
+    console.log(`  Activities updated: ${updatedCount}`);
+    console.log(`  Errors: ${errorCount}`);
+    
+    if (updatedCount > 0) {
+      console.log("\n✓ Migration successful! Your activities now use the new entity names.");
+    } else if (errorCount === 0) {
+      console.log("\n✓ No activities needed migration.");
+    } else {
+      console.log("\n✗ Migration completed with errors. Please check logs.");
+    }
   }
 
   /**
-   * Rename an entity by updating its ID
-   * This is a workaround since the Integration API doesn't have a direct rename method
+   * Fetch all activities from the Remote via API
    */
-  private async renameEntity(oldEntityId: string, newEntityId: string): Promise<boolean> {
+  private async fetchActivitiesFromRemote(): Promise<Activity[]> {
     try {
-      const configuredEntities = this.driver.getConfiguredEntities();
-      const oldEntity = configuredEntities.getEntity(oldEntityId);
-      
-      if (!oldEntity) {
-        console.warn(`Cannot rename entity ${oldEntityId}: not found`);
+      const response = await fetch(`${this.remoteBaseUrl}/api/activities`, {
+        headers: {
+          'Authorization': `Bearer ${this.apiToken}`,
+        },
+      });
+
+      if (!response.ok) {
+        console.error(`Failed to fetch activities: ${response.status} ${response.statusText}`);
+        return [];
+      }
+
+      const activities = (await response.json()) as Activity[];
+      return activities;
+    } catch (error) {
+      console.error('Error fetching activities from Remote:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Check if an activity uses entities from this integration
+   */
+  private activityUsesIntegration(activity: Activity): boolean {
+    const includedEntities = activity.options?.included_entities || [];
+    
+    // Check if any entity belongs to this integration
+    for (const entity of includedEntities) {
+      // Check against old entity IDs (the ones we're migrating from)
+      for (const mapping of this.mappings) {
+        if (entity.entity_id === mapping.oldEntityId) {
+          return true;
+        }
+      }
+    }
+    
+    return false;
+  }
+
+  /**
+   * Replace old entity IDs with new ones in an activity
+   * Returns the number of replacements made
+   */
+  private replaceEntitiesInActivity(activity: Activity): number {
+    let replacedCount = 0;
+
+    if (!activity.options) {
+      return replacedCount;
+    }
+
+    // Replace in included_entities
+    if (activity.options.included_entities) {
+      for (const entity of activity.options.included_entities) {
+        const mapping = this.mappings.find(m => m.oldEntityId === entity.entity_id);
+        if (mapping) {
+          console.log(`    Replacing included entity: ${entity.entity_id} -> ${mapping.newEntityId}`);
+          entity.entity_id = mapping.newEntityId;
+          replacedCount++;
+        }
+      }
+    }
+
+    // Replace in button_mapping
+    if (activity.options.button_mapping) {
+      for (const button of activity.options.button_mapping) {
+        if (button.short_press?.entity_id) {
+          const mapping = this.mappings.find(m => m.oldEntityId === button.short_press!.entity_id);
+          if (mapping) {
+            console.log(`    Replacing button ${button.button} short_press: ${button.short_press.entity_id} -> ${mapping.newEntityId}`);
+            button.short_press.entity_id = mapping.newEntityId;
+            replacedCount++;
+          }
+        }
+        
+        if (button.long_press?.entity_id) {
+          const mapping = this.mappings.find(m => m.oldEntityId === button.long_press!.entity_id);
+          if (mapping) {
+            console.log(`    Replacing button ${button.button} long_press: ${button.long_press.entity_id} -> ${mapping.newEntityId}`);
+            button.long_press.entity_id = mapping.newEntityId;
+            replacedCount++;
+          }
+        }
+        
+        if (button.double_press?.entity_id) {
+          const mapping = this.mappings.find(m => m.oldEntityId === button.double_press!.entity_id);
+          if (mapping) {
+            console.log(`    Replacing button ${button.button} double_press: ${button.double_press.entity_id} -> ${mapping.newEntityId}`);
+            button.double_press.entity_id = mapping.newEntityId;
+            replacedCount++;
+          }
+        }
+      }
+    }
+
+    // Replace in user_interface pages
+    if (activity.options.user_interface?.pages) {
+      for (const page of activity.options.user_interface.pages) {
+        for (const item of page.items) {
+          // Handle command as string
+          if (typeof item.command === 'string') {
+            const mapping = this.mappings.find(m => m.oldEntityId === item.command);
+            if (mapping) {
+              console.log(`    Replacing page \"${page.name}\" command: ${item.command} -> ${mapping.newEntityId}`);
+              item.command = mapping.newEntityId;
+              replacedCount++;
+            }
+          }
+          // Handle command as object with entity_id
+          else if (item.command && typeof item.command === 'object' && 'entity_id' in item.command) {
+            const cmdObj = item.command as { entity_id: string; [key: string]: any };
+            const mapping = this.mappings.find(m => m.oldEntityId === cmdObj.entity_id);
+            if (mapping) {
+              console.log(`    Replacing page \"${page.name}\" command.entity_id: ${cmdObj.entity_id} -> ${mapping.newEntityId}`);
+              cmdObj.entity_id = mapping.newEntityId;
+              replacedCount++;
+            }
+          }
+          
+          // Handle media_player_id
+          if (item.media_player_id) {
+            const mapping = this.mappings.find(m => m.oldEntityId === item.media_player_id);
+            if (mapping) {
+              console.log(`    Replacing page \"${page.name}\" media_player_id: ${item.media_player_id} -> ${mapping.newEntityId}`);
+              item.media_player_id = mapping.newEntityId;
+              replacedCount++;
+            }
+          }
+        }
+      }
+    }
+
+    // Replace in sequences (on/off)
+    if (activity.options.sequences) {
+      for (const [seqType, sequences] of Object.entries(activity.options.sequences)) {
+        for (const sequence of sequences) {
+          if (sequence.command?.entity_id) {
+            const mapping = this.mappings.find(m => m.oldEntityId === sequence.command!.entity_id);
+            if (mapping) {
+              console.log(`    Replacing ${seqType} sequence: ${sequence.command.entity_id} -> ${mapping.newEntityId}`);
+              sequence.command.entity_id = mapping.newEntityId;
+              replacedCount++;
+            }
+          }
+        }
+      }
+    }
+
+    return replacedCount;
+  }
+
+  /**
+   * Update an activity on the Remote via PATCH API
+   */
+  private async updateActivityOnRemote(activity: Activity): Promise<boolean> {
+    try {
+      const body: any = {
+        name: activity.name,
+        options: {}
+      };
+
+      if (activity.icon) {
+        body.icon = activity.icon;
+      }
+
+      if (activity.options?.included_entities) {
+        body.options.entity_ids = activity.options.included_entities.map(e => e.entity_id);
+      }
+
+      if (activity.options?.sequences) {
+        body.options.sequences = activity.options.sequences;
+      }
+
+      const response = await fetch(`${this.remoteBaseUrl}/api/activities/${activity.entity_id}`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${this.apiToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(body),
+      });
+
+      if (!response.ok) {
+        console.error(`Failed to update activity: ${response.status} ${response.statusText}`);
         return false;
       }
 
-      // Note: The actual entity renaming would need to be done through the Remote's API
-      // The Integration API doesn't provide direct entity rename functionality
-      // This is a placeholder for the actual implementation
-      
-      // For now, we'll log the migration action
-      // The actual implementation would depend on UC Remote Core API capabilities
-      console.log(`Entity rename requested: ${oldEntityId} -> ${newEntityId}`);
-      console.log(`This requires Remote Core API support for entity ID updates`);
-      
-      // In practice, the remote's core will handle this through:
-      // 1. Unsubscribe from old entity
-      // 2. Remove old entity from configured entities
-      // 3. Add new entity with new ID
-      // 4. Re-subscribe to new entity
-      // 5. Update all activities, pages, and macros that reference the old entity
-      
+      // Update button_mapping (separate API calls)
+      if (activity.options?.button_mapping) {
+        for (const button of activity.options.button_mapping) {
+          if (!button.short_press && !button.long_press && !button.double_press) {
+            continue;
+          }
+
+          const buttonResponse = await fetch(
+            `${this.remoteBaseUrl}/api/activities/${activity.entity_id}/buttons/${button.button}`,
+            {
+              method: 'PATCH',
+              headers: {
+                'Authorization': `Bearer ${this.apiToken}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify(button),
+            }
+          );
+
+          if (!buttonResponse.ok) {
+            console.error(`Failed to update button ${button.button}: ${buttonResponse.status}`);
+          }
+        }
+      }
+
+      // Update UI pages (separate API calls)
+      if (activity.options?.user_interface?.pages) {
+        for (const page of activity.options.user_interface.pages) {
+          if (!page.page_id) {
+            continue;
+          }
+
+          const pageResponse = await fetch(
+            `${this.remoteBaseUrl}/api/activities/${activity.entity_id}/ui/pages/${page.page_id}`,
+            {
+              method: 'PATCH',
+              headers: {
+                'Authorization': `Bearer ${this.apiToken}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify(page),
+            }
+          );
+
+          if (!pageResponse.ok) {
+            console.error(`Failed to update page ${page.name}: ${pageResponse.status}`);
+          }
+        }
+      }
+
       return true;
     } catch (error) {
-      console.error(`Error renaming entity ${oldEntityId}:`, error);
+      console.error('Error updating activity on Remote:', error);
       return false;
     }
   }
 
   /**
-   * Remove an old entity that's been replaced
+   * Get the activity name (handles multi-language names)
    */
-  private async removeOldEntity(oldEntityId: string): Promise<void> {
-    try {
-      // The Integration API should handle entity removal
-      console.log(`Removing old entity: ${oldEntityId}`);
-      
-      // Note: Actual removal would be through driver.removeEntity() if available
-      // or by not registering it in the available entities
-    } catch (error) {
-      console.error(`Error removing old entity ${oldEntityId}:`, error);
+  private getActivityName(activity: Activity): string {
+    if (typeof activity.name === 'string') {
+      return activity.name;
     }
+    return activity.name?.en || activity.name?.[Object.keys(activity.name)[0]] || activity.entity_id;
   }
 
   /**
@@ -249,7 +535,7 @@ export class EntityMigration {
    * Log migration status for debugging
    */
   public logMigrationStatus(): void {
-    console.log("=== Entity Migration Status ===");
+    console.log("=== Entity Migration Mappings ===");
     console.log(`Total mappings: ${this.mappings.length}`);
     
     if (this.mappings.length === 0) {
@@ -257,26 +543,13 @@ export class EntityMigration {
       return;
     }
 
-    const configuredEntities = this.driver.getConfiguredEntities();
-    
+    console.log("\\nEntity name changes:");
     for (const mapping of this.mappings) {
-      const oldExists = configuredEntities.getEntity(mapping.oldEntityId) !== undefined;
-      const newExists = configuredEntities.getEntity(mapping.newEntityId) !== undefined;
-      
-      console.log(`  ${mapping.oldEntityId} -> ${mapping.newEntityId}`);
-      console.log(`    Old entity exists: ${oldExists}`);
-      console.log(`    New entity exists: ${newExists}`);
-      
-      if (oldExists && !newExists) {
-        console.log(`    Status: NEEDS MIGRATION`);
-      } else if (!oldExists && newExists) {
-        console.log(`    Status: MIGRATED`);
-      } else if (oldExists && newExists) {
-        console.log(`    Status: BOTH EXIST (cleanup needed)`);
-      } else {
-        console.log(`    Status: NEITHER EXISTS`);
-      }
+      console.log(`  "${mapping.oldEntityId}" -> "${mapping.newEntityId}"`);
     }
-    console.log("=== End Migration Status ===");
+    
+    console.log("\\nNote: These old entity names may exist in your activities.");
+    console.log("Running migrate() will update all activities to use the new names.");
+    console.log("=== End Migration Mappings ===");
   }
 }

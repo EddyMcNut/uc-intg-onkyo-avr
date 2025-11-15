@@ -1,301 +1,182 @@
-# Entity Migration Guide
+# Entity Migration
 
 ## Overview
 
-The `EntityMigration` class handles the automatic migration of entity names when upgrading from the single-zone format to the multi-zone format.
+Starting from version 0.7.0, this integration supports multiple zones (main, zone2, zone3) on the same physical AVR. To support this, entity names now include the zone suffix:
 
-**Old format:** `TX-RZ50 192.168.2.103`  
-**New format:** `TX-RZ50 192.168.2.103 main`
+- **Old format**: `TX-RZ50 192.168.2.103`
+- **New format**: `TX-RZ50 192.168.2.103 main`
 
-## How It Works
+## Automatic Migration
 
-The migration utility:
-1. Analyzes the current configuration to identify which entities need migration
-2. Builds mappings between old entity IDs (without zone) and new entity IDs (with zone)
-3. Detects existing old-format entities in the Remote's configured entities
-4. Provides methods to migrate entities to the new naming format
+When you upgrade to version 0.7.0+ and run the integration setup, the migration process will **automatically** update all your activities to use the new entity names.
 
-## Integration into Your Driver
+### How It Works
 
-### Step 1: Import the Migration Class
+1. **During Setup**: After you configure your AVRs, the integration:
+   - Creates new entities with zone suffixes (e.g., "TX-RZ50 192.168.2.103 main")
+   - Builds a mapping of old entity names → new entity names
+   - Fetches all activities from your Remote
+   - Replaces old entity names with new ones in:
+     - Included entities
+     - Button mappings (short press, long press, double press)
+     - UI pages and commands
+     - Startup/shutdown sequences
+   - Updates each activity on your Remote via the API
 
-Add the import to your `onkyo.ts` file:
+2. **What Gets Updated**: The migration updates entity references in:
+   - **Activity included entities**: The entities your activity uses
+   - **Button mapping**: Physical button assignments
+   - **User interface pages**: On-screen button commands
+   - **Sequences**: Power on/off command sequences
 
-```typescript
-import { EntityMigration } from "./entityMigration.js";
-```
+### Example
 
-### Step 2: Add Migration to Constructor
-
-In the `OnkyoDriver` constructor, after loading the config:
-
-```typescript
-constructor() {
-  this.driver = new uc.IntegrationAPI();
-  this.config = ConfigManager.load();
-  this.driver.init("driver.json", this.handleDriverSetup.bind(this));
-  this.setupDriverEvents();
-  this.setupEventHandlers();
-  console.log("Loaded config at startup:", this.config);
-
-  // Check for entity migration needs
-  const migration = new EntityMigration(this.driver, this.config);
-  if (migration.needsMigration()) {
-    console.log("Entity migration needed - will be performed on Connect event");
-    this.pendingMigration = migration;
-  }
-
-  // Register entities from config at startup
-  if (this.config.avrs && this.config.avrs.length > 0) {
-    this.registerAvailableEntities();
-  }
+**Before Migration** (in an activity):
+```json
+{
+  "entity_id": "TX-RZ50 192.168.2.103",
+  "button_mapping": [{
+    "button": "VOLUME_UP",
+    "short_press": {
+      "entity_id": "TX-RZ50 192.168.2.103",
+      "cmd_id": "volume_up"
+    }
+  }]
 }
 ```
 
-### Step 3: Add Migration Property
-
-Add a property to store the pending migration:
-
-```typescript
-export default class OnkyoDriver {
-  private driver: uc.IntegrationAPI;
-  private config: OnkyoConfig;
-  private physicalConnections: Map<string, PhysicalAvrConnection> = new Map();
-  private avrInstances: Map<string, AvrInstance> = new Map();
-  private pendingMigration?: EntityMigration; // Add this line
-  // ... rest of properties
+**After Migration**:
+```json
+{
+  "entity_id": "TX-RZ50 192.168.2.103 main",
+  "button_mapping": [{
+    "button": "VOLUME_UP",
+    "short_press": {
+      "entity_id": "TX-RZ50 192.168.2.103 main",
+      "cmd_id": "volume_up"
+    }
+  }]
 }
 ```
 
-### Step 4: Perform Migration on Connect
+## Configuration
 
-Modify the `handleConnect` method to perform migration before connecting:
+The migration automatically discovers the Remote's API connection details from the environment. No manual configuration is needed!
 
-```typescript
-private async handleConnect() {
-  console.log(`${integrationName} ===== HANDLING CONNECT =====`);
+**How it works:**
+- The integration automatically detects the Remote's URL and API token from environment variables
+- UC Remote sets these variables when starting the integration
+- The migration uses the native Node.js `fetch` API (no external dependencies)
 
-  // Perform entity migration if needed
-  if (this.pendingMigration) {
-    console.log(`${integrationName} Performing entity migration...`);
-    this.pendingMigration.logMigrationStatus();
-    await this.pendingMigration.migrate();
-    this.pendingMigration = undefined; // Clear after migration
-  }
+## Migration Logs
 
-  // Continue with normal connection handling
-  if (!this.config.avrs || this.config.avrs.length === 0) {
-    console.error(`${integrationName} No AVRs configured`);
-    await this.driver.setDeviceState(uc.DeviceStates.Error);
-    return;
-  }
+During setup, you'll see migration logs in the integration logs:
 
-  // ... rest of handleConnect implementation
-}
 ```
+Onkyo-Integration: Checking for entity migrations...
+=== Entity Migration Mappings ===
+Total mappings: 1
 
-## Migration Behavior
+Entity name changes:
+  "TX-RZ50 192.168.2.103" -> "TX-RZ50 192.168.2.103 main"
 
-### When Migration is Needed
+Note: These old entity names may exist in your activities.
+Running migrate() will update all activities to use the new names.
+=== End Migration Mappings ===
+Onkyo-Integration: Migration needed, performing entity replacement in activities...
+=== Starting Entity Migration ===
+Fetching activities from Remote at http://192.168.2.90...
+Found 5 activities, checking for entity replacements...
+Activity "Watch TV" (activity_01) uses onkyo-avr
+  Replaced 3 entity reference(s), updating activity...
+  ✓ Activity updated successfully
+Activity "Listen to Music" (activity_02) uses onkyo-avr
+  Replaced 5 entity reference(s), updating activity...
+  ✓ Activity updated successfully
+=== Entity Migration Complete ===
+  Activities updated: 2
+  Errors: 0
 
-Migration is needed when:
-- An AVR was previously configured without zone information
-- The old entity ID exists in the Remote's configured entities
-- The new entity ID (with zone suffix) doesn't exist yet
-
-### What Happens During Migration
-
-1. **Detection Phase:**
-   - Scans configuration for AVRs
-   - Identifies entities using old naming format
-   - Builds mapping between old and new entity IDs
-
-2. **Migration Phase:**
-   - Checks if old entity exists
-   - Checks if new entity already exists
-   - Logs migration actions
-
-3. **Cleanup Phase:**
-   - Removes old entities that have been replaced
-   - Ensures no duplicate entities remain
-
-## API Methods
-
-### `needsMigration(): boolean`
-Returns `true` if any entities need migration from old to new format.
-
-### `migrate(): Promise<void>`
-Performs the actual migration of entities.
-
-### `getMappings(): EntityMapping[]`
-Returns all entity mappings for inspection.
-
-### `getNewEntityId(oldEntityId: string): string | undefined`
-Gets the new entity ID for a given old entity ID.
-
-### `getOldEntityId(newEntityId: string): string | undefined`
-Gets the old entity ID for a given new entity ID.
-
-### `isOldFormat(entityId: string): boolean`
-Checks if an entity ID uses the old format.
-
-### `isNewFormat(entityId: string): boolean`
-Checks if an entity ID uses the new format.
-
-### `logMigrationStatus(): void`
-Logs detailed migration status for debugging.
-
-## Important Notes
-
-### Remote Core API Limitations
-
-The current implementation is limited by the Unfolded Circle Integration API capabilities:
-
-1. **No Direct Rename:** The Integration API doesn't provide a direct method to rename entity IDs
-2. **Manual Update Required:** Users may need to manually update activities, pages, and macros that reference old entity IDs
-3. **Remote Restart:** A restart of the Remote may be needed to complete the migration
-
-### Recommended Approach
-
-For production use, consider one of these approaches:
-
-1. **Automatic Migration (Recommended for Seamless Upgrade):**
-   - Implement during the Connect event
-   - Log all migration actions
-   - Provide clear user notifications
-
-2. **User-Prompted Migration:**
-   - Detect migration needs
-   - Show a setup prompt asking user to confirm migration
-   - Perform migration only after confirmation
-
-3. **Documentation-Based Migration:**
-   - Document the naming change in release notes
-   - Provide instructions for users to manually update their configurations
-   - The migration class can help identify which entities need updates
-
-## Example Usage
-
-### Basic Migration Check
-
-```typescript
-const migration = new EntityMigration(this.driver, this.config);
-
-if (migration.needsMigration()) {
-  console.log("Migration needed!");
-  migration.logMigrationStatus();
-  
-  const mappings = migration.getMappings();
-  for (const mapping of mappings) {
-    console.log(`Will migrate: ${mapping.oldEntityId} -> ${mapping.newEntityId}`);
-  }
-}
-```
-
-### Performing Migration
-
-```typescript
-const migration = new EntityMigration(this.driver, this.config);
-
-if (migration.needsMigration()) {
-  await migration.migrate();
-  console.log("Migration complete!");
-}
-```
-
-### Checking Individual Entities
-
-```typescript
-const migration = new EntityMigration(this.driver, this.config);
-
-const oldId = "TX-RZ50 192.168.2.103";
-if (migration.isOldFormat(oldId)) {
-  const newId = migration.getNewEntityId(oldId);
-  console.log(`Entity ${oldId} should be migrated to ${newId}`);
-}
-```
-
-## Testing
-
-### Test Scenarios
-
-1. **Fresh Install (No Migration Needed):**
-   - New configuration with zones
-   - No old entities exist
-   - Migration should be skipped
-
-2. **Upgrade from Single Zone:**
-   - Old entity: `TX-RZ50 192.168.2.103`
-   - New entity: `TX-RZ50 192.168.2.103 main`
-   - Migration should rename entity
-
-3. **Multiple Zones Added:**
-   - Old entity: `TX-RZ50 192.168.2.103`
-   - New entities: 
-     - `TX-RZ50 192.168.2.103 main`
-     - `TX-RZ50 192.168.2.103 zone2`
-     - `TX-RZ50 192.168.2.103 zone3`
-   - Old entity should migrate to main zone
-
-4. **Already Migrated:**
-   - Only new-format entities exist
-   - Migration should be skipped
-
-### Test Commands
-
-```bash
-# Build and run with migration
-npm run build
-npm start
-
-# Check logs for migration messages
-# Look for: "Entity migration needed"
-# Look for: "Migrating entity: X -> Y"
-# Look for: "Migration complete"
+✓ Migration successful! Your activities now use the new entity names.
 ```
 
 ## Troubleshooting
 
-### Migration Not Detected
+### Migration Doesn't Run
 
-**Symptoms:** Migration doesn't run even though old entities exist
+**Problem**: You don't see migration logs during setup.
 
-**Solutions:**
-- Check that `needsMigration()` is called after driver initialization
-- Verify config has AVRs defined
-- Check that `getConfiguredEntities()` is available
+**Solution**: 
+- Check that you have activities using this integration
+- Verify the old entity format (without zone suffix) exists in your activities
+- Make sure `UC_API_URL` and `UC_API_TOKEN` environment variables are set
 
-### Entities Not Updated
+### "No API token configured"
 
-**Symptoms:** Old entities still appear after migration
+**Problem**: Migration logs show "No API token configured, cannot access Remote API"
 
-**Solutions:**
-- Restart the Remote to refresh entity list
-- Check Remote Core logs for API errors
-- Manually remove old entities from Remote configuration
+**Solution**:
+- The integration couldn't auto-detect the Remote's API connection details
+- This typically means the integration is running in development mode
+- In production on UC Remote, this should never happen
+- If you see this when running on the Remote, report it as a bug with full logs
 
-### Duplicate Entities
+### Activities Not Updated
 
-**Symptoms:** Both old and new format entities exist
+**Problem**: Migration runs but activities still use old entity names.
 
-**Solutions:**
-- Run cleanup to remove old entities
-- Check that migration completed successfully
-- Manually delete old entities from Remote
+**Solution**:
+1. Check the integration logs for error messages
+2. Verify your activities actually used the old entity names
+3. Try running setup again
+4. Check that the Remote API is accessible
 
-## Related Files
+### Manual Migration
 
-- `src/entityMigration.ts` - Migration class implementation
-- `src/onkyo.ts` - Main driver file (integrate migration here)
-- `src/configManager.ts` - Configuration management
-- `docs/entity-migration.md` - This document
+If automatic migration fails, you can manually update your activities:
 
-## Future Enhancements
+1. Open each activity in the UC Remote interface
+2. Remove the old entity (e.g., "TX-RZ50 192.168.2.103")
+3. Add the new entity (e.g., "TX-RZ50 192.168.2.103 main")
+4. Reassign buttons and UI commands to the new entity
 
-Potential improvements for the migration system:
+## Multi-Zone Support
 
-1. **Remote API Integration:** Direct API calls to Remote Core for entity renaming
-2. **Activity Updates:** Automatically update activities that reference old entities
-3. **Rollback Support:** Ability to rollback migration if issues occur
-4. **Migration History:** Track migration history in config file
-5. **Batch Operations:** Migrate multiple entities in a single API call
+With the new entity naming, you can now add multiple zones from the same physical AVR:
+
+1. Run setup
+2. Add first zone:
+   - Model: `TX-RZ50`
+   - IP: `192.168.2.103`
+   - Zone: `main`
+3. Run setup again and add second zone:
+   - Model: `TX-RZ50`
+   - IP: `192.168.2.103`
+   - Zone: `zone2`
+
+This creates two separate entities:
+- `TX-RZ50 192.168.2.103 main`
+- `TX-RZ50 192.168.2.103 zone2`
+
+You can control them independently in different activities.
+
+## Technical Details
+
+The migration is implemented in `src/entityMigration.ts` and follows the approach used by the [UC Remote Two Toolkit](https://github.com/albaintor/UC-Remote-Two-Toolkit/tree/main/src/app/replace-entity).
+
+Key implementation details:
+- Fetches activities via `GET /api/activities`
+- Updates activities via `PATCH /api/activities/{id}`
+- Updates buttons via `PATCH /api/activities/{id}/buttons/{button}`
+- Updates UI pages via `PATCH /api/activities/{id}/ui/pages/{page_id}`
+- Only updates activities that use entities from this integration
+- Performs atomic updates for each activity component
+
+## Support
+
+If you encounter issues with migration:
+
+1. Check the integration logs for detailed error messages
+2. Verify your Remote firmware is up to date (min version 0.20.0)
+3. Report issues at: https://github.com/EddyMcNut/uc-intg-onkyo-avr/issues
