@@ -65,6 +65,8 @@ export default class OnkyoDriver {
     const volumeScale = (msg as any).setupData?.volumeScale;
     const useHalfDbSteps = (msg as any).setupData?.useHalfDbSteps;
     const zoneCount = (msg as any).setupData?.zoneCount;
+    const remoteIp = (msg as any).setupData?.remoteIp;
+    const remotePinCode = (msg as any).setupData?.remotePinCode;
 
     console.log(
       "%s Setup data received - volumeScale raw value: '%s' (type: %s), useHalfDbSteps: '%s' (type: %s), zoneCount: '%s'",
@@ -185,8 +187,8 @@ export default class OnkyoDriver {
     this.config = ConfigManager.load();
     this.registerAvailableEntities();
 
-    // Perform entity migration if needed
-    await this.performEntityMigration();
+    // Perform entity migration if Remote IP and PIN provided
+    await this.performEntityMigration(remoteIp, remotePinCode);
 
     // Now connect to the AVRs
     await this.handleConnect();
@@ -204,13 +206,15 @@ export default class OnkyoDriver {
     }
   }
 
-  private async performEntityMigration(): Promise<void> {
+  private async performEntityMigration(remoteIp?: string, remotePinCode?: string): Promise<void> {
     console.log("%s Checking for entity migrations...", integrationName);
     
-    // EntityMigration automatically determines Remote URL and token from environment
+    // EntityMigration with Remote IP and PIN for authentication
     const migration = new EntityMigration(
       this.driver,
       this.config,
+      remoteIp,
+      remotePinCode,
       "onkyo-avr" // integration ID
     );
 

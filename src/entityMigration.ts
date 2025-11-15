@@ -13,7 +13,7 @@
 
 import * as uc from "@unfoldedcircle/integration-api";
 import { OnkyoConfig, AvrConfig } from "./configManager.js";
-import * as fs from "fs";
+import { Buffer } from "buffer";
 
 interface EntityMapping {
   oldEntityId: string;
@@ -62,17 +62,19 @@ export class EntityMigration {
   private mappings: EntityMapping[] = [];
   private integrationId: string = "onkyo-avr";
   private remoteBaseUrl: string;
-  private apiToken: string;
+  private apiToken: string = '';
+  private remoteIp?: string;
+  private remotePinCode?: string;
 
-  constructor(driver: uc.IntegrationAPI, config: OnkyoConfig, integrationId?: string) {
+  constructor(driver: uc.IntegrationAPI, config: OnkyoConfig, remoteIp?: string, remotePinCode?: string, integrationId?: string) {
     this.driver = driver;
     this.config = config;
+    this.remoteIp = remoteIp;
+    this.remotePinCode = remotePinCode;
     if (integrationId) this.integrationId = integrationId;
     
-    // Auto-determine Remote API connection info from environment
-    // UC Remote sets these when starting the integration
+    // Auto-determine Remote API connection info
     this.remoteBaseUrl = this.determineRemoteUrl();
-    this.apiToken = this.determineApiToken();
     
     this.buildMappings();
   }
@@ -99,40 +101,82 @@ export class EntityMigration {
   }
 
   /**
-   * Determine the API token from environment or API key file
-   * UC Remote stores the integration's API key in /app/api.key
+   * Register with the Remote to get an API key using PIN authentication
+   * Based on UC Remote Two Toolkit's registration flow
+   * Deletes any existing key with the same name first
    */
-  private determineApiToken(): string {
-    // Check for explicitly set tokens in environment
-    const token = process.env.UC_API_TOKEN 
-        || process.env.UC_TOKEN 
-        || process.env.UC_INTEGRATION_TOKEN
-        || process.env.CORE_API_TOKEN;
-    
-    if (token) {
-      console.log('Using API token from environment');
-      return token;
+  private async registerWithRemote(): Promise<boolean> {
+    if (!this.remoteIp || !this.remotePinCode) {
+      console.log('Migration: No Remote IP or PIN provided, skipping Remote API registration');
+      return false;
     }
-    
-    // Try to read API key from file (standard location for UC integrations)
+
     try {
-      const apiKeyPath = '/app/api.key';
+      const username = 'web-configurator';
+      const apiKeyName = 'onkyo-avr-migration';
       
-      if (fs.existsSync(apiKeyPath)) {
-        const apiKey = fs.readFileSync(apiKeyPath, 'utf-8').trim();
-        if (apiKey) {
-          console.log('Using API key from /app/api.key');
-          return apiKey;
+      // Create Basic auth header with username and PIN
+      const auth = Buffer.from(`${username}:${this.remotePinCode}`).toString('base64');
+      const headers = {
+        'Authorization': `Basic ${auth}`,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      };
+      
+      console.log(`Migration: Registering with Remote at ${this.remoteIp}...`);
+      
+      // Step 1: Get list of existing API keys to check if our key exists
+      const listUrl = `http://${this.remoteIp}/api/auth/api_keys?page=1&limit=100`;
+      const listResponse = await fetch(listUrl, {
+        method: 'GET',
+        headers
+      });
+
+      if (listResponse.ok) {
+        const keys = await listResponse.json() as Array<{ key_id: string; name: string }>;
+        
+        // Step 2: Delete any existing key with the same name
+        for (const key of keys) {
+          if (key.name === apiKeyName) {
+            console.log(`Migration: Deleting existing API key "${apiKeyName}"...`);
+            const deleteUrl = `http://${this.remoteIp}/api/auth/api_keys/${key.key_id}`;
+            await fetch(deleteUrl, {
+              method: 'DELETE',
+              headers
+            });
+          }
         }
-      } else {
-        console.log('API key file not found at /app/api.key');
       }
+      
+      // Step 3: Register new API key
+      const registerUrl = `http://${this.remoteIp}/api/auth/api_keys`;
+      const response = await fetch(registerUrl, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          name: apiKeyName,
+          scopes: ['admin']
+        })
+      });
+
+      if (!response.ok) {
+        console.error(`Migration: Failed to register with Remote: ${response.status} ${response.statusText}`);
+        const text = await response.text();
+        console.error(`Migration: Response body: ${text}`);
+        return false;
+      }
+
+      const data = await response.json() as { api_key: string; valid_to: string };
+      this.apiToken = data.api_key;
+      this.remoteBaseUrl = `http://${this.remoteIp}`;
+      
+      console.log(`Migration: Successfully registered with Remote, API key valid until ${data.valid_to}`);
+      return true;
+      
     } catch (error) {
-      console.log('Could not read API key file:', error);
+      console.error('Migration: Failed to register with Remote:', error);
+      return false;
     }
-    
-    console.log('⚠ No API token found - migration will fail without authentication');
-    return '';
   }
 
   /**
@@ -201,11 +245,17 @@ export class EntityMigration {
       return;
     }
 
-    // Note: We'll try to access the API even without a token
-    // When running on the Remote, localhost access typically doesn't require auth
-    if (!this.apiToken) {
-      console.log("ℹ No API token found - attempting local access to Remote API");
-      console.log("  (Integrations running on Remote have localhost access)");
+    // Register with Remote to get API access if IP and PIN provided
+    if (this.remoteIp && this.remotePinCode) {
+      const registered = await this.registerWithRemote();
+      if (!registered) {
+        console.log("Migration: Failed to register with Remote - migration cannot proceed");
+        return;
+      }
+    } else {
+      console.log("Migration: No Remote IP/PIN provided - skipping migration");
+      console.log("Migration: To migrate activities, provide Remote IP and PIN in setup");
+      return;
     }
 
     console.log(`Fetching activities from Remote at ${this.remoteBaseUrl}...`);
@@ -223,6 +273,7 @@ export class EntityMigration {
     for (const activity of activities) {
       try {
         // Check if this activity uses this integration's entities
+        console.log(`******* Activity "${this.getActivityName(activity)}" (${activity.entity_id}) ******************************`);
         if (!this.activityUsesIntegration(activity)) {
           continue;
         }
@@ -305,6 +356,9 @@ export class EntityMigration {
     for (const entity of includedEntities) {
       // Check against old entity IDs (the ones we're migrating from)
       for (const mapping of this.mappings) {
+
+        console.log(`******* Checking entity: ${entity.entity_id} against mapping: ${mapping.oldEntityId} *******`);
+
         if (entity.entity_id === mapping.oldEntityId) {
           return true;
         }
