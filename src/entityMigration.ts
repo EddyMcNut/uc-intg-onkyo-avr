@@ -78,34 +78,46 @@ export class EntityMigration {
 
   /**
    * Determine the Remote's API base URL from environment
-   * UC Remote typically runs integrations and sets UC_INTEGRATION_HTTP_PORT or similar
+   * UC Remote runs integrations in a container and the Remote's API is accessible at localhost
    */
   private determineRemoteUrl(): string {
-    // Check various environment variables that UC Remote might set
-    const wsHost = process.env.UC_INTEGRATION_INTERFACE || process.env.UC_BIND_INTERFACE || '0.0.0.0';
-    const wsPort = process.env.UC_INTEGRATION_HTTP_PORT || process.env.UC_API_PORT || '80';
+    // UC Remote Core API runs on port 80 (default) or can be accessed via localhost
+    // When the integration runs, the Remote's API is at http://localhost (within the container network)
+    // or via the host's IP on port 80/443
     
-    // If websocket info is available, use it to construct HTTP URL
-    // The Remote's REST API is typically on the same host as the WebSocket
-    if (wsHost && wsHost !== '0.0.0.0') {
-      return `http://${wsHost}:${wsPort}`;
+    // Try to get from environment first
+    const apiUrl = process.env.UC_API_URL || process.env.CORE_API_URL;
+    if (apiUrl) {
+      console.log(`Using API URL from environment: ${apiUrl}`);
+      return apiUrl;
     }
     
-    // Fallback: Use localhost (for development/testing)
-    // In production, the Remote should be setting proper environment variables
-    return 'http://localhost:8080';
+    // Default: Remote's Core API is at localhost:80 (from integration's perspective)
+    // The integration runs in a container on the Remote, and the Core API is accessible at localhost
+    return 'http://localhost';
   }
 
   /**
    * Determine the API token from environment
-   * UC Remote sets this when authenticating the integration
+   * UC Remote integrations typically don't need a token for local API calls
+   * The integration runs within the Remote's container network and has direct access
    */
   private determineApiToken(): string {
-    // Check various possible environment variable names
-    return process.env.UC_API_TOKEN 
+    // Check for explicitly set tokens
+    const token = process.env.UC_API_TOKEN 
         || process.env.UC_TOKEN 
         || process.env.UC_INTEGRATION_TOKEN
-        || '';
+        || process.env.CORE_API_TOKEN;
+    
+    if (token) {
+      console.log('Using API token from environment');
+      return token;
+    }
+    
+    // For integrations running on the Remote itself, no token is typically needed
+    // The integration has localhost access to the Core API
+    console.log('No API token found in environment - trying without authentication (local access)');
+    return '';
   }
 
   /**
@@ -174,12 +186,11 @@ export class EntityMigration {
       return;
     }
 
+    // Note: We'll try to access the API even without a token
+    // When running on the Remote, localhost access typically doesn't require auth
     if (!this.apiToken) {
-      console.log("⚠ No API token configured, cannot access Remote API");
-      console.log("  This is expected in development mode.");
-      console.log("  In production, UC Remote automatically provides the token.");
-      console.log("  Migration requires access to Remote's activities API.");
-      return;
+      console.log("ℹ No API token found - attempting local access to Remote API");
+      console.log("  (Integrations running on Remote have localhost access)");
     }
 
     console.log(`Fetching activities from Remote at ${this.remoteBaseUrl}...`);
@@ -242,18 +253,26 @@ export class EntityMigration {
    */
   private async fetchActivitiesFromRemote(): Promise<Activity[]> {
     try {
+      const headers: Record<string, string> = {};
+      
+      // Only add Authorization header if we have a token
+      if (this.apiToken) {
+        headers['Authorization'] = `Bearer ${this.apiToken}`;
+      }
+      
       const response = await fetch(`${this.remoteBaseUrl}/api/activities`, {
-        headers: {
-          'Authorization': `Bearer ${this.apiToken}`,
-        },
+        headers,
       });
 
       if (!response.ok) {
         console.error(`Failed to fetch activities: ${response.status} ${response.statusText}`);
+        console.error(`  URL: ${this.remoteBaseUrl}/api/activities`);
+        console.error(`  Using auth token: ${this.apiToken ? 'Yes' : 'No'}`);
         return [];
       }
 
       const activities = (await response.json()) as Activity[];
+      console.log(`Successfully fetched ${activities.length} activities`);
       return activities;
     } catch (error) {
       console.error('Error fetching activities from Remote:', error);
@@ -396,6 +415,15 @@ export class EntityMigration {
    */
   private async updateActivityOnRemote(activity: Activity): Promise<boolean> {
     try {
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+      
+      // Only add Authorization header if we have a token
+      if (this.apiToken) {
+        headers['Authorization'] = `Bearer ${this.apiToken}`;
+      }
+      
       const body: any = {
         name: activity.name,
         options: {}
@@ -415,10 +443,7 @@ export class EntityMigration {
 
       const response = await fetch(`${this.remoteBaseUrl}/api/activities/${activity.entity_id}`, {
         method: 'PATCH',
-        headers: {
-          'Authorization': `Bearer ${this.apiToken}`,
-          'Content-Type': 'application/json',
-        },
+        headers,
         body: JSON.stringify(body),
       });
 
@@ -438,10 +463,7 @@ export class EntityMigration {
             `${this.remoteBaseUrl}/api/activities/${activity.entity_id}/buttons/${button.button}`,
             {
               method: 'PATCH',
-              headers: {
-                'Authorization': `Bearer ${this.apiToken}`,
-                'Content-Type': 'application/json',
-              },
+              headers,
               body: JSON.stringify(button),
             }
           );
@@ -463,10 +485,7 @@ export class EntityMigration {
             `${this.remoteBaseUrl}/api/activities/${activity.entity_id}/ui/pages/${page.page_id}`,
             {
               method: 'PATCH',
-              headers: {
-                'Authorization': `Bearer ${this.apiToken}`,
-                'Content-Type': 'application/json',
-              },
+              headers,
               body: JSON.stringify(page),
             }
           );
