@@ -13,6 +13,7 @@
 
 import * as uc from "@unfoldedcircle/integration-api";
 import { OnkyoConfig, AvrConfig } from "./configManager.js";
+import * as fs from "fs";
 
 interface EntityMapping {
   oldEntityId: string;
@@ -98,12 +99,11 @@ export class EntityMigration {
   }
 
   /**
-   * Determine the API token from environment
-   * UC Remote integrations typically don't need a token for local API calls
-   * The integration runs within the Remote's container network and has direct access
+   * Determine the API token from environment or API key file
+   * UC Remote stores the integration's API key in /app/api.key
    */
   private determineApiToken(): string {
-    // Check for explicitly set tokens
+    // Check for explicitly set tokens in environment
     const token = process.env.UC_API_TOKEN 
         || process.env.UC_TOKEN 
         || process.env.UC_INTEGRATION_TOKEN
@@ -114,9 +114,24 @@ export class EntityMigration {
       return token;
     }
     
-    // For integrations running on the Remote itself, no token is typically needed
-    // The integration has localhost access to the Core API
-    console.log('No API token found in environment - trying without authentication (local access)');
+    // Try to read API key from file (standard location for UC integrations)
+    try {
+      const apiKeyPath = '/app/api.key';
+      
+      if (fs.existsSync(apiKeyPath)) {
+        const apiKey = fs.readFileSync(apiKeyPath, 'utf-8').trim();
+        if (apiKey) {
+          console.log('Using API key from /app/api.key');
+          return apiKey;
+        }
+      } else {
+        console.log('API key file not found at /app/api.key');
+      }
+    } catch (error) {
+      console.log('Could not read API key file:', error);
+    }
+    
+    console.log('⚠ No API token found - migration will fail without authentication');
     return '';
   }
 
