@@ -1,5 +1,5 @@
 {
-  "driver_id": "onkyo-avr",
+  "driver_id": "onkyo_avr",
   "version": "0.7.0",
   "min_core_api": "0.20.0",
   "name": { "en": "Onkyo AVR" },

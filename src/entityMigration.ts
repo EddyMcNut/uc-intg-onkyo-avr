@@ -60,14 +60,14 @@ export class EntityMigration {
   private driver: uc.IntegrationAPI;
   private config: OnkyoConfig;
   private mappings: EntityMapping[] = [];
-  private integrationId: string = "onkyo-avr";
+  private integrationId: string = "onkyo_avr";
   private remoteBaseUrl: string;
   private apiToken: string = '';
   private remoteIp?: string;
   private remotePinCode?: string;
 
   private oldIntegrationId: string = "uc_onkyo-avr_driver_custom.main";
-  private newIntegrationId: string = "onkyo-avr_driver_custom.main";
+  private newIntegrationId: string = "onkyo_avr_driver_custom.main";
 
   constructor(driver: uc.IntegrationAPI, config: OnkyoConfig, remoteIp?: string, remotePinCode?: string, integrationId?: string) {
     this.driver = driver;

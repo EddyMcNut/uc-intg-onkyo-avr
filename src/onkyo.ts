@@ -223,7 +223,7 @@ export default class OnkyoDriver {
       this.config,
       remoteIp,
       remotePinCode,
-      "onkyo-avr" // integration ID
+      "onkyo_avr" // integration ID
     );
 
     migration.logMigrationStatus();
