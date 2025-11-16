@@ -187,8 +187,16 @@ export default class OnkyoDriver {
     this.config = ConfigManager.load();
     this.registerAvailableEntities();
 
-    // Perform entity migration if Remote IP and PIN provided
-    await this.performEntityMigration(remoteIp, remotePinCode);
+    // Perform entity migration ONLY if Remote IP and PIN provided
+    // This ensures user has already configured entities (first setup)
+    // and is now reconfiguring with migration parameters (second setup)
+    if (remoteIp && remotePinCode) {
+      console.log("%s Remote IP and PIN provided, attempting entity migration...", integrationName);
+      await this.performEntityMigration(remoteIp, remotePinCode);
+    } else {
+      console.log("%s No Remote IP/PIN provided, skipping entity migration", integrationName);
+      console.log("%s For migration: reconfigure integration with Remote IP and 4-digit PIN code", integrationName);
+    }
 
     // Now connect to the AVRs
     await this.handleConnect();
@@ -206,8 +214,8 @@ export default class OnkyoDriver {
     }
   }
 
-  private async performEntityMigration(remoteIp?: string, remotePinCode?: string): Promise<void> {
-    console.log("%s Checking for entity migrations...", integrationName);
+  private async performEntityMigration(remoteIp: string, remotePinCode: string): Promise<void> {
+    console.log("%s Starting entity migration process...", integrationName);
     
     // EntityMigration with Remote IP and PIN for authentication
     const migration = new EntityMigration(
@@ -224,7 +232,7 @@ export default class OnkyoDriver {
       console.log("%s Migration needed, performing entity replacement in activities...", integrationName);
       await migration.migrate();
     } else {
-      console.log("%s No migration needed", integrationName);
+      console.log("%s No migration needed - no old entity mappings found", integrationName);
     }
   }
 

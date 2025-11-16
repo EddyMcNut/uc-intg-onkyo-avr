@@ -66,6 +66,9 @@ export class EntityMigration {
   private remoteIp?: string;
   private remotePinCode?: string;
 
+  private oldIntegrationId: string = "uc_onkyo-avr_driver_custom.main";
+  private newIntegrationId: string = "onkyo-avr_driver_custom.main";
+
   constructor(driver: uc.IntegrationAPI, config: OnkyoConfig, remoteIp?: string, remotePinCode?: string, integrationId?: string) {
     this.driver = driver;
     this.config = config;
@@ -273,12 +276,11 @@ export class EntityMigration {
     for (const activity of activities) {
       try {
         // Check if this activity uses this integration's entities
-        console.log(`******* Activity "${this.getActivityName(activity)}" (${activity.entity_id}) ******************************`);
         if (!this.activityUsesIntegration(activity)) {
           continue;
         }
 
-        console.log(`Activity "${this.getActivityName(activity)}" (${activity.entity_id}) uses ${this.integrationId}`);
+        console.log(`Activity "${this.getActivityName(activity)}" (${activity.entity_id}) uses ${this.integrationId}<---OLD`);
         
         // Replace entities in the activity
         const replacedCount = this.replaceEntitiesInActivity(activity);
@@ -316,6 +318,7 @@ export class EntityMigration {
 
   /**
    * Fetch all activities from the Remote via API
+   * First gets the list of activities, then fetches full details for each
    */
   private async fetchActivitiesFromRemote(): Promise<Activity[]> {
     try {
@@ -326,6 +329,7 @@ export class EntityMigration {
         headers['Authorization'] = `Bearer ${this.apiToken}`;
       }
       
+      // First, get the list of activities
       const response = await fetch(`${this.remoteBaseUrl}/api/activities`, {
         headers,
       });
@@ -337,9 +341,33 @@ export class EntityMigration {
         return [];
       }
 
-      const activities = (await response.json()) as Activity[];
-      console.log(`Successfully fetched ${activities.length} activities`);
-      return activities;
+      const activityList = (await response.json()) as Activity[];
+      console.log(`Found ${activityList.length} activities, fetching full details for each...`);
+      
+      // Now fetch full details for each activity (includes all entities, buttons, UI pages, etc.)
+      const detailedActivities: Activity[] = [];
+      for (const activity of activityList) {
+        if (!activity.entity_id) {
+          console.log(`  Skipping activity without entity_id`);
+          continue;
+        }
+        
+        const detailResponse = await fetch(`${this.remoteBaseUrl}/api/activities/${activity.entity_id}`, {
+          headers,
+        });
+        
+        if (detailResponse.ok) {
+          const detailedActivity = (await detailResponse.json()) as Activity;
+          detailedActivities.push(detailedActivity);
+        } else {
+          console.log(`  Warning: Failed to fetch details for activity ${activity.entity_id}: ${detailResponse.status}`);
+          // Use the basic activity info as fallback
+          detailedActivities.push(activity);
+        }
+      }
+      
+      console.log(`Successfully fetched detailed information for ${detailedActivities.length} activities`);
+      return detailedActivities;
     } catch (error) {
       console.error('Error fetching activities from Remote:', error);
       return [];
@@ -352,19 +380,31 @@ export class EntityMigration {
   private activityUsesIntegration(activity: Activity): boolean {
     const includedEntities = activity.options?.included_entities || [];
     
-    // Check if any entity belongs to this integration
+    // Log all entities in this activity
+    console.log(`  Activity has ${includedEntities.length} included entities:`);
     for (const entity of includedEntities) {
-      // Check against old entity IDs (the ones we're migrating from)
-      for (const mapping of this.mappings) {
-
-        console.log(`******* Checking entity: ${entity.entity_id} against mapping: ${mapping.oldEntityId} *******`);
-
-        if (entity.entity_id === mapping.oldEntityId) {
+      // Extract integration ID from entity_id (format: integration_id.entity_name)
+      const parts = entity.entity_id.split('.');
+      const integrationId = parts.length > 1 ? parts[0] : 'unknown';
+      console.log(`    - ${entity.entity_id} (integration: ${integrationId})`);
+    }
+    
+    // Check if any entity belongs to this integration
+    console.log(`  Checking for old entity IDs that need migration:`);
+    for (const mapping of this.mappings) {
+      // Build the full old entity ID with old integration prefix
+      const fullOldEntityId = `${this.oldIntegrationId}.${mapping.oldEntityId}`;
+      console.log(`    Looking for: "${fullOldEntityId}"`);
+      
+      for (const entity of includedEntities) {
+        if (entity.entity_id === fullOldEntityId) {
+          console.log(`    ✓ MATCH FOUND: "${entity.entity_id}" needs migration!`);
           return true;
         }
       }
     }
     
+    console.log(`  ✗ No matching entities found for this integration`);
     return false;
   }
 
@@ -382,11 +422,16 @@ export class EntityMigration {
     // Replace in included_entities
     if (activity.options.included_entities) {
       for (const entity of activity.options.included_entities) {
-        const mapping = this.mappings.find(m => m.oldEntityId === entity.entity_id);
-        if (mapping) {
-          console.log(`    Replacing included entity: ${entity.entity_id} -> ${mapping.newEntityId}`);
-          entity.entity_id = mapping.newEntityId;
-          replacedCount++;
+        // Check if this entity matches any of our old entity patterns
+        for (const mapping of this.mappings) {
+          const fullOldEntityId = `${this.oldIntegrationId}.${mapping.oldEntityId}`;
+          if (entity.entity_id === fullOldEntityId) {
+            const fullNewEntityId = `${this.newIntegrationId}.${mapping.newEntityId}`;
+            console.log(`    Replacing included entity: ${entity.entity_id} -> ${fullNewEntityId}`);
+            entity.entity_id = fullNewEntityId;
+            replacedCount++;
+            break;
+          }
         }
       }
     }
@@ -395,29 +440,41 @@ export class EntityMigration {
     if (activity.options.button_mapping) {
       for (const button of activity.options.button_mapping) {
         if (button.short_press?.entity_id) {
-          const mapping = this.mappings.find(m => m.oldEntityId === button.short_press!.entity_id);
-          if (mapping) {
-            console.log(`    Replacing button ${button.button} short_press: ${button.short_press.entity_id} -> ${mapping.newEntityId}`);
-            button.short_press.entity_id = mapping.newEntityId;
-            replacedCount++;
+          for (const mapping of this.mappings) {
+            const fullOldEntityId = `${this.oldIntegrationId}.${mapping.oldEntityId}`;
+            if (button.short_press.entity_id === fullOldEntityId) {
+              const fullNewEntityId = `${this.newIntegrationId}.${mapping.newEntityId}`;
+              console.log(`    Replacing button ${button.button} short_press: ${button.short_press.entity_id} -> ${fullNewEntityId}`);
+              button.short_press.entity_id = fullNewEntityId;
+              replacedCount++;
+              break;
+            }
           }
         }
         
         if (button.long_press?.entity_id) {
-          const mapping = this.mappings.find(m => m.oldEntityId === button.long_press!.entity_id);
-          if (mapping) {
-            console.log(`    Replacing button ${button.button} long_press: ${button.long_press.entity_id} -> ${mapping.newEntityId}`);
-            button.long_press.entity_id = mapping.newEntityId;
-            replacedCount++;
+          for (const mapping of this.mappings) {
+            const fullOldEntityId = `${this.oldIntegrationId}.${mapping.oldEntityId}`;
+            if (button.long_press.entity_id === fullOldEntityId) {
+              const fullNewEntityId = `${this.newIntegrationId}.${mapping.newEntityId}`;
+              console.log(`    Replacing button ${button.button} long_press: ${button.long_press.entity_id} -> ${fullNewEntityId}`);
+              button.long_press.entity_id = fullNewEntityId;
+              replacedCount++;
+              break;
+            }
           }
         }
         
         if (button.double_press?.entity_id) {
-          const mapping = this.mappings.find(m => m.oldEntityId === button.double_press!.entity_id);
-          if (mapping) {
-            console.log(`    Replacing button ${button.button} double_press: ${button.double_press.entity_id} -> ${mapping.newEntityId}`);
-            button.double_press.entity_id = mapping.newEntityId;
-            replacedCount++;
+          for (const mapping of this.mappings) {
+            const fullOldEntityId = `${this.oldIntegrationId}.${mapping.oldEntityId}`;
+            if (button.double_press.entity_id === fullOldEntityId) {
+              const fullNewEntityId = `${this.newIntegrationId}.${mapping.newEntityId}`;
+              console.log(`    Replacing button ${button.button} double_press: ${button.double_press.entity_id} -> ${fullNewEntityId}`);
+              button.double_press.entity_id = fullNewEntityId;
+              replacedCount++;
+              break;
+            }
           }
         }
       }
@@ -429,31 +486,43 @@ export class EntityMigration {
         for (const item of page.items) {
           // Handle command as string
           if (typeof item.command === 'string') {
-            const mapping = this.mappings.find(m => m.oldEntityId === item.command);
-            if (mapping) {
-              console.log(`    Replacing page \"${page.name}\" command: ${item.command} -> ${mapping.newEntityId}`);
-              item.command = mapping.newEntityId;
-              replacedCount++;
+            for (const mapping of this.mappings) {
+              const fullOldEntityId = `${this.oldIntegrationId}.${mapping.oldEntityId}`;
+              if (item.command === fullOldEntityId) {
+                const fullNewEntityId = `${this.newIntegrationId}.${mapping.newEntityId}`;
+                console.log(`    Replacing page \"${page.name}\" command: ${item.command} -> ${fullNewEntityId}`);
+                item.command = fullNewEntityId;
+                replacedCount++;
+                break;
+              }
             }
           }
           // Handle command as object with entity_id
           else if (item.command && typeof item.command === 'object' && 'entity_id' in item.command) {
             const cmdObj = item.command as { entity_id: string; [key: string]: any };
-            const mapping = this.mappings.find(m => m.oldEntityId === cmdObj.entity_id);
-            if (mapping) {
-              console.log(`    Replacing page \"${page.name}\" command.entity_id: ${cmdObj.entity_id} -> ${mapping.newEntityId}`);
-              cmdObj.entity_id = mapping.newEntityId;
-              replacedCount++;
+            for (const mapping of this.mappings) {
+              const fullOldEntityId = `${this.oldIntegrationId}.${mapping.oldEntityId}`;
+              if (cmdObj.entity_id === fullOldEntityId) {
+                const fullNewEntityId = `${this.newIntegrationId}.${mapping.newEntityId}`;
+                console.log(`    Replacing page \"${page.name}\" command.entity_id: ${cmdObj.entity_id} -> ${fullNewEntityId}`);
+                cmdObj.entity_id = fullNewEntityId;
+                replacedCount++;
+                break;
+              }
             }
           }
           
           // Handle media_player_id
           if (item.media_player_id) {
-            const mapping = this.mappings.find(m => m.oldEntityId === item.media_player_id);
-            if (mapping) {
-              console.log(`    Replacing page \"${page.name}\" media_player_id: ${item.media_player_id} -> ${mapping.newEntityId}`);
-              item.media_player_id = mapping.newEntityId;
-              replacedCount++;
+            for (const mapping of this.mappings) {
+              const fullOldEntityId = `${this.oldIntegrationId}.${mapping.oldEntityId}`;
+              if (item.media_player_id === fullOldEntityId) {
+                const fullNewEntityId = `${this.newIntegrationId}.${mapping.newEntityId}`;
+                console.log(`    Replacing page \"${page.name}\" media_player_id: ${item.media_player_id} -> ${fullNewEntityId}`);
+                item.media_player_id = fullNewEntityId;
+                replacedCount++;
+                break;
+              }
             }
           }
         }
@@ -465,11 +534,15 @@ export class EntityMigration {
       for (const [seqType, sequences] of Object.entries(activity.options.sequences)) {
         for (const sequence of sequences) {
           if (sequence.command?.entity_id) {
-            const mapping = this.mappings.find(m => m.oldEntityId === sequence.command!.entity_id);
-            if (mapping) {
-              console.log(`    Replacing ${seqType} sequence: ${sequence.command.entity_id} -> ${mapping.newEntityId}`);
-              sequence.command.entity_id = mapping.newEntityId;
-              replacedCount++;
+            for (const mapping of this.mappings) {
+              const fullOldEntityId = `${this.oldIntegrationId}.${mapping.oldEntityId}`;
+              if (sequence.command.entity_id === fullOldEntityId) {
+                const fullNewEntityId = `${this.newIntegrationId}.${mapping.newEntityId}`;
+                console.log(`    Replacing ${seqType} sequence: ${sequence.command.entity_id} -> ${fullNewEntityId}`);
+                sequence.command.entity_id = fullNewEntityId;
+                replacedCount++;
+                break;
+              }
             }
           }
         }
