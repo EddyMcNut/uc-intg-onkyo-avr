@@ -187,10 +187,6 @@ export default class OnkyoDriver {
     this.config = ConfigManager.load();
     this.registerAvailableEntities();
 
-    // Get the Remote's IP address from environment (not from user input)
-    const actualRemoteIp = this.getRemoteIpFromEnvironment();
-    console.log("%s Remote IP detected from environment: %s", integrationName, actualRemoteIp || "not available");
-
     
     // Perform entity migration ONLY if:
     // 1. Remote IP and PIN provided (user wants migration)
@@ -426,6 +422,10 @@ export default class OnkyoDriver {
   }
 
   private async handleConnect() {
+    // Get the Remote's IP address from environment (available when integration is running)
+    const actualRemoteIp = this.getRemoteIpFromEnvironment();
+    console.log("%s Remote IP detected from environment: %s", integrationName, actualRemoteIp || "not available");
+    
     // Reload config to get latest AVR list
     this.config = ConfigManager.load();
 
