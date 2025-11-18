@@ -187,12 +187,27 @@ export default class OnkyoDriver {
     this.config = ConfigManager.load();
     this.registerAvailableEntities();
 
-    // Perform entity migration ONLY if Remote IP and PIN provided
+    // Get the Remote's IP address from environment (not from user input)
+    const actualRemoteIp = this.getRemoteIpFromEnvironment();
+    console.log("%s Remote IP detected from environment: %s", integrationName, actualRemoteIp || "not available");
+
+    
+    // Perform entity migration ONLY if:
+    // 1. Remote IP and PIN provided (user wants migration)
+    // 2. At least one AVR entity is configured (entities exist to migrate)
     // This ensures user has already configured entities (first setup)
     // and is now reconfiguring with migration parameters (second setup)
     if (remoteIp && remotePinCode) {
-      console.log("%s Remote IP and PIN provided, attempting entity migration...", integrationName);
-      await this.performEntityMigration(remoteIp, remotePinCode);
+      const configuredEntities = this.driver.getConfiguredEntities();
+      const entities = configuredEntities ? configuredEntities.getEntities() : [];
+      const hasConfiguredEntities = entities && entities.length > 0;
+      if (hasConfiguredEntities) {
+        console.log("%s Remote IP and PIN provided, %d entities configured, attempting migration...", integrationName, entities.length);
+        await this.performEntityMigration(remoteIp, remotePinCode);
+      } else {
+        console.log("%s Remote IP and PIN provided, but no entities configured yet", integrationName);
+        console.log("%s Please configure entities first, then reconfigure integration with Remote IP/PIN for migration", integrationName);
+      }
     } else {
       console.log("%s No Remote IP/PIN provided, skipping entity migration", integrationName);
       console.log("%s For migration: reconfigure integration with Remote IP and 4-digit PIN code", integrationName);
@@ -388,6 +403,26 @@ export default class OnkyoDriver {
         physicalConnection.reconnectTimer = undefined;
       }
     }, 30000); // 30 seconds
+  }
+
+  /**
+   * Extract the Remote's IP address from environment variables
+   * UC Remote provides the API URL via UC_API_URL or CORE_API_URL
+   */
+  private getRemoteIpFromEnvironment(): string | null {
+    const apiUrl = process.env.UC_API_URL || process.env.CORE_API_URL;
+    if (!apiUrl) {
+      return null;
+    }
+
+    try {
+      // Extract hostname from URL (e.g., "http://192.168.1.100" -> "192.168.1.100")
+      const url = new URL(apiUrl);
+      return url.hostname;
+    } catch (error) {
+      console.warn("%s Failed to parse Remote API URL from environment: %s", integrationName, apiUrl);
+      return null;
+    }
   }
 
   private async handleConnect() {
