@@ -60,21 +60,19 @@ export class EntityMigration {
   private driver: uc.IntegrationAPI;
   private config: OnkyoConfig;
   private mappings: EntityMapping[] = [];
-  private integrationId: string = "onkyo_avr";
   private remoteBaseUrl: string;
   private apiToken: string = '';
   private remoteIp?: string;
   private remotePinCode?: string;
 
   private oldIntegrationId: string = "uc_onkyo-avr_driver_custom.main";
-  private newIntegrationId: string = "onkyo_avr_driver_custom.main";
+  private newIntegrationId: string = "onkyo_avr_custom_driver.main";
 
   constructor(driver: uc.IntegrationAPI, config: OnkyoConfig, remoteIp?: string, remotePinCode?: string, integrationId?: string) {
     this.driver = driver;
     this.config = config;
     this.remoteIp = remoteIp;
     this.remotePinCode = remotePinCode;
-    if (integrationId) this.integrationId = integrationId;
     
     // Auto-determine Remote API connection info
     this.remoteBaseUrl = this.determineRemoteUrl();
@@ -280,7 +278,7 @@ export class EntityMigration {
           continue;
         }
 
-        console.log(`Activity "${this.getActivityName(activity)}" (${activity.entity_id}) uses ${this.integrationId}<---OLD`);
+        console.log(`Activity "${this.getActivityName(activity)}" (${activity.entity_id}) uses ${this.oldIntegrationId}`);
         
         // Replace entities in the activity
         const replacedCount = this.replaceEntitiesInActivity(activity);
