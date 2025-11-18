@@ -401,31 +401,7 @@ export default class OnkyoDriver {
     }, 30000); // 30 seconds
   }
 
-  /**
-   * Extract the Remote's IP address from environment variables
-   * UC Remote provides the API URL via UC_API_URL or CORE_API_URL
-   */
-  private getRemoteIpFromEnvironment(): string | null {
-    const apiUrl = process.env.UC_API_URL || process.env.CORE_API_URL;
-    if (!apiUrl) {
-      return null;
-    }
-
-    try {
-      // Extract hostname from URL (e.g., "http://192.168.1.100" -> "192.168.1.100")
-      const url = new URL(apiUrl);
-      return url.hostname;
-    } catch (error) {
-      console.warn("%s Failed to parse Remote API URL from environment: %s", integrationName, apiUrl);
-      return null;
-    }
-  }
-
   private async handleConnect() {
-    // Get the Remote's IP address from environment (available when integration is running)
-    const actualRemoteIp = this.getRemoteIpFromEnvironment();
-    console.log("%s Remote IP detected from environment: %s", integrationName, actualRemoteIp || "not available");
-    
     // Reload config to get latest AVR list
     this.config = ConfigManager.load();
 
