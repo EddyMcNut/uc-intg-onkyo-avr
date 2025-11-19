@@ -455,9 +455,16 @@ export default class OnkyoDriver {
           reconnected = true;
 
           // Query state for all zones of this AVR after successful reconnection
+          let firstZone = true;
           for (const [avrEntry, instance] of this.avrInstances) {
             const entryPhysicalAVR = `${instance.config.model} ${instance.config.ip}`;
             if (entryPhysicalAVR === physicalAVR) {
+              const queueThreshold = instance.config.queueThreshold ?? DEFAULT_QUEUE_THRESHOLD;
+              // Wait between zones (except first) to give AVR time to process
+              if (!firstZone) {
+                await new Promise((resolve) => setTimeout(resolve, queueThreshold));
+              }
+              firstZone = false;
               await this.queryAvrState(avrEntry, physicalConnection.eiscp, "after scheduled reconnection");
             }
           }
@@ -600,6 +607,21 @@ export default class OnkyoDriver {
 
             console.log("%s [%s] Successfully reconnected to AVR", integrationName, physicalAVR);
             reconnected = true;
+            
+            // Query state for all zones after successful reconnection
+            let firstZone = true;
+            for (const [avrEntry, instance] of this.avrInstances) {
+              const entryPhysicalAVR = `${instance.config.model} ${instance.config.ip}`;
+              if (entryPhysicalAVR === physicalAVR) {
+                const queueThreshold = instance.config.queueThreshold ?? DEFAULT_QUEUE_THRESHOLD;
+                // Wait between zones (except first) to give AVR time to process
+                if (!firstZone) {
+                  await new Promise((resolve) => setTimeout(resolve, queueThreshold));
+                }
+                firstZone = false;
+                await this.queryAvrState(avrEntry, physicalConnection.eiscp, "after reconnection in handleConnect");
+              }
+            }
             break;
           } catch (reconnectErr) {
             console.warn("%s [%s] Reconnection attempt %d/%d failed: %s", integrationName, physicalAVR, attempt + 1, timeouts.length, reconnectErr);
@@ -672,10 +694,17 @@ export default class OnkyoDriver {
     }
 
     // Query state for all connected AVRs
+    const queriedPhysicalAvrs = new Set<string>();
     for (const [avrEntry, instance] of this.avrInstances) {
       const physicalAVR = `${instance.config.model} ${instance.config.ip}`;
       const physicalConnection = this.physicalConnections.get(physicalAVR);
       if (physicalConnection) {
+        const queueThreshold = instance.config.queueThreshold ?? DEFAULT_QUEUE_THRESHOLD;
+        // If we already queried a zone for this physical AVR, wait before next zone
+        if (queriedPhysicalAvrs.has(physicalAVR)) {
+          await new Promise((resolve) => setTimeout(resolve, queueThreshold));
+        }
+        queriedPhysicalAvrs.add(physicalAVR);
         await this.queryAvrState(avrEntry, physicalConnection.eiscp, "after connection");
       }
     }
