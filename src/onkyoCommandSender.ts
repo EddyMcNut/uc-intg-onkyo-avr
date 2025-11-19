@@ -5,6 +5,18 @@ import { DEFAULT_QUEUE_THRESHOLD, OnkyoConfig } from "./configManager.js";
 const integrationName = "Onkyo-Integration (sender):";
 let lastCommandTime = 0;
 
+// Security: Maximum input lengths
+const MAX_LENGTHS = {
+  USER_COMMAND: 250,      // input-selector, listening-mode, etc.
+  RAW_COMMAND: 20        // raw MVL20, etc.
+};
+
+// Security: Valid character patterns
+const PATTERNS = {
+  USER_COMMAND: /^[a-z0-9\-\s.:=]+$/i,  // Letters, numbers, hyphens, spaces, delimiters
+  RAW_COMMAND: /^[A-Z0-9]+$/             // Uppercase letters and numbers only
+};
+
 export class OnkyoCommandSender {
   private driver: uc.IntegrationAPI;
   private config: OnkyoConfig;
@@ -96,10 +108,37 @@ export class OnkyoCommandSender {
         if (params?.source) {
           if (typeof params.source === "string" && params.source.toLowerCase().startsWith("raw")) {
             const rawCmd = (params.source as string).substring(3).trim().toUpperCase();
+            
+            // Security: Validate raw command length
+            if (rawCmd.length > MAX_LENGTHS.RAW_COMMAND) {
+              console.error("%s [%s] Raw command too long (%d chars), rejecting", integrationName, entity.id, rawCmd.length);
+              return uc.StatusCodes.BadRequest;
+            }
+            
+            // Security: Validate raw command characters (alphanumeric only)
+            if (!PATTERNS.RAW_COMMAND.test(rawCmd)) {
+              console.error("%s [%s] Raw command contains invalid characters, rejecting", integrationName, entity.id);
+              return uc.StatusCodes.BadRequest;
+            }
+            
             console.error("%s [%s] sending raw command: %s", integrationName, entity.id, rawCmd);
             await this.eiscp.raw(rawCmd);
           } else if (typeof params.source === "string") {
-            await this.eiscp.command(formatCommand(`${params.source.toLowerCase()}`));
+            const userCmd = params.source.toLowerCase();
+            
+            // Security: Validate user command length
+            if (userCmd.length > MAX_LENGTHS.USER_COMMAND) {
+              console.error("%s [%s] Command too long (%d chars), rejecting", integrationName, entity.id, userCmd.length);
+              return uc.StatusCodes.BadRequest;
+            }
+            
+            // Security: Validate user command characters
+            if (!PATTERNS.USER_COMMAND.test(userCmd)) {
+              console.error("%s [%s] Command contains invalid characters, rejecting", integrationName, entity.id);
+              return uc.StatusCodes.BadRequest;
+            }
+            
+            await this.eiscp.command(formatCommand(userCmd));
           }
         }
         break;

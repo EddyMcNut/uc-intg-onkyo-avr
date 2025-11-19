@@ -10,6 +10,46 @@ import { EntityMigration } from "./entityMigration.js";
 
 const integrationName = "Onkyo-Integration: ";
 
+// Security: Maximum input lengths for setup fields
+const MAX_LENGTHS = {
+  MODEL_NAME: 50,
+  IP_ADDRESS: 15,
+  ALBUM_ART_URL: 250,
+  PIN_CODE: 4
+};
+
+// Security: Validation patterns
+const PATTERNS = {
+  IP_ADDRESS: /^(\d{1,3}\.){3}\d{1,3}$/,
+  MODEL_NAME: /^[a-zA-Z0-9\-_ ]+$/,
+  ALBUM_ART_URL: /^[a-zA-Z0-9._\-/]+$/,
+  PIN_CODE: /^\d{4}$/
+};
+
+// Security: Helper function to validate IP addresses
+function validateIpAddress(ip: string, fieldName: string): string | null {
+  const trimmedIp = ip.trim();
+  
+  if (trimmedIp.length > MAX_LENGTHS.IP_ADDRESS) {
+    console.error(`${integrationName}${fieldName} too long`);
+    return null;
+  }
+  
+  if (!PATTERNS.IP_ADDRESS.test(trimmedIp)) {
+    console.error(`${integrationName}Invalid ${fieldName} format`);
+    return null;
+  }
+  
+  // Validate IP octets are in valid range
+  const octets = trimmedIp.split('.').map(Number);
+  if (!octets.every((octet: number) => octet >= 0 && octet <= 255)) {
+    console.error(`${integrationName}${fieldName} octets out of range`);
+    return null;
+  }
+  
+  return trimmedIp;
+}
+
 interface PhysicalAvrConnection {
   eiscp: EiscpDriver;
   commandReceiver: OnkyoCommandReceiver;
@@ -119,17 +159,50 @@ export default class OnkyoDriver {
 
     try {
       if (hasManualConfig) {
-        // Add manually configured AVR
+        // Security: Validate model name
+        const modelName = model.trim();
+        if (modelName.length > MAX_LENGTHS.MODEL_NAME) {
+          console.error("%s Model name too long (%d chars), max %d", integrationName, modelName.length, MAX_LENGTHS.MODEL_NAME);
+          return new uc.SetupError("OTHER");
+        }
+        if (!PATTERNS.MODEL_NAME.test(modelName)) {
+          console.error("%s Model name contains invalid characters", integrationName);
+          return new uc.SetupError("OTHER");
+        }
+        
+        // Security: Validate IP address
+        const ip = validateIpAddress(ipAddress, "IP address");
+        if (!ip) {
+          return new uc.SetupError("OTHER");
+        }
+        
+        // Security: Validate port
         const portNum = port && port.toString().trim() !== "" ? parseInt(port, 10) : 60128;
+        if (isNaN(portNum) || portNum < 1 || portNum > 65535) {
+          console.error("%s Invalid port number: %d", integrationName, portNum);
+          return new uc.SetupError("OTHER");
+        }
+        
+        // Security: Validate album art URL
+        if (albumArtURLValue.length > MAX_LENGTHS.ALBUM_ART_URL) {
+          console.error("%s Album art URL too long (%d chars), max %d", integrationName, albumArtURLValue.length, MAX_LENGTHS.ALBUM_ART_URL);
+          return new uc.SetupError("OTHER");
+        }
+        if (!PATTERNS.ALBUM_ART_URL.test(albumArtURLValue)) {
+          console.error("%s Album art URL contains invalid characters", integrationName);
+          return new uc.SetupError("OTHER");
+        }
+        
+        // Add manually configured AVR
         const zones = ["main"];
         if (zoneCountValue >= 2) zones.push("zone2");
         if (zoneCountValue >= 3) zones.push("zone3");
 
         for (const zone of zones) {
           const avrConfig: AvrConfig = {
-            model: model.trim(),
-            ip: ipAddress.trim(),
-            port: isNaN(portNum) ? 60128 : portNum,
+            model: modelName,
+            ip: ip,
+            port: portNum,
             zone: zone,
             queueThreshold: queueThresholdValue,
             albumArtURL: albumArtURLValue,
@@ -194,12 +267,24 @@ export default class OnkyoDriver {
     // This ensures user has already configured entities (first setup)
     // and is now reconfiguring with migration parameters (second setup)
     if (remoteIp && remotePinCode) {
+      // Security: Validate remote IP address
+      const remoteIpTrimmed = validateIpAddress(remoteIp, "Remote IP address");
+      if (!remoteIpTrimmed) {
+        return new uc.SetupError("OTHER");
+      }
+      
+      // Security: Validate PIN code (must be exactly 4 digits)
+      const pinTrimmed = remotePinCode.trim();
+      if (!PATTERNS.PIN_CODE.test(pinTrimmed)) {
+        console.error("%s Invalid PIN code format (must be exactly 4 digits)", integrationName);
+        return new uc.SetupError("OTHER");
+      }
       const configuredEntities = this.driver.getConfiguredEntities();
       const entities = configuredEntities ? configuredEntities.getEntities() : [];
       const hasConfiguredEntities = entities && entities.length > 0;
       if (hasConfiguredEntities) {
         console.log("%s Remote IP and PIN provided, %d entities configured, attempting migration...", integrationName, entities.length);
-        await this.performEntityMigration(remoteIp, remotePinCode);
+        await this.performEntityMigration(remoteIpTrimmed, pinTrimmed);
       } else {
         console.log("%s Remote IP and PIN provided, but no entities configured yet", integrationName);
         console.log("%s Please configure entities first, then reconfigure integration with Remote IP/PIN for migration", integrationName);
