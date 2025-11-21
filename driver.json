@@ -185,7 +185,7 @@
         "field": {
           "label": {
             "value": {
-              "en": "If upgrading from v0.6.5 or lower, provide the Remote's 4-digit PIN code below to automatically update the AVR instance in your activities to the new entity name including zone."
+              "en": "If upgrading from v0.6.5 or lower, run setup again after AVR entity is configured and selected. Then provide the Remote's 4-digit PIN code below to automatically update the AVR entity in your activities to the new entity name including zone."
             }
           }
         }
