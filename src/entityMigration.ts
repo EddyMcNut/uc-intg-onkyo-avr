@@ -2,10 +2,10 @@
  * Entity Migration Utility
  * 
  * This class handles migration of entity names when the integration is upgraded
- * to include zone information in entity names (main, zone2, zone3).
+ * to include zone information in entity names (main, zone2, zone3) and to correct the incorrect original integration ID.
  * 
- * Previous format: "TX-RZ50 192.168.2.103"
- * New format: "TX-RZ50 192.168.2.103 main"
+ * Previous format v0.6.5-: "TX-RZ50 192.168.2.103"
+ * New format v0.7.0+: "TX-RZ50 192.168.2.103 main"
  * 
  * Based on the UC Remote Two Toolkit replace-entity implementation:
  * https://github.com/albaintor/UC-Remote-Two-Toolkit/tree/main/src/app/replace-entity
@@ -73,39 +73,11 @@ export class EntityMigration {
     this.config = config;
     this.remoteIp = remoteIp;
     this.remotePinCode = remotePinCode;
-    
-    // Auto-determine Remote API connection info
-    this.remoteBaseUrl = this.determineRemoteUrl();
+    this.remoteBaseUrl = `http://${this.remoteIp}`;
     
     this.buildMappings();
   }
 
-  /**
-   * Determine the Remote's API base URL from environment
-   * UC Remote runs integrations in a container and the Remote's API is accessible at localhost
-   */
-  private determineRemoteUrl(): string {
-    // UC Remote Core API runs on port 80 (default) or can be accessed via localhost
-    // When the integration runs, the Remote's API is at http://localhost (within the container network)
-    // or via the host's IP on port 80/443
-    
-    // Try to get from environment first
-    const apiUrl = process.env.UC_API_URL || process.env.CORE_API_URL;
-    if (apiUrl) {
-      console.log(`Using API URL from environment: ${apiUrl}`);
-      return apiUrl;
-    }
-    
-    // Default: Remote's Core API is at localhost:80 (from integration's perspective)
-    // The integration runs in a container on the Remote, and the Core API is accessible at localhost
-    return 'http://localhost';
-  }
-
-  /**
-   * Register with the Remote to get an API key using PIN authentication
-   * Based on UC Remote Two Toolkit's registration flow
-   * Deletes any existing key with the same name first
-   */
   private async registerWithRemote(): Promise<boolean> {
     if (!this.remoteIp || !this.remotePinCode) {
       console.log('Migration: No Remote IP or PIN provided, skipping Remote API registration');
@@ -201,8 +173,6 @@ export class EntityMigration {
 
     // Create mappings for each physical AVR
     for (const [physicalKey, zones] of avrsByPhysical.entries()) {
-      // Check if this physical AVR was configured without zones (old format)
-      // The old format would have been just "model ip" without zone suffix
       const oldEntityId = physicalKey;
       
       // Find the main zone (or first zone if no main) for this physical AVR
