@@ -95,7 +95,15 @@ export class OnkyoCommandSender {
           // Convert to EISCP: some models use 0.5 dB steps (×2), others show EISCP value directly
           const eiscpValue = useHalfDbSteps ? avrDisplayValue * 2 : avrDisplayValue;
           const hexVolume = eiscpValue.toString(16).toUpperCase().padStart(2, "0");
-          await this.eiscp.raw(`MVL${hexVolume}`);
+          
+          // Use zone-specific volume command prefix
+          let volumePrefix = "MVL"; // main zone
+          if (zone === "zone2") {
+            volumePrefix = "ZVL";
+          } else if (zone === "zone3") {
+            volumePrefix = "VL3";
+          }
+          await this.eiscp.raw(`${volumePrefix}${hexVolume}`);
         }
         break;
       case uc.MediaPlayerCommands.ChannelUp:
