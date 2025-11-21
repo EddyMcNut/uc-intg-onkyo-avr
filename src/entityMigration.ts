@@ -4,7 +4,7 @@
  * This class handles migration of entity names when the integration is upgraded
  * to include zone information in entity names (main, zone2, zone3) and to correct the incorrect original integration ID.
  * 
- * Previous format v0.6.5-: "TX-RZ50 192.168.2.103"
+ * Previous format v0.6.5 and lower: "TX-RZ50 192.168.2.103"
  * New format v0.7.0+: "TX-RZ50 192.168.2.103 main"
  * 
  * Based on the UC Remote Two Toolkit replace-entity implementation:
@@ -62,25 +62,23 @@ export class EntityMigration {
   private mappings: EntityMapping[] = [];
   private remoteBaseUrl: string;
   private apiToken: string = '';
-  private remoteIp?: string;
   private remotePinCode?: string;
 
   private oldIntegrationId: string = "uc_onkyo-avr_driver_custom.main";
   private newIntegrationId: string = "onkyo_avr_custom_driver.main";
 
-  constructor(driver: uc.IntegrationAPI, config: OnkyoConfig, remoteIp?: string, remotePinCode?: string, integrationId?: string) {
+  constructor(driver: uc.IntegrationAPI, config: OnkyoConfig, remotePinCode?: string) {
     this.driver = driver;
     this.config = config;
-    this.remoteIp = remoteIp;
     this.remotePinCode = remotePinCode;
-    this.remoteBaseUrl = `http://${this.remoteIp}`;
+    this.remoteBaseUrl = "http://127.0.0.1";
     
     this.buildMappings();
   }
 
   private async registerWithRemote(): Promise<boolean> {
-    if (!this.remoteIp || !this.remotePinCode) {
-      console.log('Migration: No Remote IP or PIN provided, skipping Remote API registration');
+    if (!this.remotePinCode) {
+      console.log('Migration: No Remote PIN provided, skipping Remote API registration');
       return false;
     }
 
@@ -96,10 +94,10 @@ export class EntityMigration {
         'Accept': 'application/json'
       };
       
-      console.log(`Migration: Registering with Remote at ${this.remoteIp}...`);
+      console.log(`Migration: Registering with Remote at ${this.remoteBaseUrl}...`);
       
       // Step 1: Get list of existing API keys to check if our key exists
-      const listUrl = `http://${this.remoteIp}/api/auth/api_keys?page=1&limit=100`;
+      const listUrl = `${this.remoteBaseUrl}/api/auth/api_keys?page=1&limit=100`;
       const listResponse = await fetch(listUrl, {
         method: 'GET',
         headers
@@ -112,7 +110,7 @@ export class EntityMigration {
         for (const key of keys) {
           if (key.name === apiKeyName) {
             console.log(`Migration: Deleting existing API key "${apiKeyName}"...`);
-            const deleteUrl = `http://${this.remoteIp}/api/auth/api_keys/${key.key_id}`;
+            const deleteUrl = `${this.remoteBaseUrl}/api/auth/api_keys/${key.key_id}`;
             await fetch(deleteUrl, {
               method: 'DELETE',
               headers
@@ -122,7 +120,7 @@ export class EntityMigration {
       }
       
       // Step 3: Register new API key
-      const registerUrl = `http://${this.remoteIp}/api/auth/api_keys`;
+      const registerUrl = `${this.remoteBaseUrl}/api/auth/api_keys`;
       const response = await fetch(registerUrl, {
         method: 'POST',
         headers,
@@ -141,7 +139,7 @@ export class EntityMigration {
 
       const data = await response.json() as { api_key: string; valid_to: string };
       this.apiToken = data.api_key;
-      this.remoteBaseUrl = `http://${this.remoteIp}`;
+      this.remoteBaseUrl = `${this.remoteBaseUrl}`;
       
       console.log(`Migration: Successfully registered with Remote, API key valid until ${data.valid_to}`);
       return true;
@@ -217,7 +215,7 @@ export class EntityMigration {
     }
 
     // Register with Remote to get API access if IP and PIN provided
-    if (this.remoteIp && this.remotePinCode) {
+    if (this.remoteBaseUrl && this.remotePinCode) {
       const registered = await this.registerWithRemote();
       if (!registered) {
         console.log("Migration: Failed to register with Remote - migration cannot proceed");

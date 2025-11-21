@@ -185,26 +185,15 @@
         "field": {
           "label": {
             "value": {
-              "en": "If upgrading from single-zone to multi-zone, provide the Remote's IP address and 4-digit PIN code below to automatically update your activities. Leave empty to skip migration (old activities won't work with multi-zone entities)."
+              "en": "If upgrading from v0.6.5 or lower, provide the Remote's 4-digit PIN code below to automatically update the AVR instance in your activities to the new entity name including zone."
             }
-          }
-        }
-      },
-      {
-        "id": "remoteIp",
-        "label": {
-          "en": "Remote IP Address (for entity migration)"
-        },
-        "field": {
-          "text": {
-            "value": ""
           }
         }
       },
       {
         "id": "remotePinCode",
         "label": {
-          "en": "Remote 4-digit PIN code (for entity migration)"
+          "en": "Remote 4-digit PIN code (for AVR entity migration)"
         },
         "field": {
           "text": {
