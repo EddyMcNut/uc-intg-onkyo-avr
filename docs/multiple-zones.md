@@ -18,6 +18,8 @@ As from v0.7.0, this integration can handle multiple zones for each configured A
 
 - As the integration offers you a full AVR entity per zone, you can use the slider to control the volume for a specific zone, just by selecting that zone entity in the [MediaWidget](volume.md#slider). However the slider and volume buttons can only work if in your AVR the zone is set to have variable volume level, not a fixed volume level.
 
-*note: when you have configured multiple zones, it takes a couple of seconds longer to recover from a reboot of the UC Remote compared to just having only the main zone configured*
+*note 1: when you have configured multiple zones, it takes a couple of seconds longer to recover from a reboot of the UC Remote compared to just having only the main zone configured*
+
+*note 2: when updating from a lower version to v0.7.0 it breaks the mappings in activities, [see this step-by-step guide](./v070-migration.md) for an easy fix.*
 
 [back to main README](../README.md#multiple-zones)
