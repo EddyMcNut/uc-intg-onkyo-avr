@@ -14,7 +14,7 @@ As from v0.7.0, this integration can handle multiple zones for each configured A
 
 - For each configured zone, the integration will offer you a complete AVR entity which you can use in your activities. Consult the manual of your AVR to learn about any limitations which apply for your model. For example most models only allow specific inputs to be assigned to a zone, this integration does not know that so it is up to you to determine what functionality is available for you and configure it in the activity.
 
-- Most models allow to switch one zone 2 or 3 while the main zone is in standby, as this integration creates an entity per zone you can just select that entity for an activity, adding all zones in one activity is also possible of course.
+- Most models allow to switch on zone 2 or 3 while the main zone is in standby, as this integration creates an entity per zone you can just select that entity for an activity, adding all zones in one activity is also possible of course.
 
 - As the integration offers you a full AVR entity per zone, you can use the slider to control the volume for a specific zone, just by selecting that zone entity in the [MediaWidget](volume.md#slider). However the slider and volume buttons can only work if in your AVR the zone is set to have variable volume level, not a fixed volume level.
 
