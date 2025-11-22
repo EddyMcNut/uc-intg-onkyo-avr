@@ -12,7 +12,7 @@ The two breaking changes are:
 
 ## Detailed step-by-step guide
 
-My aim is to make it as easy as possible to update to v0.7.0. Kudos to [Albaintor](https://github.com/albaintor/UC-Remote-Two-Toolkit) for creating an awesome toolkit! I added a part of that code to this integration to make the below stuff possible. 
+Kudos to [Albaintor](https://github.com/albaintor/UC-Remote-Two-Toolkit) for creating an awesome toolkit! I added a manupilated part of Albaintor's code to this integration to make the below stuff possible, my aim is to make the update to v0.7.0 as smooth as possible. 
 
 I have performed this several times (by installing backup and v0.6.5 and then updating again) and it worked fine every time. I also used the new entities a couple of days including reboots of the remote and it worked as expected with just one remark: when you have configured multilpe zones for your AVR(s), the integration needs more time to recover after a reboot of the remote compared with just having one zone.
 
