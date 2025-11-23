@@ -791,8 +791,7 @@ export const eiscpCommands = {
         "8": { name: "8-in-direct-mode", description: "sets 8 in Direct Tuning Mode" },
         "9": { name: "9-in-direct-mode", description: "sets 9 in Direct Tuning Mode" },
         nnnnn: {
-          description:
-            "sets Directly Tuning Frequency (FM nnn.nn MHz / AM nnnnn kHz / SR nnnnn ch)\nput 0 in the first two digits of nnnnn at SR"
+          description: "sets Directly Tuning Frequency (FM nnn.nn MHz / AM nnnnn kHz / SR nnnnn ch)\nput 0 in the first two digits of nnnnn at SR"
         },
         DIRECT: { name: "direct", description: "starts/restarts Direct Tuning Mode" },
         UP: { name: "up", description: "sets Tuning Frequency Wrap-Around Up" },
@@ -1070,8 +1069,7 @@ export const eiscpCommands = {
       description: "NET/USB Artist Name Info",
       values: {
         nnnnnnnnnn: {
-          description:
-            "NET/USB Artist Name (variable-length, 64 Unicode letters [UTF-8 encoded] max , for Network Control only)"
+          description: "NET/USB Artist Name (variable-length, 64 Unicode letters [UTF-8 encoded] max , for Network Control only)"
         },
         QSTN: { name: "query", description: "gets iPod Artist Name" }
       }
@@ -1081,8 +1079,7 @@ export const eiscpCommands = {
       description: "NET/USB Album Name Info",
       values: {
         nnnnnnn: {
-          description:
-            "NET/USB Album Name (variable-length, 64 Unicode letters [UTF-8 encoded] max , for Network Control only)"
+          description: "NET/USB Album Name (variable-length, 64 Unicode letters [UTF-8 encoded] max , for Network Control only)"
         },
         QSTN: { name: "query", description: "gets iPod Album Name" }
       }
@@ -1092,8 +1089,7 @@ export const eiscpCommands = {
       description: "NET/USB Title Name",
       values: {
         nnnnnnnnnn: {
-          description:
-            "NET/USB Title Name (variable-length, 64 Unicode letters [UTF-8 encoded] max , for Network Control only)"
+          description: "NET/USB Title Name (variable-length, 64 Unicode letters [UTF-8 encoded] max , for Network Control only)"
         },
         QSTN: { name: "query", description: "gets HD Radio Title" }
       }
@@ -1189,8 +1185,7 @@ export const eiscpCommands = {
             "waiting Keyboard Input\nll -> category\n 00: Off ( Exit Keyboard Input )\n 01: User Name\n 02: Password\n 03: Artist Name\n 04: Album Name\n 05: Song Name\n 06: Station Name\n 07: Tag Name\n 08: Artist or Song\n 09: Episode Name\n 0A: Pin Code (some digit Number [0-9])\n 0B: User Name (available ISO 8859-1 character set)\n 0C: Password (available ISO 8859-1 character set)"
         },
         nnnnnnnnn: {
-          description:
-            'set Keyboard Input letter\n"nnnnnnnn" is variable-length, 128 Unicode letters [UTF-8 encoded] max'
+          description: 'set Keyboard Input letter\n"nnnnnnnn" is variable-length, 128 Unicode letters [UTF-8 encoded] max'
         }
       }
     },

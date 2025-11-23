@@ -10,11 +10,11 @@
 import debugModule from "debug";
 
 const log = {
-  msgTrace: debugModule("onkyo-avr:msg"),
-  debug: debugModule("onkyo-avr:debug"),
-  info: debugModule("onkyo-avr:info"),
-  warn: debugModule("onkyo-avr:warn"),
-  error: debugModule("onkyo-avr:error")
+  msgTrace: debugModule("onkyo_avr:msg"),
+  debug: debugModule("onkyo_avr:debug"),
+  info: debugModule("onkyo_avr:info"),
+  warn: debugModule("onkyo_avr:warn"),
+  error: debugModule("onkyo_avr:error")
 };
 
 export default log;

@@ -1,6 +1,6 @@
 {
-  "driver_id": "onkyo-avr",
-  "version": "0.6.5",
+  "driver_id": "onkyo_avr",
+  "version": "0.7.0",
   "min_core_api": "0.20.0",
   "name": { "en": "Onkyo AVR" },
   "icon": "uc:music",
@@ -134,6 +134,37 @@
         }
       },
       {
+        "id": "zoneCount",
+        "label": {
+          "en": "Number of zones to configure"
+        },
+        "field": {
+          "dropdown": {
+            "value": "1",
+            "items": [
+              {
+                "id": "1",
+                "label": {
+                  "en": "1 zone (Main only)"
+                }
+              },
+              {
+                "id": "2",
+                "label": {
+                  "en": "2 zones (Main + Zone 2)"
+                }
+              },
+              {
+                "id": "3",
+                "label": {
+                  "en": "3 zones (Main + Zone 2 + Zone 3)"
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
         "id": "infoTwo",
         "label": {
           "en": "Not auto discoverable? Adjust on-sequence!"
@@ -143,6 +174,30 @@
             "value": {
               "en": "If your AVR is not auto-discoverable, you may need to adjust the on-sequence settings of your Activities to ensure proper communication. Some models disconnect during power on, in that case you need to add a delay between 'AVR switch on' and the next AVR command of approx 5 seconds."
             }
+          }
+        }
+      },
+      {
+        "id": "infoThree",
+        "label": {
+          "en": "Entity migration (multi-zone upgrade)"
+        },
+        "field": {
+          "label": {
+            "value": {
+              "en": "If upgrading from v0.6.5 or lower, run setup again after AVR entity is configured and selected. Then provide the Remote's 4-digit PIN code below to automatically update the AVR entity in your activities to the new entity name including zone. This is a one-time action."
+            }
+          }
+        }
+      },
+      {
+        "id": "remotePinCode",
+        "label": {
+          "en": "Remote 4-digit PIN code (for AVR entity migration)"
+        },
+        "field": {
+          "text": {
+            "value": ""
           }
         }
       }

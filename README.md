@@ -7,6 +7,10 @@ Onkyo AVR custom integration for Unfolded Circle remotes.
 [![Discord](https://img.shields.io/badge/Discord-Join%20Chat-5865F2?logo=discord&logoColor=white)](https://discord.gg/zGVYf58)
 [![Unfolded Community](https://img.shields.io/badge/Unfolded-Community-orange?logo=discourse&logoColor=white)](https://unfolded.community/)
 
+## ⚠️ Disclaimer ⚠️
+
+You use this integration at your own risk!
+
 ## Kudos
 
 [Kudos](./docs/kudos.md)
@@ -15,9 +19,13 @@ Onkyo AVR custom integration for Unfolded Circle remotes.
 
 Read this readme completely, it contains some tips for known issues and it also explains how to use `Input source` in a flexibale way so you can send a lot of different commands to your AVR.
 
-Your Onkyo AVR(s) needs to be ON or STANDBY, if it is disconnected from power (off) this integration will fail. If your AVR has been disconnected from power, it could be that you first have to switch on your AVR manually one time before network commands work again (depends on the model), waking up after STANDBY should then work again.
+- Your Onkyo AVR(s) needs a fixed IP address.
+- Your Onkyo AVR(s) needs a wired network connection.
+- Your Onkyo AVR(s) needs to be ON or STANDBY.
+- Your UC Remote needs to have `New reconnect logic` enabled.
+    ![](./screenshots/new-reconnect-logic.png)
 
-Make sure your AVR has a fixed IP address.
+If your AVR is disconnected from power (off) this integration will fail. If your AVR has been disconnected from power, it could be that you first have to switch on your AVR manually one time before network commands work again (depends on the model), waking up after STANDBY should then work again.
 
 ## Reported to work on different brands and models
 
@@ -47,9 +55,9 @@ Users report it also to work with:
 
 [Install new version](./docs/new-version.md)
 
-## Multiple AVRs
+## Migrate from pre-v.0.7.0 to v.0.7.0+
 
-[Multiple AVRs](./docs/multiple-avrs.md)
+[Migrate from pre-v.0.7.0 to v.0.7.0+](./docs/v070-migration.md)
 
 ## Album Art
 
@@ -67,13 +75,13 @@ Users report it also to work with:
 
 [Volume](./docs/volume.md)
 
+## Slider
+
+[Slider](./docs/volume.md#slider)
+
 ## Listening modes
 
 [Listening modes](./docs/listening-modes.md)
-
-## Raw messages
-
-[Raw messages](./docs/raw.md)
 
 ## Example activities
 
@@ -84,11 +92,22 @@ Users report it also to work with:
 - `Home` \ `Customise your remote` Add your new Activity to a page and now you can give it a try on the awesome Unfolded Circle Remote!
 - or, when not created an activity yet: `Home` \ `Customise your remote` and just add your AVR, in that case physical buttons are mapped.
 
+## Multiple AVRs
+
+[Multiple AVRs](./docs/multiple-avrs.md)
+
+## Multiple zones
+
+[Multiple zones](./docs/multiple-zones.md)
+
+## Raw messages
+
+[Raw messages](./docs/raw.md)
+
 ## Collect logs
 
 [Collect logs](./docs/collect-logs.md)
 
 ## Stuff to do / backlog
 
-- Align and improve logging.
-- The code is partly ready to deal with different zones, but that still needs some attention before that will actually work.
+- show AV info

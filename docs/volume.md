@@ -7,6 +7,7 @@ The AVR itself may display the volume as dB (relative) or as an absolute number,
 ### Volume Encoding in eISCP:
 
 The volume command uses a range of 0-200 to represent volume levels from 0.0 to 100.0 in 0.5 steps. Why This Design?
+
 - AVR Precision: Many Onkyo/Integra receivers can be configured to adjust volume in 0.5 dB increments for finer control.
 - Protocol Flexibility: Using 0-200 range allows the protocol to handle both 0.5 dB and 1 dB step configurations with a single integer-based command.
 - Backward Compatibility: The protocol can support different AVR models with different volume ranges and step sizes.
@@ -43,6 +44,6 @@ If you already have a Media Widget in that activity for a different device, let'
 
 Now you can control the AVR volume with the Slider.
 
-*note: after installing a new version of the integration or after a reboot of the remote, it might be needed to close screen on the remote and enter the already active activity again to get the slider to work*
+_note: after installing a new version of the integration or after a reboot of the remote, it might be needed to close screen on the remote and enter the already active activity again to get the slider to work_
 
 [back to main README](../README.md#volume)

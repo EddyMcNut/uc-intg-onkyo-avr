@@ -10,6 +10,6 @@
 
   ![](../screenshots/albumArtNo.png)
 
-*note: after installing a new version of the integration or after a reboot of the remote, it might be needed to close screen on the remote and enter the already active activity again to get the MediaWidget to work, hit next to go to the next song and trigger refresh of the album art*
+_note: after installing a new version of the integration or after a reboot of the remote, it might be needed to close screen on the remote and enter the already active activity again to get the MediaWidget to work, hit next to go to the next song and trigger refresh of the album art_
 
-  [back to main README](../README.md#album-art)
+[back to main README](../README.md#album-art)

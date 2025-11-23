@@ -2,8 +2,20 @@ import * as uc from "@unfoldedcircle/integration-api";
 import { EiscpDriver } from "./eiscp.js";
 import { DEFAULT_QUEUE_THRESHOLD, OnkyoConfig } from "./configManager.js";
 
-const integrationName = "Onkyo-Integration (sender): ";
+const integrationName = "Onkyo-Integration (sender):";
 let lastCommandTime = 0;
+
+// Security: Maximum input lengths
+const MAX_LENGTHS = {
+  USER_COMMAND: 250,      // input-selector, listening-mode, etc.
+  RAW_COMMAND: 20        // raw MVL20, etc.
+};
+
+// Security: Valid character patterns
+const PATTERNS = {
+  USER_COMMAND: /^[a-z0-9\-\s.:=]+$/i,  // Letters, numbers, hyphens, spaces, delimiters
+  RAW_COMMAND: /^[A-Z0-9]+$/             // Uppercase letters and numbers only
+};
 
 export class OnkyoCommandSender {
   private driver: uc.IntegrationAPI;
@@ -16,11 +28,9 @@ export class OnkyoCommandSender {
     this.eiscp = eiscp;
   }
 
-  async sharedCmdHandler(
-    entity: uc.Entity,
-    cmdId: string,
-    params?: { [key: string]: string | number | boolean }
-  ): Promise<uc.StatusCodes> {
+  async sharedCmdHandler(entity: uc.Entity, cmdId: string, params?: { [key: string]: string | number | boolean }): Promise<uc.StatusCodes> {
+    const zone = this.config.avrs?.[0]?.zone || "main";
+
     try {
       await this.eiscp.waitForConnect();
     } catch (err) {
@@ -41,32 +51,35 @@ export class OnkyoCommandSender {
 
     console.log("%s [%s] media-player command request: %s", integrationName, entity.id, cmdId, params || "");
 
+    // Helper function to format command with zone prefix
+    const formatCommand = (cmd: string): string => {
+      return zone === "main" ? cmd : `${zone}.${cmd}`;
+    };
+
     const now = Date.now();
     switch (cmdId) {
       case uc.MediaPlayerCommands.On:
-        await this.eiscp.command("system-power on");
+        await this.eiscp.command(formatCommand("system-power on"));
         break;
       case uc.MediaPlayerCommands.Off:
-        await this.eiscp.command("system-power standby");
+        await this.eiscp.command(formatCommand("system-power standby"));
         break;
       case uc.MediaPlayerCommands.Toggle:
-        entity.attributes?.state === uc.MediaPlayerStates.On
-          ? await this.eiscp.command("system-power standby")
-          : await this.eiscp.command("system-power on");
+        entity.attributes?.state === uc.MediaPlayerStates.On ? await this.eiscp.command(formatCommand("system-power standby")) : await this.eiscp.command(formatCommand("system-power on"));
         break;
       case uc.MediaPlayerCommands.MuteToggle:
-        await this.eiscp.command("audio-muting toggle");
+        await this.eiscp.command(formatCommand("audio-muting toggle"));
         break;
       case uc.MediaPlayerCommands.VolumeUp:
         if (now - lastCommandTime > (this.config.queueThreshold ?? DEFAULT_QUEUE_THRESHOLD)) {
           lastCommandTime = now;
-          await this.eiscp.command("volume level-up-1db-step");
+          await this.eiscp.command(formatCommand("volume level-up-1db-step"));
         }
         break;
       case uc.MediaPlayerCommands.VolumeDown:
         if (now - lastCommandTime > (this.config.queueThreshold ?? DEFAULT_QUEUE_THRESHOLD)) {
           lastCommandTime = now;
-          await this.eiscp.command("volume level-down-1db-step");
+          await this.eiscp.command(formatCommand("volume level-down-1db-step"));
         }
         break;
       case uc.MediaPlayerCommands.Volume:
@@ -82,55 +95,90 @@ export class OnkyoCommandSender {
           // Convert to EISCP: some models use 0.5 dB steps (×2), others show EISCP value directly
           const eiscpValue = useHalfDbSteps ? avrDisplayValue * 2 : avrDisplayValue;
           const hexVolume = eiscpValue.toString(16).toUpperCase().padStart(2, "0");
-          await this.eiscp.raw(`MVL${hexVolume}`);
+          
+          // Use zone-specific volume command prefix
+          let volumePrefix = "MVL"; // main zone
+          if (zone === "zone2") {
+            volumePrefix = "ZVL";
+          } else if (zone === "zone3") {
+            volumePrefix = "VL3";
+          }
+          await this.eiscp.raw(`${volumePrefix}${hexVolume}`);
         }
         break;
       case uc.MediaPlayerCommands.ChannelUp:
-        await this.eiscp.command("preset up");
+        await this.eiscp.command(formatCommand("preset up"));
         break;
       case uc.MediaPlayerCommands.ChannelDown:
-        await this.eiscp.command("preset down");
+        await this.eiscp.command(formatCommand("preset down"));
         break;
       case uc.MediaPlayerCommands.SelectSource:
         if (params?.source) {
           if (typeof params.source === "string" && params.source.toLowerCase().startsWith("raw")) {
             const rawCmd = (params.source as string).substring(3).trim().toUpperCase();
+            
+            // Security: Validate raw command length
+            if (rawCmd.length > MAX_LENGTHS.RAW_COMMAND) {
+              console.error("%s [%s] Raw command too long (%d chars), rejecting", integrationName, entity.id, rawCmd.length);
+              return uc.StatusCodes.BadRequest;
+            }
+            
+            // Security: Validate raw command characters (alphanumeric only)
+            if (!PATTERNS.RAW_COMMAND.test(rawCmd)) {
+              console.error("%s [%s] Raw command contains invalid characters, rejecting", integrationName, entity.id);
+              return uc.StatusCodes.BadRequest;
+            }
+            
             console.error("%s [%s] sending raw command: %s", integrationName, entity.id, rawCmd);
             await this.eiscp.raw(rawCmd);
           } else if (typeof params.source === "string") {
-            await this.eiscp.command(`${params.source.toLowerCase()}`);
+            const userCmd = params.source.toLowerCase();
+            
+            // Security: Validate user command length
+            if (userCmd.length > MAX_LENGTHS.USER_COMMAND) {
+              console.error("%s [%s] Command too long (%d chars), rejecting", integrationName, entity.id, userCmd.length);
+              return uc.StatusCodes.BadRequest;
+            }
+            
+            // Security: Validate user command characters
+            if (!PATTERNS.USER_COMMAND.test(userCmd)) {
+              console.error("%s [%s] Command contains invalid characters, rejecting", integrationName, entity.id);
+              return uc.StatusCodes.BadRequest;
+            }
+            
+            await this.eiscp.command(formatCommand(userCmd));
           }
         }
         break;
       case uc.MediaPlayerCommands.PlayPause:
-        await this.eiscp.command("network-usb play");
+        await this.eiscp.command(formatCommand("network-usb play"));
         break;
       case uc.MediaPlayerCommands.Next:
-        await this.eiscp.command("network-usb trup");
+        await this.eiscp.command(formatCommand("network-usb trup"));
         break;
       case uc.MediaPlayerCommands.Previous:
-        await this.eiscp.command("network-usb trdn");
+        await this.eiscp.command(formatCommand("network-usb trdn"));
         break;
       case uc.MediaPlayerCommands.Settings:
-        await this.eiscp.command("setup menu");
+        await this.eiscp.command(formatCommand("setup menu"));
         break;
       case uc.MediaPlayerCommands.Home:
-        await this.eiscp.command("setup exit");
+        await this.eiscp.command(formatCommand("setup exit"));
         break;
       case uc.MediaPlayerCommands.CursorEnter:
-        await this.eiscp.command("setup enter");
+        await this.eiscp.command(formatCommand("setup enter"));
         break;
       case uc.MediaPlayerCommands.CursorUp:
-        await this.eiscp.command("setup up");
+        await this.eiscp.command(formatCommand("setup up"));
         break;
       case uc.MediaPlayerCommands.CursorDown:
-        await this.eiscp.command("setup down");
+        await this.eiscp.command(formatCommand("setup down"));
         break;
       case uc.MediaPlayerCommands.CursorLeft:
-        await this.eiscp.command("setup left");
+        await this.eiscp.command(formatCommand("setup left"));
         break;
       case uc.MediaPlayerCommands.CursorRight:
-        await this.eiscp.command("setup right");
+        await this.eiscp.command(formatCommand("setup right"));
         break;
       default:
         return uc.StatusCodes.NotImplemented;
