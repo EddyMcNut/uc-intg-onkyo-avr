@@ -55,6 +55,10 @@ Users report it also to work with:
 
 [Install new version](./docs/new-version.md)
 
+## Migrate from pre-v.0.7.0 to v.0.7.0+
+
+[Migrate from pre-v.0.7.0 to v.0.7.0+](./docs/v070-migration.md)
+
 ## Album Art
 
 [Album art](./docs/album-art.md)
@@ -70,6 +74,10 @@ Users report it also to work with:
 ## Volume
 
 [Volume](./docs/volume.md)
+
+## Slider
+
+[Slider](./docs/volume.md#slider)
 
 ## Listening modes
 

@@ -20,4 +20,6 @@ If your AVR was autodiscovered, the name will be the same when you let it be aut
 6. in the new version, **start setup** and make sure that the selected AVR entity has the exact same name as in the previous version (see step 3)
 7. done!
 
+[Migrate from pre-v.0.7.0 to v.0.7.0+](v070-migration.md)
+
 [back to main README](../README.md#install-new-version)
