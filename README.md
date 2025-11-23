@@ -102,5 +102,4 @@ Users report it also to work with:
 
 ## Stuff to do / backlog
 
-- Align and improve logging.
-- The code is partly ready to deal with different zones, but that still needs some attention before that will actually work.
+- show AV info
