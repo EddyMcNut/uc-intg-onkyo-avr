@@ -8,7 +8,7 @@ Version v0.7.0 however has two changes compared to lower versions which break th
 
 The two breaking changes are:
 - v0.7.0 offers new functionality which enables you to control the zones in your AVR, this changes the AVR entity name
-- correcting the interal integration ID: I made a mistake here in v0.0.1 which gets fixed in version v.0.7.0 because I wanted to offer an easy fix breaking the entity name anyway
+- correcting the interal integration ID: I made a mistake here in v0.0.1 which gets fixed in version v.0.7.0 because I wanted to offer an easy fix for breaking the entity name anyway
 
 ## Detailed step-by-step guide
 
