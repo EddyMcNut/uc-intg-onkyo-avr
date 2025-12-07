@@ -151,14 +151,14 @@ export class OnkyoCommandReceiver {
             break;
           }
           case "DSN": {
-            setAvrCurrentSource("dab", this.eiscpInstance, eventZone, entityId, this.driver);
+            // setAvrCurrentSource("dab", this.eiscpInstance, eventZone, entityId, this.driver);
             nowPlaying.station = avrUpdates.argument.toString();
             nowPlaying.artist = "DAB Radio";
             console.log("%s [%s] DAB station set to: %s", integrationName, entityId, avrUpdates.argument.toString());
             break;
           }
           case "RDS": {
-            setAvrCurrentSource("fm", this.eiscpInstance, eventZone, entityId, this.driver);
+            // setAvrCurrentSource("fm", this.eiscpInstance, eventZone, entityId, this.driver);
             nowPlaying.station = avrUpdates.argument.toString();
             nowPlaying.artist = "FM Radio";
             // console.log(`${integrationName} [${entityId}] RDS set to: ${String(avrUpdates.argument)}`);
@@ -174,7 +174,7 @@ export class OnkyoCommandReceiver {
             break;
           }
           case "metadata": {
-            setAvrCurrentSource("net", this.eiscpInstance, eventZone, entityId, this.driver);
+            // setAvrCurrentSource("net", this.eiscpInstance, eventZone, entityId, this.driver);
             if (typeof avrUpdates.argument === "object" && avrUpdates.argument !== null) {
               nowPlaying.title = (avrUpdates.argument as Record<string, string>).title || "unknown";
               nowPlaying.album = (avrUpdates.argument as Record<string, string>).album || "unknown";

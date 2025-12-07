@@ -13,7 +13,7 @@ import async from "async";
 
 import EventEmitter from "events";
 import { eiscpCommands } from "./eiscp-commands.js";
-import { avrCurrentSource, setAvrCurrentSource } from "./state.js";
+import { avrCurrentSource } from "./state.js";
 import { DEFAULT_QUEUE_THRESHOLD } from "./configManager.js";
 const COMMANDS = eiscpCommands.commands;
 const COMMAND_MAPPINGS = eiscpCommands.command_mappings;
