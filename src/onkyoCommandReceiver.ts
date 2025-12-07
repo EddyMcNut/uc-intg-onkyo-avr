@@ -175,7 +175,7 @@ export class OnkyoCommandReceiver {
           }
           case "metadata": {
             // Only update metadata if we're already on a network source (don't let metadata override input-selector)
-            if (["spotify", "airplay", "net"].includes(avrCurrentSource)) {
+            if (["spotify", "airplay", "net,network"].includes(avrCurrentSource)) {
               if (typeof avrUpdates.argument === "object" && avrUpdates.argument !== null) {
                 nowPlaying.title = (avrUpdates.argument as Record<string, string>).title || "unknown";
                 nowPlaying.album = (avrUpdates.argument as Record<string, string>).album || "unknown";
@@ -190,7 +190,7 @@ export class OnkyoCommandReceiver {
         switch (avrCurrentSource) {
           case "spotify":
           case "airplay":
-          case "net":
+          case "net,network":
             let trackId = `${nowPlaying.title}|${nowPlaying.album}|${nowPlaying.artist}`;
             if (trackId !== this.currentTrackId) {
               this.currentTrackId = trackId;
