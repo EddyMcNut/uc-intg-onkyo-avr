@@ -52,22 +52,21 @@ export class OnkyoCommandReceiver {
 
   async maybeUpdateImage(entityId: string) {
     if (!this.config.albumArtURL || this.config.albumArtURL === "na") return;
+
     let imageUrl = `http://${this.config.ip}/${this.config.albumArtURL}`;
-    if (this.lastTrackId !== this.currentTrackId) {
-      this.lastTrackId = this.currentTrackId;
-      let newHash = await this.getImageHash(imageUrl);
-      let attempts = 0;
-      while (newHash === this.lastImageHash && attempts < 3) {
-        attempts++;
-        await new Promise((resolve) => setTimeout(resolve, 500));
-        newHash = await this.getImageHash(imageUrl);
-      }
-      if (newHash !== this.lastImageHash) {
-        this.lastImageHash = newHash;
-        this.driver.updateEntityAttributes(entityId, {
-          [uc.MediaPlayerAttributes.MediaImageUrl]: imageUrl
-        });
-      }
+    let newHash = await this.getImageHash(imageUrl);
+    let attempts = 0;
+
+    while (newHash === this.lastImageHash && attempts < 3) {
+      attempts++;
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      newHash = await this.getImageHash(imageUrl);
+    }
+    if (newHash !== this.lastImageHash) {
+      this.lastImageHash = newHash;
+      this.driver.updateEntityAttributes(entityId, {
+        [uc.MediaPlayerAttributes.MediaImageUrl]: imageUrl
+      });
     }
   }
 
@@ -134,7 +133,7 @@ export class OnkyoCommandReceiver {
             break;
           }
           case "input-selector": {
-            setAvrCurrentSource(avrUpdates.argument.toString());
+            setAvrCurrentSource(avrUpdates.argument.toString(), this.eiscpInstance, eventZone, entityId, this.driver);
             this.driver.updateEntityAttributes(entityId, {
               [uc.MediaPlayerAttributes.Source]: avrUpdates.argument.toString()
             });
@@ -152,14 +151,14 @@ export class OnkyoCommandReceiver {
             break;
           }
           case "DSN": {
-            setAvrCurrentSource("dab");
+            setAvrCurrentSource("dab", this.eiscpInstance, eventZone, entityId, this.driver);
             nowPlaying.station = avrUpdates.argument.toString();
             nowPlaying.artist = "DAB Radio";
             console.log("%s [%s] DAB station set to: %s", integrationName, entityId, avrUpdates.argument.toString());
             break;
           }
           case "RDS": {
-            setAvrCurrentSource("fm");
+            setAvrCurrentSource("fm", this.eiscpInstance, eventZone, entityId, this.driver);
             nowPlaying.station = avrUpdates.argument.toString();
             nowPlaying.artist = "FM Radio";
             // console.log(`${integrationName} [${entityId}] RDS set to: ${String(avrUpdates.argument)}`);
@@ -175,7 +174,7 @@ export class OnkyoCommandReceiver {
             break;
           }
           case "metadata": {
-            setAvrCurrentSource("net");
+            setAvrCurrentSource("net", this.eiscpInstance, eventZone, entityId, this.driver);
             if (typeof avrUpdates.argument === "object" && avrUpdates.argument !== null) {
               nowPlaying.title = (avrUpdates.argument as Record<string, string>).title || "unknown";
               nowPlaying.album = (avrUpdates.argument as Record<string, string>).album || "unknown";
@@ -198,8 +197,8 @@ export class OnkyoCommandReceiver {
                 [uc.MediaPlayerAttributes.MediaTitle]: nowPlaying.title || "unknown",
                 [uc.MediaPlayerAttributes.MediaAlbum]: nowPlaying.album || "unknown"
               });
+              await this.maybeUpdateImage(entityId);
             }
-            await this.maybeUpdateImage(entityId);
             break;
           case "tuner":
           case "fm":

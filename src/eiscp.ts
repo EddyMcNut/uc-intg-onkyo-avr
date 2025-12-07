@@ -77,72 +77,33 @@ export class EiscpDriver extends EventEmitter {
 
   // Create a proper eISCP packet for UDP broadcast (discovery)
   private eiscp_packet(data: any): Buffer {
-    // Add ISCP header if not already present
     if (data.charAt(0) !== "!") {
       data = "!1" + data;
     }
-    // ISCP message
     const iscp_msg = Buffer.from(data + "\x0D\x0a");
-    // eISCP header
-    const header = Buffer.from([
-      73,
-      83,
-      67,
-      80, // magic
-      0,
-      0,
-      0,
-      16, // header size
-      0,
-      0,
-      0,
-      0, // data size
-      1,
-      0,
-      0,
-      0 // version + reserved
-    ]);
-    // write data size to eISCP header
+    const header = Buffer.from([73, 83, 67, 80, 0, 0, 0, 16, 0, 0, 0, 0, 1, 0, 0, 0]);
     header.writeUInt32BE(iscp_msg.length, 8);
     return Buffer.concat([header, iscp_msg]);
   }
 
-  // Extract message from eISCP packet (discovery response)
   private eiscp_packet_extract(packet: Buffer): string {
-    // Extract ASCII message from offset 18 to length-2
     return packet.toString("ascii", 18, packet.length - 2);
   }
 
-  private iscp_to_command(iscp_message: any) {
-    // Transform a low-level ISCP message to a high-level command
-    var command = iscp_message.slice(0, 3),
-      value = iscp_message.slice(3),
-      result: { command: string; argument: string | number | string[] | Record<string, string>; zone: string } = {
+  private iscp_to_command(command: string, value: string): { command: string; argument: string | number | string[] | Record<string, string>; zone: string } {
+      let result: { command: string; argument: string | number | string[] | Record<string, string>; zone: string } = {
         command: "undefined",
         argument: "undefined",
         zone: "main"
       };
 
-    // Detect zone from command prefix
-    // Zone 2 commands start with Z (ZPW, ZVL, ZMT, ZSL, etc.) or end with Z (TUZ)
-    // Zone 3 commands end with 3 (PW3, VL3, MT3, SL3, TU3, etc.)
+    // Detect zone from command prefix, Zone 2 commands start with Z (ZPW, ZVL, ZMT, ZSL, etc.) or end with Z (TUZ), Zone 3 commands end with 3 (PW3, VL3, MT3, SL3, TU3, etc.)
     if (command.charAt(0) === "Z" && command.length === 3) {
       result.zone = "zone2";
     } else if (command.charAt(2) === "Z" && command.length === 3) {
       result.zone = "zone2";
     } else if (command.charAt(2) === "3" && command.length === 3) {
       result.zone = "zone3";
-    }
-
-    value = String(value).replace(/[\x00-\x1F]/g, ""); // remove weird characters like \x1A
-
-    // Strip trailing ISCP messages for certain commands, move this to ondata?
-    if (["SLI", "SLZ", "SL3", "PRS", "AMT", "ZMT", "MT3", "MVL", "ZVL", "VL3"].includes(command)) {
-      const idx = value.indexOf("ISCP");
-      if (idx !== -1) {
-        value = value.substring(0, idx);
-      }
-      value = value.trim();
     }
 
     // console.log("%s RAW RECEIVE: [%s] %s %s", integrationName, result.zone, command, value);
@@ -193,7 +154,6 @@ export class EiscpDriver extends EventEmitter {
       return result;
     }
 
-    // move filter to ondata?
     if (avrCurrentSource === "fm" && command === "FLD" && value.slice(0, 12) !== "566F6C756D65") {
       let ascii = Buffer.from(value, "hex").toString("ascii");
       result.command = "RDS";
@@ -209,7 +169,6 @@ export class EiscpDriver extends EventEmitter {
     // Map zone-specific command codes back to main zone for lookup
     let lookupCommand = command;
     if (result.zone === "zone2") {
-      // Zone 2: ZVL->MVL, ZPW->PWR, ZMT->AMT, SLZ->SLI, TUZ->TUN
       const zone2ReverseMap: Record<string, string> = {
         ZVL: "MVL",
         ZPW: "PWR",
@@ -219,7 +178,6 @@ export class EiscpDriver extends EventEmitter {
       };
       lookupCommand = zone2ReverseMap[command] || command;
     } else if (result.zone === "zone3") {
-      // Zone 3: VL3->MVL, PW3->PWR, MT3->AMT, SL3->SLI, TU3->TUN
       const zone3ReverseMap: Record<string, string> = {
         VL3: "MVL",
         PW3: "PWR",
@@ -296,16 +254,12 @@ export class EiscpDriver extends EventEmitter {
           try {
             client.close();
           } catch {}
-          // Don't reject immediately - allow timeout to complete for graceful handling
-          // Only reject if timeout hasn't been set yet (meaning bind failed)
+          // Don't reject immediately - allow timeout to complete for graceful handling, Only reject if timeout hasn't been set yet (meaning bind failed)
           if (!timeout_timer) {
             reject(err);
           }
         })
         .on("message", (packet: any, rinfo: any) => {
-          // Log ALL UDP packets, not just ECN
-          const raw = packet.toString("hex");
-          const ascii = packet.toString("ascii");
           const message = this.eiscp_packet_extract(packet);
           const command = message.slice(0, 3);
           if (command === "ECN") {
@@ -392,14 +346,26 @@ export class EiscpDriver extends EventEmitter {
       })
       .on("data", (data: any) => {
         var iscp_message = this.eiscp_packet_extract(data);
-        const command = iscp_message.slice(0, 3);
-
+        let command = iscp_message.slice(0, 3);
+        let value = iscp_message.slice(3);
+        
         // Ignore these messages
         if (["NMS", "NPB"].includes(command)) {
           return;
         }
 
-        const rawResult = this.iscp_to_command(iscp_message);
+        value = String(value).replace(/[\x00-\x1F]/g, ""); // remove weird characters like \x1A
+
+        // Strip trailing ISCP messages for certain commands, move this to ondata?
+        if (["SLI", "SLZ", "SL3", "PRS", "AMT", "ZMT", "MT3", "MVL", "ZVL", "VL3"].includes(command)) {
+          const idx = value.indexOf("ISCP");
+          if (idx !== -1) {
+            value = value.substring(0, idx);
+          }
+          value = value.trim();
+        }
+
+        const rawResult = this.iscp_to_command(command, value);
 
         // Only emit if rawResult is defined
         if (!rawResult) {
@@ -427,23 +393,6 @@ export class EiscpDriver extends EventEmitter {
 
   private async sendCommand(data: any, callback: any) {
     if (this.is_connected && this.eiscp) {
-      // Extract command and value for logging
-      const cleanData = data.replace(/^!1/, "");
-      const command = cleanData.slice(0, 3);
-      const value = cleanData.slice(3);
-
-      // Detect zone from command for logging
-      let zone = "main";
-      if (command.charAt(0) === "Z" && command.length === 3) {
-        zone = "zone2";
-      } else if (command.charAt(2) === "Z" && command.length === 3) {
-        zone = "zone2";
-      } else if (command.charAt(2) === "3" && command.length === 3) {
-        zone = "zone3";
-      }
-
-      // console.log("%s RAW SEND: [%s] %s %s", integrationName, zone, command, value);
-
       this.eiscp.write(this.eiscp_packet(data));
       setTimeout(callback, this.config.send_delay, false);
       return;
