@@ -19,8 +19,8 @@ export function setAvrCurrentSource(source: string, eiscpInstance?: any, zone?: 
         MediaTitle: "",
         MediaAlbum: "",
         MediaImageUrl: "",
-        MediaPosition: "",
-        MediaDuration: ""
+        MediaPosition: 0,
+        MediaDuration: 0
       });
     }
   } else {

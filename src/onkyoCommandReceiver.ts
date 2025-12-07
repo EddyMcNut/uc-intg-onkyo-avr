@@ -208,8 +208,8 @@ export class OnkyoCommandReceiver {
               [uc.MediaPlayerAttributes.MediaTitle]: nowPlaying.station || "unknown",
               [uc.MediaPlayerAttributes.MediaAlbum]: "",
               [uc.MediaPlayerAttributes.MediaImageUrl]: "",
-              [uc.MediaPlayerAttributes.MediaPosition]: "",
-              [uc.MediaPlayerAttributes.MediaDuration]: ""
+              [uc.MediaPlayerAttributes.MediaPosition]: 0,
+              [uc.MediaPlayerAttributes.MediaDuration]: 0
             });
             break;
           default:
@@ -218,8 +218,8 @@ export class OnkyoCommandReceiver {
               [uc.MediaPlayerAttributes.MediaTitle]: "",
               [uc.MediaPlayerAttributes.MediaAlbum]: "",
               [uc.MediaPlayerAttributes.MediaImageUrl]: "",
-              [uc.MediaPlayerAttributes.MediaPosition]: "",
-              [uc.MediaPlayerAttributes.MediaDuration]: ""
+              [uc.MediaPlayerAttributes.MediaPosition]: 0,
+              [uc.MediaPlayerAttributes.MediaDuration]: 0
             });
             break;
         }
