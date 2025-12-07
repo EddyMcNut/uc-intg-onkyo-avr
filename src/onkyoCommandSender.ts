@@ -31,6 +31,28 @@ export class OnkyoCommandSender {
   async sharedCmdHandler(entity: uc.Entity, cmdId: string, params?: { [key: string]: string | number | boolean }): Promise<uc.StatusCodes> {
     const zone = this.config.avrs?.[0]?.zone || "main";
 
+    // Check if connected, and trigger reconnection if needed
+    // This handles the case where user sends a command after wake-up from standby
+    // and the driver reconnection hasn't been triggered yet
+    if (!this.eiscp.connected) {
+      console.log("%s [%s] Command received while disconnected, triggering reconnection...", integrationName, entity.id);
+      try {
+        const avrConfig = this.config.avrs?.[0];
+        if (avrConfig) {
+          await this.eiscp.connect({
+            model: avrConfig.model,
+            host: avrConfig.ip,
+            port: avrConfig.port
+          });
+          await this.eiscp.waitForConnect(3000);
+          console.log("%s [%s] Reconnected on command", integrationName, entity.id);
+        }
+      } catch (connectErr) {
+        console.warn("%s [%s] Failed to reconnect on command: %s", integrationName, entity.id, connectErr);
+        // Fall through to retry logic below
+      }
+    }
+
     try {
       await this.eiscp.waitForConnect();
     } catch (err) {

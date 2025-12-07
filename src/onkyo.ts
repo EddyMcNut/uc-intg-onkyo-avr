@@ -66,6 +66,7 @@ export default class OnkyoDriver {
   private config: OnkyoConfig;
   private physicalConnections: Map<string, PhysicalAvrConnection> = new Map(); // One connection per physical AVR
   private avrInstances: Map<string, AvrInstance> = new Map(); // One instance per zone
+  private remoteInStandby: boolean = false; // Track Remote standby state
   private lastSetupData: {
     queueThreshold: number;
     albumArtURL: string;
@@ -327,8 +328,37 @@ export default class OnkyoDriver {
       console.log(`${integrationName} ===== CONNECT EVENT RECEIVED =====`);
       await this.handleConnect();
     });
+    this.driver.on(uc.Events.EnterStandby, async () => {
+      console.log(`${integrationName} ===== ENTER STANDBY EVENT RECEIVED =====`);
+      this.remoteInStandby = true;
+      console.log(`${integrationName} Remote entering standby, disconnecting AVR(s) to save battery...`);
+      
+      // Clear all reconnect timers
+      for (const [physicalAVR, connection] of this.physicalConnections) {
+        if (connection.reconnectTimer) {
+          console.log(`${integrationName} [${physicalAVR}] Clearing reconnect timer due to standby`);
+          clearTimeout(connection.reconnectTimer);
+          connection.reconnectTimer = undefined;
+        }
+      }
+      
+      // Disconnect all physical AVRs
+      for (const [physicalAVR, connection] of this.physicalConnections) {
+        if (connection.eiscp.connected) {
+          try {
+            console.log(`${integrationName} [${physicalAVR}] Disconnecting AVR for standby`);
+            connection.eiscp.disconnect();
+          } catch (err) {
+            console.warn(`${integrationName} [${physicalAVR}] Error disconnecting AVR:`, err);
+          }
+        }
+      }
+      
+      await this.driver.setDeviceState(uc.DeviceStates.Disconnected);
+    });
     this.driver.on(uc.Events.ExitStandby, async () => {
       console.log(`${integrationName} ===== EXIT STANDBY EVENT RECEIVED =====`);
+      this.remoteInStandby = false;
       await this.handleConnect();
     });
   }
@@ -412,6 +442,13 @@ export default class OnkyoDriver {
 
     physicalConnection.reconnectTimer = setTimeout(async () => {
       console.log(`${integrationName} [${physicalAVR}] Attempting scheduled reconnection...`);
+
+      // Don't reconnect if remote is in standby
+      if (this.remoteInStandby) {
+        console.log(`${integrationName} [${physicalAVR}] Remote in standby, canceling scheduled reconnection`);
+        physicalConnection.reconnectTimer = undefined;
+        return;
+      }
 
       if (physicalConnection.eiscp.connected) {
         console.log(`${integrationName} [${physicalAVR}] Already reconnected, canceling scheduled attempt`);
@@ -723,6 +760,9 @@ export default class OnkyoDriver {
     this.driver.on(uc.Events.SubscribeEntities, async (entityIds: string[]) => {
       console.log(`${integrationName} Entities subscribed: ${entityIds.join(', ')}`);
       
+      // Clear standby flag when entities are subscribed
+      this.remoteInStandby = false;
+      
       // Query state for all subscribed entities that are connected
       for (const entityId of entityIds) {
         const instance = this.avrInstances.get(entityId);
@@ -733,8 +773,28 @@ export default class OnkyoDriver {
             const queueThreshold = instance.config.queueThreshold ?? DEFAULT_QUEUE_THRESHOLD;
             console.log(`${integrationName} [${entityId}] Subscribed entity connected, querying state (threshold: ${queueThreshold}ms)`);
             await this.queryAvrState(entityId, physicalConnection.eiscp, "on subscribe");
+          } else if (physicalConnection) {
+            // Connection exists but not connected - try to reconnect
+            console.log(`${integrationName} [${entityId}] Subscribed entity not connected, attempting reconnection...`);
+            try {
+              await physicalConnection.eiscp.connect({
+                model: instance.config.model,
+                host: instance.config.ip,
+                port: instance.config.port
+              });
+              await physicalConnection.eiscp.waitForConnect(3000);
+              console.log(`${integrationName} [${physicalAVR}] Reconnected on subscription`);
+              
+              // Query state after reconnection
+              const queueThreshold = instance.config.queueThreshold ?? DEFAULT_QUEUE_THRESHOLD;
+              await this.queryAvrState(entityId, physicalConnection.eiscp, "after subscription reconnection");
+            } catch (err) {
+              console.warn(`${integrationName} [${physicalAVR}] Failed to reconnect on subscription:`, err);
+              // Schedule reconnection attempt
+              this.scheduleReconnect(physicalAVR, physicalConnection, instance.config);
+            }
           } else {
-            console.log(`${integrationName} [${entityId}] Subscribed entity not yet connected, waiting for Connect event`);
+            console.log(`${integrationName} [${entityId}] Subscribed entity has no connection yet, waiting for Connect event`);
           }
         } else {
           console.log(`${integrationName} [${entityId}] Subscribed entity has no instance yet, waiting for Connect event`);
