@@ -124,6 +124,14 @@ export class OnkyoCommandReceiver {
               [uc.MediaPlayerAttributes.Volume]: sliderValue
             });
             console.log("%s [%s] volume set to: %s", integrationName, entityId, sliderValue);
+
+            // Update volume sensor
+            const volumeSensorId = `${entityId}_volume_sensor`;
+            this.driver.updateEntityAttributes(volumeSensorId, {
+              [uc.SensorAttributes.State]: uc.SensorStates.On,
+              [uc.SensorAttributes.Value]: sliderValue
+            });
+            console.log("%s [%s] volume sensor updated to: %s%%", integrationName, volumeSensorId, sliderValue);
             break;
           }
           case "preset": {

@@ -299,7 +299,14 @@ export default class OnkyoDriver {
       const avrEntry = `${avrConfig.model} ${avrConfig.ip} ${avrConfig.zone}`;
       const mediaPlayerEntity = this.createMediaPlayerEntity(avrEntry, avrConfig.volumeScale ?? 100);
       this.driver.addAvailableEntity(mediaPlayerEntity);
-      console.log("%s [%s] Entity registered as available", integrationName, avrEntry);
+      console.log("%s [%s] Media player entity registered as available", integrationName, avrEntry);
+      
+      // Register sensor entities
+      const sensorEntities = this.createSensorEntities(avrEntry);
+      for (const sensor of sensorEntities) {
+        this.driver.addAvailableEntity(sensor);
+        console.log("%s [%s] Sensor entity registered: %s", integrationName, avrEntry, sensor.id);
+      }
     }
   }
 
@@ -404,6 +411,37 @@ export default class OnkyoDriver {
     );
     mediaPlayerEntity.setCmdHandler(this.sharedCmdHandler.bind(this));
     return mediaPlayerEntity;
+  }
+
+  private createSensorEntities(avrEntry: string): uc.Sensor[] {
+    const sensors: uc.Sensor[] = [];
+
+    // Volume Level Sensor
+    // NOTE: To add more sensors (e.g., bitrate, resolution, audio format, video format),
+    // follow this pattern: create a new Sensor instance with appropriate device class,
+    // attributes, and options, then push to sensors array. Update the corresponding
+    // case in onkyoCommandReceiver.ts to update the sensor attributes.
+    const volumeSensor = new uc.Sensor(
+      `${avrEntry}_volume_sensor`,
+      { en: `${avrEntry} Volume` },
+      {
+        attributes: {
+          [uc.SensorAttributes.State]: uc.SensorStates.Unknown,
+          [uc.SensorAttributes.Value]: 0,
+          // [uc.SensorAttributes.Unit]: "%"
+        },
+        deviceClass: uc.SensorDeviceClasses.Custom,
+        options: {
+          // [uc.SensorOptions.CustomUnit]: "%",
+          [uc.SensorOptions.Decimals]: 0,
+          [uc.SensorOptions.MinValue]: 0,
+          [uc.SensorOptions.MaxValue]: 200
+        }
+      }
+    );
+    sensors.push(volumeSensor);
+
+    return sensors;
   }
 
   private async queryAvrState(avrEntry: string, eiscp: EiscpDriver, context: string): Promise<void> {
