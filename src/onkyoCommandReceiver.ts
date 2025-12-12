@@ -52,22 +52,22 @@ export class OnkyoCommandReceiver {
 
   async maybeUpdateImage(entityId: string) {
     if (!this.config.albumArtURL || this.config.albumArtURL === "na") return;
+
     let imageUrl = `http://${this.config.ip}/${this.config.albumArtURL}`;
-    if (this.lastTrackId !== this.currentTrackId) {
-      this.lastTrackId = this.currentTrackId;
-      let newHash = await this.getImageHash(imageUrl);
-      let attempts = 0;
-      while (newHash === this.lastImageHash && attempts < 3) {
-        attempts++;
-        await new Promise((resolve) => setTimeout(resolve, 500));
-        newHash = await this.getImageHash(imageUrl);
-      }
-      if (newHash !== this.lastImageHash) {
-        this.lastImageHash = newHash;
-        this.driver.updateEntityAttributes(entityId, {
-          [uc.MediaPlayerAttributes.MediaImageUrl]: imageUrl
-        });
-      }
+    let newHash = await this.getImageHash(imageUrl);
+    let attempts = 0;
+
+    while (newHash === this.lastImageHash && attempts < 3) {
+      attempts++;
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      newHash = await this.getImageHash(imageUrl);
+    }
+    if (newHash !== this.lastImageHash) {
+      this.lastImageHash = newHash;
+      let newURL = `${imageUrl}?hash=${newHash}`; // this dummy quuery param forces refresh in UCR3
+      this.driver.updateEntityAttributes(entityId, {
+        [uc.MediaPlayerAttributes.MediaImageUrl]: newURL
+      });
     }
   }
 
@@ -125,6 +125,14 @@ export class OnkyoCommandReceiver {
               [uc.MediaPlayerAttributes.Volume]: sliderValue
             });
             console.log("%s [%s] volume set to: %s", integrationName, entityId, sliderValue);
+
+            // Update volume sensor
+            const volumeSensorId = `${entityId}_volume_sensor`;
+            this.driver.updateEntityAttributes(volumeSensorId, {
+              [uc.SensorAttributes.State]: uc.SensorStates.On,
+              [uc.SensorAttributes.Value]: sliderValue
+            });
+            console.log("%s [%s] volume sensor updated to: %s%%", integrationName, volumeSensorId, sliderValue);
             break;
           }
           case "preset": {
@@ -134,7 +142,7 @@ export class OnkyoCommandReceiver {
             break;
           }
           case "input-selector": {
-            setAvrCurrentSource(avrUpdates.argument.toString());
+            setAvrCurrentSource(avrUpdates.argument.toString(), this.eiscpInstance, eventZone, entityId, this.driver);
             this.driver.updateEntityAttributes(entityId, {
               [uc.MediaPlayerAttributes.Source]: avrUpdates.argument.toString()
             });
@@ -152,14 +160,14 @@ export class OnkyoCommandReceiver {
             break;
           }
           case "DSN": {
-            setAvrCurrentSource("dab");
+            setAvrCurrentSource("dab", this.eiscpInstance, eventZone, entityId, this.driver);
             nowPlaying.station = avrUpdates.argument.toString();
             nowPlaying.artist = "DAB Radio";
             console.log("%s [%s] DAB station set to: %s", integrationName, entityId, avrUpdates.argument.toString());
             break;
           }
           case "RDS": {
-            setAvrCurrentSource("fm");
+            setAvrCurrentSource("fm", this.eiscpInstance, eventZone, entityId, this.driver);
             nowPlaying.station = avrUpdates.argument.toString();
             nowPlaying.artist = "FM Radio";
             // console.log(`${integrationName} [${entityId}] RDS set to: ${String(avrUpdates.argument)}`);
@@ -175,11 +183,13 @@ export class OnkyoCommandReceiver {
             break;
           }
           case "metadata": {
-            setAvrCurrentSource("net");
-            if (typeof avrUpdates.argument === "object" && avrUpdates.argument !== null) {
-              nowPlaying.title = (avrUpdates.argument as Record<string, string>).title || "unknown";
-              nowPlaying.album = (avrUpdates.argument as Record<string, string>).album || "unknown";
-              nowPlaying.artist = (avrUpdates.argument as Record<string, string>).artist || "unknown";
+            // Only update metadata if we're already on a network source (don't let metadata override input-selector)
+            if (["spotify", "airplay", "net,network"].includes(avrCurrentSource)) {
+              if (typeof avrUpdates.argument === "object" && avrUpdates.argument !== null) {
+                nowPlaying.title = (avrUpdates.argument as Record<string, string>).title || "unknown";
+                nowPlaying.album = (avrUpdates.argument as Record<string, string>).album || "unknown";
+                nowPlaying.artist = (avrUpdates.argument as Record<string, string>).artist || "unknown";
+              }
             }
             break;
           }
@@ -189,7 +199,7 @@ export class OnkyoCommandReceiver {
         switch (avrCurrentSource) {
           case "spotify":
           case "airplay":
-          case "net":
+          case "net,network":
             let trackId = `${nowPlaying.title}|${nowPlaying.album}|${nowPlaying.artist}`;
             if (trackId !== this.currentTrackId) {
               this.currentTrackId = trackId;
@@ -198,8 +208,8 @@ export class OnkyoCommandReceiver {
                 [uc.MediaPlayerAttributes.MediaTitle]: nowPlaying.title || "unknown",
                 [uc.MediaPlayerAttributes.MediaAlbum]: nowPlaying.album || "unknown"
               });
+              await this.maybeUpdateImage(entityId);
             }
-            await this.maybeUpdateImage(entityId);
             break;
           case "tuner":
           case "fm":
@@ -209,8 +219,8 @@ export class OnkyoCommandReceiver {
               [uc.MediaPlayerAttributes.MediaTitle]: nowPlaying.station || "unknown",
               [uc.MediaPlayerAttributes.MediaAlbum]: "",
               [uc.MediaPlayerAttributes.MediaImageUrl]: "",
-              [uc.MediaPlayerAttributes.MediaPosition]: "",
-              [uc.MediaPlayerAttributes.MediaDuration]: ""
+              [uc.MediaPlayerAttributes.MediaPosition]: 0,
+              [uc.MediaPlayerAttributes.MediaDuration]: 0
             });
             break;
           default:
@@ -219,8 +229,8 @@ export class OnkyoCommandReceiver {
               [uc.MediaPlayerAttributes.MediaTitle]: "",
               [uc.MediaPlayerAttributes.MediaAlbum]: "",
               [uc.MediaPlayerAttributes.MediaImageUrl]: "",
-              [uc.MediaPlayerAttributes.MediaPosition]: "",
-              [uc.MediaPlayerAttributes.MediaDuration]: ""
+              [uc.MediaPlayerAttributes.MediaPosition]: 0,
+              [uc.MediaPlayerAttributes.MediaDuration]: 0
             });
             break;
         }

@@ -79,6 +79,10 @@ Users report it also to work with:
 
 [Slider](./docs/volume.md#slider)
 
+## Sensors
+
+[Sensors](./docs/sensor.md)
+
 ## Listening modes
 
 [Listening modes](./docs/listening-modes.md)
