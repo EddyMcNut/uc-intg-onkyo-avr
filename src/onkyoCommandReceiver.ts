@@ -64,8 +64,9 @@ export class OnkyoCommandReceiver {
     }
     if (newHash !== this.lastImageHash) {
       this.lastImageHash = newHash;
+      let newURL = `${imageUrl}?hash=${newHash}`; // this dummy quuery param forces refresh in UCR3
       this.driver.updateEntityAttributes(entityId, {
-        [uc.MediaPlayerAttributes.MediaImageUrl]: imageUrl
+        [uc.MediaPlayerAttributes.MediaImageUrl]: newURL
       });
     }
   }
