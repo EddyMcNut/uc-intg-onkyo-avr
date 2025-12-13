@@ -7,7 +7,7 @@ export function setAvrCurrentSource(source: string, eiscpInstance?: any, zone?: 
   if (avrCurrentSource !== source) {
     console.log("%s [%s] source changed from '%s' to '%s'", integrationName, entityId || '', avrCurrentSource, source);
     avrCurrentSource = source;
-    
+   
     // Trigger volume query and clear media attributes if eiscp instance and zone are provided
     if (eiscpInstance && zone && driver && entityId) {
       console.log("%s [%s] querying volume for zone '%s'", integrationName, entityId, zone);

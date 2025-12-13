@@ -132,7 +132,6 @@ export class OnkyoCommandReceiver {
               [uc.SensorAttributes.State]: uc.SensorStates.On,
               [uc.SensorAttributes.Value]: sliderValue
             });
-            console.log("%s [%s] volume sensor updated to: %s%%", integrationName, volumeSensorId, sliderValue);
             break;
           }
           case "preset": {
@@ -157,6 +156,62 @@ export class OnkyoCommandReceiver {
               default:
                 break;
             }
+              // Update source sensor
+              let sourceSensorId = `${entityId}_source_sensor`;
+              this.driver.updateEntityAttributes(sourceSensorId, {
+              [uc.SensorAttributes.State]: uc.SensorStates.On,
+              [uc.SensorAttributes.Value]: avrUpdates.argument.toString()
+            });
+            break;
+          }
+          case "ifa": {
+            const arg = avrUpdates.argument as Record<string, string> | undefined;
+            const audioInputValue = arg?.audioInputValue ?? "";
+            const audioOutputValue = arg?.audioOutputValue ?? "";
+
+            const audioInputSensorId = `${entityId}_audio_input_sensor`;
+            const audioOutputSensorId = `${entityId}_audio_output_sensor`;
+
+            if (audioInputValue) {
+              this.driver.updateEntityAttributes(audioInputSensorId, {
+                [uc.SensorAttributes.State]: uc.SensorStates.On,
+                [uc.SensorAttributes.Value]: audioInputValue
+              });
+            }
+
+            if (audioOutputValue) {
+              this.driver.updateEntityAttributes(audioOutputSensorId, {
+                [uc.SensorAttributes.State]: uc.SensorStates.On,
+                [uc.SensorAttributes.Value]: audioOutputValue
+              });
+            }
+
+            // console.log("%s [%s] IFA parsed input: %s | output: %s", integrationName, entityId, audioInputValue, audioOutputValue);
+            break;
+          }
+          case "ifv": {
+            const arg = avrUpdates.argument as Record<string, string> | undefined;
+            const videoInputValue = arg?.videoInputValue ?? "";
+            const videoOutputValue = arg?.videoOutputValue ?? "";
+
+            const videoInputSensorId = `${entityId}_video_input_sensor`;
+            const videoOutputSensorId = `${entityId}_video_output_sensor`;
+
+            if (videoInputValue) {
+              this.driver.updateEntityAttributes(videoInputSensorId, {
+                [uc.SensorAttributes.State]: uc.SensorStates.On,
+                [uc.SensorAttributes.Value]: videoInputValue
+              });
+            }
+
+            if (videoOutputValue) {
+              this.driver.updateEntityAttributes(videoOutputSensorId, {
+                [uc.SensorAttributes.State]: uc.SensorStates.On,
+                [uc.SensorAttributes.Value]: videoOutputValue
+              });
+            }
+
+            // console.log("%s [%s] IFV parsed input: %s | output: %s", integrationName, entityId, videoInputValue, videoOutputValue);
             break;
           }
           case "DSN": {
