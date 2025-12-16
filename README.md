@@ -36,6 +36,7 @@ Users report it also to work with:
 - TX-RZ70
 - TX-RZ1100
 - TX RZ-730
+- TX-NR555
 - TX-NR656
 - TX-NR807
 - TX-NR6050
