@@ -1,4 +1,4 @@
-# Update from v0.6.5 to v0.7.0
+# Update from v0.6.5 or lower to v0.7.0 or higher
 
 Normally when you install a new version, as long as you kept the AVR name and IP the same as the previous version, all mappings in your activities keep on working.
 
