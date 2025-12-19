@@ -517,6 +517,21 @@ export default class OnkyoDriver {
     );
     sensors.push(videoOutputSensor);
 
+    const outputDisplaySensor = new uc.Sensor(
+      `${avrEntry}_output_display_sensor`,
+      { en: `${avrEntry} Output Display` },
+      {
+        attributes: {
+          [uc.SensorAttributes.State]: uc.SensorStates.Unknown,
+          [uc.SensorAttributes.Value]: "",
+          // [uc.SensorAttributes.Unit]: ""
+        },
+        deviceClass: uc.SensorDeviceClasses.Custom,
+        options: {}
+      }
+    );
+    sensors.push(outputDisplaySensor);
+
     return sensors;
   }
 

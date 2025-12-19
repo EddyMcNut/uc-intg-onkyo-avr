@@ -129,11 +129,11 @@ export class EiscpDriver extends EventEmitter {
       const outputFormat = parts[4] || ""; // Stereo / Dolby Atmos
       const outputChannels = parts[5] || ""; // 2.1 ch / 5.1 ch
 
-      const inputRateChannels = [inputRate, inputChannels].filter(Boolean).join(" ");
+      const inputRateChannels = inputFormat === "" ? inputSource : [inputRate, inputChannels].filter(Boolean).join(" ");
       const audioInputValue = [inputFormat, inputRateChannels].filter(Boolean).join(" | ");
       const audioOutputValue = [outputFormat, outputChannels].filter(Boolean).join(" | ");
       
-      result.command = "ifa";
+      result.command = "IFA";
       result.argument = {
         inputSource,
         inputFormat,
@@ -167,7 +167,7 @@ export class EiscpDriver extends EventEmitter {
       const outputColorBit = [outputColorSpace, outputBitDepth].filter(Boolean).join(" ");
       const videoOutputValue = outputResolution.toLowerCase() === "unknown" ? "---" : [outputResolution, outputColorBit, videoFormat].filter(Boolean).join(" | "); //outputDisplay
 
-      result.command = "ifv";
+      result.command = "IFV";
       result.argument = {
         inputSource,
         inputResolution,

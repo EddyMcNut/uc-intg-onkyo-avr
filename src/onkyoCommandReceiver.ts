@@ -164,7 +164,7 @@ export class OnkyoCommandReceiver {
             });
             break;
           }
-          case "ifa": {
+          case "IFA": {
             const arg = avrUpdates.argument as Record<string, string> | undefined;
             const audioInputValue = arg?.audioInputValue ?? "";
             const audioOutputValue = arg?.audioOutputValue ?? "";
@@ -189,13 +189,15 @@ export class OnkyoCommandReceiver {
             // console.log("%s [%s] IFA parsed input: %s | output: %s", integrationName, entityId, audioInputValue, audioOutputValue);
             break;
           }
-          case "ifv": {
+          case "IFV": {
             const arg = avrUpdates.argument as Record<string, string> | undefined;
             const videoInputValue = arg?.videoInputValue ?? "";
             const videoOutputValue = arg?.videoOutputValue ?? "";
+            const videoOutputDisplay = arg?.outputDisplay ?? "";
 
             const videoInputSensorId = `${entityId}_video_input_sensor`;
             const videoOutputSensorId = `${entityId}_video_output_sensor`;
+            const videoOutputDisplaySensorId = `${entityId}_video_output_display_sensor`;
 
             if (videoInputValue) {
               this.driver.updateEntityAttributes(videoInputSensorId, {
@@ -211,6 +213,12 @@ export class OnkyoCommandReceiver {
               });
             }
 
+            if (videoOutputDisplay) {
+              this.driver.updateEntityAttributes(videoOutputDisplaySensorId, {
+                [uc.SensorAttributes.State]: uc.SensorStates.On,
+                [uc.SensorAttributes.Value]: videoOutputDisplay
+              });
+            }
             // console.log("%s [%s] IFV parsed input: %s | output: %s", integrationName, entityId, videoInputValue, videoOutputValue);
             break;
           }
