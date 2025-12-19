@@ -27,6 +27,10 @@ Like that you can have the volume visible without adjusting it.
 
   ![](/screenshots/sensor-volume.png)
 
+When you switch Source, the integration will try to refresh the sensor values. You can send a request to the AVR to refresh the information when you suspect the value has not been updated, trigger the `Info` command in that case:
+
+  ![](/screenshots/info-command.png)
+
 _note: after installing a new version of the integration or after a reboot of the remote, it might be needed to close screen on the remote and enter the already active activity again to get the sensor to work, hit next to go to the next song and trigger refresh of the album art_
 
 [back to main README](../README.md#sensors)
