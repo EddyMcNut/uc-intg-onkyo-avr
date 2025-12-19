@@ -25,6 +25,10 @@
   - Click `Next`, click `Done`.
 - Add your AVR as entity: In `Integrations` select `Onkyo AVR custom`, click the `+` next to `Configured entities`, add your AVR
 
+  *next to the AVR entity, the integration also creates several [sensors](./sensor.md), you can decide for yourself if you also want to use these sensors, to control your AVR you only have to select the AVR entity*
+
+  **the AVR entity has the🎵icon**
+ 
   ![](../screenshots/configured-entities.png)
 
   ![](../screenshots/select-entity.png)
