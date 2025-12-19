@@ -32,6 +32,8 @@ export function setAvrCurrentSource(source: string, eiscpInstance?: any, zone?: 
       eiscpInstance.command({ zone, command: "audio-information", args: "query" });
       eiscpInstance.command({ zone, command: "video-information", args: "query" });
 
+      // to make sure the sensor also updates (in case a message is missed)
+      eiscpInstance.command({ zone, command: "input-selector", args: "query" });
     }
   }
 }

@@ -313,21 +313,21 @@ export const eiscpCommands = {
       }
     },
     IFA: {
-      name: "audio-infomation",
+      name: "audio-information",
       description: "Audio Infomation Command",
       values: {
         "nnnnn:nnnnn": {
-          description: "Infomation of Audio(Same Immediate Display ',' is separator of infomations)"
+          description: "Information of Audio(Same Immediate Display ',' is separator of informations)"
         },
         QSTN: { name: "query", description: "gets Infomation of Audio" }
       }
     },
     IFV: {
-      name: "video-infomation",
+      name: "video-information",
       description: "Video Infomation Command",
       values: {
         "nnnnn:nnnnn": {
-          description: "infomation of Video(Same Immediate Display ',' is separator of infomations)"
+          description: "information of Video(Same Immediate Display ',' is separator of infomartions)"
         },
         QSTN: { name: "query", description: "gets Infomation of Video" }
       }
@@ -1720,8 +1720,8 @@ export const eiscpCommands = {
     "dimmer-level": "DIM",
     setup: "OSD",
     "memory-setup": "MEM",
-    "audio-infomation": "IFA",
-    "video-infomation": "IFV",
+    "audio-information": "IFA",
+    "video-information": "IFV",
     "input-selector": "SLI",
     "recout-selector": "SLR",
     "audio-selector": "SLA",
