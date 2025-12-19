@@ -394,7 +394,8 @@ export default class OnkyoDriver {
           uc.MediaPlayerFeatures.Settings,
           uc.MediaPlayerFeatures.Home,
           uc.MediaPlayerFeatures.Next,
-          uc.MediaPlayerFeatures.Previous
+          uc.MediaPlayerFeatures.Previous,
+          uc.MediaPlayerFeatures.Info
         ],
         attributes: {
           [uc.MediaPlayerAttributes.State]: uc.MediaPlayerStates.Unknown,

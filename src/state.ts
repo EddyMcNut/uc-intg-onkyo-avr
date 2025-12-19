@@ -22,8 +22,16 @@ export function setAvrCurrentSource(source: string, eiscpInstance?: any, zone?: 
         MediaPosition: 0,
         MediaDuration: 0
       });
+
+      // Reset Audio/Video sensors
+      console.log("%s [%s] querying AV-info for zone '%s'", integrationName, entityId, zone);
+      driver.updateEntityAttributes(entityId, {
+        AudioInput: "",
+        VideoInput: ""
+      });
+      eiscpInstance.command({ zone, command: "audio-information", args: "query" });
+      eiscpInstance.command({ zone, command: "video-information", args: "query" });
+
     }
-  } else {
-    avrCurrentSource = source;
   }
 }

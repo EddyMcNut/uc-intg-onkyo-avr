@@ -202,6 +202,10 @@ export class OnkyoCommandSender {
       case uc.MediaPlayerCommands.CursorRight:
         await this.eiscp.command(formatCommand("setup right"));
         break;
+      case uc.MediaPlayerCommands.Info:
+        await this.eiscp.command(formatCommand("audio-infomation query"));
+        await this.eiscp.command(formatCommand("video-infomation query"));
+        break;
       default:
         return uc.StatusCodes.NotImplemented;
     }
