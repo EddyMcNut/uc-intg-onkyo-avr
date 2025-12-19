@@ -197,7 +197,7 @@ export class OnkyoCommandReceiver {
 
             const videoInputSensorId = `${entityId}_video_input_sensor`;
             const videoOutputSensorId = `${entityId}_video_output_sensor`;
-            const videoOutputDisplaySensorId = `${entityId}_video_output_display_sensor`;
+            const videoOutputDisplaySensorId = `${entityId}_output_display_sensor`;
 
             if (videoInputValue) {
               this.driver.updateEntityAttributes(videoInputSensorId, {
