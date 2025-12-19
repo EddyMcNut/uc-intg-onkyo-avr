@@ -18,7 +18,7 @@ import { DEFAULT_QUEUE_THRESHOLD } from "./configManager.js";
 const COMMANDS = eiscpCommands.commands;
 const COMMAND_MAPPINGS = eiscpCommands.command_mappings;
 const VALUE_MAPPINGS = eiscpCommands.value_mappings;
-const integrationName = "Onkyo-Integration: ";
+const integrationName = "Onkyo-Integration eISCP:";
 
 interface Metadata {
   title?: string;
@@ -114,6 +114,73 @@ export class EiscpDriver extends EventEmitter {
       duration = this.timeToSeconds(duration).toString();
       result.command = "NTM";
       result.argument = position + "/" + duration;
+      return result;
+    }
+
+    if (command.toUpperCase() === "IFA") {
+      const raw = value?.toString() ?? "";
+      const parts = raw.split(",").map((p) => p.trim());
+
+      const inputSource = (parts[0] || "").replace(/\s+/g, ""); // "HDMI 1" -> "HDMI1"
+      const inputFormat = parts[1] || ""; // PCM / Dolby Atmos
+      const inputRate = parts[2] || ""; // 48 kHz
+      const inputChannels = parts[3] || ""; // 2.0 ch
+
+      const outputFormat = parts[4] || ""; // Stereo / Dolby Atmos
+      const outputChannels = parts[5] || ""; // 2.1 ch / 5.1 ch
+
+      const inputRateChannels = inputFormat === "" ? inputSource : [inputRate, inputChannels].filter(Boolean).join(" ");
+      const audioInputValue = [inputFormat, inputRateChannels].filter(Boolean).join(" | ");
+      const audioOutputValue = [outputFormat, outputChannels].filter(Boolean).join(" | ");
+      
+      result.command = "IFA";
+      result.argument = {
+        inputSource,
+        inputFormat,
+        inputRate,
+        inputChannels,
+        outputFormat,
+        outputChannels,
+        audioInputValue,
+        audioOutputValue
+      };
+      return result;
+    }
+
+    if (command.toUpperCase() === "IFV") {
+      const raw = value?.toString() ?? "";
+      const parts = raw.split(",").map((p) => p.trim());
+
+      const inputSource = (parts[0] || "").replace(/\s+/g, ""); // "HDMI 1" -> "HDMI1"
+      const inputResolution = parts[1] || ""; // 4K(3840x2160) 59 Hz
+      const inputColorSpace = parts[2] || ""; // RGB
+      const inputBitDepth = parts[3] || ""; // 24bit
+      const videoFormat = parts[9] || ""; // Dolby Vision
+
+      const outputDisplay = parts[4] || ""; // MAIN
+      const outputResolution = parts[5] || ""; // 4K(3840x2160) 59 Hz
+      const outputColorSpace = parts[6] || ""; // RGB
+      const outputBitDepth = parts[7] || ""; // 24bit
+
+      const inputColorBit = [inputColorSpace, inputBitDepth].filter(Boolean).join(" ");
+      const videoInputValue = inputResolution.toLowerCase() === "unknown" ? "---" : [inputResolution, inputColorBit, videoFormat].filter(Boolean).join(" | ");
+      const outputColorBit = [outputColorSpace, outputBitDepth].filter(Boolean).join(" ");
+      const videoOutputValue = outputResolution.toLowerCase() === "unknown" ? "---" : [outputResolution, outputColorBit, videoFormat].filter(Boolean).join(" | "); //outputDisplay
+
+      result.command = "IFV";
+      result.argument = {
+        inputSource,
+        inputResolution,
+        inputColorSpace,
+        inputBitDepth,
+        videoFormat,
+        outputDisplay,
+        outputResolution,
+        outputColorSpace,
+        outputBitDepth,
+        videoInputValue,
+        videoOutputValue
+      };
       return result;
     }
 

@@ -7,7 +7,7 @@ export function setAvrCurrentSource(source: string, eiscpInstance?: any, zone?: 
   if (avrCurrentSource !== source) {
     console.log("%s [%s] source changed from '%s' to '%s'", integrationName, entityId || '', avrCurrentSource, source);
     avrCurrentSource = source;
-    
+   
     // Trigger volume query and clear media attributes if eiscp instance and zone are provided
     if (eiscpInstance && zone && driver && entityId) {
       console.log("%s [%s] querying volume for zone '%s'", integrationName, entityId, zone);
@@ -22,8 +22,14 @@ export function setAvrCurrentSource(source: string, eiscpInstance?: any, zone?: 
         MediaPosition: 0,
         MediaDuration: 0
       });
+
+      // Reset Audio/Video sensors
+      console.log("%s [%s] querying AV-info for zone '%s'", integrationName, entityId, zone);
+      eiscpInstance.command({ zone, command: "audio-information", args: "query" });
+      eiscpInstance.command({ zone, command: "video-information", args: "query" });
+
+      // to make sure the sensor also updates (in case a message is missed)
+      eiscpInstance.command({ zone, command: "input-selector", args: "query" });
     }
-  } else {
-    avrCurrentSource = source;
   }
 }

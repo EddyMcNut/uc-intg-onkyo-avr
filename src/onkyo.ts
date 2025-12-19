@@ -394,7 +394,8 @@ export default class OnkyoDriver {
           uc.MediaPlayerFeatures.Settings,
           uc.MediaPlayerFeatures.Home,
           uc.MediaPlayerFeatures.Next,
-          uc.MediaPlayerFeatures.Previous
+          uc.MediaPlayerFeatures.Previous,
+          uc.MediaPlayerFeatures.Info
         ],
         attributes: {
           [uc.MediaPlayerAttributes.State]: uc.MediaPlayerStates.Unknown,
@@ -440,6 +441,96 @@ export default class OnkyoDriver {
       }
     );
     sensors.push(volumeSensor);
+
+    const audioInputSensor = new uc.Sensor(
+      `${avrEntry}_audio_input_sensor`,
+      { en: `${avrEntry} Audio Input` },
+      {
+        attributes: {
+          [uc.SensorAttributes.State]: uc.SensorStates.Unknown,
+          [uc.SensorAttributes.Value]: "",
+          // [uc.SensorAttributes.Unit]: ""
+        },
+        deviceClass: uc.SensorDeviceClasses.Custom,
+        options: {}
+      }
+    );
+    sensors.push(audioInputSensor);
+
+    const audioOutputSensor = new uc.Sensor(
+      `${avrEntry}_audio_output_sensor`,
+      { en: `${avrEntry} Audio Output` },
+      {
+        attributes: {
+          [uc.SensorAttributes.State]: uc.SensorStates.Unknown,
+          [uc.SensorAttributes.Value]: "",
+          // [uc.SensorAttributes.Unit]: ""
+        },
+        deviceClass: uc.SensorDeviceClasses.Custom,
+        options: {}
+      }
+    );
+    sensors.push(audioOutputSensor);
+
+    const sourceSensor = new uc.Sensor(
+      `${avrEntry}_source_sensor`,
+      { en: `${avrEntry} Source` },
+      {
+        attributes: {
+          [uc.SensorAttributes.State]: uc.SensorStates.Unknown,
+          [uc.SensorAttributes.Value]: "",
+          // [uc.SensorAttributes.Unit]: ""
+        },
+        deviceClass: uc.SensorDeviceClasses.Custom,
+        options: {}
+      }
+    );
+    sensors.push(sourceSensor);
+
+    const videoInputSensor = new uc.Sensor(
+      `${avrEntry}_video_input_sensor`,
+      { en: `${avrEntry} Video Input` },
+      {
+        attributes: {
+          [uc.SensorAttributes.State]: uc.SensorStates.Unknown,
+          [uc.SensorAttributes.Value]: "",
+          // [uc.SensorAttributes.Unit]: ""
+        },
+        deviceClass: uc.SensorDeviceClasses.Custom,
+        options: {}
+      }
+    );
+    sensors.push(videoInputSensor);
+
+    const videoOutputSensor = new uc.Sensor(
+      `${avrEntry}_video_output_sensor`,
+      { en: `${avrEntry} Video Output` },
+      {
+        attributes: {
+          [uc.SensorAttributes.State]: uc.SensorStates.Unknown,
+          [uc.SensorAttributes.Value]: "",
+          // [uc.SensorAttributes.Unit]: ""
+        },
+        deviceClass: uc.SensorDeviceClasses.Custom,
+        options: {}
+      }
+    );
+    sensors.push(videoOutputSensor);
+
+    const outputDisplaySensor = new uc.Sensor(
+      `${avrEntry}_output_display_sensor`,
+      { en: `${avrEntry} Output Display` },
+      {
+        attributes: {
+          [uc.SensorAttributes.State]: uc.SensorStates.Unknown,
+          [uc.SensorAttributes.Value]: "",
+          // [uc.SensorAttributes.Unit]: ""
+        },
+        deviceClass: uc.SensorDeviceClasses.Custom,
+        options: {}
+      }
+    );
+    sensors.push(outputDisplaySensor);
 
     return sensors;
   }

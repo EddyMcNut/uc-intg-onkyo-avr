@@ -1,5 +1,13 @@
 ## Volume
 
+### Steps
+
+Currently the volume level that is shown on the display of the remote can only show integer values (1, 15, 60, ...) and not yet x.5 values (1.5, 15.5, 60.5, ...). When you assign `Volume up` or `Volume down` commands to a button, the volume step will be 1.0, this is done so the volume level that is shown on the display of the remote is the same as the level showing on the AVR. 
+
+You can however send 0.5 steps by cheating with the `Input source`, select that as command for the volume button and then as `source` enter `volume level-up` or `volume level-down`. See the [Cheats section](cheats.md) for other examples. When you decide to use 0.5 volume steps, the value shown by the remote will be a bit off compared to the level shown by the AVR when the level is at x.5
+
+When the remote itself can show 0.5 steps in the future, I will add something like a ‘volumeUp0.5’ to the list of commands
+
 ### Relative / Absolute
 
 The AVR itself may display the volume as dB (relative) or as an absolute number, depending on its settings, but the eISCP protocol only accepts and returns the absolute value. There is no command to set the volume directly in dB via eISCP.
