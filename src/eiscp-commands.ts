@@ -314,22 +314,22 @@ export const eiscpCommands = {
     },
     IFA: {
       name: "audio-information",
-      description: "Audio Infomation Command",
+      description: "Audio Information Command",
       values: {
         "nnnnn:nnnnn": {
           description: "Information of Audio(Same Immediate Display ',' is separator of informations)"
         },
-        QSTN: { name: "query", description: "gets Infomation of Audio" }
+        QSTN: { name: "query", description: "gets Information of Audio" }
       }
     },
     IFV: {
       name: "video-information",
-      description: "Video Infomation Command",
+      description: "Video Information Command",
       values: {
         "nnnnn:nnnnn": {
-          description: "information of Video(Same Immediate Display ',' is separator of infomartions)"
+          description: "information of Video(Same Immediate Display ',' is separator of informations)"
         },
-        QSTN: { name: "query", description: "gets Infomation of Video" }
+        QSTN: { name: "query", description: "gets Information of Video" }
       }
     },
     SLI: {
@@ -1145,7 +1145,7 @@ export const eiscpCommands = {
       values: {
         tlpnnnnnnnnnn: {
           description:
-            'NET/USB List Info\nt ->Information Type (A : ASCII letter, C : Cursor Info, U : Unicode letter)\nwhen t = A,\n  l ->Line Info (0-9 : 1st to 10th Line)\n  nnnnnnnnn:Listed data (variable-length, 64 ASCII letters max)\n    when AVR is not displayed NET/USB List(Ketboard,Menu,Popup…), "nnnnnnnnn" is "See TV".\n  p ->Property (- : no)\nwhen t = C,\n  l ->Cursor Position (0-9 : 1st to 10th Line, - : No Cursor)\n  p ->Update Type (P : Page Infomation Update ( Page Clear or Disable List Info) , C : Cursor Position Update)\nwhen t = U, (for Network Control Only)\n  l ->Line Info (0-9 : 1st to 10th Line)\n  nnnnnnnnn:Listed data (variable-length, 64 Unicode letters [UTF-8 encoded] max)\n    when AVR is not displayed NET/USB List(Ketboard,Menu,Popup…), "nnnnnnnnn" is "See TV".\n  p ->Property (- : no)'
+            'NET/USB List Info\nt ->Information Type (A : ASCII letter, C : Cursor Info, U : Unicode letter)\nwhen t = A,\n  l ->Line Info (0-9 : 1st to 10th Line)\n  nnnnnnnnn:Listed data (variable-length, 64 ASCII letters max)\n    when AVR is not displayed NET/USB List(Ketboard,Menu,Popup…), "nnnnnnnnn" is "See TV".\n  p ->Property (- : no)\nwhen t = C,\n  l ->Cursor Position (0-9 : 1st to 10th Line, - : No Cursor)\n  p ->Update Type (P : Page Information Update ( Page Clear or Disable List Info) , C : Cursor Position Update)\nwhen t = U, (for Network Control Only)\n  l ->Line Info (0-9 : 1st to 10th Line)\n  nnnnnnnnn:Listed data (variable-length, 64 Unicode letters [UTF-8 encoded] max)\n    when AVR is not displayed NET/USB List(Ketboard,Menu,Popup…), "nnnnnnnnn" is "See TV".\n  p ->Property (- : no)'
         },
         ti: {
           name: "ti",
@@ -1562,7 +1562,7 @@ export const eiscpCommands = {
       values: {
         tlpnnnnnnnnnn: {
           description:
-            "iPod List Info\nt ->Information Type (A : ASCII letter, C : Cursor Info)\nwhen t = A,\n  l ->Line Info (0-9 : 1st to 10th Line)\n  nnnnnnnnn:Listed data (variable-length, 64 letters max ASCII letter only)\n  p ->Property (- : no)\nwhen t = C,\n  l ->Cursor Position (0-9 : 1st to 10th Line, - : No Cursor)\n  p ->Update Type (P : Page Infomation Update ( Page Clear or Disable List Info) , C : Cursor Position Update)"
+            "iPod List Info\nt ->Information Type (A : ASCII letter, C : Cursor Info)\nwhen t = A,\n  l ->Line Info (0-9 : 1st to 10th Line)\n  nnnnnnnnn:Listed data (variable-length, 64 letters max ASCII letter only)\n  p ->Property (- : no)\nwhen t = C,\n  l ->Cursor Position (0-9 : 1st to 10th Line, - : No Cursor)\n  p ->Update Type (P : Page Information Update ( Page Clear or Disable List Info) , C : Cursor Position Update)"
         }
       }
     },
@@ -1693,7 +1693,7 @@ export const eiscpCommands = {
         AT: { name: "at", description: "gets & display DAB Bitrate & Audio Type" },
         MN: { name: "mn", description: "gets & display DAB Multicast Name" },
         MF: { name: "mf", description: "gets & display DAB Multicast Band & Freq Info" },
-        UP: { name: "up", description: "gets & dispaly DAB Infomation Wrap-Around Up" }
+        UP: { name: "up", description: "gets & display DAB Information Wrap-Around Up" }
       }
     }
   },
