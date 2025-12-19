@@ -163,9 +163,9 @@ export class EiscpDriver extends EventEmitter {
       const outputBitDepth = parts[7] || ""; // 24bit
 
       const inputColorBit = [inputColorSpace, inputBitDepth].filter(Boolean).join(" ");
-      const videoInputValue = inputResolution === "unknown" ? "---" : [inputResolution, inputColorBit, videoFormat].filter(Boolean).join(" | ");
+      const videoInputValue = inputResolution.toLowerCase() === "unknown" ? "---" : [inputResolution, inputColorBit, videoFormat].filter(Boolean).join(" | ");
       const outputColorBit = [outputColorSpace, outputBitDepth].filter(Boolean).join(" ");
-      const videoOutputValue = outputResolution === "unknown" ? "---" : [outputResolution, outputColorBit, videoFormat].filter(Boolean).join(" | "); //outputDisplay
+      const videoOutputValue = outputResolution.toLowerCase() === "unknown" ? "---" : [outputResolution, outputColorBit, videoFormat].filter(Boolean).join(" | "); //outputDisplay
 
       result.command = "ifv";
       result.argument = {
