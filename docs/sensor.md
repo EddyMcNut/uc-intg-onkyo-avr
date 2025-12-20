@@ -23,7 +23,7 @@ The sensors are available to add to the User Interface of your Activities.
 
   ![](/screenshots/assign-sensor.png)
 
-Like that you can have the volume visible without adjusting it.
+Like that you can have the volume visible without adjusting it for example.
 
   ![](/screenshots/sensor-volume.png)
 
