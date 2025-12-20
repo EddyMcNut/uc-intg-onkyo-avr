@@ -11,7 +11,7 @@ As from v0.7.2, this integration contains the following sensors for *every zone*
 
 **Prerequisite: make sure you are using UC Firmware 2.7.1 or higher.**
 
-After running setup, you can select the sensors next to the AVR entity.
+After running setup, you can select the sensors in the same way you select the AVR entity.
 
   **the AVR entity has the🎵icon**
   
