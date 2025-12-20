@@ -17,6 +17,6 @@ This integration has been made possible by:
   - To see what uc-intg-onkyo-avr integration is missing :)
 - [mase1981](https://github.com/mase1981): for helping out when I got stuck packaging this first version.
 - [harvey28](https://unfolded.community/u/harvey28/summary): for testing and feedback.
-- [albaintor](https://github.com/albaintor): for let me use a piece of the awesome toolkit for entity migrations and his Sony AVR code helped me improve my own code for this Onkyo AVR integration. 
+- [albaintor](https://github.com/albaintor): for letting me use a piece of the awesome toolkit for entity migrations in this integration and his Sony AVR code helped me improve this. 
 
 [back to main README](../README.md#kudos)
