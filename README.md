@@ -112,7 +112,3 @@ Users report it also to work with:
 ## Collect logs
 
 [Collect logs](./docs/collect-logs.md)
-
-## Stuff to do / backlog
-
-- show AV info
