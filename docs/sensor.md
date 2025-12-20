@@ -17,7 +17,7 @@ After running setup, you can select the sensors in the same way you select the A
   
   ![](/screenshots/sensor-entity.png)
 
-That sensors are available to add to the User Interface of your Activities.
+The sensors are available to add to the User Interface of your Activities.
 
   ![](/screenshots/add-sensor-widget.png)
 
