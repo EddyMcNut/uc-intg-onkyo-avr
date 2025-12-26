@@ -1,6 +1,6 @@
 {
   "driver_id": "onkyo_avr",
-  "version": "0.7.2",
+  "version": "0.7.3",
   "min_core_api": "0.20.0",
   "name": { "en": "Onkyo AVR" },
   "icon": "uc:music",
@@ -196,7 +196,7 @@
           "en": "Remote 4-digit PIN code (for AVR entity migration)"
         },
         "field": {
-          "text": {
+          "password": {
             "value": ""
           }
         }

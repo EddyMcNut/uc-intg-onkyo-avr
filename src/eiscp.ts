@@ -6,6 +6,7 @@ export interface EiscpConfig {
   reconnect_sleep?: number;
   verify_commands?: boolean;
   send_delay?: number;
+  receive_delay?: number;
 }
 import net from "net";
 import dgram from "dgram";
@@ -19,6 +20,7 @@ const COMMANDS = eiscpCommands.commands;
 const COMMAND_MAPPINGS = eiscpCommands.command_mappings;
 const VALUE_MAPPINGS = eiscpCommands.value_mappings;
 const integrationName = "Onkyo-Integration eISCP:";
+const IGNORED_COMMANDS = new Set(["NMS", "NPB"]); // Commands to ignore from AVR
 
 interface Metadata {
   title?: string;
@@ -33,7 +35,8 @@ export class EiscpDriver extends EventEmitter {
   private config: EiscpConfig;
   private eiscp: net.Socket | null = null;
   private is_connected = false;
-  private send_queue: async.AsyncQueue<any>;
+  private send_queue: async.QueueObject<any>;
+  private receive_queue: async.QueueObject<any>;
   private currentMetadata: Metadata = {};
 
   constructor(config?: EiscpConfig) {
@@ -45,9 +48,11 @@ export class EiscpDriver extends EventEmitter {
       reconnect: config?.reconnect ?? false,
       reconnect_sleep: config?.reconnect_sleep ?? 5,
       verify_commands: config?.verify_commands ?? false,
-      send_delay: config?.send_delay ?? DEFAULT_QUEUE_THRESHOLD
+      send_delay: config?.send_delay ?? DEFAULT_QUEUE_THRESHOLD,
+      receive_delay: config?.receive_delay ?? DEFAULT_QUEUE_THRESHOLD
     };
     this.send_queue = async.queue(this.sendCommand.bind(this), 1);
+    this.receive_queue = async.queue(this.processIncomingMessage.bind(this), 1);
     this.setupErrorHandler();
   }
 
@@ -106,7 +111,7 @@ export class EiscpDriver extends EventEmitter {
       result.zone = "zone3";
     }
 
-    // console.log("%s RAW RECEIVE: [%s] %s %s", integrationName, result.zone, command, value);
+    console.log("%s RAW RECEIVE: [%s] %s %s", integrationName, result.zone, command, value);
 
     if (command === "NTM") {
       let [position, duration] = value.toString().split("/");
@@ -221,11 +226,19 @@ export class EiscpDriver extends EventEmitter {
       return result;
     }
 
-    if (avrCurrentSource === "fm" && command === "FLD" && value.slice(0, 12) !== "566F6C756D65") {
-      let ascii = Buffer.from(value, "hex").toString("ascii");
-      result.command = "RDS";
-      result.argument = ascii;
-      return result;
+    if (command === "FLD") {
+      // Decode front panel display, skip volume messages
+      if (value.slice(0, 12) !== "566F6C756D65") {
+        let ascii = Buffer.from(value, "hex").toString("ascii");
+        // // For FM radio, keep RDS command
+        // if (avrCurrentSource === "fm") {
+        //   result.command = "RDS";
+        // } else {
+          result.command = "FLD";
+        // }
+        result.argument = ascii;
+        return result;
+      }
     }
 
     type CommandType = {
@@ -416,8 +429,8 @@ export class EiscpDriver extends EventEmitter {
         let command = iscp_message.slice(0, 3);
         let value = iscp_message.slice(3);
         
-        // Ignore these messages
-        if (["NMS", "NPB"].includes(command)) {
+        // Ignore unwanted messages early
+        if (IGNORED_COMMANDS.has(command)) {
           return;
         }
 
@@ -439,7 +452,7 @@ export class EiscpDriver extends EventEmitter {
           return;
         }
 
-        this.emit("data", {
+        const dataPayload = {
           command: rawResult.command ?? undefined,
           argument: rawResult.argument ?? undefined,
           zone: rawResult.zone ?? undefined,
@@ -447,7 +460,19 @@ export class EiscpDriver extends EventEmitter {
           host: this.config.host,
           port: this.config.port,
           model: this.config.model
-        });
+        };
+
+        // Route IFA and IFV messages through the incoming queue for throttling
+        if (command === "IFA" || command === "IFV") {
+          this.receive_queue.push(dataPayload, (err: any) => {
+            if (err) {
+              console.error("Error processing queued incoming message:", err);
+            }
+          });
+        } else {
+          // Emit other messages immediately
+          this.emit("data", dataPayload);
+        }
       });
     return { model: this.config.model!, host: this.config.host!, port: this.config.port! };
   }
@@ -465,6 +490,16 @@ export class EiscpDriver extends EventEmitter {
       return;
     }
     callback("Send command, while not connected", null);
+  }
+
+  private async processIncomingMessage(data: any, callback: any) {
+    // Emit the incoming message data after the throttle delay
+    setTimeout(() => {
+      this.emit("data", data);
+      if (typeof callback === "function") {
+        callback();
+      }
+    }, this.config.receive_delay);
   }
 
   raw(data: any, callback?: any) {

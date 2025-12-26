@@ -417,11 +417,6 @@ export default class OnkyoDriver {
   private createSensorEntities(avrEntry: string): uc.Sensor[] {
     const sensors: uc.Sensor[] = [];
 
-    // Volume Level Sensor
-    // NOTE: To add more sensors (e.g., bitrate, resolution, audio format, video format),
-    // follow this pattern: create a new Sensor instance with appropriate device class,
-    // attributes, and options, then push to sensors array. Update the corresponding
-    // case in onkyoCommandReceiver.ts to update the sensor attributes.
     const volumeSensor = new uc.Sensor(
       `${avrEntry}_volume_sensor`,
       { en: `${avrEntry} Volume` },
@@ -429,12 +424,10 @@ export default class OnkyoDriver {
         attributes: {
           [uc.SensorAttributes.State]: uc.SensorStates.Unknown,
           [uc.SensorAttributes.Value]: 0,
-          // [uc.SensorAttributes.Unit]: "%"
         },
         deviceClass: uc.SensorDeviceClasses.Custom,
         options: {
-          // [uc.SensorOptions.CustomUnit]: "%",
-          [uc.SensorOptions.Decimals]: 0,
+          [uc.SensorOptions.Decimals]: 1,
           [uc.SensorOptions.MinValue]: 0,
           [uc.SensorOptions.MaxValue]: 200
         }
@@ -449,7 +442,6 @@ export default class OnkyoDriver {
         attributes: {
           [uc.SensorAttributes.State]: uc.SensorStates.Unknown,
           [uc.SensorAttributes.Value]: "",
-          // [uc.SensorAttributes.Unit]: ""
         },
         deviceClass: uc.SensorDeviceClasses.Custom,
         options: {}
@@ -464,7 +456,6 @@ export default class OnkyoDriver {
         attributes: {
           [uc.SensorAttributes.State]: uc.SensorStates.Unknown,
           [uc.SensorAttributes.Value]: "",
-          // [uc.SensorAttributes.Unit]: ""
         },
         deviceClass: uc.SensorDeviceClasses.Custom,
         options: {}
@@ -479,7 +470,6 @@ export default class OnkyoDriver {
         attributes: {
           [uc.SensorAttributes.State]: uc.SensorStates.Unknown,
           [uc.SensorAttributes.Value]: "",
-          // [uc.SensorAttributes.Unit]: ""
         },
         deviceClass: uc.SensorDeviceClasses.Custom,
         options: {}
@@ -494,7 +484,6 @@ export default class OnkyoDriver {
         attributes: {
           [uc.SensorAttributes.State]: uc.SensorStates.Unknown,
           [uc.SensorAttributes.Value]: "",
-          // [uc.SensorAttributes.Unit]: ""
         },
         deviceClass: uc.SensorDeviceClasses.Custom,
         options: {}
@@ -509,7 +498,6 @@ export default class OnkyoDriver {
         attributes: {
           [uc.SensorAttributes.State]: uc.SensorStates.Unknown,
           [uc.SensorAttributes.Value]: "",
-          // [uc.SensorAttributes.Unit]: ""
         },
         deviceClass: uc.SensorDeviceClasses.Custom,
         options: {}
@@ -524,13 +512,40 @@ export default class OnkyoDriver {
         attributes: {
           [uc.SensorAttributes.State]: uc.SensorStates.Unknown,
           [uc.SensorAttributes.Value]: "",
-          // [uc.SensorAttributes.Unit]: ""
         },
         deviceClass: uc.SensorDeviceClasses.Custom,
         options: {}
       }
     );
     sensors.push(outputDisplaySensor);
+
+    const frontPanelDisplaySensor = new uc.Sensor(
+      `${avrEntry}_front_panel_display_sensor`,
+      { en: `${avrEntry} Front Panel Display` },
+      {
+        attributes: {
+          [uc.SensorAttributes.State]: uc.SensorStates.Unknown,
+          [uc.SensorAttributes.Value]: "",
+        },
+        deviceClass: uc.SensorDeviceClasses.Custom,
+        options: {}
+      }
+    );
+    sensors.push(frontPanelDisplaySensor);
+
+    const muteSensor = new uc.Sensor(
+      `${avrEntry}_mute_sensor`,
+      { en: `${avrEntry} Mute` },
+      {
+        attributes: {
+          [uc.SensorAttributes.State]: uc.SensorStates.Unknown,
+          [uc.SensorAttributes.Value]: "off",
+        },
+        deviceClass: uc.SensorDeviceClasses.Custom,
+        options: {}
+      }
+    );
+    sensors.push(muteSensor);
 
     return sensors;
   }

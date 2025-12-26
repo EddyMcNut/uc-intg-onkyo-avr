@@ -7,17 +7,19 @@ As from v0.7.2, this integration contains the following sensors for *every zone*
 - Audio Output
 - Video Input
 - Video Output
-- Output Display 
+- Output Display
+- Front Panel Display
+- Mute
 
 **Prerequisite: make sure you are using UC Firmware 2.7.1 or higher.**
 
 After running setup, you can select the sensors in the same way you select the AVR entity.
 
-  **the AVR entity has the🎵icon**
+  **the AVR entities have the🎵icon** all others are sensors
   
   ![](/screenshots/sensor-entity.png)
 
-The sensors are available to add to the User Interface of your Activities.
+The sensors are available to add to the User Interface of your Activities, you don't need to include them in an activity, they are available anyway.
 
   ![](/screenshots/add-sensor-widget.png)
 
