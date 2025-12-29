@@ -236,6 +236,8 @@ export class EiscpDriver extends EventEmitter {
         } else {
           ascii = ascii.slice(0, -4);
         }
+        // Filter to only human-readable characters (a-z, A-Z, 0-9, space, common punctuation)
+        ascii = ascii.replace(/[^a-zA-Z0-9 .\-:]/g, "").trim();
         result.argument = ascii;
         return result;
       }

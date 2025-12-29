@@ -254,7 +254,7 @@ export class OnkyoCommandReceiver {
               nowPlaying.station = avrUpdates.argument.toString();
               nowPlaying.artist = "FM Radio";
             }
-            console.log("%s [%s] Front panel display: %s", integrationName, entityId, frontPanelText);
+            // console.log("%s [%s] Front panel display: %s", integrationName, entityId, frontPanelText);
             break;
           }
           case "NTM": {

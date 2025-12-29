@@ -41,8 +41,12 @@ Front Panel Display can be helpful when you have renamed an input source in your
 
   ![](/screenshots/avr-source-name-edit.png)
 
+  ![](/screenshots/front-panel-display-sensor.png)
 
-  But: probably the Front Panel Display is only showing info for the main zone, it might not be helpful in an activity which is using Zone2/3 without main.
+
+  note 1: probably the Front Panel Display is only showing info for the main zone, it might not be helpful in an activity which is using Zone2/3 without main.
+
+  note 2: when using Spotify or other streaming services the Front Panel Display might be scrolling though some info, the sensor will also be updated like that.
 
 _note: after installing a new version of the integration or after a reboot of the remote, it might be needed to close screen on the remote and enter the already active activity again to get the sensor to work, hit next to go to the next song and trigger refresh of the album art_
 
