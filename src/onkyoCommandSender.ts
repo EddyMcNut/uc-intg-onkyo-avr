@@ -205,6 +205,7 @@ export class OnkyoCommandSender {
       case uc.MediaPlayerCommands.Info:
         await this.eiscp.command(formatCommand("audio-information query"));
         await this.eiscp.command(formatCommand("video-information query"));
+        await this.eiscp.command(formatCommand("fp-display query"));
         break;
       default:
         return uc.StatusCodes.NotImplemented;

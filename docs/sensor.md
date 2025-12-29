@@ -1,6 +1,6 @@
 ## Sensors
 
-As from v0.7.2, this integration contains the following sensors for *every zone*:
+As from v0.7.3, this integration contains the following sensors for *every zone*:
 - Volume
 - Source
 - Audio Input
@@ -12,6 +12,10 @@ As from v0.7.2, this integration contains the following sensors for *every zone*
 - Mute
 
 **Prerequisite: make sure you are using UC Firmware 2.7.1 or higher.**
+
+During setup, you can choose to not have the sensors created:
+
+  ![](/screenshots/create-sensors.png)
 
 After running setup, you can select the sensors in the same way you select the AVR entity.
 
@@ -32,6 +36,13 @@ Like that you can have the volume visible without adjusting it for example.
 When you switch Source, the integration will try to refresh the sensor values. You can send a request to the AVR to refresh the information when you suspect the value has not been updated, trigger the `Info` command in that case:
 
   ![](/screenshots/info-command.png)
+
+Front Panel Display can be helpful when you have renamed an input source in your AVR:
+
+  ![](/screenshots/avr-source-name-edit.png)
+
+
+  But: probably the Front Panel Display is only showing info for the main zone, it might not be helpful in an activity which is using Zone2/3 without main.
 
 _note: after installing a new version of the integration or after a reboot of the remote, it might be needed to close screen on the remote and enter the already active activity again to get the sensor to work, hit next to go to the next song and trigger refresh of the album art_
 
