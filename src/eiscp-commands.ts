@@ -332,6 +332,16 @@ export const eiscpCommands = {
         QSTN: { name: "query", description: "gets Information of Video" }
       }
     },
+    FLD: {
+      name: "fp-display",
+      description: "FP Display Information Command",
+      values: {
+        '{xx}{xx}{xx}{xx}{xx}x': {
+          description: "FP Display Information Character Code for FP Display (UTF-8 encoded)",
+        },
+        QSTN: {name: "query", description: "gets FP Display Information" }
+      }
+    },
     SLI: {
       name: "input-selector",
       description: "Input Selector Command",
@@ -1722,6 +1732,7 @@ export const eiscpCommands = {
     "memory-setup": "MEM",
     "audio-information": "IFA",
     "video-information": "IFV",
+    "fp-display": "FLD",
     "input-selector": "SLI",
     "recout-selector": "SLR",
     "audio-selector": "SLA",
@@ -1950,6 +1961,7 @@ export const eiscpCommands = {
     },
     IFA: { query: { value: "QSTN" } },
     IFV: { query: { value: "QSTN" } },
+    FLD: { query: { value: "QSTN" } },
     SLI: {
       video1: { value: "00" },
       vcr: { value: "00" },

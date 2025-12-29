@@ -30,6 +30,7 @@ export function setAvrCurrentSource(source: string, eiscpInstance?: any, zone?: 
 
       // to make sure the sensor also updates (in case a message is missed)
       eiscpInstance.command({ zone, command: "input-selector", args: "query" });
+      eiscpInstance.command({ zone, command: "fp-display", args: "query" });
     }
   }
 }

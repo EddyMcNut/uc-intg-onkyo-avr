@@ -21,6 +21,7 @@ const COMMAND_MAPPINGS = eiscpCommands.command_mappings;
 const VALUE_MAPPINGS = eiscpCommands.value_mappings;
 const integrationName = "Onkyo-Integration eISCP:";
 const IGNORED_COMMANDS = new Set(["NMS", "NPB"]); // Commands to ignore from AVR
+const THROTTLED_COMMANDS = new Set(["IFA", "IFV", "FLD"]); // Commands to send to incoming queue for throttling
 
 interface Metadata {
   title?: string;
@@ -111,7 +112,7 @@ export class EiscpDriver extends EventEmitter {
       result.zone = "zone3";
     }
 
-    console.log("%s RAW RECEIVE: [%s] %s %s", integrationName, result.zone, command, value);
+    // console.log("%s RAW (2) RECEIVE: [%s] %s %s", integrationName, result.zone, command, value);
 
     if (command === "NTM") {
       let [position, duration] = value.toString().split("/");
@@ -227,15 +228,14 @@ export class EiscpDriver extends EventEmitter {
     }
 
     if (command === "FLD") {
-      // Decode front panel display, skip volume messages
       if (value.slice(0, 12) !== "566F6C756D65") {
+        result.command = "FLD";
         let ascii = Buffer.from(value, "hex").toString("ascii");
-        // // For FM radio, keep RDS command
-        // if (avrCurrentSource === "fm") {
-        //   result.command = "RDS";
-        // } else {
-          result.command = "FLD";
-        // }
+        if (avrCurrentSource.toLocaleLowerCase() === "fm") {
+          ascii = ascii.slice(0, -2);
+        } else {
+          ascii = ascii.slice(0, -4);
+        }
         result.argument = ascii;
         return result;
       }
@@ -429,7 +429,9 @@ export class EiscpDriver extends EventEmitter {
         let command = iscp_message.slice(0, 3);
         let value = iscp_message.slice(3);
         
-        // Ignore unwanted messages early
+        // console.log("%s RAW (0) RECEIVE: [%s] %s %s", integrationName, command, value);
+
+        // Ignore messages we don't care about
         if (IGNORED_COMMANDS.has(command)) {
           return;
         }
@@ -462,8 +464,8 @@ export class EiscpDriver extends EventEmitter {
           model: this.config.model
         };
 
-        // Route IFA and IFV messages through the incoming queue for throttling
-        if (command === "IFA" || command === "IFV") {
+        // Route less important messages through the incoming queue for throttling
+        if (THROTTLED_COMMANDS.has(command)) {
           this.receive_queue.push(dataPayload, (err: any) => {
             if (err) {
               console.error("Error processing queued incoming message:", err);
