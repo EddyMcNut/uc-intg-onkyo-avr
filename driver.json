@@ -165,6 +165,31 @@
         }
       },
       {
+        "id": "createSensors",
+        "label": {
+          "en": "Create sensor entities?"
+        },
+        "field": {
+          "dropdown": {
+            "value": "true",
+            "items": [
+              {
+                "id": "true",
+                "label": {
+                  "en": "Yes"
+                }
+              },
+              {
+                "id": "false",
+                "label": {
+                  "en": "No"
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
         "id": "infoTwo",
         "label": {
           "en": "Not auto discoverable? Adjust on-sequence!"

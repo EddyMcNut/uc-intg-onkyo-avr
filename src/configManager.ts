@@ -15,6 +15,7 @@ export interface AvrConfig {
   albumArtURL?: string;
   volumeScale?: number; // 80 or 100
   useHalfDbSteps?: boolean; // true = use 0.5 dB steps (×2 / ÷2), false = direct EISCP value
+  createSensors?: boolean; // true = create sensor entities for this AVR
 }
 
 export interface OnkyoConfig {
@@ -23,6 +24,7 @@ export interface OnkyoConfig {
   albumArtURL?: string;
   volumeScale?: number; // 80 or 100
   useHalfDbSteps?: boolean; // true = use 0.5 dB steps (×2 / ÷2), false = direct EISCP value
+  createSensors?: boolean; // true = create sensor entities
   // Legacy fields for backward compatibility
   model?: string;
   ip?: string;

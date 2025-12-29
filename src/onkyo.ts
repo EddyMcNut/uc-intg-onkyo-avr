@@ -72,11 +72,13 @@ export default class OnkyoDriver {
     albumArtURL: string;
     volumeScale: number;
     useHalfDbSteps: boolean;
+    createSensors: boolean;
   } = {
     queueThreshold: DEFAULT_QUEUE_THRESHOLD,
     albumArtURL: "album_art.cgi",
     volumeScale: 100,
-    useHalfDbSteps: true
+    useHalfDbSteps: true,
+    createSensors: true
   };
 
   constructor() {
@@ -106,6 +108,7 @@ export default class OnkyoDriver {
     const volumeScale = (msg as any).setupData?.volumeScale;
     const useHalfDbSteps = (msg as any).setupData?.useHalfDbSteps;
     const zoneCount = (msg as any).setupData?.zoneCount;
+    const createSensors = (msg as any).setupData?.createSensors;
     const remotePinCode = (msg as any).setupData?.remotePinCode;
 
     console.log(
@@ -139,7 +142,17 @@ export default class OnkyoDriver {
       }
     }
 
-    console.log("%s Setup data parsed - volumeScale: %d, useHalfDbSteps: %s", integrationName, volumeScaleValue, useHalfDbStepsValue);
+    // Parse createSensors - handle both string and boolean types
+    let createSensorsValue = true; // Default to true for backward compatibility
+    if (createSensors !== undefined && createSensors !== null && createSensors !== "") {
+      if (typeof createSensors === "boolean") {
+        createSensorsValue = createSensors;
+      } else if (typeof createSensors === "string") {
+        createSensorsValue = createSensors.toLowerCase() === "true";
+      }
+    }
+
+    console.log("%s Setup data parsed - volumeScale: %d, useHalfDbSteps: %s, createSensors: %s", integrationName, volumeScaleValue, useHalfDbStepsValue, createSensorsValue);
 
     // Parse zoneCount
     const zoneCountValue = zoneCount && !isNaN(parseInt(zoneCount, 10)) ? parseInt(zoneCount, 10) : 1;
@@ -150,7 +163,8 @@ export default class OnkyoDriver {
       queueThreshold: queueThresholdValue,
       albumArtURL: albumArtURLValue,
       volumeScale: volumeScaleValue,
-      useHalfDbSteps: useHalfDbStepsValue
+      useHalfDbSteps: useHalfDbStepsValue,
+      createSensors: createSensorsValue
     };
     console.log("%s Stored setup data for autodiscovery:", integrationName, this.lastSetupData);
 
@@ -207,9 +221,10 @@ export default class OnkyoDriver {
             queueThreshold: queueThresholdValue,
             albumArtURL: albumArtURLValue,
             volumeScale: volumeScaleValue,
-            useHalfDbSteps: useHalfDbStepsValue
+            useHalfDbSteps: useHalfDbStepsValue,
+            createSensors: createSensorsValue
           };
-          console.log("%s Adding AVR config for zone %s with volumeScale: %d, useHalfDbSteps: %s", integrationName, zone, avrConfig.volumeScale, avrConfig.useHalfDbSteps);
+          console.log("%s Adding AVR config for zone %s with volumeScale: %d, useHalfDbSteps: %s, createSensors: %s", integrationName, zone, avrConfig.volumeScale, avrConfig.useHalfDbSteps, avrConfig.createSensors);
           ConfigManager.addAvr(avrConfig);
         }
       } else {
@@ -240,9 +255,10 @@ export default class OnkyoDriver {
                 queueThreshold: queueThresholdValue,
                 albumArtURL: albumArtURLValue,
                 volumeScale: volumeScaleValue,
-                useHalfDbSteps: useHalfDbStepsValue
+                useHalfDbSteps: useHalfDbStepsValue,
+                createSensors: createSensorsValue
               };
-              console.log("%s Adding AVR config for zone %s with volumeScale: %d, useHalfDbSteps: %s", integrationName, zone, avrConfig.volumeScale, avrConfig.useHalfDbSteps);
+              console.log("%s Adding AVR config for zone %s with volumeScale: %d, useHalfDbSteps: %s, createSensors: %s", integrationName, zone, avrConfig.volumeScale, avrConfig.useHalfDbSteps, avrConfig.createSensors);
               ConfigManager.addAvr(avrConfig);
             }
           }
@@ -301,11 +317,15 @@ export default class OnkyoDriver {
       this.driver.addAvailableEntity(mediaPlayerEntity);
       console.log("%s [%s] Media player entity registered as available", integrationName, avrEntry);
       
-      // Register sensor entities
-      const sensorEntities = this.createSensorEntities(avrEntry);
-      for (const sensor of sensorEntities) {
-        this.driver.addAvailableEntity(sensor);
-        console.log("%s [%s] Sensor entity registered: %s", integrationName, avrEntry, sensor.id);
+      // Register sensor entities only if createSensors is enabled (defaults to true for backward compatibility)
+      if (avrConfig.createSensors !== false) {
+        const sensorEntities = this.createSensorEntities(avrEntry);
+        for (const sensor of sensorEntities) {
+          this.driver.addAvailableEntity(sensor);
+          console.log("%s [%s] Sensor entity registered: %s", integrationName, avrEntry, sensor.id);
+        }
+      } else {
+        console.log("%s [%s] Sensor entities disabled by user preference", integrationName, avrEntry);
       }
     }
   }
