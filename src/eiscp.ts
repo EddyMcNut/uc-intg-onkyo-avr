@@ -23,6 +23,22 @@ const integrationName = "Onkyo-Integration eISCP:";
 const IGNORED_COMMANDS = new Set(["NMS", "NPB"]); // Commands to ignore from AVR
 const THROTTLED_COMMANDS = new Set(["IFA", "IFV", "FLD"]); // Commands to send to incoming queue for throttling
 
+// Known network streaming services - when FLD starts with one of these, emit once and suppress scroll updates
+const NETWORK_SERVICES = [
+  "TuneIn",
+  "Spotify",
+  "Deezer",
+  "Tidal",
+  "AmazonMusic",
+  "Chromecast built-in",
+  "DTS Play-Fi",
+  "AirPlay",
+  "Alexa",
+  "Music Server",
+  "USB",
+  "Play Queue"
+];
+
 interface Metadata {
   title?: string;
   artist?: string;
@@ -39,6 +55,7 @@ export class EiscpDriver extends EventEmitter {
   private send_queue: async.QueueObject<any>;
   private receive_queue: async.QueueObject<any>;
   private currentMetadata: Metadata = {};
+  private lastFldService: string | null = null; // Track last detected network service from FLD
 
   constructor(config?: EiscpConfig) {
     super();
@@ -228,19 +245,47 @@ export class EiscpDriver extends EventEmitter {
     }
 
     if (command === "FLD") {
-      if (value.slice(0, 12) !== "566F6C756D65") {
-        result.command = "FLD";
-        let ascii = Buffer.from(value, "hex").toString("ascii");
-        if (avrCurrentSource.toLocaleLowerCase() === "fm") {
-          ascii = ascii.slice(0, -2);
-        } else {
-          ascii = ascii.slice(0, -4);
-        }
-        // Filter to only human-readable characters (a-z, A-Z, 0-9, space, common punctuation)
-        ascii = ascii.replace(/[^a-zA-Z0-9 .\-:]/g, "").trim();
-        result.argument = ascii;
+      // Skip volume display messages
+      if (value.slice(0, 12) === "566F6C756D65") {
         return result;
       }
+
+      // Decode hex to ASCII and filter to only human-readable characters
+      let ascii = Buffer.from(value, "hex").toString("ascii");
+      ascii = ascii.replace(/[^a-zA-Z0-9 .\-:/]/g, "").trim();
+
+      // Check if we're on a network source
+      const isNetworkSource = avrCurrentSource.toLowerCase().includes("net");
+
+      if (isNetworkSource) {
+        // Check if FLD text starts with a known network service
+        const detectedService = NETWORK_SERVICES.find((service) => ascii.startsWith(service));
+
+        if (detectedService) {
+          // Service detected at start of display - only emit if it's a new service
+          if (this.lastFldService !== detectedService) {
+            this.lastFldService = detectedService;
+            result.command = "FLD";
+            result.argument = detectedService;
+            return result;
+          }
+        }
+        // Either scrolling text or same service - suppress to avoid sensor spam
+        return result;
+      }
+
+      // Not on network source - reset tracking and pass through (e.g., FM RDS)
+      this.lastFldService = null;
+      if (avrCurrentSource.toLocaleLowerCase() === "fm") {
+        // remote the Tuner Preset at the end
+        ascii = ascii.slice(0, -2);
+      } else {
+        // remove the volume at the end (its slow and we already have a volume sensor)
+        ascii = ascii.slice(0, -4);
+      }
+      result.command = "FLD";
+      result.argument = ascii;
+      return result;
     }
 
     type CommandType = {

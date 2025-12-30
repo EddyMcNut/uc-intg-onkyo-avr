@@ -235,14 +235,6 @@ export class OnkyoCommandReceiver {
             console.log("%s [%s] DAB station set to: %s", integrationName, entityId, avrUpdates.argument.toString());
             break;
           }
-          // case "RDS": {
-          //   setAvrCurrentSource("fm", this.eiscpInstance, eventZone, entityId, this.driver);
-          //   nowPlaying.station = avrUpdates.argument.toString();
-          //   nowPlaying.artist = "FM Radio";
-          //   // console.log(`${integrationName} [${entityId}] RDS set to: ${String(avrUpdates.argument)}`);
-          //   console.log("%s [%s] RDS set to: %s", integrationName, entityId, avrUpdates.argument.toString());
-          //   break;
-          // }
           case "FLD": {
             const frontPanelText = avrUpdates.argument.toString();
             const frontPanelDisplaySensorId = `${entityId}_front_panel_display_sensor`;
