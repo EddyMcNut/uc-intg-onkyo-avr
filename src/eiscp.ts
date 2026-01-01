@@ -129,7 +129,7 @@ export class EiscpDriver extends EventEmitter {
       result.zone = "zone3";
     }
 
-    console.log("%s RAW (2) RECEIVE: [%s] %s %s", integrationName, result.zone, command, value);
+    // console.log("%s RAW (2) RECEIVE: [%s] %s %s", integrationName, result.zone, command, value);
 
     if (command === "NTM") {
       let [position, duration] = value.toString().split("/");

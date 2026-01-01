@@ -7,41 +7,41 @@ All commands can be found in [this JSON](../src/eiscp-commands.ts), from there y
 ![](../screenshots/input-json.png)
 
 Some examples to explain how to interpret that list:
-| I want to select on AVR | value(s) in JSON | value to enter into `Input source` |
+| I want to select on AVR | value(s) in JSON | Value to enter into `Input source` |
 |-------------------------|----------------------------|------------------------------------|
-| CBL/SAT | `video2` or `cbl` or `sat` | input-selector cbl |
-| BD/DVD | `bd` or `dvd` | input-selector bd |
-| STMBOX | `stm` | input-selector stm |
-| TV | `tv` | input-selector tv |
-| GAME | `video3` or `game` | input-selector game |
-| NET | `net` or `network` | input-selector net |
+| CBL/SAT | `video2` or `cbl` or `sat` | `input-selector cbl` |
+| BD/DVD | `bd` or `dvd` | `input-selector bd` |
+| STMBOX | `stm` | `input-selector stm` |
+| TV | `tv` | `input-selector tv` |
+| GAME | `video3` or `game` | `input-selector game` |
+| NET | `net` or `network` | `input-selector net` |
 
 ### NET
 `NET` covers multiple options, for example streaming Spotify/Deezer/Tidal to your AVR. So when you want to stream Spotify/Tidal/... you can use `input-selector net` and then hit play on your Spotify app and select your AVR. Later on, when you select your NET activity again and hit play on the remote, the AVR will try to continue where you left it last time it was playing from NET.
 
 ### Select Spotify/Deezer/... directly
-As from v0.7.3 you can select the 'sub-sources'of `NET` directly, let's say you want the AVR to switch to TuneIn, you can send `input-selector tunein` and the integration will make sure that first the command is send to switch to `NET` and then the second command is send to select `TuneIn` as the sub-source in NET. 
+As from v0.7.3 you can select the 'sub-sources'of `NET` directly, let's say you want the AVR to switch to TuneIn, you can send `input-selector tunein` and the integration will make sure that first the command is send to switch to `NET` and then the second command is send to select `TuneIn` as the sub-source in NET. As after switching to `NET` your AVR might need a few moments to setup, the next command is send with a 2,5 second delay (automatically).
 
-As a second example, looking at the [JSON](../src/eiscp-commands.ts), when you send `input-selector tidal` the integration will send two commands to the AVR:
+As on other example, looking at the [JSON](../src/eiscp-commands.ts), when you send `input-selector tidal` the integration will send two commands to the AVR:
 - SLI2B (switch to NET)
 - NLSL3 (within NET, switch to Tidal)
 
 For the following sources, the integration will first send the `input-selector net` command automatically before switching to the subsource:
 
-| Source       | Command in `Input source`     |
-|--------------|-------------------------------|
-| TuneIn       | `input-selector tunein`       |
-| Spotify      | `input-selector spotify`      |
-| Deezer       | `input-selector deezer`       |
-| Tidal        | `input-selector tidal`        |
-| AmazonMusic  | `input-selector amazonmusic`  |
-| Chromecast   | `input-selector chromecast`   |
-| DTS-Play-Fi  | `input-selector dts-play-fi`  |
-| AirPlay      | `input-selector airplay`      |
-| Alexa        | `input-selector alexa`        |
-| Music-Server | `input-selector music-server` |
-| USB          | `input-selector usb`          |
-| Play-Queue   | `input-selector play-queue`   |
+| Source       | Value to enter into `Input source` |
+|--------------|------------------------------------|
+| TuneIn       | `input-selector tunein`            |
+| Spotify      | `input-selector spotify`           |
+| Deezer       | `input-selector deezer`            |
+| Tidal        | `input-selector tidal`             |
+| AmazonMusic  | `input-selector amazonmusic`       |
+| Chromecast   | `input-selector chromecast`        |
+| DTS-Play-Fi  | `input-selector dts-play-fi`       |
+| AirPlay      | `input-selector airplay`           |
+| Alexa        | `input-selector alexa`             |
+| Music-Server | `input-selector music-server`      |
+| USB          | `input-selector usb`               |
+| Play-Queue   | `input-selector play-queue`        |
 
 [back to main README](../README.md#input-source)
 
