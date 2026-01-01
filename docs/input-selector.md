@@ -28,20 +28,20 @@ As a second example, looking at the [JSON](../src/eiscp-commands.ts), when you s
 
 For the following sources, the integration will first send the `input-selector net` command automatically before switching to the subsource:
 
-| Source       | Command                     |
-|--------------|-----------------------------|
-| TuneIn       | `Input source tunein`       |
-| Spotify      | `Input source spotify`      |
-| Deezer       | `Input source deezer`       |
-| Tidal        | `Input source tidal`        |
-| AmazonMusic  | `Input source amazonmusic`  |
-| Chromecast   | `Input source chromecast`   |
-| DTS-Play-Fi  | `Input source dts-play-fi`  |
-| AirPlay      | `Input source airplay`      |
-| Alexa        | `Input source alexa`        |
-| Music-Server | `Input source music-server` |
-| USB          | `Input source usb`          |
-| Play-Queue   | `Input source play-queue`   |
+| Source       | Command in `Input source`     |
+|--------------|-------------------------------|
+| TuneIn       | `input-selector tunein`       |
+| Spotify      | `input-selector spotify`      |
+| Deezer       | `input-selector deezer`       |
+| Tidal        | `input-selector tidal`        |
+| AmazonMusic  | `input-selector amazonmusic`  |
+| Chromecast   | `input-selector chromecast`   |
+| DTS-Play-Fi  | `input-selector dts-play-fi`  |
+| AirPlay      | `input-selector airplay`      |
+| Alexa        | `input-selector alexa`        |
+| Music-Server | `input-selector music-server` |
+| USB          | `input-selector usb`          |
+| Play-Queue   | `input-selector play-queue`   |
 
 [back to main README](../README.md#input-source)
 

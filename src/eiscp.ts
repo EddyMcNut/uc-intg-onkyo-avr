@@ -129,7 +129,7 @@ export class EiscpDriver extends EventEmitter {
       result.zone = "zone3";
     }
 
-    // console.log("%s RAW (2) RECEIVE: [%s] %s %s", integrationName, result.zone, command, value);
+    console.log("%s RAW (2) RECEIVE: [%s] %s %s", integrationName, result.zone, command, value);
 
     if (command === "NTM") {
       let [position, duration] = value.toString().split("/");
@@ -566,10 +566,17 @@ export class EiscpDriver extends EventEmitter {
   /**
    * Send an ISCP command, automatically prepending SLI2B (NET input) for network service selection commands
    */
-  private sendIscp(iscpCommand: string, callback?: any) {
-    // If selecting a network service (NLSLx), first switch to NET input
-    if (iscpCommand.startsWith("NLSL")) {
-      this.raw("SLI2B"); // Select NET input first (queue handles delay between commands)
+  private async sendIscp(iscpCommand: string, callback?: any) {
+    // Check if command contains a network service selection (NLSLx)
+    // This handles both direct NLSL commands and embedded ones like "SLINLSL1"
+    const nlslMatch = iscpCommand.match(/NLSL[0-9A-Fa-f]/);
+    if (nlslMatch) {
+      console.log("%s Sending SLI2B (NET input) before %s", integrationName, nlslMatch[0]);
+      this.raw("SLI2B"); // Select NET input first
+      await new Promise((resolve) => setTimeout(resolve, 2500)); // Wait for AVR to fully load NET menu (needs time when exiting a service)
+      console.log("%s Sending network service command: %s", integrationName, nlslMatch[0]);
+      this.raw(nlslMatch[0], callback); // Send just the NLSL command
+      return;
     }
     this.raw(iscpCommand, callback);
   }
