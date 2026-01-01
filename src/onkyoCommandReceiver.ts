@@ -6,6 +6,18 @@ import { EiscpDriver } from "./eiscp.js";
 
 const integrationName = "Onkyo-Integration (receiver):";
 
+const SENSOR_SUFFIXES = [
+  "_mute_sensor",
+  "_volume_sensor",
+  "_source_sensor",
+  "_audio_input_sensor",
+  "_audio_output_sensor",
+  "_video_input_sensor",
+  "_video_output_sensor",
+  "_output_display_sensor",
+  "_front_panel_display_sensor"
+];
+
 export class OnkyoCommandReceiver {
   private driver: uc.IntegrationAPI;
   private config: OnkyoConfig;
@@ -102,6 +114,16 @@ export class OnkyoCommandReceiver {
               [uc.MediaPlayerAttributes.State]: avrUpdates.argument === "on" ? uc.MediaPlayerStates.On : uc.MediaPlayerStates.Standby
             });
             console.log("%s [%s] power set to: %s", integrationName, entityId, entity?.attributes?.state);
+
+            // When AVR is off, set all sensor states to Unavailable
+            if (avrUpdates.argument !== "on") {
+              for (const suffix of SENSOR_SUFFIXES) {
+                this.driver.updateEntityAttributes(`${entityId}${suffix}`, {
+                  [uc.SensorAttributes.State]: uc.SensorStates.Unavailable
+                });
+              }
+              console.log("%s [%s] all sensors state set to: Unavailable", integrationName, entityId);
+            }
             break;
           }
           case "audio-muting": {

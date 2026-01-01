@@ -563,6 +563,17 @@ export class EiscpDriver extends EventEmitter {
     }
   }
 
+  /**
+   * Send an ISCP command, automatically prepending SLI2B (NET input) for network service selection commands
+   */
+  private sendIscp(iscpCommand: string, callback?: any) {
+    // If selecting a network service (NLSLx), first switch to NET input
+    if (iscpCommand.startsWith("NLSL")) {
+      this.raw("SLI2B"); // Select NET input first (queue handles delay between commands)
+    }
+    this.raw(iscpCommand, callback);
+  }
+
   command(data: any, callback?: any) {
     let command: string, args: any, zone: any;
 
@@ -580,7 +591,7 @@ export class EiscpDriver extends EventEmitter {
         command = parts[0];
         args = parts[1];
       } else {
-        this.raw(this.command_to_iscp(data, undefined, "main"), callback);
+        this.sendIscp(this.command_to_iscp(data, undefined, "main"), callback);
         return;
       }
     } else if (typeof data === "object" && data !== null) {
@@ -588,10 +599,10 @@ export class EiscpDriver extends EventEmitter {
       command = data.command;
       args = data.args;
     } else {
-      this.raw(this.command_to_iscp(data, undefined, "main"), callback);
+      this.sendIscp(this.command_to_iscp(data, undefined, "main"), callback);
       return;
     }
-    this.raw(this.command_to_iscp(command, args, zone), callback);
+    this.sendIscp(this.command_to_iscp(command, args, zone), callback);
   }
 
   private command_to_iscp(command: string, args: any, zone: string) {

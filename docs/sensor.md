@@ -37,6 +37,7 @@ When you switch Source, the integration will try to refresh the sensor values. Y
 
   ![](/screenshots/info-command.png)
 
+### Front Panel Display
 Front Panel Display can be helpful when you have renamed an input source in your AVR:
 
   ![](/screenshots/avr-source-name-edit.png)
@@ -46,7 +47,7 @@ Front Panel Display can be helpful when you have renamed an input source in your
 
   note 1: probably the Front Panel Display is only showing info for the main zone, it might not be helpful in an activity which is using Zone2/3 without main.
 
-  note 2: when using Spotify or other streaming services the Front Panel Display might be scrolling though some info, the sensor will only be updated with the value of the selected 'sub-source' of 'NET' like TuneIn, Spotify, Deezer, Tidal, AmazonMusic, Chromecast built-in, DTS Play-Fi, AirPlay, Alexa, Music Server, USB, Play Queue. This prevents the integration to continuously update the sensor.
+  note 2: when using Spotify or other streaming services the Front Panel Display on the AVR might be scrolling though some info like song and artist, the sensor of this integration will only be updated with the value of the selected 'sub-source' of 'NET' which are TuneIn, Spotify, Deezer, Tidal, AmazonMusic, Chromecast, DTS-Play-Fi, AirPlay, Alexa, Music-Server, USB, Play-Queue. This prevents the integration to continuously update the sensor.
 
 _note: after installing a new version of the integration or after a reboot of the remote, it might be needed to close screen on the remote and enter the already active activity again to get the sensor to work, hit next to go to the next song and trigger refresh of the album art_
 
