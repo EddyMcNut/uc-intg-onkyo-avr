@@ -388,8 +388,6 @@ export const eiscpCommands = {
         "NLSL7": { name: "airplay", description: "selects AirPlay after selecting NET" },
         "NLSL8": { name: "alexa", description: "selects Alexa after selecting NET" },
         "NLSL9": { name: "music-server", description: "selects Music-Server after selecting NET" },
-        "NLSLA": { name: "usb", description: "selects USB after selecting NET" },
-        "NLSLB": { name: "play-queue", description: "selects Play-Queue after selecting NET" },
         UP: { name: "up", description: "sets Selector Position Wrap-Around Up" },
         DOWN: { name: "down", description: "sets Selector Position Wrap-Around Down" },
         QSTN: { name: "query", description: "gets The Selector Position" }
@@ -2032,8 +2030,6 @@ export const eiscpCommands = {
       "airplay": { value: "NLSL7"},
       "alexa": { value: "NLSL8"},
       "music-server": { value: "NLSL9"},
-      "usb": { value: "NLSLA"},
-      "play-queue": { value: "NLSLB"},
       up: { value: "UP" },
       down: { value: "DOWN" },
       query: { value: "QSTN" }

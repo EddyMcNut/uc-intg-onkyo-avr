@@ -1,5 +1,5 @@
 import * as uc from "@unfoldedcircle/integration-api";
-import { avrCurrentSource, setAvrCurrentSource } from "./state.js";
+import { avrCurrentSource, avrCurrentSubSource, setAvrCurrentSource, setAvrCurrentSubSource } from "./state.js";
 import crypto from "crypto";
 import { OnkyoConfig } from "./configManager.js";
 import { EiscpDriver } from "./eiscp.js";
@@ -17,6 +17,8 @@ const SENSOR_SUFFIXES = [
   "_output_display_sensor",
   "_front_panel_display_sensor"
 ];
+
+const ALBUM_ART = ["spotify", "deezer", "tidal", "amazonmusic", "dts-play-fi"];
 
 export class OnkyoCommandReceiver {
   private driver: uc.IntegrationAPI;
@@ -169,12 +171,13 @@ export class OnkyoCommandReceiver {
             break;
           }
           case "input-selector": {
-            setAvrCurrentSource(avrUpdates.argument.toString(), this.eiscpInstance, eventZone, entityId, this.driver);
+            let source = avrUpdates.argument.toString().split(",")[0];
+            setAvrCurrentSource(source, this.eiscpInstance, eventZone, entityId, this.driver);
             this.driver.updateEntityAttributes(entityId, {
-              [uc.MediaPlayerAttributes.Source]: avrUpdates.argument.toString()
+              [uc.MediaPlayerAttributes.Source]: source
             });
-            console.log("%s [%s] input-selector (source) set to: %s", integrationName, entityId, avrUpdates.argument.toString());
-            switch (avrUpdates.argument.toString()) {
+            console.log("%s [%s] input-selector (source) set to: %s", integrationName, entityId, source);
+            switch (source.toLowerCase()) {
               case "dab":
                 this.eiscpInstance.raw("DSNQSTN");
                 break;
@@ -188,7 +191,7 @@ export class OnkyoCommandReceiver {
               let sourceSensorId = `${entityId}_source_sensor`;
               this.driver.updateEntityAttributes(sourceSensorId, {
               [uc.SensorAttributes.State]: uc.SensorStates.On,
-              [uc.SensorAttributes.Value]: avrUpdates.argument.toString().toUpperCase()
+              [uc.SensorAttributes.Value]: source.toUpperCase()
             });
             break;
           }
@@ -259,6 +262,7 @@ export class OnkyoCommandReceiver {
           }
           case "FLD": {
             const frontPanelText = avrUpdates.argument.toString();
+            setAvrCurrentSubSource(frontPanelText, this.eiscpInstance, eventZone, entityId, this.driver);
             const frontPanelDisplaySensorId = `${entityId}_front_panel_display_sensor`;
             this.driver.updateEntityAttributes(frontPanelDisplaySensorId, {
               [uc.SensorAttributes.State]: uc.SensorStates.On,
@@ -280,8 +284,7 @@ export class OnkyoCommandReceiver {
             break;
           }
           case "metadata": {
-            // Only update metadata if we're already on a network source (don't let metadata override input-selector)
-            if (["spotify", "airplay", "net,network"].includes(avrCurrentSource)) {
+            if (["spotify", "deezer", "tidal", "amazonmusic", "dts-play-fi", "airplay"].includes(avrCurrentSubSource.toLowerCase())) {
               if (typeof avrUpdates.argument === "object" && avrUpdates.argument !== null) {
                 nowPlaying.title = (avrUpdates.argument as Record<string, string>).title || "unknown";
                 nowPlaying.album = (avrUpdates.argument as Record<string, string>).album || "unknown";
@@ -293,10 +296,8 @@ export class OnkyoCommandReceiver {
           default:
             break;
         }
-        switch (avrCurrentSource) {
-          case "spotify":
-          case "airplay":
-          case "net,network":
+        switch (avrCurrentSource.toLowerCase()) {
+          case "net":
             let trackId = `${nowPlaying.title}|${nowPlaying.album}|${nowPlaying.artist}`;
             if (trackId !== this.currentTrackId) {
               this.currentTrackId = trackId;
@@ -305,7 +306,15 @@ export class OnkyoCommandReceiver {
                 [uc.MediaPlayerAttributes.MediaTitle]: nowPlaying.title || "unknown",
                 [uc.MediaPlayerAttributes.MediaAlbum]: nowPlaying.album || "unknown"
               });
-              await this.maybeUpdateImage(entityId);
+              const hasAlbumArt = ALBUM_ART.some(name => avrCurrentSubSource.toLowerCase().includes(name));
+              if (hasAlbumArt) {
+                await this.maybeUpdateImage(entityId);
+              }else {
+                // Clear image URL if source does not support album art
+                this.driver.updateEntityAttributes(entityId, {
+                  [uc.MediaPlayerAttributes.MediaImageUrl]: ""
+                });
+              }
             }
             break;
           case "tuner":
