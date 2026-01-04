@@ -119,10 +119,10 @@ export class OnkyoCommandReceiver {
             if (avrUpdates.argument !== "on") {
               for (const suffix of SENSOR_SUFFIXES) {
                 this.driver.updateEntityAttributes(`${entityId}${suffix}`, {
-                  [uc.SensorAttributes.State]: uc.SensorStates.Unavailable
+                  [uc.SensorAttributes.Value]: "AVR Off",
                 });
               }
-              console.log("%s [%s] all sensors state set to: Unavailable", integrationName, entityId);
+              console.log("%s [%s] all sensors state set to: AVR Off", integrationName, entityId);
             }
             break;
           }
@@ -131,7 +131,7 @@ export class OnkyoCommandReceiver {
               [uc.MediaPlayerAttributes.Muted]: avrUpdates.argument === "on" ? true : false
             });
             const muteSensorId = `${entityId}_mute_sensor`;
-            const muteState = avrUpdates.argument === "on" ? "on" : "off";
+            const muteState = avrUpdates.argument === "on" ? "ON" : "OFF";
             this.driver.updateEntityAttributes(muteSensorId, {
               [uc.SensorAttributes.State]: uc.SensorStates.On,
               [uc.SensorAttributes.Value]: muteState
@@ -188,7 +188,7 @@ export class OnkyoCommandReceiver {
               let sourceSensorId = `${entityId}_source_sensor`;
               this.driver.updateEntityAttributes(sourceSensorId, {
               [uc.SensorAttributes.State]: uc.SensorStates.On,
-              [uc.SensorAttributes.Value]: avrUpdates.argument.toString()
+              [uc.SensorAttributes.Value]: avrUpdates.argument.toString().toUpperCase()
             });
             break;
           }
@@ -274,8 +274,8 @@ export class OnkyoCommandReceiver {
           case "NTM": {
             let [position, duration] = avrUpdates.argument.toString().split("/");
             this.driver.updateEntityAttributes(entityId, {
-              [uc.MediaPlayerAttributes.MediaPosition]: position || "0",
-              [uc.MediaPlayerAttributes.MediaDuration]: duration || "0"
+              [uc.MediaPlayerAttributes.MediaPosition]: position || 0,
+              [uc.MediaPlayerAttributes.MediaDuration]: duration || 0
             });
             break;
           }

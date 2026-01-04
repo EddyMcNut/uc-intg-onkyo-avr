@@ -84,6 +84,17 @@
         }
       },
       {
+        "id": "netMenuDelay",
+        "label": {
+          "en": "NET sub-source selection delay. Default `500`"
+        },
+        "field": {
+          "number": {
+            "value": 500
+          }
+        }
+      },
+      {
         "id": "volumeScale",
         "label": {
           "en": "Volume scale (0-80 or 0-100)"

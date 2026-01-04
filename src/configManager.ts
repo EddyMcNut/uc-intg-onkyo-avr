@@ -16,6 +16,7 @@ export interface AvrConfig {
   volumeScale?: number; // 80 or 100
   useHalfDbSteps?: boolean; // true = use 0.5 dB steps (×2 / ÷2), false = direct EISCP value
   createSensors?: boolean; // true = create sensor entities for this AVR
+  netMenuDelay?: number; // delay in ms for NET menu to load (default 2500)
 }
 
 export interface OnkyoConfig {

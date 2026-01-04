@@ -7,6 +7,7 @@ export interface EiscpConfig {
   verify_commands?: boolean;
   send_delay?: number;
   receive_delay?: number;
+  netMenuDelay?: number;
 }
 import net from "net";
 import dgram from "dgram";
@@ -39,6 +40,12 @@ const NETWORK_SERVICES = [
   "Play Queue"
 ];
 
+// Source names that indicate we're on a network/streaming source (used for FLD filtering)
+const NETWORK_SOURCE_NAMES = [
+  "net", "network", "tunein", "spotify", "deezer", "tidal", "amazonmusic",
+  "chromecast", "dts-play-fi", "airplay", "alexa", "music-server", "usb", "play-queue"
+];
+
 interface Metadata {
   title?: string;
   artist?: string;
@@ -67,7 +74,8 @@ export class EiscpDriver extends EventEmitter {
       reconnect_sleep: config?.reconnect_sleep ?? 5,
       verify_commands: config?.verify_commands ?? false,
       send_delay: config?.send_delay ?? DEFAULT_QUEUE_THRESHOLD,
-      receive_delay: config?.receive_delay ?? DEFAULT_QUEUE_THRESHOLD
+      receive_delay: config?.receive_delay ?? DEFAULT_QUEUE_THRESHOLD,
+      netMenuDelay: config?.netMenuDelay ?? 2500
     };
     this.send_queue = async.queue(this.sendCommand.bind(this), 1);
     this.receive_queue = async.queue(this.processIncomingMessage.bind(this), 1);
@@ -255,7 +263,7 @@ export class EiscpDriver extends EventEmitter {
       ascii = ascii.replace(/[^a-zA-Z0-9 .\-:/]/g, "").trim();
 
       // Check if we're on a network source
-      const isNetworkSource = avrCurrentSource.toLowerCase().includes("net");
+      const isNetworkSource = NETWORK_SOURCE_NAMES.some(name => avrCurrentSource.toLowerCase().includes(name));
 
       if (isNetworkSource) {
         // Check if FLD text starts with a known network service
@@ -496,8 +504,8 @@ export class EiscpDriver extends EventEmitter {
 
         const rawResult = this.iscp_to_command(command, value);
 
-        // Only emit if rawResult is defined
-        if (!rawResult) {
+        // Only emit if rawResult is defined and has a meaningful command
+        if (!rawResult || rawResult.command === "undefined") {
           return;
         }
 
@@ -563,17 +571,13 @@ export class EiscpDriver extends EventEmitter {
     }
   }
 
-  /**
-   * Send an ISCP command, automatically prepending SLI2B (NET input) for network service selection commands
-   */
   private async sendIscp(iscpCommand: string, callback?: any) {
-    // Check if command contains a network service selection (NLSLx)
-    // This handles both direct NLSL commands and embedded ones like "SLINLSL1"
+    // Check if command contains a network service selection (NLSLx), this handles both direct NLSL commands and embedded ones like "SLINLSL1"
     const nlslMatch = iscpCommand.match(/NLSL[0-9A-Fa-f]/);
     if (nlslMatch) {
       console.log("%s Sending SLI2B (NET input) before %s", integrationName, nlslMatch[0]);
       this.raw("SLI2B"); // Select NET input first
-      await new Promise((resolve) => setTimeout(resolve, 2500)); // Wait for AVR to fully load NET menu (needs time when exiting a service)
+      await new Promise((resolve) => setTimeout(resolve, this.config.netMenuDelay ?? 2500)); // Wait for AVR to fully load NET menu (needs time when exiting a service)
       console.log("%s Sending network service command: %s", integrationName, nlslMatch[0]);
       this.raw(nlslMatch[0], callback); // Send just the NLSL command
       return;

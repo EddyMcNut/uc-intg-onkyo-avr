@@ -1,6 +1,6 @@
 ## Input source
 
-When creating an activity, you probably also want to be able to change the input source on your AVR. As this integration uses the flexibility of the `Input source` command to be able to control almost everything, there is no dropdown available. Instead you type the command you want to send.
+When creating an activity, you probably also want to be able to change the input source on your AVR. As this integration uses the flexibility of the `Input source` command to be able to control almost everything, there is no dropdown available. Instead you type the command you want to send. Maximum flexibility for you, less work for me :)
 
 All commands can be found in [this JSON](../src/eiscp-commands.ts), from there you can determine how to select the correct input.
 
@@ -17,16 +17,18 @@ Some examples to explain how to interpret that list:
 | NET | `net` or `network` | `input-selector net` |
 
 ### NET
-`NET` covers multiple options, for example streaming Spotify/Deezer/Tidal to your AVR. So when you want to stream Spotify/Tidal/... you can use `input-selector net` and then hit play on your Spotify app and select your AVR. Later on, when you select your NET activity again and hit play on the remote, the AVR will try to continue where you left it last time it was playing from NET.
+`NET` covers multiple options, for example streaming Spotify/Deezer/Tidal to your AVR. So when you want to stream Spotify/Tidal/... you can use `input-selector net` and then hit play on your Spotify/Deezer app and select your AVR. Later on, when you select your NET activity again and hit play on the remote, the AVR will try to continue where you left it last time it was playing from NET.
 
 ### Select Spotify/Deezer/... directly
-As from v0.7.3 you can select the 'sub-sources'of `NET` directly, let's say you want the AVR to switch to TuneIn, you can send `input-selector tunein` and the integration will make sure that first the command is send to switch to `NET` and then the second command is send to select `TuneIn` as the sub-source in NET. As after switching to `NET` your AVR might need a few moments to setup, the next command is send with a 2,5 second delay (automatically).
+As from v0.7.3 you can select the 'sub-sources'of `NET` directly, let's say you want the AVR to switch to TuneIn, you can send `input-selector tunein` and the integration will make sure that *first* the command is send to switch to `NET` and then a *second* command is send to select `TuneIn` as the sub-source in NET. As after switching to `NET` your AVR might need a few moments to setup, the next command is send with a delay **automatically** which you can configure during setup:
 
-As on other example, looking at the [JSON](../src/eiscp-commands.ts), when you send `input-selector tidal` the integration will send two commands to the AVR:
+![](/screenshots/net-subsource-delay.png)
+
+As a more detailed example, looking at the [JSON](../src/eiscp-commands.ts), when you send `input-selector tidal` the integration will send two commands to the AVR:
 - SLI2B (switch to NET)
 - NLSL3 (within NET, switch to Tidal)
 
-For the following sources, the integration will first send the `input-selector net` command automatically before switching to the subsource:
+For the following sources, the integration will first send the `input-selector net` command automatically *before* switching to the subsource:
 
 | Source       | Value to enter into `Input source` |
 |--------------|------------------------------------|
@@ -40,8 +42,8 @@ For the following sources, the integration will first send the `input-selector n
 | AirPlay      | `input-selector airplay`           |
 | Alexa        | `input-selector alexa`             |
 | Music-Server | `input-selector music-server`      |
-| USB          | `input-selector usb`               |
-| Play-Queue   | `input-selector play-queue`        |
+
+Of course, your AVR must support these services. Check the manual of your model to see which of these services are available.
 
 [back to main README](../README.md#input-source)
 

@@ -73,12 +73,14 @@ export default class OnkyoDriver {
     volumeScale: number;
     useHalfDbSteps: boolean;
     createSensors: boolean;
+    netMenuDelay: number;
   } = {
     queueThreshold: DEFAULT_QUEUE_THRESHOLD,
     albumArtURL: "album_art.cgi",
     volumeScale: 100,
     useHalfDbSteps: true,
-    createSensors: true
+    createSensors: true,
+    netMenuDelay: 2500
   };
 
   constructor() {
@@ -109,6 +111,7 @@ export default class OnkyoDriver {
     const useHalfDbSteps = (msg as any).setupData?.useHalfDbSteps;
     const zoneCount = (msg as any).setupData?.zoneCount;
     const createSensors = (msg as any).setupData?.createSensors;
+    const netMenuDelay = (msg as any).setupData?.netMenuDelay;
     const remotePinCode = (msg as any).setupData?.remotePinCode;
 
     console.log(
@@ -152,7 +155,10 @@ export default class OnkyoDriver {
       }
     }
 
-    console.log("%s Setup data parsed - volumeScale: %d, useHalfDbSteps: %s, createSensors: %s", integrationName, volumeScaleValue, useHalfDbStepsValue, createSensorsValue);
+    // Parse netMenuDelay - default to 2500ms
+    const netMenuDelayValue = netMenuDelay && netMenuDelay.toString().trim() !== "" ? parseInt(netMenuDelay, 10) : 2500;
+
+    console.log("%s Setup data parsed - volumeScale: %d, useHalfDbSteps: %s, createSensors: %s, netMenuDelay: %d", integrationName, volumeScaleValue, useHalfDbStepsValue, createSensorsValue, netMenuDelayValue);
 
     // Parse zoneCount
     const zoneCountValue = zoneCount && !isNaN(parseInt(zoneCount, 10)) ? parseInt(zoneCount, 10) : 1;
@@ -164,7 +170,8 @@ export default class OnkyoDriver {
       albumArtURL: albumArtURLValue,
       volumeScale: volumeScaleValue,
       useHalfDbSteps: useHalfDbStepsValue,
-      createSensors: createSensorsValue
+      createSensors: createSensorsValue,
+      netMenuDelay: netMenuDelayValue
     };
     console.log("%s Stored setup data for autodiscovery:", integrationName, this.lastSetupData);
 
@@ -222,9 +229,10 @@ export default class OnkyoDriver {
             albumArtURL: albumArtURLValue,
             volumeScale: volumeScaleValue,
             useHalfDbSteps: useHalfDbStepsValue,
-            createSensors: createSensorsValue
+            createSensors: createSensorsValue,
+            netMenuDelay: netMenuDelayValue
           };
-          console.log("%s Adding AVR config for zone %s with volumeScale: %d, useHalfDbSteps: %s, createSensors: %s", integrationName, zone, avrConfig.volumeScale, avrConfig.useHalfDbSteps, avrConfig.createSensors);
+          console.log("%s Adding AVR config for zone %s with volumeScale: %d, useHalfDbSteps: %s, createSensors: %s, netMenuDelay: %d", integrationName, zone, avrConfig.volumeScale, avrConfig.useHalfDbSteps, avrConfig.createSensors, avrConfig.netMenuDelay);
           ConfigManager.addAvr(avrConfig);
         }
       } else {
@@ -256,9 +264,10 @@ export default class OnkyoDriver {
                 albumArtURL: albumArtURLValue,
                 volumeScale: volumeScaleValue,
                 useHalfDbSteps: useHalfDbStepsValue,
-                createSensors: createSensorsValue
+                createSensors: createSensorsValue,
+                netMenuDelay: netMenuDelayValue
               };
-              console.log("%s Adding AVR config for zone %s with volumeScale: %d, useHalfDbSteps: %s, createSensors: %s", integrationName, zone, avrConfig.volumeScale, avrConfig.useHalfDbSteps, avrConfig.createSensors);
+              console.log("%s Adding AVR config for zone %s with volumeScale: %d, useHalfDbSteps: %s, createSensors: %s, netMenuDelay: %d", integrationName, zone, avrConfig.volumeScale, avrConfig.useHalfDbSteps, avrConfig.createSensors, avrConfig.netMenuDelay);
               ConfigManager.addAvr(avrConfig);
             }
           }
@@ -559,7 +568,7 @@ export default class OnkyoDriver {
       {
         attributes: {
           [uc.SensorAttributes.State]: uc.SensorStates.Unknown,
-          [uc.SensorAttributes.Value]: "off",
+          [uc.SensorAttributes.Value]: "",
         },
         deviceClass: uc.SensorDeviceClasses.Custom,
         options: {}
@@ -590,7 +599,7 @@ export default class OnkyoDriver {
       await eiscp.command({ zone, command: "volume", args: "query" });
       await new Promise((resolve) => setTimeout(resolve, queueThreshold));
       await eiscp.command({ zone, command: "audio-muting", args: "query" });
-      await new Promise((resolve) => setTimeout(resolve, queueThreshold));
+      await new Promise((resolve) => setTimeout(resolve, queueThreshold * 2));
       await eiscp.command({ zone, command: "fp-display", args: "query" });
     } catch (queryErr) {
       console.warn(`${integrationName} [${avrEntry}] Failed to query AVR state (${context}):`, queryErr);
@@ -719,7 +728,8 @@ export default class OnkyoDriver {
           host: avrConfig.ip,
           port: avrConfig.port,
           model: avrConfig.model,
-          send_delay: avrConfig.queueThreshold ?? DEFAULT_QUEUE_THRESHOLD
+          send_delay: avrConfig.queueThreshold ?? DEFAULT_QUEUE_THRESHOLD,
+          netMenuDelay: avrConfig.netMenuDelay ?? 2500
         });
 
         // Create per-AVR config for command receiver (shared by all zones)
