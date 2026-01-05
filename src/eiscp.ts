@@ -25,26 +25,7 @@ const IGNORED_COMMANDS = new Set(["NMS", "NPB"]); // Commands to ignore from AVR
 const THROTTLED_COMMANDS = new Set(["IFA", "IFV", "FLD"]); // Commands to send to incoming queue for throttling
 
 // Known network streaming services - when FLD starts with one of these, emit once and suppress scroll updates
-const NETWORK_SERVICES = [
-  "TuneIn",
-  "Spotify",
-  "Deezer",
-  "Tidal",
-  "AmazonMusic",
-  "Chromecast built-in",
-  "DTS Play-Fi",
-  "AirPlay",
-  "Alexa",
-  "Music Server",
-  "USB",
-  "Play Queue"
-];
-
-// Source names that indicate we're on a network/streaming source (used for FLD filtering)
-const NETWORK_SOURCE_NAMES = [
-  "net", "network", "tunein", "spotify", "deezer", "tidal", "amazonmusic",
-  "chromecast", "dts-play-fi", "airplay", "alexa", "music-server", "usb", "play-queue"
-];
+const NETWORK_SERVICES = ["TuneIn", "Spotify", "Deezer", "Tidal", "AmazonMusic", "Chromecast built-in", "DTS Play-Fi", "AirPlay", "Alexa", "Music Server", "USB", "Play Queue"];
 
 interface Metadata {
   title?: string;
@@ -139,161 +120,172 @@ export class EiscpDriver extends EventEmitter {
 
     // console.log("%s RAW (2) RECEIVE: [%s] %s %s", integrationName, result.zone, command, value);
 
-    if (command === "NTM") {
-      let [position, duration] = value.toString().split("/");
-      position = this.timeToSeconds(position).toString();
-      duration = this.timeToSeconds(duration).toString();
-      result.command = "NTM";
-      result.argument = position + "/" + duration;
-      return result;
-    }
-
-    if (command.toUpperCase() === "IFA") {
-      const raw = value?.toString() ?? "";
-      const parts = raw.split(",").map((p) => p.trim());
-
-      const inputSource = (parts[0] || "").replace(/\s+/g, ""); // "HDMI 1" -> "HDMI1"
-      const inputFormat = parts[1] || ""; // PCM / Dolby Atmos
-      const inputRate = parts[2] || ""; // 48 kHz
-      const inputChannels = parts[3] || ""; // 2.0 ch
-
-      const outputFormat = parts[4] || ""; // Stereo / Dolby Atmos
-      const outputChannels = parts[5] || ""; // 2.1 ch / 5.1 ch
-
-      const inputRateChannels = inputFormat === "" ? inputSource : [inputRate, inputChannels].filter(Boolean).join(" ");
-      const audioInputValue = [inputFormat, inputRateChannels].filter(Boolean).join(" | ");
-      const audioOutputValue = [outputFormat, outputChannels].filter(Boolean).join(" | ");
-      
-      result.command = "IFA";
-      result.argument = {
-        inputSource,
-        inputFormat,
-        inputRate,
-        inputChannels,
-        outputFormat,
-        outputChannels,
-        audioInputValue,
-        audioOutputValue
-      };
-      return result;
-    }
-
-    if (command.toUpperCase() === "IFV") {
-      const raw = value?.toString() ?? "";
-      const parts = raw.split(",").map((p) => p.trim());
-
-      const inputSource = (parts[0] || "").replace(/\s+/g, ""); // "HDMI 1" -> "HDMI1"
-      const inputResolution = parts[1] || ""; // 4K(3840x2160) 59 Hz
-      const inputColorSpace = parts[2] || ""; // RGB
-      const inputBitDepth = parts[3] || ""; // 24bit
-      const videoFormat = parts[9] || ""; // Dolby Vision
-
-      const outputDisplay = parts[4] || ""; // MAIN
-      const outputResolution = parts[5] || ""; // 4K(3840x2160) 59 Hz
-      const outputColorSpace = parts[6] || ""; // RGB
-      const outputBitDepth = parts[7] || ""; // 24bit
-
-      const inputColorBit = [inputColorSpace, inputBitDepth].filter(Boolean).join(" ");
-      const videoInputValue = inputResolution.toLowerCase() === "unknown" ? "---" : [inputResolution, inputColorBit, videoFormat].filter(Boolean).join(" | ");
-      const outputColorBit = [outputColorSpace, outputBitDepth].filter(Boolean).join(" ");
-      const videoOutputValue = outputResolution.toLowerCase() === "unknown" ? "---" : [outputResolution, outputColorBit, videoFormat].filter(Boolean).join(" | "); //outputDisplay
-
-      result.command = "IFV";
-      result.argument = {
-        inputSource,
-        inputResolution,
-        inputColorSpace,
-        inputBitDepth,
-        videoFormat,
-        outputDisplay,
-        outputResolution,
-        outputColorSpace,
-        outputBitDepth,
-        videoInputValue,
-        videoOutputValue
-      };
-      return result;
-    }
-
-    if (["NAT", "NTI", "NAL"].includes(command)) {
-      value = command + value;
-      const parts = value.split(/ISCP(?:[$.!]1|\$!1)/);
-      for (const part of parts) {
-        if (!part.trim()) continue; // skip empty parts
-        const match = part.trim().match(/^([A-Z]{3})\s*(.*)$/s);
-        if (match) {
-          // Parse all metadata fields from the value, regardless of command, handles cases like: "NATTitle\nNTIArtist\nNALAlbum"
-          const metaMatches = value.match(/(NAT|NTI|NAL)[^\n\r]*/g);
-          if (metaMatches) {
-            for (const meta of metaMatches) {
-              const type = match[1];
-              const val = match[2].trim();
-              if (type === "NAT") this.currentMetadata.title = val;
-              if (type === "NTI") this.currentMetadata.artist = val;
-              if (type === "NAL") this.currentMetadata.album = val;
-            }
-          } else {
-            // Fallback: assign the value to the current command type
-            if (command === "NAT") this.currentMetadata.title = value;
-            if (command === "NTI") this.currentMetadata.artist = value;
-            if (command === "NAL") this.currentMetadata.album = value;
-          }
-        }
-      }
-
-      result.command = "metadata";
-      result.argument = { ...this.currentMetadata };
-      return result;
-    }
-
-    if (command === "DSN") {
-      result.command = "DSN";
-      result.argument = value;
-      return result;
-    }
-
-    if (command === "FLD") {
-      // Skip volume display messages
-      if (value.slice(0, 12) === "566F6C756D65") {
+    switch (command.toUpperCase()) {
+      case "NTM": {
+        let [position, duration] = value.toString().split("/");
+        position = this.timeToSeconds(position).toString();
+        duration = this.timeToSeconds(duration).toString();
+        result.command = "NTM";
+        result.argument = position + "/" + duration;
         return result;
       }
 
-      // Decode hex to ASCII and filter to only human-readable characters
-      let ascii = Buffer.from(value, "hex").toString("ascii");
-      ascii = ascii.replace(/[^a-zA-Z0-9 .\-:/]/g, "").trim();
+      case "IFA": {
+        const raw = value?.toString() ?? "";
+        const parts = raw.split(",").map((p) => p.trim());
 
-      // Check if we're on a network source
-      const isNetworkSource = NETWORK_SOURCE_NAMES.some(name => avrCurrentSource.toLowerCase().includes(name));
+        const inputSource = (parts[0] || "").replace(/\s+/g, ""); // "HDMI 1" -> "HDMI1"
+        const inputFormat = parts[1] || ""; // PCM / Dolby Atmos
+        const inputRate = parts[2] || ""; // 48 kHz
+        const inputChannels = parts[3] || ""; // 2.0 ch
 
-      if (isNetworkSource) {
-        // Check if FLD text starts with a known network service
-        const detectedService = NETWORK_SERVICES.find((service) => ascii.startsWith(service));
+        const outputFormat = parts[4] || ""; // Stereo / Dolby Atmos
+        const outputChannels = parts[5] || ""; // 2.1 ch / 5.1 ch
 
-        if (detectedService) {
-          // Service detected at start of display - only emit if it's a new service
-          if (this.lastFldService !== detectedService) {
-            this.lastFldService = detectedService;
-            result.command = "FLD";
-            result.argument = detectedService;
+        const inputRateChannels = inputFormat === "" ? inputSource : [inputRate, inputChannels].filter(Boolean).join(" ");
+        const audioInputValue = [inputFormat, inputRateChannels].filter(Boolean).join(" | ");
+        const audioOutputValue = [outputFormat, outputChannels].filter(Boolean).join(" | ");
+        
+        result.command = "IFA";
+        result.argument = {
+          inputSource,
+          inputFormat,
+          inputRate,
+          inputChannels,
+          outputFormat,
+          outputChannels,
+          audioInputValue,
+          audioOutputValue
+        };
+        return result;
+      }
+
+      case "IFV": {
+        const raw = value?.toString() ?? "";
+        const parts = raw.split(",").map((p) => p.trim());
+
+        const inputSource = (parts[0] || "").replace(/\s+/g, ""); // "HDMI 1" -> "HDMI1"
+        const inputResolution = parts[1] || ""; // 4K(3840x2160) 59 Hz
+        const inputColorSpace = parts[2] || ""; // RGB
+        const inputBitDepth = parts[3] || ""; // 24bit
+        const videoFormat = parts[9] || ""; // Dolby Vision
+
+        const outputDisplay = parts[4] || ""; // MAIN
+        const outputResolution = parts[5] || ""; // 4K(3840x2160) 59 Hz
+        const outputColorSpace = parts[6] || ""; // RGB
+        const outputBitDepth = parts[7] || ""; // 24bit
+
+        const inputColorBit = [inputColorSpace, inputBitDepth].filter(Boolean).join(" ");
+        const videoInputValue = inputResolution.toLowerCase() === "unknown" ? "---" : [inputResolution, inputColorBit, videoFormat].filter(Boolean).join(" | ");
+        const outputColorBit = [outputColorSpace, outputBitDepth].filter(Boolean).join(" ");
+        const videoOutputValue = outputResolution.toLowerCase() === "unknown" ? "---" : [outputResolution, outputColorBit, videoFormat].filter(Boolean).join(" | "); //outputDisplay
+
+        result.command = "IFV";
+        result.argument = {
+          inputSource,
+          inputResolution,
+          inputColorSpace,
+          inputBitDepth,
+          videoFormat,
+          outputDisplay,
+          outputResolution,
+          outputColorSpace,
+          outputBitDepth,
+          videoInputValue,
+          videoOutputValue
+        };
+        return result;
+      }
+    
+      case "NAT":
+      case "NTI":
+      case "NAL": {
+        value = command + value;
+        const parts = value.split(/ISCP(?:[$.!]1|\$!1)/);
+        for (const part of parts) {
+          if (!part.trim()) continue; // skip empty parts
+          const match = part.trim().match(/^([A-Z]{3})\s*(.*)$/s);
+          if (match) {
+            // Parse all metadata fields from the value, regardless of command, handles cases like: "NATTitle\nNTIArtist\nNALAlbum"
+            const metaMatches = value.match(/(NAT|NTI|NAL)[^\n\r]*/g);
+            if (metaMatches) {
+              for (const meta of metaMatches) {
+                const type = match[1];
+                const val = match[2].trim();
+                if (type === "NAT") this.currentMetadata.title = val;
+                if (type === "NTI") this.currentMetadata.artist = val;
+                if (type === "NAL") this.currentMetadata.album = val;
+              }
+            } else {
+              // Fallback: assign the value to the current command type
+              if (command === "NAT") this.currentMetadata.title = value;
+              if (command === "NTI") this.currentMetadata.artist = value;
+              if (command === "NAL") this.currentMetadata.album = value;
+            }
+          }
+        }
+
+        result.command = "metadata";
+        result.argument = { ...this.currentMetadata };
+        return result;
+      }
+
+      case "DSN": {
+        result.command = "DSN";
+        result.argument = value;
+        return result;
+      }
+
+      case "FLD": {
+        // Skip volume display messages
+        if (value.slice(0, 12) === "566F6C756D65") {
+          return result;
+        }
+
+        let ascii = Buffer.from(value, "hex").toString("ascii");
+        ascii = ascii.replace(/[^a-zA-Z0-9 .\-:/]/g, "").trim();
+
+        switch (avrCurrentSource.toUpperCase()) {
+          case "NET": {
+            // Check if FLD text starts with a known network service
+            const detectedService = NETWORK_SERVICES.find((service) => ascii.startsWith(service));
+
+            if (detectedService) {
+              // Service detected at start of display - only emit if it's a new service
+              if (this.lastFldService !== detectedService) {
+                this.lastFldService = detectedService;
+                result.command = "FLD";
+                result.argument = detectedService;
+                return result;
+              }
+            }
+            // Either scrolling text or same service - suppress to avoid sensor spam
             return result;
           }
+
+          case "FM": {
+            // Not on network source - reset tracking and pass through (e.g., FM RDS)
+            this.lastFldService = null;
+            // remove the Tuner Preset at the end
+            ascii = ascii.slice(0, -2);
+            break;
+          }
+
+          default: {
+            // Not on network source - reset tracking and pass through
+            this.lastFldService = null;
+            // remove the volume at the end (its slow and we already have a volume sensor)
+            ascii = ascii.slice(0, -4);
+            break;
+          }
         }
-        // Either scrolling text or same service - suppress to avoid sensor spam
+        result.command = "FLD";
+        result.argument = ascii;
         return result;
       }
 
-      // Not on network source - reset tracking and pass through (e.g., FM RDS)
-      this.lastFldService = null;
-      if (avrCurrentSource.toLocaleLowerCase() === "fm") {
-        // remote the Tuner Preset at the end
-        ascii = ascii.slice(0, -2);
-      } else {
-        // remove the volume at the end (its slow and we already have a volume sensor)
-        ascii = ascii.slice(0, -4);
-      }
-      result.command = "FLD";
-      result.argument = ascii;
-      return result;
+      default:
+        break;
     }
 
     type CommandType = {
@@ -575,10 +567,10 @@ export class EiscpDriver extends EventEmitter {
     // Check if command contains a network service selection (NLSLx), this handles both direct NLSL commands and embedded ones like "SLINLSL1"
     const nlslMatch = iscpCommand.match(/NLSL[0-9A-Fa-f]/);
     if (nlslMatch) {
-      console.log("%s Sending SLI2B (NET input) before %s", integrationName, nlslMatch[0]);
+      console.debug("%s Sending SLI2B (NET input) before %s", integrationName, nlslMatch[0]);
       this.raw("SLI2B"); // Select NET input first
       await new Promise((resolve) => setTimeout(resolve, this.config.netMenuDelay ?? 2500)); // Wait for AVR to fully load NET menu (needs time when exiting a service)
-      console.log("%s Sending network service command: %s", integrationName, nlslMatch[0]);
+      console.debug("%s Sending network service command: %s", integrationName, nlslMatch[0]);
       this.raw(nlslMatch[0], callback); // Send just the NLSL command
       return;
     }

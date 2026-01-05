@@ -19,6 +19,7 @@ const SENSOR_SUFFIXES = [
 ];
 
 const ALBUM_ART = ["spotify", "deezer", "tidal", "amazonmusic", "dts-play-fi"];
+const SONG_INFO = ["spotify", "deezer", "tidal", "amazonmusic", "dts-play-fi", "airplay"];
 
 export class OnkyoCommandReceiver {
   private driver: uc.IntegrationAPI;
@@ -172,7 +173,7 @@ export class OnkyoCommandReceiver {
           }
           case "input-selector": {
             let source = avrUpdates.argument.toString().split(",")[0];
-            setAvrCurrentSource(source, this.eiscpInstance, eventZone, entityId, this.driver);
+            setAvrCurrentSource(source.toLowerCase(), this.eiscpInstance, eventZone, entityId, this.driver);
             this.driver.updateEntityAttributes(entityId, {
               [uc.MediaPlayerAttributes.Source]: source
             });
@@ -284,7 +285,8 @@ export class OnkyoCommandReceiver {
             break;
           }
           case "metadata": {
-            if (["spotify", "deezer", "tidal", "amazonmusic", "dts-play-fi", "airplay"].includes(avrCurrentSubSource.toLowerCase())) {
+            const hasSongInfo = SONG_INFO.some(name => avrCurrentSubSource.toLowerCase().includes(name));
+            if (hasSongInfo) {
               if (typeof avrUpdates.argument === "object" && avrUpdates.argument !== null) {
                 nowPlaying.title = (avrUpdates.argument as Record<string, string>).title || "unknown";
                 nowPlaying.album = (avrUpdates.argument as Record<string, string>).album || "unknown";
