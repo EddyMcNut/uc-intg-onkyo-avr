@@ -23,6 +23,7 @@ const VALUE_MAPPINGS = eiscpCommands.value_mappings;
 const integrationName = "Onkyo-Integration eISCP:";
 const IGNORED_COMMANDS = new Set(["NMS", "NPB"]); // Commands to ignore from AVR
 const THROTTLED_COMMANDS = new Set(["IFA", "IFV", "FLD"]); // Commands to send to incoming queue for throttling
+const FLD_VOLUME_HEX_PREFIX = "566F6C756D65"; // "Volume" in hex - skip these FLD messages
 
 // Known network streaming services - when FLD starts with one of these, emit once and suppress scroll updates
 const NETWORK_SERVICES = ["TuneIn", "Spotify", "Deezer", "Tidal", "AmazonMusic", "Chromecast built-in", "DTS Play-Fi", "AirPlay", "Alexa", "Music Server", "USB", "Play Queue"];
@@ -32,6 +33,16 @@ interface Metadata {
   artist?: string;
   album?: string;
 }
+
+/** Result from parsing an ISCP command */
+interface CommandResult {
+  command: string;
+  argument: string | number | string[] | Record<string, string>;
+  zone: string;
+}
+
+/** Handler function type for special command parsing */
+type CommandHandler = (value: string, command: string, result: CommandResult) => CommandResult;
 
 export class EiscpDriver extends EventEmitter {
   public get connected(): boolean {
@@ -44,6 +55,18 @@ export class EiscpDriver extends EventEmitter {
   private receive_queue: async.QueueObject<any>;
   private currentMetadata: Metadata = {};
   private lastFldService: string | null = null; // Track last detected network service from FLD
+
+  /** Map of special command handlers for complex parsing logic */
+  private readonly commandHandlers: Record<string, CommandHandler> = {
+    NTM: (value, _cmd, result) => this.handleNTM(value, result),
+    IFA: (value, _cmd, result) => this.handleIFA(value, result),
+    IFV: (value, _cmd, result) => this.handleIFV(value, result),
+    NAT: (value, cmd, result) => this.handleMetadata(value, cmd, result),
+    NTI: (value, cmd, result) => this.handleMetadata(value, cmd, result),
+    NAL: (value, cmd, result) => this.handleMetadata(value, cmd, result),
+    DSN: (value, _cmd, result) => this.handleDSN(value, result),
+    FLD: (value, _cmd, result) => this.handleFLD(value, result),
+  };
 
   constructor(config?: EiscpConfig) {
     super();
@@ -87,6 +110,177 @@ export class EiscpDriver extends EventEmitter {
     return 0;
   }
 
+  /** Parse comma-separated AV info string into trimmed parts array */
+  private parseAvInfoParts(value: string): string[] {
+    return (value?.toString() ?? "").split(",").map((p) => p.trim());
+  }
+
+  /** Get part at index, with optional space removal for source names */
+  private getAvPart(parts: string[], index: number, removeSpaces = false): string {
+    const val = parts[index] || "";
+    return removeSpaces ? val.replace(/\s+/g, "") : val;
+  }
+
+  /** Join non-empty values with separator (default: " | ") */
+  private joinFiltered(values: string[], separator = " | "): string {
+    return values.filter(Boolean).join(separator);
+  }
+
+  /** Build display value, returning "---" if resolution is unknown */
+  private buildDisplayValue(resolution: string, ...parts: string[]): string {
+    return resolution.toLowerCase() === "unknown" ? "---" : this.joinFiltered(parts);
+  }
+
+  // ==================== Command Handlers ====================
+
+  private handleNTM(value: string, result: CommandResult): CommandResult {
+    let [position, duration] = value.toString().split("/");
+    position = this.timeToSeconds(position).toString();
+    duration = this.timeToSeconds(duration).toString();
+    result.command = "NTM";
+    result.argument = position + "/" + duration;
+    return result;
+  }
+
+  private handleIFA(value: string, result: CommandResult): CommandResult {
+    const parts = this.parseAvInfoParts(value);
+
+    const inputSource = this.getAvPart(parts, 0, true);
+    const inputFormat = this.getAvPart(parts, 1);
+    const inputRate = this.getAvPart(parts, 2);
+    const inputChannels = this.getAvPart(parts, 3);
+    const outputFormat = this.getAvPart(parts, 4);
+    const outputChannels = this.getAvPart(parts, 5);
+
+    const inputRateChannels = inputFormat === "" ? inputSource : this.joinFiltered([inputRate, inputChannels], " ");
+    const audioInputValue = this.joinFiltered([inputFormat, inputRateChannels]);
+    const audioOutputValue = this.joinFiltered([outputFormat, outputChannels]);
+
+    result.command = "IFA";
+    result.argument = {
+      inputSource,
+      inputFormat,
+      inputRate,
+      inputChannels,
+      outputFormat,
+      outputChannels,
+      audioInputValue,
+      audioOutputValue
+    };
+    return result;
+  }
+
+  private handleIFV(value: string, result: CommandResult): CommandResult {
+    // IFV format: inputSource,inputRes,inputColor,inputBit,outDisplay,outRes,outColor,outBit,?,videoFormat
+    // Index:      0          ,1       ,2         ,3       ,4         ,5     ,6       ,7      ,8,9
+    const parts = this.parseAvInfoParts(value);
+
+    const inputSource = this.getAvPart(parts, 0, true);
+    const inputResolution = this.getAvPart(parts, 1);
+    const inputColorSpace = this.getAvPart(parts, 2);
+    const inputBitDepth = this.getAvPart(parts, 3);
+    const videoFormat = parts.length > 9 ? parts[9] : "";
+    const outputDisplay = this.getAvPart(parts, 4);
+    const outputResolution = this.getAvPart(parts, 5);
+    const outputColorSpace = this.getAvPart(parts, 6);
+    const outputBitDepth = this.getAvPart(parts, 7);
+
+    const inputColorBit = this.joinFiltered([inputColorSpace, inputBitDepth], " ");
+    const videoInputValue = this.buildDisplayValue(inputResolution, inputResolution, inputColorBit, videoFormat);
+    const outputColorBit = this.joinFiltered([outputColorSpace, outputBitDepth], " ");
+    const videoOutputValue = this.buildDisplayValue(outputResolution, outputResolution, outputColorBit, videoFormat);
+
+    result.command = "IFV";
+    result.argument = {
+      inputSource,
+      inputResolution,
+      inputColorSpace,
+      inputBitDepth,
+      videoFormat,
+      outputDisplay,
+      outputResolution,
+      outputColorSpace,
+      outputBitDepth,
+      videoInputValue,
+      videoOutputValue
+    };
+    return result;
+  }
+
+  private handleMetadata(value: string, command: string, result: CommandResult): CommandResult {
+    const originalValue = value;
+    const combined = command + value;
+    const parts = combined.split(/ISCP(?:[$.!]1|\$!1)/);
+    let foundMatch = false;
+
+    for (const part of parts) {
+      if (!part.trim()) continue;
+      const match = part.trim().match(/^([A-Z]{3})\s*(.*)$/s);
+      if (match) {
+        foundMatch = true;
+        const type = match[1];
+        const val = match[2].trim();
+        if (type === "NAT") this.currentMetadata.title = val;
+        if (type === "NTI") this.currentMetadata.artist = val;
+        if (type === "NAL") this.currentMetadata.album = val;
+      }
+    }
+
+    if (!foundMatch) {
+      if (command === "NAT") this.currentMetadata.title = originalValue;
+      if (command === "NTI") this.currentMetadata.artist = originalValue;
+      if (command === "NAL") this.currentMetadata.album = originalValue;
+    }
+
+    result.command = "metadata";
+    result.argument = { ...this.currentMetadata };
+    return result;
+  }
+
+  private handleDSN(value: string, result: CommandResult): CommandResult {
+    result.command = "DSN";
+    result.argument = value;
+    return result;
+  }
+
+  private handleFLD(value: string, result: CommandResult): CommandResult {
+    let ascii = Buffer.from(value, "hex").toString("ascii");
+    ascii = ascii.replace(/[^a-zA-Z0-9 .\-:/]/g, "").trim();
+
+    switch (avrCurrentSource.toUpperCase()) {
+      case "NET": {
+        const detectedService = NETWORK_SERVICES.find((service) => ascii.startsWith(service));
+        if (detectedService) {
+          if (this.lastFldService !== detectedService) {
+            this.lastFldService = detectedService;
+            result.command = "FLD";
+            result.argument = detectedService;
+            return result;
+          }
+        }
+        return result;
+      }
+
+      case "FM": {
+        this.lastFldService = null;
+        ascii = ascii.slice(0, -2);
+        result.command = "FLD";
+        result.argument = ascii;
+        return result;
+      }
+
+      default: {
+        this.lastFldService = null;
+        ascii = ascii.slice(0, -4);
+        result.command = "FLD";
+        result.argument = ascii;
+        return result;
+      }
+    }
+  }
+
+  // ==================== Packet Handling ====================
+
   // Create a proper eISCP packet for UDP broadcast (discovery)
   private eiscp_packet(data: any): Buffer {
     if (data.charAt(0) !== "!") {
@@ -102,14 +296,16 @@ export class EiscpDriver extends EventEmitter {
     return packet.toString("ascii", 18, packet.length - 2);
   }
 
-  private iscp_to_command(command: string, value: string): { command: string; argument: string | number | string[] | Record<string, string>; zone: string } {
-      let result: { command: string; argument: string | number | string[] | Record<string, string>; zone: string } = {
-        command: "undefined",
-        argument: "undefined",
-        zone: "main"
-      };
+  private iscp_to_command(command: string, value: string): CommandResult {
+    const result: CommandResult = {
+      command: "undefined",
+      argument: "undefined",
+      zone: "main"
+    };
 
-    // Detect zone from command prefix, Zone 2 commands start with Z (ZPW, ZVL, ZMT, ZSL, etc.) or end with Z (TUZ), Zone 3 commands end with 3 (PW3, VL3, MT3, SL3, TU3, etc.)
+    // Detect zone from command prefix
+    // Zone 2: starts with Z (ZPW, ZVL, ZMT, SLZ) or ends with Z (TUZ)
+    // Zone 3: ends with 3 (PW3, VL3, MT3, SL3, TU3)
     if (command.charAt(0) === "Z" && command.length === 3) {
       result.zone = "zone2";
     } else if (command.charAt(2) === "Z" && command.length === 3) {
@@ -118,176 +314,14 @@ export class EiscpDriver extends EventEmitter {
       result.zone = "zone3";
     }
 
-    // console.log("%s RAW (2) RECEIVE: [%s] %s %s", integrationName, result.zone, command, value);
-
-    switch (command.toUpperCase()) {
-      case "NTM": {
-        let [position, duration] = value.toString().split("/");
-        position = this.timeToSeconds(position).toString();
-        duration = this.timeToSeconds(duration).toString();
-        result.command = "NTM";
-        result.argument = position + "/" + duration;
-        return result;
-      }
-
-      case "IFA": {
-        const raw = value?.toString() ?? "";
-        const parts = raw.split(",").map((p) => p.trim());
-
-        const inputSource = (parts[0] || "").replace(/\s+/g, ""); // "HDMI 1" -> "HDMI1"
-        const inputFormat = parts[1] || ""; // PCM / Dolby Atmos
-        const inputRate = parts[2] || ""; // 48 kHz
-        const inputChannels = parts[3] || ""; // 2.0 ch
-
-        const outputFormat = parts[4] || ""; // Stereo / Dolby Atmos
-        const outputChannels = parts[5] || ""; // 2.1 ch / 5.1 ch
-
-        const inputRateChannels = inputFormat === "" ? inputSource : [inputRate, inputChannels].filter(Boolean).join(" ");
-        const audioInputValue = [inputFormat, inputRateChannels].filter(Boolean).join(" | ");
-        const audioOutputValue = [outputFormat, outputChannels].filter(Boolean).join(" | ");
-        
-        result.command = "IFA";
-        result.argument = {
-          inputSource,
-          inputFormat,
-          inputRate,
-          inputChannels,
-          outputFormat,
-          outputChannels,
-          audioInputValue,
-          audioOutputValue
-        };
-        return result;
-      }
-
-      case "IFV": {
-        const raw = value?.toString() ?? "";
-        const parts = raw.split(",").map((p) => p.trim());
-
-        const inputSource = (parts[0] || "").replace(/\s+/g, ""); // "HDMI 1" -> "HDMI1"
-        const inputResolution = parts[1] || ""; // 4K(3840x2160) 59 Hz
-        const inputColorSpace = parts[2] || ""; // RGB
-        const inputBitDepth = parts[3] || ""; // 24bit
-        const videoFormat = parts[9] || ""; // Dolby Vision
-
-        const outputDisplay = parts[4] || ""; // MAIN
-        const outputResolution = parts[5] || ""; // 4K(3840x2160) 59 Hz
-        const outputColorSpace = parts[6] || ""; // RGB
-        const outputBitDepth = parts[7] || ""; // 24bit
-
-        const inputColorBit = [inputColorSpace, inputBitDepth].filter(Boolean).join(" ");
-        const videoInputValue = inputResolution.toLowerCase() === "unknown" ? "---" : [inputResolution, inputColorBit, videoFormat].filter(Boolean).join(" | ");
-        const outputColorBit = [outputColorSpace, outputBitDepth].filter(Boolean).join(" ");
-        const videoOutputValue = outputResolution.toLowerCase() === "unknown" ? "---" : [outputResolution, outputColorBit, videoFormat].filter(Boolean).join(" | "); //outputDisplay
-
-        result.command = "IFV";
-        result.argument = {
-          inputSource,
-          inputResolution,
-          inputColorSpace,
-          inputBitDepth,
-          videoFormat,
-          outputDisplay,
-          outputResolution,
-          outputColorSpace,
-          outputBitDepth,
-          videoInputValue,
-          videoOutputValue
-        };
-        return result;
-      }
-    
-      case "NAT":
-      case "NTI":
-      case "NAL": {
-        value = command + value;
-        const parts = value.split(/ISCP(?:[$.!]1|\$!1)/);
-        for (const part of parts) {
-          if (!part.trim()) continue; // skip empty parts
-          const match = part.trim().match(/^([A-Z]{3})\s*(.*)$/s);
-          if (match) {
-            // Parse all metadata fields from the value, regardless of command, handles cases like: "NATTitle\nNTIArtist\nNALAlbum"
-            const metaMatches = value.match(/(NAT|NTI|NAL)[^\n\r]*/g);
-            if (metaMatches) {
-              for (const meta of metaMatches) {
-                const type = match[1];
-                const val = match[2].trim();
-                if (type === "NAT") this.currentMetadata.title = val;
-                if (type === "NTI") this.currentMetadata.artist = val;
-                if (type === "NAL") this.currentMetadata.album = val;
-              }
-            } else {
-              // Fallback: assign the value to the current command type
-              if (command === "NAT") this.currentMetadata.title = value;
-              if (command === "NTI") this.currentMetadata.artist = value;
-              if (command === "NAL") this.currentMetadata.album = value;
-            }
-          }
-        }
-
-        result.command = "metadata";
-        result.argument = { ...this.currentMetadata };
-        return result;
-      }
-
-      case "DSN": {
-        result.command = "DSN";
-        result.argument = value;
-        return result;
-      }
-
-      case "FLD": {
-        // Skip volume display messages
-        if (value.slice(0, 12) === "566F6C756D65") {
-          return result;
-        }
-
-        let ascii = Buffer.from(value, "hex").toString("ascii");
-        ascii = ascii.replace(/[^a-zA-Z0-9 .\-:/]/g, "").trim();
-
-        switch (avrCurrentSource.toUpperCase()) {
-          case "NET": {
-            // Check if FLD text starts with a known network service
-            const detectedService = NETWORK_SERVICES.find((service) => ascii.startsWith(service));
-
-            if (detectedService) {
-              // Service detected at start of display - only emit if it's a new service
-              if (this.lastFldService !== detectedService) {
-                this.lastFldService = detectedService;
-                result.command = "FLD";
-                result.argument = detectedService;
-                return result;
-              }
-            }
-            // Either scrolling text or same service - suppress to avoid sensor spam
-            return result;
-          }
-
-          case "FM": {
-            // Not on network source - reset tracking and pass through (e.g., FM RDS)
-            this.lastFldService = null;
-            // remove the Tuner Preset at the end
-            ascii = ascii.slice(0, -2);
-            break;
-          }
-
-          default: {
-            // Not on network source - reset tracking and pass through
-            this.lastFldService = null;
-            // remove the volume at the end (its slow and we already have a volume sensor)
-            ascii = ascii.slice(0, -4);
-            break;
-          }
-        }
-        result.command = "FLD";
-        result.argument = ascii;
-        return result;
-      }
-
-      default:
-        break;
+    // Check for special command handler
+    const upperCommand = command.toUpperCase();
+    const handler = this.commandHandlers[upperCommand];
+    if (handler) {
+      return handler(value, command, result);
     }
 
+    // Fall through to generic command lookup
     type CommandType = {
       name: string;
       values: { [key: string]: { name: string } };
@@ -480,6 +514,11 @@ export class EiscpDriver extends EventEmitter {
 
         // Ignore messages we don't care about
         if (IGNORED_COMMANDS.has(command)) {
+          return;
+        }
+
+        // Skip FLD volume display messages early (before full parsing)
+        if (command === "FLD" && value.slice(0, 12) === FLD_VOLUME_HEX_PREFIX) {
           return;
         }
 
