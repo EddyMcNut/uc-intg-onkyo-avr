@@ -13,7 +13,7 @@ As from v0.7.3, this integration contains the following sensors for *every zone*
 
 **Prerequisite: make sure you are using UC Firmware 2.7.1 or higher.**
 
-During setup, you can choose to not have the sensors created:
+During setup, you can choose to have the sensors created:
 
   ![](/screenshots/create-sensors.png)
 
