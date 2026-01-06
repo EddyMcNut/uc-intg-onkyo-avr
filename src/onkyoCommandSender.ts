@@ -1,26 +1,14 @@
 import * as uc from "@unfoldedcircle/integration-api";
 import { EiscpDriver } from "./eiscp.js";
-import { DEFAULT_QUEUE_THRESHOLD, OnkyoConfig } from "./configManager.js";
+import { DEFAULT_QUEUE_THRESHOLD, MAX_LENGTHS, PATTERNS, OnkyoConfig } from "./configManager.js";
 
 const integrationName = "Onkyo-Integration (sender):";
-let lastCommandTime = 0;
-
-// Security: Maximum input lengths
-const MAX_LENGTHS = {
-  USER_COMMAND: 250,      // input-selector, listening-mode, etc.
-  RAW_COMMAND: 20        // raw MVL20, etc.
-};
-
-// Security: Valid character patterns
-const PATTERNS = {
-  USER_COMMAND: /^[a-z0-9\-\s.:=]+$/i,  // Letters, numbers, hyphens, spaces, delimiters
-  RAW_COMMAND: /^[A-Z0-9]+$/             // Uppercase letters and numbers only
-};
 
 export class OnkyoCommandSender {
   private driver: uc.IntegrationAPI;
   private config: OnkyoConfig;
   private eiscp: EiscpDriver;
+  private lastCommandTime: number = 0;
 
   constructor(driver: uc.IntegrationAPI, config: OnkyoConfig, eiscp: EiscpDriver) {
     this.driver = driver;
@@ -93,14 +81,14 @@ export class OnkyoCommandSender {
         await this.eiscp.command(formatCommand("audio-muting toggle"));
         break;
       case uc.MediaPlayerCommands.VolumeUp:
-        if (now - lastCommandTime > (this.config.queueThreshold ?? DEFAULT_QUEUE_THRESHOLD)) {
-          lastCommandTime = now;
+        if (now - this.lastCommandTime > (this.config.queueThreshold ?? DEFAULT_QUEUE_THRESHOLD)) {
+          this.lastCommandTime = now;
           await this.eiscp.command(formatCommand("volume level-up-1db-step"));
         }
         break;
       case uc.MediaPlayerCommands.VolumeDown:
-        if (now - lastCommandTime > (this.config.queueThreshold ?? DEFAULT_QUEUE_THRESHOLD)) {
-          lastCommandTime = now;
+        if (now - this.lastCommandTime > (this.config.queueThreshold ?? DEFAULT_QUEUE_THRESHOLD)) {
+          this.lastCommandTime = now;
           await this.eiscp.command(formatCommand("volume level-down-1db-step"));
         }
         break;
@@ -151,7 +139,7 @@ export class OnkyoCommandSender {
               return uc.StatusCodes.BadRequest;
             }
             
-            console.error("%s [%s] sending raw command: %s", integrationName, entity.id, rawCmd);
+            console.log("%s [%s] sending raw command: %s", integrationName, entity.id, rawCmd);
             await this.eiscp.raw(rawCmd);
           } else if (typeof params.source === "string") {
             const userCmd = params.source.toLowerCase();

@@ -1,7 +1,7 @@
 import * as uc from "@unfoldedcircle/integration-api";
-import { avrCurrentSource, avrCurrentSubSource, setAvrCurrentSource, setAvrCurrentSubSource } from "./state.js";
+import { avrStateManager } from "./state.js";
 import crypto from "crypto";
-import { OnkyoConfig } from "./configManager.js";
+import { OnkyoConfig, buildEntityId } from "./configManager.js";
 import { EiscpDriver } from "./eiscp.js";
 
 const integrationName = "Onkyo-Integration (receiver):";
@@ -28,7 +28,6 @@ export class OnkyoCommandReceiver {
   private avrPreset: string = "unknown";
   private lastImageHash: string = "";
   private currentTrackId: string = "";
-  private lastTrackId: string = "";
   private zone: string = "";
 
   constructor(driver: uc.IntegrationAPI, config: OnkyoConfig, eiscpInstance: EiscpDriver) {
@@ -38,8 +37,8 @@ export class OnkyoCommandReceiver {
     this.zone = this.config.avrs && this.config.avrs.length > 0 ? this.config.avrs[0].zone || "main" : "main";
   }
 
-  private entitiesToArray(entities: any): any[] {
-    const arr: any[] = [];
+  private entitiesToArray(entities: Record<string, uc.Entity> | undefined): uc.Entity[] {
+    const arr: uc.Entity[] = [];
     if (entities && typeof entities === "object") {
       for (const key in entities) {
         if (Object.prototype.hasOwnProperty.call(entities, key)) {
@@ -89,43 +88,30 @@ export class OnkyoCommandReceiver {
   setupEiscpListener() {
     const nowPlaying: { station?: string; artist?: string; album?: string; title?: string } = {};
 
-    this.eiscpInstance.on("error", (err: any) => {
+    this.eiscpInstance.on("error", (err: Error) => {
       console.error("%s eiscp error: %s", integrationName, err);
     });
     this.eiscpInstance.on(
       "data",
       async (avrUpdates: { command: string; argument: string | number | Record<string, string>; zone: string; iscpCommand: string; host: string; port: number; model: string }) => {
         const eventZone = avrUpdates.zone || "main";
-        const entityId = `${avrUpdates.model} ${avrUpdates.host} ${eventZone}`;
-
-        // Get the entity for this specific AVR zone
-        let entity = this.driver.getConfiguredEntities().getEntity(entityId);
-        if (!entity) {
-          // Try availableEntities as fallback using utility
-          const availableEntitiesArr = this.entitiesToArray(this.driver.getAvailableEntities());
-          for (const e of availableEntitiesArr) {
-            if (e.id === entityId) {
-              entity = e;
-              break;
-            }
-          }
-        }
+        const entityId = buildEntityId(avrUpdates.model, avrUpdates.host, eventZone);
 
         switch (avrUpdates.command) {
           case "system-power": {
+            const powerState = avrUpdates.argument === "on" ? uc.MediaPlayerStates.On : uc.MediaPlayerStates.Standby;
             this.driver.updateEntityAttributes(entityId, {
-              [uc.MediaPlayerAttributes.State]: avrUpdates.argument === "on" ? uc.MediaPlayerStates.On : uc.MediaPlayerStates.Standby
+              [uc.MediaPlayerAttributes.State]: powerState
             });
-            console.log("%s [%s] power set to: %s", integrationName, entityId, entity?.attributes?.state);
+            console.log("%s [%s] power set to: %s", integrationName, entityId, powerState);
 
-            // When AVR is off, set all sensor states to Unavailable
+            // When AVR is off, set all sensor states to standby
             if (avrUpdates.argument !== "on") {
               for (const suffix of SENSOR_SUFFIXES) {
                 this.driver.updateEntityAttributes(`${entityId}${suffix}`, {
-                  [uc.SensorAttributes.Value]: "AVR Off",
+                  [uc.SensorAttributes.Value]: "AVR standby",
                 });
               }
-              console.log("%s [%s] all sensors state set to: AVR Off", integrationName, entityId);
             }
             break;
           }
@@ -173,12 +159,12 @@ export class OnkyoCommandReceiver {
           }
           case "input-selector": {
             let source = avrUpdates.argument.toString().split(",")[0];
-            setAvrCurrentSource(source.toLowerCase(), this.eiscpInstance, eventZone, entityId, this.driver);
+            avrStateManager.setSource(entityId, source, this.eiscpInstance, eventZone, this.driver);
             this.driver.updateEntityAttributes(entityId, {
               [uc.MediaPlayerAttributes.Source]: source
             });
             console.log("%s [%s] input-selector (source) set to: %s", integrationName, entityId, source);
-            switch (source.toLowerCase()) {
+            switch (source) {
               case "dab":
                 this.eiscpInstance.raw("DSNQSTN");
                 break;
@@ -188,9 +174,9 @@ export class OnkyoCommandReceiver {
               default:
                 break;
             }
-              // Update source sensor
-              let sourceSensorId = `${entityId}_source_sensor`;
-              this.driver.updateEntityAttributes(sourceSensorId, {
+            // Update source sensor
+            const sourceSensorId = `${entityId}_source_sensor`;
+            this.driver.updateEntityAttributes(sourceSensorId, {
               [uc.SensorAttributes.State]: uc.SensorStates.On,
               [uc.SensorAttributes.Value]: source.toUpperCase()
             });
@@ -255,7 +241,7 @@ export class OnkyoCommandReceiver {
             break;
           }
           case "DSN": {
-            setAvrCurrentSource("dab", this.eiscpInstance, eventZone, entityId, this.driver);
+            avrStateManager.setSource(entityId, "dab", this.eiscpInstance, eventZone, this.driver);
             nowPlaying.station = avrUpdates.argument.toString();
             nowPlaying.artist = "DAB Radio";
             console.log("%s [%s] DAB station set to: %s", integrationName, entityId, avrUpdates.argument.toString());
@@ -263,17 +249,27 @@ export class OnkyoCommandReceiver {
           }
           case "FLD": {
             const frontPanelText = avrUpdates.argument.toString();
-            setAvrCurrentSubSource(frontPanelText, this.eiscpInstance, eventZone, entityId, this.driver);
-            const frontPanelDisplaySensorId = `${entityId}_front_panel_display_sensor`;
-            this.driver.updateEntityAttributes(frontPanelDisplaySensorId, {
-              [uc.SensorAttributes.State]: uc.SensorStates.On,
-              [uc.SensorAttributes.Value]: frontPanelText
-            });
-            if (avrCurrentSource === "fm") {
-              nowPlaying.station = avrUpdates.argument.toString();
-              nowPlaying.artist = "FM Radio";
+            const currentSource = avrStateManager.getSource(entityId);
+            switch (currentSource) {
+              case "net":
+                if (avrStateManager.getSubSource(entityId) !== frontPanelText.toLowerCase()) {
+                  avrStateManager.setSubSource(entityId, frontPanelText, this.eiscpInstance, eventZone, this.driver);
+                  const frontPanelDisplaySensorId = `${entityId}_front_panel_display_sensor`;
+                  this.driver.updateEntityAttributes(frontPanelDisplaySensorId, {
+                    [uc.SensorAttributes.State]: uc.SensorStates.On,
+                    [uc.SensorAttributes.Value]: frontPanelText
+                  });
+                }
+                break;
+
+              case "fm":
+                nowPlaying.station = avrUpdates.argument.toString();
+                nowPlaying.artist = "FM Radio";
+                break;
+
+              default:
+                break;
             }
-            // console.log("%s [%s] Front panel display: %s", integrationName, entityId, frontPanelText);
             break;
           }
           case "NTM": {
@@ -285,7 +281,8 @@ export class OnkyoCommandReceiver {
             break;
           }
           case "metadata": {
-            const hasSongInfo = SONG_INFO.some(name => avrCurrentSubSource.toLowerCase().includes(name));
+            const currentSubSource = avrStateManager.getSubSource(entityId);
+            const hasSongInfo = SONG_INFO.some(name => currentSubSource.includes(name));
             if (hasSongInfo) {
               if (typeof avrUpdates.argument === "object" && avrUpdates.argument !== null) {
                 nowPlaying.title = (avrUpdates.argument as Record<string, string>).title || "unknown";
@@ -298,7 +295,9 @@ export class OnkyoCommandReceiver {
           default:
             break;
         }
-        switch (avrCurrentSource.toLowerCase()) {
+        const entitySource = avrStateManager.getSource(entityId);
+        const entitySubSource = avrStateManager.getSubSource(entityId);
+        switch (entitySource) {
           case "net":
             let trackId = `${nowPlaying.title}|${nowPlaying.album}|${nowPlaying.artist}`;
             if (trackId !== this.currentTrackId) {
@@ -308,7 +307,7 @@ export class OnkyoCommandReceiver {
                 [uc.MediaPlayerAttributes.MediaTitle]: nowPlaying.title || "unknown",
                 [uc.MediaPlayerAttributes.MediaAlbum]: nowPlaying.album || "unknown"
               });
-              const hasAlbumArt = ALBUM_ART.some(name => avrCurrentSubSource.toLowerCase().includes(name));
+              const hasAlbumArt = ALBUM_ART.some(name => entitySubSource.includes(name));
               if (hasAlbumArt) {
                 await this.maybeUpdateImage(entityId);
               }else {

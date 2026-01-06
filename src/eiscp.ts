@@ -11,12 +11,11 @@ export interface EiscpConfig {
 }
 import net from "net";
 import dgram from "dgram";
-import async from "async";
 
-import EventEmitter from "events";
+import EventEmitter from "events";;
 import { eiscpCommands } from "./eiscp-commands.js";
-import { avrCurrentSource } from "./state.js";
-import { DEFAULT_QUEUE_THRESHOLD } from "./configManager.js";
+import { avrStateManager } from "./state.js";
+import { DEFAULT_QUEUE_THRESHOLD, buildEntityId } from "./configManager.js";
 const COMMANDS = eiscpCommands.commands;
 const COMMAND_MAPPINGS = eiscpCommands.command_mappings;
 const VALUE_MAPPINGS = eiscpCommands.value_mappings;
@@ -24,6 +23,30 @@ const integrationName = "Onkyo-Integration eISCP:";
 const IGNORED_COMMANDS = new Set(["NMS", "NPB"]); // Commands to ignore from AVR
 const THROTTLED_COMMANDS = new Set(["IFA", "IFV", "FLD"]); // Commands to send to incoming queue for throttling
 const FLD_VOLUME_HEX_PREFIX = "566F6C756D65"; // "Volume" in hex - skip these FLD messages
+
+// Zone command prefix mappings (main -> zone-specific)
+const ZONE2_COMMAND_MAP: Record<string, string> = {
+  MVL: "ZVL",
+  PWR: "ZPW",
+  AMT: "ZMT",
+  SLI: "SLZ",
+  TUN: "TUZ"
+};
+const ZONE3_COMMAND_MAP: Record<string, string> = {
+  MVL: "VL3",
+  PWR: "PW3",
+  AMT: "MT3",
+  SLI: "SL3",
+  TUN: "TU3"
+};
+
+// Reverse mappings (zone-specific -> main) for parsing incoming commands
+const ZONE2_REVERSE_MAP = Object.fromEntries(
+  Object.entries(ZONE2_COMMAND_MAP).map(([k, v]) => [v, k])
+);
+const ZONE3_REVERSE_MAP = Object.fromEntries(
+  Object.entries(ZONE3_COMMAND_MAP).map(([k, v]) => [v, k])
+);
 
 // Known network streaming services - when FLD starts with one of these, emit once and suppress scroll updates
 const NETWORK_SERVICES = ["TuneIn", "Spotify", "Deezer", "Tidal", "AmazonMusic", "Chromecast built-in", "DTS Play-Fi", "AirPlay", "Alexa", "Music Server", "USB", "Play Queue"];
@@ -41,6 +64,39 @@ interface CommandResult {
   zone: string;
 }
 
+/** Data payload emitted on 'data' event */
+interface DataPayload {
+  command: string | undefined;
+  argument: string | number | string[] | Record<string, string> | undefined;
+  zone: string | undefined;
+  iscpCommand: string;
+  host: string | undefined;
+  port: number | undefined;
+  model: string | undefined;
+}
+
+/** Discovered AVR device info */
+interface DiscoveredDevice {
+  host: string;
+  port: string;
+  model: string;
+  mac: string;
+  areacode: string;
+}
+
+/** Command input as object */
+interface CommandInput {
+  zone?: string;
+  command: string;
+  args: string | number;
+}
+
+/** Standard Node-style callback */
+type NodeCallback<T = null> = (err: Error | null, result: T) => void;
+
+/** Helper to create a delay promise */
+const delay = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
+
 /** Handler function type for special command parsing */
 type CommandHandler = (value: string, command: string, result: CommandResult) => CommandResult;
 
@@ -51,8 +107,8 @@ export class EiscpDriver extends EventEmitter {
   private config: EiscpConfig;
   private eiscp: net.Socket | null = null;
   private is_connected = false;
-  private send_queue: async.QueueObject<any>;
-  private receive_queue: async.QueueObject<any>;
+  private sendQueue: Promise<void> = Promise.resolve();
+  private receiveQueue: Promise<void> = Promise.resolve();
   private currentMetadata: Metadata = {};
   private lastFldService: string | null = null; // Track last detected network service from FLD
 
@@ -81,14 +137,12 @@ export class EiscpDriver extends EventEmitter {
       receive_delay: config?.receive_delay ?? DEFAULT_QUEUE_THRESHOLD,
       netMenuDelay: config?.netMenuDelay ?? 2500
     };
-    this.send_queue = async.queue(this.sendCommand.bind(this), 1);
-    this.receive_queue = async.queue(this.processIncomingMessage.bind(this), 1);
     this.setupErrorHandler();
   }
 
   private setupErrorHandler() {
     if (this.listenerCount("error") === 0) {
-      this.on("error", (err: any) => {
+      this.on("error", (err: Error) => {
         console.error("eiscp error (unhandled):", err);
       });
     }
@@ -247,8 +301,12 @@ export class EiscpDriver extends EventEmitter {
     let ascii = Buffer.from(value, "hex").toString("ascii");
     ascii = ascii.replace(/[^a-zA-Z0-9 .\-:/]/g, "").trim();
 
-    switch (avrCurrentSource.toUpperCase()) {
-      case "NET": {
+    // Construct entityId from config and zone
+    const entityId = buildEntityId(this.config.model!, this.config.host!, result.zone);
+    const currentSource = avrStateManager.getSource(entityId);
+
+    switch (currentSource) {
+      case "net": {
         const detectedService = NETWORK_SERVICES.find((service) => ascii.startsWith(service));
         if (detectedService) {
           if (this.lastFldService !== detectedService) {
@@ -261,7 +319,7 @@ export class EiscpDriver extends EventEmitter {
         return result;
       }
 
-      case "FM": {
+      case "fm": {
         this.lastFldService = null;
         ascii = ascii.slice(0, -2);
         result.command = "FLD";
@@ -282,7 +340,7 @@ export class EiscpDriver extends EventEmitter {
   // ==================== Packet Handling ====================
 
   // Create a proper eISCP packet for UDP broadcast (discovery)
-  private eiscp_packet(data: any): Buffer {
+  private eiscp_packet(data: string): Buffer {
     if (data.charAt(0) !== "!") {
       data = "!1" + data;
     }
@@ -321,79 +379,58 @@ export class EiscpDriver extends EventEmitter {
       return handler(value, command, result);
     }
 
-    // Fall through to generic command lookup
-    type CommandType = {
-      name: string;
-      values: { [key: string]: { name: string } };
-    };
-
     // Map zone-specific command codes back to main zone for lookup
     let lookupCommand = command;
     if (result.zone === "zone2") {
-      const zone2ReverseMap: Record<string, string> = {
-        ZVL: "MVL",
-        ZPW: "PWR",
-        ZMT: "AMT",
-        SLZ: "SLI",
-        TUZ: "TUN"
-      };
-      lookupCommand = zone2ReverseMap[command] || command;
+      lookupCommand = ZONE2_REVERSE_MAP[command] || command;
     } else if (result.zone === "zone3") {
-      const zone3ReverseMap: Record<string, string> = {
-        VL3: "MVL",
-        PW3: "PWR",
-        MT3: "AMT",
-        SL3: "SLI",
-        TU3: "TUN"
-      };
-      lookupCommand = zone3ReverseMap[command] || command;
+      lookupCommand = ZONE3_REVERSE_MAP[command] || command;
     }
 
-    (Object.keys(COMMANDS) as Array<keyof typeof COMMANDS>).forEach(function () {
-      const commansList = COMMANDS as unknown as { [key: string]: CommandType };
+    // Direct lookup instead of iterating all commands
+    type CommandType = {
+      name: string;
+      values: { [key: string]: { name: string | string[] } };
+    };
+    const cmdObj = (COMMANDS as unknown as Record<string, CommandType>)[lookupCommand];
+    if (!cmdObj) {
+      return result;
+    }
 
-      if (typeof commansList[lookupCommand] !== "undefined") {
-        result.command = commansList[lookupCommand].name;
+    result.command = cmdObj.name;
+    const valuesObj = cmdObj.values;
 
-        // console.log("******* %s", command);
-
-        const cmdObj = COMMANDS[lookupCommand as keyof typeof COMMANDS];
-        const valuesObj = cmdObj.values as { [key: string]: { name: string } };
-        if (valuesObj[value]?.name !== undefined) {
-          result.argument = valuesObj[value]?.name;
-
-          // return result;
-        } else if (value === "N/A") {
-          // Skip N/A values (zone is off or unavailable)
-          return result;
-        } else if (
-          VALUE_MAPPINGS.hasOwnProperty(lookupCommand as keyof typeof VALUE_MAPPINGS) &&
-          Object.prototype.hasOwnProperty.call(VALUE_MAPPINGS[lookupCommand as keyof typeof VALUE_MAPPINGS], "intgrRange")
-        ) {
-          result.argument = parseInt(value, 16);
-        } else if (typeof value === "string" && value.match(/^([0-9A-F]{2})+(,([0-9A-F]{2})+)*$/i)) {
-          // Handle hex-encoded string(s), possibly comma-separated
-          result.argument = value.split(",").map((hexStr) => {
-            hexStr = hexStr.trim();
-            let str = "";
-            for (let i = 0; i < hexStr.length; i += 2) {
-              str += String.fromCharCode(parseInt(hexStr.substring(i, i + 2), 16));
-            }
-            return str;
-          });
-          if (result.argument.length === 1) {
-            result.argument = result.argument[0];
-          }
+    if (valuesObj[value]?.name !== undefined) {
+      result.argument = valuesObj[value].name;
+    } else if (value === "N/A") {
+      // Skip N/A values (zone is off or unavailable)
+      // result.argument remains "undefined"
+    } else if (
+      VALUE_MAPPINGS.hasOwnProperty(lookupCommand as keyof typeof VALUE_MAPPINGS) &&
+      Object.prototype.hasOwnProperty.call(VALUE_MAPPINGS[lookupCommand as keyof typeof VALUE_MAPPINGS], "intgrRange")
+    ) {
+      result.argument = parseInt(value, 16);
+    } else if (typeof value === "string" && value.match(/^([0-9A-F]{2})+(,([0-9A-F]{2})+)*$/i)) {
+      // Handle hex-encoded string(s), possibly comma-separated
+      result.argument = value.split(",").map((hexStr) => {
+        hexStr = hexStr.trim();
+        let str = "";
+        for (let i = 0; i < hexStr.length; i += 2) {
+          str += String.fromCharCode(parseInt(hexStr.substring(i, i + 2), 16));
         }
+        return str;
+      });
+      if (result.argument.length === 1) {
+        result.argument = result.argument[0];
       }
-    });
-    // console.log("******3* %s", result.argument);
+    }
+
     return result;
   }
 
-  async discover(options?: { devices?: number; timeout?: number; address?: string; port?: number; subnetBroadcast?: string }): Promise<any[]> {
+  async discover(options?: { devices?: number; timeout?: number; address?: string; port?: number; subnetBroadcast?: string }): Promise<DiscoveredDevice[]> {
     return new Promise((resolve, reject) => {
-      const result: any[] = [];
+      const result: DiscoveredDevice[] = [];
       // Always default to broadcast unless address is explicitly provided
       const opts = {
         devices: options?.devices ?? 1,
@@ -410,7 +447,7 @@ export class EiscpDriver extends EventEmitter {
         resolve(result);
       }
       client
-        .on("error", (err: any) => {
+        .on("error", (err: Error) => {
           console.error("[EiscpDriver] UDP error:", err);
           try {
             client.close();
@@ -420,7 +457,7 @@ export class EiscpDriver extends EventEmitter {
             reject(err);
           }
         })
-        .on("message", (packet: any, rinfo: any) => {
+        .on("message", (packet: Buffer, rinfo: dgram.RemoteInfo) => {
           const message = this.eiscp_packet_extract(packet);
           const command = message.slice(0, 3);
           if (command === "ECN") {
@@ -505,8 +542,8 @@ export class EiscpDriver extends EventEmitter {
         this.is_connected = false;
         this.eiscp?.destroy();
       })
-      .on("data", (data: any) => {
-        var iscp_message = this.eiscp_packet_extract(data);
+      .on("data", (data: Buffer) => {
+        const iscp_message = this.eiscp_packet_extract(data);
         let command = iscp_message.slice(0, 3);
         let value = iscp_message.slice(3);
         
@@ -540,7 +577,7 @@ export class EiscpDriver extends EventEmitter {
           return;
         }
 
-        const dataPayload = {
+        const dataPayload: DataPayload = {
           command: rawResult.command ?? undefined,
           argument: rawResult.argument ?? undefined,
           zone: rawResult.zone ?? undefined,
@@ -552,11 +589,7 @@ export class EiscpDriver extends EventEmitter {
 
         // Route less important messages through the incoming queue for throttling
         if (THROTTLED_COMMANDS.has(command)) {
-          this.receive_queue.push(dataPayload, (err: any) => {
-            if (err) {
-              console.error("Error processing queued incoming message:", err);
-            }
-          });
+          this.enqueueIncoming(dataPayload);
         } else {
           // Emit other messages immediately
           this.emit("data", dataPayload);
@@ -571,59 +604,61 @@ export class EiscpDriver extends EventEmitter {
     }
   }
 
-  private async sendCommand(data: any, callback: any) {
-    if (this.is_connected && this.eiscp) {
-      this.eiscp.write(this.eiscp_packet(data));
-      setTimeout(callback, this.config.send_delay, false);
-      return;
-    }
-    callback("Send command, while not connected", null);
-  }
-
-  private async processIncomingMessage(data: any, callback: any) {
-    // Emit the incoming message data after the throttle delay
-    setTimeout(() => {
-      this.emit("data", data);
-      if (typeof callback === "function") {
-        callback();
+  /** Enqueue a command to be sent with proper delay between commands */
+  private enqueueSend(data: string): Promise<void> {
+    const task = this.sendQueue.then(async () => {
+      if (this.is_connected && this.eiscp) {
+        this.eiscp.write(this.eiscp_packet(data));
+        await delay(this.config.send_delay!);
+      } else {
+        throw new Error("Send command while not connected");
       }
-    }, this.config.receive_delay);
+    });
+    this.sendQueue = task.catch(() => {}); // Prevent unhandled rejection, errors handled by caller
+    return task;
   }
 
-  raw(data: any, callback?: any) {
-    if (typeof data !== "undefined" && data !== "") {
-      this.send_queue.push(data, (err: any) => {
-        if (typeof callback === "function") {
-          callback(err, null);
-        }
-      });
-    } else if (typeof callback === "function") {
-      callback(true, "No data provided.");
+  /** Enqueue an incoming message to be emitted with throttle delay */
+  private enqueueIncoming(data: DataPayload): void {
+    this.receiveQueue = this.receiveQueue.then(async () => {
+      await delay(this.config.receive_delay!);
+      this.emit("data", data);
+    }).catch((err) => {
+      console.error("Error processing queued incoming message:", err);
+    });
+  }
+
+  /** Send a raw ISCP command */
+  async raw(data: string): Promise<void> {
+    if (!data || data === "") {
+      throw new Error("No data provided");
     }
+    return this.enqueueSend(data);
   }
 
-  private async sendIscp(iscpCommand: string, callback?: any) {
+  private async sendIscp(iscpCommand: string): Promise<void> {
     // Check if command contains a network service selection (NLSLx), this handles both direct NLSL commands and embedded ones like "SLINLSL1"
     const nlslMatch = iscpCommand.match(/NLSL[0-9A-Fa-f]/);
     if (nlslMatch) {
       console.debug("%s Sending SLI2B (NET input) before %s", integrationName, nlslMatch[0]);
-      this.raw("SLI2B"); // Select NET input first
-      await new Promise((resolve) => setTimeout(resolve, this.config.netMenuDelay ?? 2500)); // Wait for AVR to fully load NET menu (needs time when exiting a service)
+      await this.raw("SLI2B"); // Select NET input first
+      await delay(this.config.netMenuDelay ?? 2500); // Wait for AVR to fully load NET menu
       console.debug("%s Sending network service command: %s", integrationName, nlslMatch[0]);
-      this.raw(nlslMatch[0], callback); // Send just the NLSL command
+      await this.raw(nlslMatch[0]); // Send just the NLSL command
       return;
     }
-    this.raw(iscpCommand, callback);
+    await this.raw(iscpCommand);
   }
 
-  command(data: any, callback?: any) {
-    let command: string, args: any, zone: any;
+  /** Send a command to the AVR */
+  async command(data: string | CommandInput): Promise<void> {
+    let command: string, args: string | number, zone: string;
 
     if (typeof data === "string") {
       const parts = data
         .toLowerCase()
         .split(/[\s.=:]/)
-        .filter((item: any) => item !== "");
+        .filter((item) => item !== "");
       if (parts.length === 3) {
         zone = parts[0];
         command = parts[1];
@@ -633,7 +668,7 @@ export class EiscpDriver extends EventEmitter {
         command = parts[0];
         args = parts[1];
       } else {
-        this.sendIscp(this.command_to_iscp(data, undefined, "main"), callback);
+        await this.sendIscp(this.command_to_iscp(data, undefined, "main"));
         return;
       }
     } else if (typeof data === "object" && data !== null) {
@@ -641,87 +676,50 @@ export class EiscpDriver extends EventEmitter {
       command = data.command;
       args = data.args;
     } else {
-      this.sendIscp(this.command_to_iscp(data, undefined, "main"), callback);
+      await this.sendIscp(this.command_to_iscp(String(data), undefined, "main"));
       return;
     }
-    this.sendIscp(this.command_to_iscp(command, args, zone), callback);
+    await this.sendIscp(this.command_to_iscp(command, args, zone));
   }
 
-  private command_to_iscp(command: string, args: any, zone: string) {
-    const prefix = (COMMAND_MAPPINGS as Record<string, any>)[command];
-    let value: any;
-    const valueMap = (VALUE_MAPPINGS as Record<string, any>)[prefix];
-    if (valueMap && Object.prototype.hasOwnProperty.call(valueMap, args)) {
-      value = valueMap[args].value;
+  private command_to_iscp(command: string, args: string | number | undefined, zone: string): string {
+    const prefix = (COMMAND_MAPPINGS as Record<string, string>)[command];
+    let value: string;
+    const valueMap = (VALUE_MAPPINGS as unknown as Record<string, Record<string, { value: string }>>)[prefix];
+    if (args !== undefined && valueMap && Object.prototype.hasOwnProperty.call(valueMap, args)) {
+      value = valueMap[String(args)].value;
     } else if (valueMap && Object.prototype.hasOwnProperty.call(valueMap, "intgrRange")) {
-      value = (+args).toString(16).toUpperCase();
+      value = (+args!).toString(16).toUpperCase();
       value = value.length < 2 ? "0" + value : value;
     } else {
       console.log("%s not found in JSON: %s %s", integrationName, command, args);
-      value = args;
+      value = String(args ?? "");
     }
 
     // Translate main zone command prefixes to zone-specific prefixes
     let zonePrefix = prefix;
     if (zone === "zone2") {
-      // Zone 2: MVL->ZVL, PWR->ZPW, AMT->ZMT, SLI->SLZ, TUN->TUZ
-      const zone2Map: Record<string, string> = {
-        MVL: "ZVL",
-        PWR: "ZPW",
-        AMT: "ZMT",
-        SLI: "SLZ",
-        TUN: "TUZ"
-      };
-      zonePrefix = zone2Map[prefix] || prefix;
+      zonePrefix = ZONE2_COMMAND_MAP[prefix] || prefix;
     } else if (zone === "zone3") {
-      // Zone 3: MVL->VL3, PWR->PW3, AMT->MT3, SLI->SL3, TUN->TU3
-      const zone3Map: Record<string, string> = {
-        MVL: "VL3",
-        PWR: "PW3",
-        AMT: "MT3",
-        SLI: "SL3",
-        TUN: "TU3"
-      };
-      zonePrefix = zone3Map[prefix] || prefix;
+      zonePrefix = ZONE3_COMMAND_MAP[prefix] || prefix;
     }
 
     return zonePrefix + value;
   }
 
-  get_commands(zone: string, callback: any) {
-    const result: any[] = [];
-    async.each(
-      Object.keys((COMMAND_MAPPINGS as any)[zone]),
-      (cmd: string, cb: any) => {
-        result.push(cmd);
-        cb();
-      },
-      (err: any) => {
-        callback(err, result);
-      }
-    );
+  /** Get all available commands */
+  getCommands(): string[] {
+    const mappings = COMMAND_MAPPINGS as Record<string, string>;
+    return Object.keys(mappings);
   }
 
-  get_command(command: string, callback: any) {
-    const result: any[] = [];
+  /** Get all available values for a command */
+  getCommandValues(command: string): string[] {
     const parts = command.split(".");
-    if (parts.length !== 2) {
-      command = parts[0];
-    } else {
-      command = parts[1];
-    }
-    const prefix = (COMMAND_MAPPINGS as Record<string, any>)[command];
-    const valueMap = (VALUE_MAPPINGS as Record<string, any>)[prefix];
-    async.each(
-      Object.keys(valueMap),
-      (val: string, cb: any) => {
-        result.push(val);
-        cb();
-      },
-      (err: any) => {
-        callback(err, result);
-      }
-    );
+    const cmd = parts.length === 2 ? parts[1] : parts[0];
+    const prefix = (COMMAND_MAPPINGS as Record<string, string>)[cmd];
+    const valueMap = (VALUE_MAPPINGS as Record<string, Record<string, unknown>>)[prefix] ?? {};
+    return Object.keys(valueMap);
   }
 
   waitForConnect(timeoutMs = 5000): Promise<void> {
