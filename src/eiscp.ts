@@ -316,6 +316,7 @@ export class EiscpDriver extends EventEmitter {
             return result;
           }
         }
+        result.argument = ascii;
         return result;
       }
 
