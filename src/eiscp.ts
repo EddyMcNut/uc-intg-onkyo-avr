@@ -316,7 +316,8 @@ export class EiscpDriver extends EventEmitter {
             return result;
           }
         }
-        // result.argument = ascii;
+        result.command = "unknownFLDcase";
+        result.argument = ascii;
         return result;
       }
 
