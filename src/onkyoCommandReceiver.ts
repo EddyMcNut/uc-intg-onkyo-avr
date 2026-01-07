@@ -251,10 +251,7 @@ export class OnkyoCommandReceiver {
             const frontPanelText = avrUpdates.argument.toString();
             const currentSource = avrStateManager.getSource(entityId);
             const frontPanelDisplaySensorId = `${entityId}_front_panel_display_sensor`;
-            this.driver.updateEntityAttributes(frontPanelDisplaySensorId, {
-              [uc.SensorAttributes.State]: uc.SensorStates.On,
-              [uc.SensorAttributes.Value]: frontPanelText
-            });
+
             switch (currentSource) {
               case "net":
                 if (avrStateManager.getSubSource(entityId) !== frontPanelText.toLowerCase()) {
@@ -269,9 +266,12 @@ export class OnkyoCommandReceiver {
               case "fm":
                 nowPlaying.station = avrUpdates.argument.toString();
                 nowPlaying.artist = "FM Radio";                
-                break;
 
               default:
+                  this.driver.updateEntityAttributes(frontPanelDisplaySensorId, {
+                    [uc.SensorAttributes.State]: uc.SensorStates.On,
+                    [uc.SensorAttributes.Value]: frontPanelText
+                  });
                 break;
             }
             break;
