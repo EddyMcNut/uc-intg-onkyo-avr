@@ -1,5 +1,5 @@
 {
-  "driver_id": "onkyo_avr",
+  "driver_id": "onkyo_avr_custom_driver",
   "version": "0.7.3",
   "min_core_api": "0.20.0",
   "name": { "en": "Onkyo AVR" },
@@ -120,7 +120,7 @@
         }
       },
       {
-        "id": "useHalfDbSteps",
+        "id": "adjustVolumeDispl",
         "label": {
           "en": "Adjust volume display"
         },

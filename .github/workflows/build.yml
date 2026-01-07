@@ -19,7 +19,7 @@ permissions:
   contents: write
 
 env:
-  INTG_NAME: onkyo_avr
+  INTG_NAME: onkyo_avr_custom_driver
 
 jobs:
   build:
@@ -76,8 +76,6 @@ jobs:
           cp package.json artifacts/bin/
           mv node_modules artifacts/bin/
           cp driver.json artifacts/
-          # patch metadata to not conflict with pre-installed driver
-          jq '.driver_id = "onkyo_avr_custom_driver" | .name.en = "Onkyo AVR custom"' driver.json > artifacts/driver.json
           ARTIFACT_NAME="uc-intg-${{ env.INTG_NAME }}-${{ env.VERSION }}"
           echo "ARTIFACT_NAME=$ARTIFACT_NAME" >> $GITHUB_ENV
           echo "artifact-name=$ARTIFACT_NAME" >> $GITHUB_OUTPUT

@@ -132,10 +132,10 @@ export class OnkyoCommandReceiver {
             // EISCP protocol: 0-200 or 0-100 depending on model, AVR display: 0-volumeScale, Remote slider: 0-100
             const eiscpValue = Number(avrUpdates.argument);
             const volumeScale = this.config.volumeScale || 100;
-            const useHalfDbSteps = this.config.useHalfDbSteps ?? true;
+            const adjustVolumeDispl = this.config.adjustVolumeDispl ?? true;
 
             // Convert: EISCP → AVR display scale (÷2 for 0.5 dB steps if enabled) → slider
-            const avrDisplayValue = useHalfDbSteps ? Math.round(eiscpValue / 2) : eiscpValue;
+            const avrDisplayValue = adjustVolumeDispl ? Math.round(eiscpValue / 2) : eiscpValue;
             const sliderValue = Math.round((avrDisplayValue * 100) / volumeScale);
 
             this.driver.updateEntityAttributes(entityId, {
@@ -250,11 +250,15 @@ export class OnkyoCommandReceiver {
           case "FLD": {
             const frontPanelText = avrUpdates.argument.toString();
             const currentSource = avrStateManager.getSource(entityId);
+            const frontPanelDisplaySensorId = `${entityId}_front_panel_display_sensor`;
+            this.driver.updateEntityAttributes(frontPanelDisplaySensorId, {
+              [uc.SensorAttributes.State]: uc.SensorStates.On,
+              [uc.SensorAttributes.Value]: frontPanelText
+            });
             switch (currentSource) {
               case "net":
                 if (avrStateManager.getSubSource(entityId) !== frontPanelText.toLowerCase()) {
                   avrStateManager.setSubSource(entityId, frontPanelText, this.eiscpInstance, eventZone, this.driver);
-                  const frontPanelDisplaySensorId = `${entityId}_front_panel_display_sensor`;
                   this.driver.updateEntityAttributes(frontPanelDisplaySensorId, {
                     [uc.SensorAttributes.State]: uc.SensorStates.On,
                     [uc.SensorAttributes.Value]: frontPanelText
@@ -264,7 +268,7 @@ export class OnkyoCommandReceiver {
 
               case "fm":
                 nowPlaying.station = avrUpdates.argument.toString();
-                nowPlaying.artist = "FM Radio";
+                nowPlaying.artist = "FM Radio";                
                 break;
 
               default:

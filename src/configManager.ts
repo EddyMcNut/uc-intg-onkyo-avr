@@ -52,7 +52,7 @@ export const AVR_DEFAULTS = {
   queueThreshold: DEFAULT_QUEUE_THRESHOLD,
   albumArtURL: "album_art.cgi",
   volumeScale: 100,
-  useHalfDbSteps: false,
+  adjustVolumeDispl: false,
   createSensors: true,
   netMenuDelay: 500,
   port: 60128
@@ -66,7 +66,7 @@ export interface AvrConfig {
   queueThreshold?: number;
   albumArtURL?: string;
   volumeScale?: number; // 80 or 100
-  useHalfDbSteps?: boolean; // true = use 0.5 dB steps (×2 / ÷2), false = direct EISCP value
+  adjustVolumeDispl?: boolean; // true = use 0.5 dB steps (×2 / ÷2), false = direct EISCP value
   createSensors?: boolean; // true = create sensor entities for this AVR
   netMenuDelay?: number; // delay in ms for NET menu to load (default 2500)
 }
@@ -76,7 +76,7 @@ export interface OnkyoConfig {
   queueThreshold?: number;
   albumArtURL?: string;
   volumeScale?: number; // 80 or 100
-  useHalfDbSteps?: boolean; // true = use 0.5 dB steps (×2 / ÷2), false = direct EISCP value
+  adjustVolumeDispl?: boolean; // true = use 0.5 dB steps (×2 / ÷2), false = direct EISCP value
   createSensors?: boolean; // true = create sensor entities
   // Legacy fields for backward compatibility
   model?: string;
@@ -98,7 +98,7 @@ export class ConfigManager {
       queueThreshold: avr.queueThreshold ?? AVR_DEFAULTS.queueThreshold,
       albumArtURL: avr.albumArtURL ?? AVR_DEFAULTS.albumArtURL,
       volumeScale: avr.volumeScale ?? AVR_DEFAULTS.volumeScale,
-      useHalfDbSteps: avr.useHalfDbSteps ?? AVR_DEFAULTS.useHalfDbSteps,
+      adjustVolumeDispl: avr.adjustVolumeDispl ?? AVR_DEFAULTS.adjustVolumeDispl,
       createSensors: avr.createSensors ?? AVR_DEFAULTS.createSensors,
       netMenuDelay: avr.netMenuDelay ?? AVR_DEFAULTS.netMenuDelay
     };

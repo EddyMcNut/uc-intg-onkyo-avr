@@ -304,25 +304,25 @@ export class EiscpDriver extends EventEmitter {
     // Construct entityId from config and zone
     const entityId = buildEntityId(this.config.model!, this.config.host!, result.zone);
     const currentSource = avrStateManager.getSource(entityId);
-
+    result.command = "FLD";
+    
     switch (currentSource) {
       case "net": {
         const detectedService = NETWORK_SERVICES.find((service) => ascii.startsWith(service));
         if (detectedService) {
           if (this.lastFldService !== detectedService) {
             this.lastFldService = detectedService;
-            result.command = "FLD";
             result.argument = detectedService;
             return result;
           }
         }
+        result.argument = "?";
         return result;
       }
 
       case "fm": {
         this.lastFldService = null;
         ascii = ascii.slice(0, -2);
-        result.command = "FLD";
         result.argument = ascii;
         return result;
       }
@@ -330,7 +330,6 @@ export class EiscpDriver extends EventEmitter {
       default: {
         this.lastFldService = null;
         ascii = ascii.slice(0, -4);
-        result.command = "FLD";
         result.argument = ascii;
         return result;
       }

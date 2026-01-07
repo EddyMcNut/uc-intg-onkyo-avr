@@ -27,7 +27,7 @@ function testSingleAvrMigration() {
         queueThreshold: 100,
         albumArtURL: "album_art.cgi",
         volumeScale: 100,
-        useHalfDbSteps: true
+        adjustVolumeDispl: true
       }
     ]
   };
@@ -73,7 +73,7 @@ function testMultiZoneMigration() {
         queueThreshold: 100,
         albumArtURL: "album_art.cgi",
         volumeScale: 100,
-        useHalfDbSteps: true
+        adjustVolumeDispl: true
       },
       {
         model: "TX-NR696",
@@ -83,7 +83,7 @@ function testMultiZoneMigration() {
         queueThreshold: 100,
         albumArtURL: "album_art.cgi",
         volumeScale: 100,
-        useHalfDbSteps: true
+        adjustVolumeDispl: true
       },
       {
         model: "TX-NR696",
@@ -93,7 +93,7 @@ function testMultiZoneMigration() {
         queueThreshold: 100,
         albumArtURL: "album_art.cgi",
         volumeScale: 100,
-        useHalfDbSteps: true
+        adjustVolumeDispl: true
       }
     ]
   };
@@ -138,7 +138,7 @@ function testMultipleAvrsMigration() {
         queueThreshold: 100,
         albumArtURL: "album_art.cgi",
         volumeScale: 100,
-        useHalfDbSteps: true
+        adjustVolumeDispl: true
       },
       {
         model: "TX-NR696",
@@ -148,7 +148,7 @@ function testMultipleAvrsMigration() {
         queueThreshold: 100,
         albumArtURL: "album_art.cgi",
         volumeScale: 100,
-        useHalfDbSteps: true
+        adjustVolumeDispl: true
       },
       {
         model: "TX-NR696",
@@ -158,7 +158,7 @@ function testMultipleAvrsMigration() {
         queueThreshold: 100,
         albumArtURL: "album_art.cgi",
         volumeScale: 100,
-        useHalfDbSteps: true
+        adjustVolumeDispl: true
       }
     ]
   };
@@ -220,7 +220,7 @@ function testFormatChecking() {
         queueThreshold: 100,
         albumArtURL: "album_art.cgi",
         volumeScale: 100,
-        useHalfDbSteps: true
+        adjustVolumeDispl: true
       }
     ]
   };
