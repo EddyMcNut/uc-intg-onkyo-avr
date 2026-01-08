@@ -50,6 +50,7 @@ class AvrStateManager {
     if (state.source !== normalizedSource) {
       console.log("%s [%s] source changed from '%s' to '%s'", integrationName, entityId, state.source, source);
       state.source = normalizedSource;
+      state.subSource = "unknown"; // Reset sub-source on source change
       this.refreshAvrState(entityId, eiscpInstance, zone, driver);
       return true;
     }

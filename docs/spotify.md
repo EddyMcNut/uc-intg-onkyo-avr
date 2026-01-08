@@ -32,8 +32,10 @@ To set up an Activity for Spotify, have a look at these screenshots:
 
 Previous/Next on the remote will only work if you can also use previous/next directly in your Spotify app, that depends on the subscription you have for Spotify.
 
-_note1: if `input-selector spotify` does not work, try to run setup of this integration again and increase the value for 'NET sub-source selection delay', if that does not help, just try `input-selector net`, see [input-selector](./input-selector.md#net) for more info_
+If `input-selector spotify` does not work, check the manual of your AVR to see if Spotify is even available as selectable input on the AVR:
+  - your AVR *does* have a Spotify input: run setup of this integration again and increase the value for 'NET sub-source selection delay'
+  - your AVR does *not* have a Spotify input, just try `input-selector net`, see [input-selector](./input-selector.md#net) for more info
 
-_note2: after installing a new version of the integration or after a reboot of the remote, it might be needed to close screen on the remote and enter the already active activity again to get the MediaWidget to work, hit next to go to the next song and trigger refresh of the album art_
+_note: after installing a new version of the integration or after a reboot of the remote, it might be needed to close screen on the remote and enter the already active activity again to get the MediaWidget to work, hit next to go to the next song and trigger refresh of the album art_
 
 [back to main README](../README.md#example-activities)

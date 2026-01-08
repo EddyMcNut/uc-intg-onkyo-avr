@@ -110,7 +110,6 @@ export class EiscpDriver extends EventEmitter {
   private sendQueue: Promise<void> = Promise.resolve();
   private receiveQueue: Promise<void> = Promise.resolve();
   private currentMetadata: Metadata = {};
-  private lastFldService: string | null = null; // Track last detected network service from FLD
 
   /** Map of special command handlers for complex parsing logic */
   private readonly commandHandlers: Record<string, CommandHandler> = {
@@ -304,34 +303,29 @@ export class EiscpDriver extends EventEmitter {
     // Construct entityId from config and zone
     const entityId = buildEntityId(this.config.model!, this.config.host!, result.zone);
     const currentSource = avrStateManager.getSource(entityId);
-    result.command = "FLD";
     
     switch (currentSource) {
       case "net": {
         const detectedService = NETWORK_SERVICES.find((service) => ascii.startsWith(service));
-        if (detectedService) {
-          if (this.lastFldService !== detectedService) {
-            this.lastFldService = detectedService;
-            result.argument = detectedService;
-            return result;
-          }
+        const currentSubSource = avrStateManager.getSubSource(entityId);
+        if (detectedService && currentSubSource !== detectedService.toLowerCase()) {
+          result.command = "FLD";
+          result.argument = detectedService;
+          return result;
         }
-        result.command = "unknownFLDcase";
-        result.argument = ascii;
+        // No new service detected - return with "undefined" command to skip emission
         return result;
       }
 
       case "fm": {
-        this.lastFldService = null;
-        ascii = ascii.slice(0, -2);
-        result.argument = ascii;
+        result.command = "FLD";
+        result.argument = ascii.slice(0, -2);
         return result;
       }
 
       default: {
-        this.lastFldService = null;
-        ascii = ascii.slice(0, -4);
-        result.argument = ascii;
+        result.command = "FLD";
+        result.argument = ascii.slice(0, -4);
         return result;
       }
     }

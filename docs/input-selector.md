@@ -45,7 +45,7 @@ For the following sources, the integration will first send the `input-selector n
 | Alexa        | `input-selector alexa`             |
 | Music-Server | `input-selector music-server`      |
 
-Of course, your AVR must support these services. Check the manual of your model to see which of these services are available.
+**Of course, your AVR must support these services. Check the manual of your model to see which of these services / inputs are available. If a service like Spotify is not a selectable input source on your AVR, just use `input-selector net` as mentioned above.**
 
 [back to main README](../README.md#input-source)
 
