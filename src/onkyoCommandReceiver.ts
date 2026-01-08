@@ -164,6 +164,14 @@ export class OnkyoCommandReceiver {
               [uc.MediaPlayerAttributes.Source]: source
             });
             console.log("%s [%s] input-selector (source) set to: %s", integrationName, entityId, source);
+            
+            // Reset track info on source change to ensure fresh updates
+            this.currentTrackId = "";
+            nowPlaying.title = undefined;
+            nowPlaying.artist = undefined;
+            nowPlaying.album = undefined;
+            nowPlaying.station = undefined;
+            
             switch (source) {
               case "dab":
                 this.eiscpInstance.raw("DSNQSTN");
@@ -266,6 +274,13 @@ export class OnkyoCommandReceiver {
                   [uc.SensorAttributes.State]: uc.SensorStates.On,
                   [uc.SensorAttributes.Value]: frontPanelText
                 });
+                // Query metadata when switching to a new network service
+                const hasSongInfo = SONG_INFO.some(name => frontPanelText.toLowerCase().includes(name));
+                if (hasSongInfo) {
+                  this.eiscpInstance.raw("NATQSTN"); // Query title
+                  this.eiscpInstance.raw("NTIQSTN"); // Query artist  
+                  this.eiscpInstance.raw("NALQSTN"); // Query album
+                }
               }
             } else {
               // For all other sources, always update the sensor
