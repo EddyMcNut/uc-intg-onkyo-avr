@@ -304,26 +304,41 @@ export class EiscpDriver extends EventEmitter {
     const entityId = buildEntityId(this.config.model!, this.config.host!, result.zone);
     const currentSource = avrStateManager.getSource(entityId);
     
+    // Check if FLD content matches a network service (regardless of current source)
+    const detectedService = NETWORK_SERVICES.find((service) => ascii.startsWith(service));
+    
     switch (currentSource) {
       case "net": {
-        const detectedService = NETWORK_SERVICES.find((service) => ascii.startsWith(service));
-        const currentSubSource = avrStateManager.getSubSource(entityId);
-        if (detectedService && currentSubSource !== detectedService.toLowerCase()) {
-          result.command = "FLD";
-          result.argument = detectedService;
+        if (detectedService) {
+          // Known service detected - only emit if different from current subSource
+          const currentSubSource = avrStateManager.getSubSource(entityId);
+          if (currentSubSource !== detectedService.toLowerCase()) {
+            result.command = "FLD";
+            result.argument = detectedService;
+            return result;
+          }
+          // Same service, skip to prevent scroll updates
           return result;
         }
-        // No new service detected - return with "undefined" command to skip emission
+        // No known service - skip scrolling text from network sources
         return result;
       }
 
       case "fm": {
+        // If we detect a network service but source is FM, skip (source changing)
+        if (detectedService) {
+          return result;
+        }
         result.command = "FLD";
         result.argument = ascii.slice(0, -2);
         return result;
       }
 
       default: {
+        // If we detect a network service but source isn't NET, skip (source changing)
+        if (detectedService) {
+          return result;
+        }
         result.command = "FLD";
         result.argument = ascii.slice(0, -4);
         return result;
@@ -639,6 +654,7 @@ export class EiscpDriver extends EventEmitter {
       await delay(this.config.netMenuDelay ?? 2500); // Wait for AVR to fully load NET menu
       console.debug("%s Sending network service command: %s", integrationName, nlslMatch[0]);
       await this.raw(nlslMatch[0]); // Send just the NLSL command
+      await this.raw("SLIQSTN"); // Query input-selector to ensure source state updates
       return;
     }
     await this.raw(iscpCommand);

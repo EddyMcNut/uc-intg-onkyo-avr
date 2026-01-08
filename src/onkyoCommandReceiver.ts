@@ -252,27 +252,27 @@ export class OnkyoCommandReceiver {
             const currentSource = avrStateManager.getSource(entityId);
             const frontPanelDisplaySensorId = `${entityId}_front_panel_display_sensor`;
 
-            switch (currentSource) {
-              case "net":
-                if (avrStateManager.getSubSource(entityId) !== frontPanelText.toLowerCase()) {
-                  avrStateManager.setSubSource(entityId, frontPanelText, this.eiscpInstance, eventZone, this.driver);
-                  this.driver.updateEntityAttributes(frontPanelDisplaySensorId, {
-                    [uc.SensorAttributes.State]: uc.SensorStates.On,
-                    [uc.SensorAttributes.Value]: frontPanelText
-                  });
-                }
-                break;
+            // Handle FM-specific metadata
+            if (currentSource === "fm") {
+              nowPlaying.station = frontPanelText;
+              nowPlaying.artist = "FM Radio";
+            }
 
-              case "fm":
-                nowPlaying.station = avrUpdates.argument.toString();
-                nowPlaying.artist = "FM Radio";                
-
-              default:
-                  this.driver.updateEntityAttributes(frontPanelDisplaySensorId, {
-                    [uc.SensorAttributes.State]: uc.SensorStates.On,
-                    [uc.SensorAttributes.Value]: frontPanelText
-                  });
-                break;
+            // For NET source, only update if subSource changed (prevents scroll updates)
+            if (currentSource === "net") {
+              if (avrStateManager.getSubSource(entityId) !== frontPanelText.toLowerCase()) {
+                avrStateManager.setSubSource(entityId, frontPanelText, this.eiscpInstance, eventZone, this.driver);
+                this.driver.updateEntityAttributes(frontPanelDisplaySensorId, {
+                  [uc.SensorAttributes.State]: uc.SensorStates.On,
+                  [uc.SensorAttributes.Value]: frontPanelText
+                });
+              }
+            } else {
+              // For all other sources, always update the sensor
+              this.driver.updateEntityAttributes(frontPanelDisplaySensorId, {
+                [uc.SensorAttributes.State]: uc.SensorStates.On,
+                [uc.SensorAttributes.Value]: frontPanelText
+              });
             }
             break;
           }
