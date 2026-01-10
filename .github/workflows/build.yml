@@ -74,11 +74,6 @@ jobs:
           mv artifacts/dist artifacts/bin
           mv artifacts/bin/index.js artifacts/bin/driver.js
           cp package.json artifacts/bin/
-          cp backup artifacts/
-          cp restore artifacts/
-          cp backup.js artifacts/
-          cp restore.js artifacts/
-          chmod +x artifacts/backup artifacts/restore
           mv node_modules artifacts/bin/
           cp driver.json artifacts/
           ARTIFACT_NAME="uc-intg-${{ env.INTG_NAME }}-${{ env.VERSION }}"
