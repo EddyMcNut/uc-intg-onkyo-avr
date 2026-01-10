@@ -10,7 +10,7 @@
       "volumeScale": 100,
       "adjustVolumeDispl": true,
       "createSensors": true,
-      "netMenuDelay": 500
+      "netMenuDelay": 555
     }
   ]
 }

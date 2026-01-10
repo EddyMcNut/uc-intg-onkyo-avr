@@ -109,7 +109,7 @@ export class OnkyoCommandReceiver {
             if (avrUpdates.argument !== "on") {
               for (const suffix of SENSOR_SUFFIXES) {
                 this.driver.updateEntityAttributes(`${entityId}${suffix}`, {
-                  [uc.SensorAttributes.Value]: "AVR standby",
+                  [uc.SensorAttributes.Value]: "no data",
                 });
               }
             }

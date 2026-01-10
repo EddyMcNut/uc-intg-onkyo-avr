@@ -20,7 +20,7 @@ const COMMANDS = eiscpCommands.commands;
 const COMMAND_MAPPINGS = eiscpCommands.command_mappings;
 const VALUE_MAPPINGS = eiscpCommands.value_mappings;
 const integrationName = "Onkyo-Integration eISCP:";
-const IGNORED_COMMANDS = new Set(["NMS", "NPB"]); // Commands to ignore from AVR
+const IGNORED_COMMANDS = new Set(["NMS", "NPB", "NST"]); // Commands to ignore from AVR (NMS=menu, NPB=playback, NST=net status)
 const THROTTLED_COMMANDS = new Set(["IFA", "IFV", "FLD"]); // Commands to send to incoming queue for throttling
 const FLD_VOLUME_HEX_PREFIX = "566F6C756D65"; // "Volume" in hex - skip these FLD messages
 
@@ -570,14 +570,12 @@ export class EiscpDriver extends EventEmitter {
 
         value = String(value).replace(/[\x00-\x1F]/g, ""); // remove weird characters like \x1A
 
-        // Strip trailing ISCP messages for certain commands, move this to ondata?
-        if (["SLI", "SLZ", "SL3", "PRS", "AMT", "ZMT", "MT3", "MVL", "ZVL", "VL3"].includes(command)) {
-          const idx = value.indexOf("ISCP");
-          if (idx !== -1) {
-            value = value.substring(0, idx);
-          }
-          value = value.trim();
+        // Strip trailing ISCP messages for all commands (TCP buffer can combine messages during rapid AVR responses)
+        const iscpIdx = value.indexOf("ISCP");
+        if (iscpIdx !== -1) {
+          value = value.substring(0, iscpIdx);
         }
+        value = value.trim();
 
         const rawResult = this.iscp_to_command(command, value);
 

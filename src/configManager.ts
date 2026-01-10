@@ -187,8 +187,10 @@ export class ConfigManager {
     // Check if AVR already exists (by IP and zone)
     const existingIndex = this.config.avrs.findIndex((a) => a.ip === normalizedAvr.ip && a.zone === normalizedAvr.zone);
     if (existingIndex >= 0) {
-      // AVR already exists, don't update it to preserve per-AVR settings
-      console.log(`ConfigManager: AVR at ${normalizedAvr.ip} zone ${normalizedAvr.zone} already exists, skipping update`);
+      // AVR already exists, update it with new settings from setup
+      console.log(`ConfigManager: Updating existing AVR at ${normalizedAvr.ip} zone ${normalizedAvr.zone}`);
+      this.config.avrs[existingIndex] = normalizedAvr;
+      this.save(this.config);
       return;
     }
 
