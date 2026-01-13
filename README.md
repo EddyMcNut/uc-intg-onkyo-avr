@@ -42,6 +42,7 @@ Users report it also to work with:
 - TX-NR6050
 - TX-NR6100
 - Pioneer VSX-932
+- Pioneer VSX-LX305
 - Integra (model unknown)
 
 ## Known issues and solutions
