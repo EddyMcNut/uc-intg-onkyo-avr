@@ -99,7 +99,7 @@ My setup:
 ## Updated failed?
 If the update failed for some reason, best it to go back to the last working state:
 - [collect logs](collect-logs.md)
-- delete integration v0.7.0 twice so it is now showing anymore
+- delete integration v0.7.0 twice so it is not showing anymore
 - restore the backup you created in step 1 and reboot the remote
 - install integration version v0.6.5
 - run setup, keep name and IP of the AVR the same is it was in step 2
