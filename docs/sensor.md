@@ -1,6 +1,6 @@
 ## Sensors
 
-As from v0.7.3, this integration contains the following sensors for *every zone*:
+As from v0.7.3, this integration contains the following sensors:
 - Volume
 - Source
 - Audio Input
@@ -12,6 +12,8 @@ As from v0.7.3, this integration contains the following sensors for *every zone*
 - [Front Panel Display](#front-panel-display)
 
 **Prerequisite: make sure you are using UC Firmware 2.7.1 or higher.**
+
+**Sensors can be created for every zone but depending on the AVR model some sensors will not be updated for all zones**
 
 During setup, you can choose to have the sensors created:
 
