@@ -332,6 +332,16 @@ export const eiscpCommands = {
         QSTN: { name: "query", description: "gets Information of Video" }
       }
     },
+    FLD: {
+      name: "fp-display",
+      description: "FP Display Information Command",
+      values: {
+        '{xx}{xx}{xx}{xx}{xx}x': {
+          description: "FP Display Information Character Code for FP Display (UTF-8 encoded)",
+        },
+        QSTN: {name: "query", description: "gets FP Display Information" }
+      }
+    },
     SLI: {
       name: "input-selector",
       description: "Input Selector Command",
@@ -368,6 +378,16 @@ export const eiscpCommands = {
         "2B": { name: ["net", "network"], description: "sets NETWORK, NET" },
         "2C": { name: "usbt", description: "sets USB(toggle)" },
         "2E": { name: "bluetooth", description: "sets bluetooth" },
+        "NLSL0": { name: "tunein", description: "UC integration automatically selects TuneIn after selecting NET" },
+        "NLSL1": { name: "spotify", description: "UC integration automatically selects Spotify after selecting NET" },
+        "NLSL2": { name: "deezer", description: "UC integration automatically selects Deezer after selecting NET" },
+        "NLSL3": { name: "tidal", description: "UC integration automatically selects Tidal after selecting NET" },
+        "NLSL4": { name: "amazonmusic", description: "UC integration automatically selects AmazonMusic after selecting NET" },
+        "NLSL5": { name: "chromecast", description: "UC integration automatically selects Chromecast after selecting NET" },
+        "NLSL6": { name: "dts-play-fi", description: "UC integration automatically selects DTS-Play-Fi after selecting NET" },
+        "NLSL7": { name: "airplay", description: "UC integration automatically selects AirPlay after selecting NET" },
+        "NLSL8": { name: "alexa", description: "UC integration automatically selects Alexa after selecting NET" },
+        "NLSL9": { name: "music-server", description: "UC integration automatically selects Music-Server after selecting NET" },
         UP: { name: "up", description: "sets Selector Position Wrap-Around Up" },
         DOWN: { name: "down", description: "sets Selector Position Wrap-Around Down" },
         QSTN: { name: "query", description: "gets The Selector Position" }
@@ -1722,6 +1742,7 @@ export const eiscpCommands = {
     "memory-setup": "MEM",
     "audio-information": "IFA",
     "video-information": "IFV",
+    "fp-display": "FLD",
     "input-selector": "SLI",
     "recout-selector": "SLR",
     "audio-selector": "SLA",
@@ -1950,6 +1971,7 @@ export const eiscpCommands = {
     },
     IFA: { query: { value: "QSTN" } },
     IFV: { query: { value: "QSTN" } },
+    FLD: { query: { value: "QSTN" } },
     SLI: {
       video1: { value: "00" },
       vcr: { value: "00" },
@@ -1998,6 +2020,16 @@ export const eiscpCommands = {
       network: { value: "2B" },
       usbt: { value: "2C" },
       bluetooth: { value: "2E" },
+      "tunein": { value: "NLSL0"},
+      "spotify": { value: "NLSL1"},
+      "deezer": { value: "NLSL2"},
+      "tidal": { value: "NLSL3"},
+      "amazonmusic": { value: "NLSL4"},
+      "chromecast": { value: "NLSL5"},
+      "dts-play-fi": { value: "NLSL6"},
+      "airplay": { value: "NLSL7"},
+      "alexa": { value: "NLSL8"},
+      "music-server": { value: "NLSL9"},
       up: { value: "UP" },
       down: { value: "DOWN" },
       query: { value: "QSTN" }

@@ -1,26 +1,14 @@
 import * as uc from "@unfoldedcircle/integration-api";
 import { EiscpDriver } from "./eiscp.js";
-import { DEFAULT_QUEUE_THRESHOLD, OnkyoConfig } from "./configManager.js";
+import { DEFAULT_QUEUE_THRESHOLD, MAX_LENGTHS, PATTERNS, OnkyoConfig } from "./configManager.js";
 
 const integrationName = "Onkyo-Integration (sender):";
-let lastCommandTime = 0;
-
-// Security: Maximum input lengths
-const MAX_LENGTHS = {
-  USER_COMMAND: 250,      // input-selector, listening-mode, etc.
-  RAW_COMMAND: 20        // raw MVL20, etc.
-};
-
-// Security: Valid character patterns
-const PATTERNS = {
-  USER_COMMAND: /^[a-z0-9\-\s.:=]+$/i,  // Letters, numbers, hyphens, spaces, delimiters
-  RAW_COMMAND: /^[A-Z0-9]+$/             // Uppercase letters and numbers only
-};
 
 export class OnkyoCommandSender {
   private driver: uc.IntegrationAPI;
   private config: OnkyoConfig;
   private eiscp: EiscpDriver;
+  private lastCommandTime: number = 0;
 
   constructor(driver: uc.IntegrationAPI, config: OnkyoConfig, eiscp: EiscpDriver) {
     this.driver = driver;
@@ -93,14 +81,14 @@ export class OnkyoCommandSender {
         await this.eiscp.command(formatCommand("audio-muting toggle"));
         break;
       case uc.MediaPlayerCommands.VolumeUp:
-        if (now - lastCommandTime > (this.config.queueThreshold ?? DEFAULT_QUEUE_THRESHOLD)) {
-          lastCommandTime = now;
+        if (now - this.lastCommandTime > (this.config.queueThreshold ?? DEFAULT_QUEUE_THRESHOLD)) {
+          this.lastCommandTime = now;
           await this.eiscp.command(formatCommand("volume level-up-1db-step"));
         }
         break;
       case uc.MediaPlayerCommands.VolumeDown:
-        if (now - lastCommandTime > (this.config.queueThreshold ?? DEFAULT_QUEUE_THRESHOLD)) {
-          lastCommandTime = now;
+        if (now - this.lastCommandTime > (this.config.queueThreshold ?? DEFAULT_QUEUE_THRESHOLD)) {
+          this.lastCommandTime = now;
           await this.eiscp.command(formatCommand("volume level-down-1db-step"));
         }
         break;
@@ -109,13 +97,13 @@ export class OnkyoCommandSender {
           // Remote slider: 0-100, AVR display: 0-volumeScale, EISCP protocol: 0-200 or 0-100 depending on model
           const sliderValue = Math.max(0, Math.min(100, Number(params.volume)));
           const volumeScale = this.config.volumeScale || 100;
-          const useHalfDbSteps = this.config.useHalfDbSteps ?? true; // Default to true for backward compatibility
+          const adjustVolumeDispl = this.config.adjustVolumeDispl ?? true; // Default to true for backward compatibility
 
           // Convert: slider → AVR display scale
           const avrDisplayValue = Math.round((sliderValue * volumeScale) / 100);
 
           // Convert to EISCP: some models use 0.5 dB steps (×2), others show EISCP value directly
-          const eiscpValue = useHalfDbSteps ? avrDisplayValue * 2 : avrDisplayValue;
+          const eiscpValue = adjustVolumeDispl ? avrDisplayValue * 2 : avrDisplayValue;
           const hexVolume = eiscpValue.toString(16).toUpperCase().padStart(2, "0");
           
           // Use zone-specific volume command prefix
@@ -151,7 +139,7 @@ export class OnkyoCommandSender {
               return uc.StatusCodes.BadRequest;
             }
             
-            console.error("%s [%s] sending raw command: %s", integrationName, entity.id, rawCmd);
+            console.log("%s [%s] sending raw command: %s", integrationName, entity.id, rawCmd);
             await this.eiscp.raw(rawCmd);
           } else if (typeof params.source === "string") {
             const userCmd = params.source.toLowerCase();
@@ -205,6 +193,7 @@ export class OnkyoCommandSender {
       case uc.MediaPlayerCommands.Info:
         await this.eiscp.command(formatCommand("audio-information query"));
         await this.eiscp.command(formatCommand("video-information query"));
+        await this.eiscp.command(formatCommand("fp-display query"));
         break;
       default:
         return uc.StatusCodes.NotImplemented;

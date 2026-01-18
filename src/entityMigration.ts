@@ -12,7 +12,7 @@
  */
 
 import * as uc from "@unfoldedcircle/integration-api";
-import { OnkyoConfig, AvrConfig } from "./configManager.js";
+import { OnkyoConfig, AvrConfig, buildEntityId, buildPhysicalAvrId } from "./configManager.js";
 import { Buffer } from "buffer";
 
 interface EntityMapping {
@@ -162,7 +162,7 @@ export class EntityMigration {
     const avrsByPhysical = new Map<string, AvrConfig[]>();
     
     for (const avr of this.config.avrs) {
-      const physicalKey = `${avr.model} ${avr.ip}`;
+      const physicalKey = buildPhysicalAvrId(avr.model, avr.ip);
       if (!avrsByPhysical.has(physicalKey)) {
         avrsByPhysical.set(physicalKey, []);
       }
@@ -177,7 +177,7 @@ export class EntityMigration {
       const mainZone = zones.find(z => z.zone === 'main') || zones[0];
       
       if (mainZone) {
-        const newEntityId = `${mainZone.model} ${mainZone.ip} ${mainZone.zone}`;
+        const newEntityId = buildEntityId(mainZone.model, mainZone.ip, mainZone.zone);
         
         this.mappings.push({
           oldEntityId,

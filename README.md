@@ -20,12 +20,14 @@ You use this integration at your own risk!
 Read this readme completely, it contains some tips for known issues and it also explains how to use `Input source` in a flexibale way so you can send a lot of different commands to your AVR.
 
 - Your Onkyo AVR(s) needs a fixed IP address.
-- Your Onkyo AVR(s) needs a wired network connection.
+- Your Onkyo AVR(s) needs to be connected to the same network as you UC Remote (if AVR IP is 192.168.1.x then UC Remote IP must also start with 192.168.1).
 - Your Onkyo AVR(s) needs to be ON or STANDBY.
 - Your UC Remote needs to have `New reconnect logic` enabled.
     ![](./screenshots/new-reconnect-logic.png)
 
 If your AVR is disconnected from power (off) this integration will fail. If your AVR has been disconnected from power, it could be that you first have to switch on your AVR manually one time before network commands work again (depends on the model), waking up after STANDBY should then work again.
+
+A wired network connection is preferred but several users report it's working fine while AVR is connected over WiFi.
 
 ## Reported to work on different brands and models
 

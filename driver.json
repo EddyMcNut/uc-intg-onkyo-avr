@@ -1,6 +1,6 @@
 {
-  "driver_id": "onkyo_avr",
-  "version": "0.7.2",
+  "driver_id": "onkyo_avr_custom_driver",
+  "version": "0.7.3",
   "min_core_api": "0.20.0",
   "name": { "en": "Onkyo AVR" },
   "icon": "uc:music",
@@ -84,6 +84,17 @@
         }
       },
       {
+        "id": "netMenuDelay",
+        "label": {
+          "en": "NET sub-source selection delay. Default `500`"
+        },
+        "field": {
+          "number": {
+            "value": 500
+          }
+        }
+      },
+      {
         "id": "volumeScale",
         "label": {
           "en": "Volume scale (0-80 or 0-100)"
@@ -109,7 +120,7 @@
         }
       },
       {
-        "id": "useHalfDbSteps",
+        "id": "adjustVolumeDispl",
         "label": {
           "en": "Adjust volume display"
         },
@@ -165,6 +176,31 @@
         }
       },
       {
+        "id": "createSensors",
+        "label": {
+          "en": "Create sensor entities?"
+        },
+        "field": {
+          "dropdown": {
+            "value": "true",
+            "items": [
+              {
+                "id": "true",
+                "label": {
+                  "en": "Yes"
+                }
+              },
+              {
+                "id": "false",
+                "label": {
+                  "en": "No"
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
         "id": "infoTwo",
         "label": {
           "en": "Not auto discoverable? Adjust on-sequence!"
@@ -196,7 +232,7 @@
           "en": "Remote 4-digit PIN code (for AVR entity migration)"
         },
         "field": {
-          "text": {
+          "password": {
             "value": ""
           }
         }
