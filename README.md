@@ -1,6 +1,6 @@
 # uc-intg-onkyo-avr
 
-Onkyo AVR custom integration for Unfolded Circle remotes.
+Onkyo AVR custom integration for Unfolded Circle remotes. Also reported to work with Pioneer AVR. 
 
 [![GitHub Release](https://img.shields.io/github/v/release/EddyMcNut/uc-intg-onkyo-avr)](https://github.com/EddyMcNut/uc-intg-onkyo-avr/releases)
 [![License](https://img.shields.io/badge/license-MPL--2.0-blue.svg)](https://github.com/EddyMcNut/uc-intg-onkyo-avr/blob/main/LICENSE)
