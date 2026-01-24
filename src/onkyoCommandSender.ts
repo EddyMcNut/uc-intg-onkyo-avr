@@ -1,6 +1,7 @@
 import * as uc from "@unfoldedcircle/integration-api";
 import { EiscpDriver } from "./eiscp.js";
 import { DEFAULT_QUEUE_THRESHOLD, MAX_LENGTHS, PATTERNS, OnkyoConfig } from "./configManager.js";
+import log from "./loggers.js";
 
 const integrationName = "Onkyo-Integration (sender):";
 
@@ -23,7 +24,7 @@ export class OnkyoCommandSender {
     // This handles the case where user sends a command after wake-up from standby
     // and the driver reconnection hasn't been triggered yet
     if (!this.eiscp.connected) {
-      console.log("%s [%s] Command received while disconnected, triggering reconnection...", integrationName, entity.id);
+      log.info("%s [%s] Command received while disconnected, triggering reconnection...", integrationName, entity.id);
       try {
         const avrConfig = this.config.avrs?.[0];
         if (avrConfig) {
@@ -33,10 +34,10 @@ export class OnkyoCommandSender {
             port: avrConfig.port
           });
           await this.eiscp.waitForConnect(3000);
-          console.log("%s [%s] Reconnected on command", integrationName, entity.id);
+          log.info("%s [%s] Reconnected on command", integrationName, entity.id);
         }
       } catch (connectErr) {
-        console.warn("%s [%s] Failed to reconnect on command: %s", integrationName, entity.id, connectErr);
+        log.warn("%s [%s] Failed to reconnect on command: %s", integrationName, entity.id, connectErr);
         // Fall through to retry logic below
       }
     }
@@ -44,7 +45,7 @@ export class OnkyoCommandSender {
     try {
       await this.eiscp.waitForConnect();
     } catch (err) {
-      console.warn("%s [%s] Could not send command, AVR not connected: %s", integrationName, entity.id, err);
+      log.warn("%s [%s] Could not send command, AVR not connected: %s", integrationName, entity.id, err);
       for (let attempt = 1; attempt <= 5; attempt++) {
         await new Promise((resolve) => setTimeout(resolve, 1000));
         try {
@@ -52,14 +53,14 @@ export class OnkyoCommandSender {
           break;
         } catch (retryErr) {
           if (attempt === 5) {
-            console.warn("%s [%s] Could not connect to AVR after 5 attempts: %s", integrationName, entity.id, retryErr);
+            log.warn("%s [%s] Could not connect to AVR after 5 attempts: %s", integrationName, entity.id, retryErr);
             return uc.StatusCodes.Timeout;
           }
         }
       }
     }
 
-    console.log("%s [%s] media-player command request: %s", integrationName, entity.id, cmdId, params || "");
+    log.info("%s [%s] media-player command request: %s", integrationName, entity.id, cmdId, params || "");
 
     // Helper function to format command with zone prefix
     const formatCommand = (cmd: string): string => {
@@ -129,30 +130,30 @@ export class OnkyoCommandSender {
             
             // Security: Validate raw command length
             if (rawCmd.length > MAX_LENGTHS.RAW_COMMAND) {
-              console.error("%s [%s] Raw command too long (%d chars), rejecting", integrationName, entity.id, rawCmd.length);
+              log.error("%s [%s] Raw command too long (%d chars), rejecting", integrationName, entity.id, rawCmd.length);
               return uc.StatusCodes.BadRequest;
             }
             
             // Security: Validate raw command characters (alphanumeric only)
             if (!PATTERNS.RAW_COMMAND.test(rawCmd)) {
-              console.error("%s [%s] Raw command contains invalid characters, rejecting", integrationName, entity.id);
+              log.error("%s [%s] Raw command contains invalid characters, rejecting", integrationName, entity.id);
               return uc.StatusCodes.BadRequest;
             }
             
-            console.log("%s [%s] sending raw command: %s", integrationName, entity.id, rawCmd);
+            log.info("%s [%s] sending raw command: %s", integrationName, entity.id, rawCmd);
             await this.eiscp.raw(rawCmd);
           } else if (typeof params.source === "string") {
             const userCmd = params.source.toLowerCase();
             
             // Security: Validate user command length
             if (userCmd.length > MAX_LENGTHS.USER_COMMAND) {
-              console.error("%s [%s] Command too long (%d chars), rejecting", integrationName, entity.id, userCmd.length);
+              log.error("%s [%s] Command too long (%d chars), rejecting", integrationName, entity.id, userCmd.length);
               return uc.StatusCodes.BadRequest;
             }
             
             // Security: Validate user command characters
             if (!PATTERNS.USER_COMMAND.test(userCmd)) {
-              console.error("%s [%s] Command contains invalid characters, rejecting", integrationName, entity.id);
+              log.error("%s [%s] Command contains invalid characters, rejecting", integrationName, entity.id);
               return uc.StatusCodes.BadRequest;
             }
             

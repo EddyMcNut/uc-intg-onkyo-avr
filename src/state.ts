@@ -1,5 +1,6 @@
 import * as uc from "@unfoldedcircle/integration-api";
 import { EiscpDriver } from "./eiscp.js";
+import log from "./loggers.js";
 
 const integrationName = "Onkyo-Integration (state):";
 
@@ -48,7 +49,7 @@ class AvrStateManager {
     const normalizedSource = source.toLowerCase();
     
     if (state.source !== normalizedSource) {
-      console.log("%s [%s] source changed from '%s' to '%s'", integrationName, entityId, state.source, source);
+      log.info("%s [%s] source changed from '%s' to '%s'", integrationName, entityId, state.source, source);
       state.source = normalizedSource;
       state.subSource = "unknown"; // Reset sub-source on source change
       this.refreshAvrState(entityId, eiscpInstance, zone, driver);
@@ -69,7 +70,7 @@ class AvrStateManager {
     const normalizedSubSource = subSource.toLowerCase();
     
     if (state.subSource !== normalizedSubSource) {
-      console.log("%s [%s] sub-source changed from '%s' to '%s'", integrationName, entityId, state.subSource, subSource);
+      log.info("%s [%s] sub-source changed from '%s' to '%s'", integrationName, entityId, state.subSource, subSource);
       state.subSource = normalizedSubSource;
       this.refreshAvrState(entityId, eiscpInstance, zone, driver);
       return true;
@@ -102,7 +103,7 @@ class AvrStateManager {
     // Use provided queueThreshold or fallback to default
     const threshold = queueThreshold ?? (typeof eiscpInstance["config"]?.send_delay === "number" ? eiscpInstance["config"].send_delay : 250);
 
-    console.log("%s [%s] querying volume for zone '%s'", integrationName, entityId, zone);
+    log.info("%s [%s] querying volume for zone '%s'", integrationName, entityId, zone);
     await eiscpInstance.command({ zone, command: "volume", args: "query" });
     
     // Clear media attributes so they can be updated with new data
@@ -117,7 +118,7 @@ class AvrStateManager {
     });
 
     // Reset Audio/Video sensors
-    console.log("%s [%s] querying AV-info for zone '%s'", integrationName, entityId, zone);
+    log.info("%s [%s] querying AV-info for zone '%s'", integrationName, entityId, zone);
     await eiscpInstance.command({ zone, command: "audio-information", args: "query" });
     await eiscpInstance.command({ zone, command: "video-information", args: "query" });
 

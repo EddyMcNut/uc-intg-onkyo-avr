@@ -3,6 +3,7 @@ import { avrStateManager } from "./state.js";
 import crypto from "crypto";
 import { OnkyoConfig, buildEntityId } from "./configManager.js";
 import { EiscpDriver } from "./eiscp.js";
+import log from "./loggers.js";
 
 const integrationName = "Onkyo-Integration (receiver):";
 
@@ -37,21 +38,6 @@ export class OnkyoCommandReceiver {
     this.zone = this.config.avrs && this.config.avrs.length > 0 ? this.config.avrs[0].zone || "main" : "main";
   }
 
-  private entitiesToArray(entities: Record<string, uc.Entity> | undefined): uc.Entity[] {
-    const arr: uc.Entity[] = [];
-    if (entities && typeof entities === "object") {
-      for (const key in entities) {
-        if (Object.prototype.hasOwnProperty.call(entities, key)) {
-          const ent = entities[key];
-          if (ent && typeof ent === "object" && ent.name) {
-            arr.push(ent);
-          }
-        }
-      }
-    }
-    return arr;
-  }
-
   private async getImageHash(url: string): Promise<string> {
     try {
       const res = await fetch(url);
@@ -59,7 +45,7 @@ export class OnkyoCommandReceiver {
       const buffer = Buffer.from(arrayBuffer);
       return crypto.createHash("md5").update(buffer).digest("hex");
     } catch (err) {
-      console.warn("%s Failed to fetch or hash image: %s", integrationName, err);
+      log.warn("%s Failed to fetch or hash image: %s", integrationName, err);
       return "";
     }
   }
@@ -89,7 +75,7 @@ export class OnkyoCommandReceiver {
     const nowPlaying: { station?: string; artist?: string; album?: string; title?: string } = {};
 
     this.eiscpInstance.on("error", (err: Error) => {
-      console.error("%s eiscp error: %s", integrationName, err);
+      log.error("%s eiscp error: %s", integrationName, err);
     });
     this.eiscpInstance.on(
       "data",
@@ -103,7 +89,7 @@ export class OnkyoCommandReceiver {
             this.driver.updateEntityAttributes(entityId, {
               [uc.MediaPlayerAttributes.State]: powerState
             });
-            console.log("%s [%s] power set to: %s", integrationName, entityId, powerState);
+            log.info("%s [%s] power set to: %s", integrationName, entityId, powerState);
 
             // When AVR is off, set all sensor states to standby
             if (avrUpdates.argument !== "on") {
@@ -125,7 +111,7 @@ export class OnkyoCommandReceiver {
               [uc.SensorAttributes.State]: uc.SensorStates.On,
               [uc.SensorAttributes.Value]: muteState
             });
-            console.log("%s [%s] audio-muting set to: %s", integrationName, entityId, muteState);
+            log.info("%s [%s] audio-muting set to: %s", integrationName, entityId, muteState);
             break;
           }
           case "volume": {
@@ -141,7 +127,7 @@ export class OnkyoCommandReceiver {
             this.driver.updateEntityAttributes(entityId, {
               [uc.MediaPlayerAttributes.Volume]: sliderValue
             });
-            console.log("%s [%s] volume set to: %s", integrationName, entityId, sliderValue);
+            log.info("%s [%s] volume set to: %s", integrationName, entityId, sliderValue);
 
             // Update volume sensor
             const volumeSensorId = `${entityId}_volume_sensor`;
@@ -153,7 +139,7 @@ export class OnkyoCommandReceiver {
           }
           case "preset": {
             this.avrPreset = avrUpdates.argument.toString();
-            console.log("%s [%s] preset set to: %s", integrationName, entityId, this.avrPreset);
+            log.info("%s [%s] preset set to: %s", integrationName, entityId, this.avrPreset);
             // this.eiscpInstance.command("input-selector query");
             break;
           }
@@ -163,7 +149,7 @@ export class OnkyoCommandReceiver {
             this.driver.updateEntityAttributes(entityId, {
               [uc.MediaPlayerAttributes.Source]: source
             });
-            console.log("%s [%s] input-selector (source) set to: %s", integrationName, entityId, source);
+            log.info("%s [%s] input-selector (source) set to: %s", integrationName, entityId, source);
             
             // Reset track info on source change to ensure fresh updates
             this.currentTrackId = "";
@@ -212,7 +198,7 @@ export class OnkyoCommandReceiver {
               });
             }
 
-            // console.log("%s [%s] IFA parsed input: %s | output: %s", integrationName, entityId, audioInputValue, audioOutputValue);
+            // log.info("%s [%s] IFA parsed input: %s | output: %s", integrationName, entityId, audioInputValue, audioOutputValue);
             break;
           }
           case "IFV": {
@@ -245,14 +231,14 @@ export class OnkyoCommandReceiver {
                 [uc.SensorAttributes.Value]: videoOutputDisplay
               });
             }
-            // console.log("%s [%s] IFV parsed input: %s | output: %s", integrationName, entityId, videoInputValue, videoOutputValue);
+            // log.info("%s [%s] IFV parsed input: %s | output: %s", integrationName, entityId, videoInputValue, videoOutputValue);
             break;
           }
           case "DSN": {
             avrStateManager.setSource(entityId, "dab", this.eiscpInstance, eventZone, this.driver);
             nowPlaying.station = avrUpdates.argument.toString();
             nowPlaying.artist = "DAB Radio";
-            console.log("%s [%s] DAB station set to: %s", integrationName, entityId, avrUpdates.argument.toString());
+            log.info("%s [%s] DAB station set to: %s", integrationName, entityId, avrUpdates.argument.toString());
             break;
           }
           case "FLD": {

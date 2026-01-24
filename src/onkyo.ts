@@ -7,6 +7,7 @@ import { DEFAULT_QUEUE_THRESHOLD } from "./configManager.js";
 import { OnkyoCommandSender } from "./onkyoCommandSender.js";
 import { OnkyoCommandReceiver } from "./onkyoCommandReceiver.js";
 import { ReconnectionManager } from "./reconnectionManager.js";
+import log from "./loggers.js";
 
 const integrationName = "Onkyo-Integration: ";
 
@@ -44,19 +45,19 @@ function validateIpAddress(ip: string, fieldName: string): string | null {
   const trimmedIp = ip.trim();
   
   if (trimmedIp.length > MAX_LENGTHS.IP_ADDRESS) {
-    console.error(`${integrationName}${fieldName} too long`);
+    log.error(`${integrationName}${fieldName} too long`);
     return null;
   }
   
   if (!PATTERNS.IP_ADDRESS.test(trimmedIp)) {
-    console.error(`${integrationName}Invalid ${fieldName} format`);
+    log.error(`${integrationName}Invalid ${fieldName} format`);
     return null;
   }
   
   // Validate IP octets are in valid range
   const octets = trimmedIp.split('.').map(Number);
   if (!octets.every((octet: number) => octet >= 0 && octet <= 255)) {
-    console.error(`${integrationName}${fieldName} octets out of range`);
+    log.error(`${integrationName}${fieldName} octets out of range`);
     return null;
   }
   
@@ -119,7 +120,7 @@ export default class OnkyoDriver {
     this.driver.init("driver.json", this.handleDriverSetup.bind(this));
     this.setupDriverEvents();
     this.setupEventHandlers();
-    console.log("Loaded config at startup:", this.config);
+    log.info("Loaded config at startup:", this.config);
 
     // Register entities from config at startup (like Python integrations do)
     // This ensures entities survive reboots - they're registered before Connect event
@@ -129,8 +130,8 @@ export default class OnkyoDriver {
   }
 
   private async handleDriverSetup(msg: uc.SetupDriver): Promise<uc.SetupAction> {
-    console.log("%s ===== SETUP HANDLER CALLED =====", integrationName);
-    console.log("%s Setup message:", integrationName, JSON.stringify(msg, null, 2));
+    log.info("%s ===== SETUP HANDLER CALLED =====", integrationName);
+    log.info("%s Setup message:", integrationName, JSON.stringify(msg, null, 2));
 
     const setupData = (msg as unknown as { setupData?: SetupData }).setupData ?? {};
     const {
@@ -146,7 +147,7 @@ export default class OnkyoDriver {
       netMenuDelay
     } = setupData;
 
-    console.log(
+    log.info(
       "%s Setup data received - volumeScale raw value: '%s' (type: %s), adjustVolumeDispl: '%s' (type: %s), zoneCount: '%s'",
       integrationName,
       volumeScale,
@@ -164,11 +165,11 @@ export default class OnkyoDriver {
     const createSensorsValue = parseBoolean(createSensors, AVR_DEFAULTS.createSensors);
     const netMenuDelayValue = parseIntWithDefault(netMenuDelay, AVR_DEFAULTS.netMenuDelay);
 
-    console.log("%s Setup data parsed - volumeScale: %d, adjustVolumeDispl: %s, createSensors: %s, netMenuDelay: %d", integrationName, volumeScaleValue, adjustVolumeDisplValue, createSensorsValue, netMenuDelayValue);
+    log.info("%s Setup data parsed - volumeScale: %d, adjustVolumeDispl: %s, createSensors: %s, netMenuDelay: %d", integrationName, volumeScaleValue, adjustVolumeDisplValue, createSensorsValue, netMenuDelayValue);
 
     // Parse zoneCount
     const zoneCountValue = parseIntWithDefault(zoneCount, 1, (n) => n >= 1 && n <= 3);
-    console.log("%s Zone count: %d", integrationName, zoneCountValue);
+    log.info("%s Zone count: %d", integrationName, zoneCountValue);
 
     // Store setup data for use when adding autodiscovered AVRs
     this.lastSetupData = {
@@ -179,7 +180,7 @@ export default class OnkyoDriver {
       createSensors: createSensorsValue,
       netMenuDelay: netMenuDelayValue
     };
-    console.log("%s Stored setup data for autodiscovery:", integrationName, this.lastSetupData);
+    log.info("%s Stored setup data for autodiscovery:", integrationName, this.lastSetupData);
 
     // Check if manual configuration was provided
     const hasManualConfig = typeof model === "string" && model.trim() !== "" && typeof ipAddress === "string" && ipAddress.trim() !== "";
@@ -189,11 +190,11 @@ export default class OnkyoDriver {
         // Security: Validate model name
         const modelName = model.trim();
         if (modelName.length > MAX_LENGTHS.MODEL_NAME) {
-          console.error("%s Model name too long (%d chars), max %d", integrationName, modelName.length, MAX_LENGTHS.MODEL_NAME);
+          log.error("%s Model name too long (%d chars), max %d", integrationName, modelName.length, MAX_LENGTHS.MODEL_NAME);
           return new uc.SetupError("OTHER");
         }
         if (!PATTERNS.MODEL_NAME.test(modelName)) {
-          console.error("%s Model name contains invalid characters", integrationName);
+          log.error("%s Model name contains invalid characters", integrationName);
           return new uc.SetupError("OTHER");
         }
         
@@ -206,17 +207,17 @@ export default class OnkyoDriver {
         // Security: Validate port
         const portNum = parseIntWithDefault(port, AVR_DEFAULTS.port, (n) => n >= 1 && n <= 65535);
         if (portNum < 1 || portNum > 65535) {
-          console.error("%s Invalid port number: %d", integrationName, portNum);
+          log.error("%s Invalid port number: %d", integrationName, portNum);
           return new uc.SetupError("OTHER");
         }
         
         // Security: Validate album art URL
         if (albumArtURLValue.length > MAX_LENGTHS.ALBUM_ART_URL) {
-          console.error("%s Album art URL too long (%d chars), max %d", integrationName, albumArtURLValue.length, MAX_LENGTHS.ALBUM_ART_URL);
+          log.error("%s Album art URL too long (%d chars), max %d", integrationName, albumArtURLValue.length, MAX_LENGTHS.ALBUM_ART_URL);
           return new uc.SetupError("OTHER");
         }
         if (!PATTERNS.ALBUM_ART_URL.test(albumArtURLValue)) {
-          console.error("%s Album art URL contains invalid characters", integrationName);
+          log.error("%s Album art URL contains invalid characters", integrationName);
           return new uc.SetupError("OTHER");
         }
         
@@ -238,19 +239,18 @@ export default class OnkyoDriver {
             createSensors: createSensorsValue,
             netMenuDelay: netMenuDelayValue
           };
-          console.log("%s Adding AVR config for zone %s with volumeScale: %d, adjustVolumeDispl: %s, createSensors: %s, netMenuDelay: %d", integrationName, zone, avrConfig.volumeScale, avrConfig.adjustVolumeDispl, avrConfig.createSensors, avrConfig.netMenuDelay);
+          log.info("%s Adding AVR config for zone %s with volumeScale: %d, adjustVolumeDispl: %s, createSensors: %s, netMenuDelay: %d", integrationName, zone, avrConfig.volumeScale, avrConfig.adjustVolumeDispl, avrConfig.createSensors, avrConfig.netMenuDelay);
           ConfigManager.addAvr(avrConfig);
         }
       } else {
         // No manual config - run autodiscovery
-        console.log("%s No manual AVR config provided, running autodiscovery during setup", integrationName);
+        log.info("%s No manual AVR config provided, running autodiscovery during setup", integrationName);
         const tempEiscp = new EiscpDriver({ send_delay: DEFAULT_QUEUE_THRESHOLD });
         try {
           const discoveredAvrs = await tempEiscp.discover({ timeout: 5 });
-          console.log("%s Discovered %d AVR(s) via autodiscovery", integrationName, discoveredAvrs.length);
-
+          log.info("%s Discovered %d AVR(s) via autodiscovery", integrationName, discoveredAvrs.length);
           if (discoveredAvrs.length === 0) {
-            console.error("%s No AVRs discovered during setup", integrationName);
+            log.error("%s No AVRs discovered during setup", integrationName);
             return new uc.SetupError("NOT_FOUND");
           }
 
@@ -273,17 +273,17 @@ export default class OnkyoDriver {
                 createSensors: createSensorsValue,
                 netMenuDelay: netMenuDelayValue
               };
-              console.log("%s Adding AVR config for zone %s with volumeScale: %d, adjustVolumeDispl: %s, createSensors: %s, netMenuDelay: %d", integrationName, zone, avrConfig.volumeScale, avrConfig.adjustVolumeDispl, avrConfig.createSensors, avrConfig.netMenuDelay);
+              log.info("%s Adding AVR config for zone %s with volumeScale: %d, adjustVolumeDispl: %s, createSensors: %s, netMenuDelay: %d", integrationName, zone, avrConfig.volumeScale, avrConfig.adjustVolumeDispl, avrConfig.createSensors, avrConfig.netMenuDelay);
               ConfigManager.addAvr(avrConfig);
             }
           }
         } catch (err) {
-          console.error("%s Autodiscovery failed:", integrationName, err);
+          log.error("%s Autodiscovery failed:", integrationName, err);
           return new uc.SetupError("NOT_FOUND");
         }
       }
     } catch (err) {
-      console.error("%s Failed to save configuration:", integrationName, err);
+      log.error("%s Failed to save configuration:", integrationName, err);
       return new uc.SetupError("OTHER");
     }
 
@@ -298,35 +298,35 @@ export default class OnkyoDriver {
   }
 
   private registerAvailableEntities(): void {
-    console.log("%s Registering available entities from config", integrationName);
+    log.info("%s Registering available entities from config", integrationName);
     for (const avrConfig of this.config.avrs!) {
       const avrEntry = buildEntityId(avrConfig.model, avrConfig.ip, avrConfig.zone);
       const mediaPlayerEntity = this.createMediaPlayerEntity(avrEntry, avrConfig.volumeScale ?? 100);
       this.driver.addAvailableEntity(mediaPlayerEntity);
-      console.log("%s [%s] Media player entity registered as available", integrationName, avrEntry);
+      log.info("%s [%s] Media player entity registered as available", integrationName, avrEntry);
       
       // Register sensor entities only if createSensors is enabled (defaults to true for backward compatibility)
       if (avrConfig.createSensors !== false) {
         const sensorEntities = this.createSensorEntities(avrEntry);
         for (const sensor of sensorEntities) {
           this.driver.addAvailableEntity(sensor);
-          console.log("%s [%s] Sensor entity registered: %s", integrationName, avrEntry, sensor.id);
+          log.info("%s [%s] Sensor entity registered: %s", integrationName, avrEntry, sensor.id);
         }
       } else {
-        console.log("%s [%s] Sensor entities disabled by user preference", integrationName, avrEntry);
+        log.info("%s [%s] Sensor entities disabled by user preference", integrationName, avrEntry);
       }
     }
   }
 
   private setupDriverEvents() {
     this.driver.on(uc.Events.Connect, async () => {
-      console.log(`${integrationName} ===== CONNECT EVENT RECEIVED =====`);
+      log.info(`${integrationName} ===== CONNECT EVENT RECEIVED =====`);
       await this.handleConnect();
     });
     this.driver.on(uc.Events.EnterStandby, async () => {
-      console.log(`${integrationName} ===== ENTER STANDBY EVENT RECEIVED =====`);
+      log.info(`${integrationName} ===== ENTER STANDBY EVENT RECEIVED =====`);
       this.remoteInStandby = true;
-      console.log(`${integrationName} Remote entering standby, disconnecting AVR(s) to save battery...`);
+      log.info(`${integrationName} Remote entering standby, disconnecting AVR(s) to save battery...`);
       
       // Clear all reconnect timers
       this.reconnectionManager.cancelAllScheduledReconnections();
@@ -335,10 +335,10 @@ export default class OnkyoDriver {
       for (const [physicalAVR, connection] of this.physicalConnections) {
         if (connection.eiscp.connected) {
           try {
-            console.log(`${integrationName} [${physicalAVR}] Disconnecting AVR for standby`);
+            log.info(`${integrationName} [${physicalAVR}] Disconnecting AVR for standby`);
             connection.eiscp.disconnect();
           } catch (err) {
-            console.warn(`${integrationName} [${physicalAVR}] Error disconnecting AVR:`, err);
+            log.warn(`${integrationName} [${physicalAVR}] Error disconnecting AVR:`, err);
           }
         }
       }
@@ -346,7 +346,7 @@ export default class OnkyoDriver {
       await this.driver.setDeviceState(uc.DeviceStates.Disconnected);
     });
     this.driver.on(uc.Events.ExitStandby, async () => {
-      console.log(`${integrationName} ===== EXIT STANDBY EVENT RECEIVED =====`);
+      log.info (`${integrationName} ===== EXIT STANDBY EVENT RECEIVED =====`);
       this.remoteInStandby = false;
       await this.handleConnect();
     });
@@ -534,7 +534,7 @@ export default class OnkyoDriver {
 
   private async queryAvrState(avrEntry: string, eiscp: EiscpDriver, context: string): Promise<void> {
     if (!eiscp.connected) {
-      console.warn(`${integrationName} [${avrEntry}] Cannot query AVR state (${context}), not connected`);
+      log.warn(`${integrationName} [${avrEntry}] Cannot query AVR state (${context}), not connected`);
       return;
     }
 
@@ -543,7 +543,7 @@ export default class OnkyoDriver {
     const zone = instance?.config.zone || "main";
     const queueThreshold = instance?.config.queueThreshold ?? DEFAULT_QUEUE_THRESHOLD;
 
-    console.log(`${integrationName} [${avrEntry}] Querying AVR state for zone ${zone} (${context})...`);
+    log.info(`${integrationName} [${avrEntry}] Querying AVR state for zone ${zone} (${context})...`);
     try {
       await eiscp.command({ zone, command: "system-power", args: "query" });
       await new Promise((resolve) => setTimeout(resolve, queueThreshold));
@@ -555,7 +555,7 @@ export default class OnkyoDriver {
       await new Promise((resolve) => setTimeout(resolve, queueThreshold * 3));
       await eiscp.command({ zone, command: "fp-display", args: "query" });
     } catch (queryErr) {
-      console.warn(`${integrationName} [${avrEntry}] Failed to query AVR state (${context}):`, queryErr);
+      log.warn(`${integrationName} [${avrEntry}] Failed to query AVR state (${context}):`, queryErr);
     }
   }
 
@@ -607,7 +607,7 @@ export default class OnkyoDriver {
 
     // Connect to all configured AVRs
     if (!this.config.avrs || this.config.avrs.length === 0) {
-      console.log("%s No AVRs configured", integrationName);
+      log.info("%s No AVRs configured", integrationName);
       await this.driver.setDeviceState(uc.DeviceStates.Disconnected);
       return;
     }
@@ -630,7 +630,7 @@ export default class OnkyoDriver {
 
       if (!physicalConnection) {
         // Need to create a new physical connection
-        console.log("%s [%s] Connecting to AVR at %s:%d", integrationName, avrConfig.model, avrConfig.ip, avrConfig.port);
+        log.info("%s [%s] Connecting to AVR at %s:%d", integrationName, avrConfig.model, avrConfig.ip, avrConfig.port);
 
         // Create EiscpDriver instance for this physical AVR (shared by all zones)
         const eiscpInstance = new EiscpDriver({
@@ -658,7 +658,7 @@ export default class OnkyoDriver {
 
         // Setup error handler
         eiscpInstance.on("error", (err: Error) => {
-          console.error("%s [%s] EiscpDriver error:", integrationName, physicalAVR, err);
+          log.error("%s [%s] EiscpDriver error:", integrationName, physicalAVR, err);
         });
 
         // Now try to connect (but don't block zone instance creation if this fails)
@@ -677,17 +677,17 @@ export default class OnkyoDriver {
           // Wait for connection to fully establish
           await eiscpInstance.waitForConnect(3000);
 
-          console.log("%s [%s] Connected to AVR", integrationName, physicalAVR);
+          log.info("%s [%s] Connected to AVR", integrationName, physicalAVR);
         } catch (err) {
-          console.error("%s [%s] Failed to connect to AVR:", integrationName, physicalAVR, err);
-          console.log("%s [%s] Zone instances will be created but unavailable until connection succeeds", integrationName, physicalAVR);
+          log.error("%s [%s] Failed to connect to AVR:", integrationName, physicalAVR, err);
+          log.info("%s [%s] Zone instances will be created but unavailable until connection succeeds", integrationName, physicalAVR);
           // Connection failed, but physicalConnection object exists so zone instances can be created
           // scheduleReconnect will retry the connection
           this.scheduleReconnect(physicalAVR, physicalConnection, avrConfig);
         }
       } else if (!physicalConnection.eiscp.connected) {
         // Physical connection exists but is disconnected, try to reconnect
-        console.log("%s [%s] TCP connection lost, reconnecting to AVR...", integrationName, physicalAVR);
+        log.info("%s [%s] TCP connection lost, reconnecting to AVR...", integrationName, physicalAVR);
 
         const result = await this.reconnectionManager.attemptReconnection(
           physicalAVR,
@@ -716,7 +716,7 @@ export default class OnkyoDriver {
       
       // Skip if zone instance already exists
       if (this.avrInstances.has(avrEntry)) {
-        console.log("%s [%s] Zone instance already exists", integrationName, avrEntry);
+        log.info("%s [%s] Zone instance already exists", integrationName, avrEntry);
         continue;
       }
 
@@ -726,7 +726,7 @@ export default class OnkyoDriver {
       if (!physicalConnection) {
         // This shouldn't happen since Phase 1 creates physicalConnection objects even on failure
         // But if it does, we can't create zone instance without the shared eiscp
-        console.warn("%s [%s] Cannot create zone instance - no physical connection object exists", integrationName, avrEntry);
+        log.warn("%s [%s] Cannot create zone instance - no physical connection object exists", integrationName, avrEntry);
         continue;
       }
 
@@ -742,11 +742,11 @@ export default class OnkyoDriver {
         commandSender
       });
 
-      console.log("%s [%s] Zone instance created%s", integrationName, avrEntry, 
+      log.info("%s [%s] Zone instance created%s", integrationName, avrEntry, 
         physicalConnection.eiscp.connected ? " (connected)" : " (will connect when AVR available)");
 
       if (physicalConnection?.eiscp.connected) {
-        console.log("%s [%s] Zone connected and available", integrationName, avrEntry);
+        log.info("%s [%s] Zone connected and available", integrationName, avrEntry);
       }
     }
 
@@ -787,7 +787,7 @@ export default class OnkyoDriver {
     });
 
     this.driver.on(uc.Events.SubscribeEntities, async (entityIds: string[]) => {
-      console.log(`${integrationName} Entities subscribed: ${entityIds.join(", ")}`);
+      log.info("%s Entities subscribed: %s", integrationName, entityIds.join(", "));
 
       // Clear standby flag when entities are subscribed
       this.remoteInStandby = false;
@@ -800,7 +800,7 @@ export default class OnkyoDriver {
 
     this.driver.on(uc.Events.UnsubscribeEntities, async (entityIds: string[]) => {
       for (const entityId of entityIds) {
-        console.log(`${integrationName} [${entityId}] Unsubscribed entity`);
+        log.info("%s [%s] Unsubscribed entity", integrationName, entityId);
       }
     });
   }
@@ -809,7 +809,7 @@ export default class OnkyoDriver {
   private async handleEntitySubscription(entityId: string): Promise<void> {
     const instance = this.avrInstances.get(entityId);
     if (!instance) {
-      console.log(`${integrationName} [${entityId}] Subscribed entity has no instance yet, waiting for Connect event`);
+      log.info("%s [%s] Subscribed entity has no instance yet, waiting for Connect event", integrationName, entityId);
       return;
     }
 
@@ -817,20 +817,20 @@ export default class OnkyoDriver {
     const physicalConnection = this.physicalConnections.get(physicalAVR);
 
     if (!physicalConnection) {
-      console.log(`${integrationName} [${entityId}] Subscribed entity has no connection yet, waiting for Connect event`);
+      log.info("%s [%s] Subscribed entity has no connection yet, waiting for Connect event", integrationName, entityId);
       return;
     }
 
     // Already connected - just query state
     if (physicalConnection.eiscp.connected) {
       const queueThreshold = instance.config.queueThreshold ?? DEFAULT_QUEUE_THRESHOLD;
-      console.log(`${integrationName} [${entityId}] Subscribed entity connected, querying state (threshold: ${queueThreshold}ms)`);
+      log.info("%s [%s] Subscribed entity connected, querying state (threshold: %dms)", integrationName, entityId, queueThreshold);
       await this.queryAvrState(entityId, physicalConnection.eiscp, "on subscribe");
       return;
     }
 
     // Connection exists but not connected - try to reconnect
-    console.log(`${integrationName} [${entityId}] Subscribed entity not connected, attempting reconnection...`);
+    log.info("%s [%s] Subscribed entity not connected, attempting reconnection...", integrationName, entityId);
     try {
       await physicalConnection.eiscp.connect({
         model: instance.config.model,
@@ -838,12 +838,12 @@ export default class OnkyoDriver {
         port: instance.config.port
       });
       await physicalConnection.eiscp.waitForConnect(3000);
-      console.log(`${integrationName} [${physicalAVR}] Reconnected on subscription`);
+      log.info("%s [%s] Reconnected on subscription", integrationName, physicalAVR);
 
       // Query state after reconnection
       await this.queryAvrState(entityId, physicalConnection.eiscp, "after subscription reconnection");
     } catch (err) {
-      console.warn(`${integrationName} [${physicalAVR}] Failed to reconnect on subscription:`, err);
+      log.warn("%s [%s] Failed to reconnect on subscription: %s", integrationName, physicalAVR, err);
       // Schedule reconnection attempt
       this.scheduleReconnect(physicalAVR, physicalConnection, instance.config);
     }
@@ -854,13 +854,13 @@ export default class OnkyoDriver {
     // Get the AVR instance for this entity
     const instance = this.avrInstances.get(entity.id);
     if (!instance) {
-      console.error("%s [%s] No AVR instance found for entity", integrationName, entity.id);
+      log.error("%s [%s] No AVR instance found for entity", integrationName, entity.id);
       return uc.StatusCodes.NotFound;
     }
     return instance.commandSender.sharedCmdHandler(entity, cmdId, params);
   }
 
   async init() {
-    console.log("%s Initializing...", integrationName);
+    log.info("%s Initializing...", integrationName);
   }
 }

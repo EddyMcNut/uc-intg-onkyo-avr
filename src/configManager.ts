@@ -1,5 +1,6 @@
 import path from "path";
 import fs from "fs";
+import log from "./loggers.js";
 
 export const DEFAULT_QUEUE_THRESHOLD = 100;
 
@@ -159,7 +160,7 @@ export class ConfigManager {
         }
       }
     } catch (err) {
-      console.error("Failed to load config:", err);
+      log.error("Failed to load config:", err);
       this.config = {};
     }
     return this.config;
@@ -170,7 +171,7 @@ export class ConfigManager {
     try {
       fs.writeFileSync(CONFIG_PATH, JSON.stringify(this.config, null, 2), "utf-8");
     } catch (err) {
-      console.error("Failed to save config:", err);
+      log.error("Failed to save config:", err);
     }
   }
 
@@ -188,7 +189,7 @@ export class ConfigManager {
     const existingIndex = this.config.avrs.findIndex((a) => a.ip === normalizedAvr.ip && a.zone === normalizedAvr.zone);
     if (existingIndex >= 0) {
       // AVR already exists, update it with new settings from setup
-      console.log(`ConfigManager: Updating existing AVR at ${normalizedAvr.ip} zone ${normalizedAvr.zone}`);
+      log.info(`ConfigManager: Updating existing AVR at ${normalizedAvr.ip} zone ${normalizedAvr.zone}`);
       this.config.avrs[existingIndex] = normalizedAvr;
       this.save(this.config);
       return;

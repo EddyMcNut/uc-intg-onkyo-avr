@@ -1,4 +1,5 @@
 import EiscpDriver from "./eiscp.js";
+import log from "./loggers.js";
 
 const integrationName = "Onkyo-Integration:";
 
@@ -60,7 +61,7 @@ export class ReconnectionManager {
     for (let attempt = 0; attempt < this.config.timeouts.length; attempt++) {
       const timeout = this.config.timeouts[attempt];
       try {
-        console.log(
+        log.info(
           "%s [%s] %s attempt %d/%d (timeout: %dms)...",
           integrationName,
           physicalAVR,
@@ -78,10 +79,10 @@ export class ReconnectionManager {
 
         await eiscp.waitForConnect(timeout);
 
-        console.log("%s [%s] Successfully reconnected to AVR (%s)", integrationName, physicalAVR, context);
+        log.info("%s [%s] Successfully reconnected to AVR (%s)", integrationName, physicalAVR, context);
         return { success: true, attempts: attempt + 1 };
       } catch (err) {
-        console.warn(
+        log.warn(
           "%s [%s] %s attempt %d/%d failed: %s",
           integrationName,
           physicalAVR,
@@ -93,7 +94,7 @@ export class ReconnectionManager {
       }
     }
 
-    console.error("%s [%s] Failed to reconnect after all attempts (%s)", integrationName, physicalAVR, context);
+    log.error("%s [%s] Failed to reconnect after all attempts (%s)", integrationName, physicalAVR, context);
     return { success: false, attempts: this.config.timeouts.length };
   }
 
@@ -111,7 +112,7 @@ export class ReconnectionManager {
     // Clear any existing timer
     this.cancelScheduledReconnection(physicalAVR);
 
-    console.log(
+    log.info(
       "%s [%s] Scheduling reconnection attempt in %d seconds...",
       integrationName,
       physicalAVR,
@@ -119,11 +120,11 @@ export class ReconnectionManager {
     );
 
     const timer = setTimeout(async () => {
-      console.log(`${integrationName} [${physicalAVR}] Attempting scheduled reconnection...`);
+      log.info("%s [%s] Attempting scheduled reconnection...", integrationName, physicalAVR);
 
       // Check if reconnection should be skipped
       if (shouldSkip()) {
-        console.log(`${integrationName} [${physicalAVR}] Skipping scheduled reconnection (standby or already connected)`);
+        log.info("%s [%s] Skipping scheduled reconnection (standby or already connected)", integrationName, physicalAVR);
         this.timers.delete(physicalAVR);
         return;
       }
@@ -135,7 +136,7 @@ export class ReconnectionManager {
         await onReconnected(physicalAVR);
       } else {
         // Schedule another attempt
-        console.log(
+        log.info(
           "%s [%s] All scheduled reconnection attempts failed, will retry again in %d seconds",
           integrationName,
           physicalAVR,
@@ -154,7 +155,7 @@ export class ReconnectionManager {
   cancelScheduledReconnection(physicalAVR: string): boolean {
     const timer = this.timers.get(physicalAVR);
     if (timer) {
-      console.log(`${integrationName} [${physicalAVR}] Clearing reconnect timer`);
+      log.info("%s [%s] Clearing reconnect timer", integrationName, physicalAVR);
       clearTimeout(timer);
       this.timers.delete(physicalAVR);
       return true;
@@ -167,7 +168,7 @@ export class ReconnectionManager {
    */
   cancelAllScheduledReconnections(): void {
     for (const [physicalAVR, timer] of this.timers) {
-      console.log(`${integrationName} [${physicalAVR}] Clearing reconnect timer`);
+      log.info("%s [%s] Clearing reconnect timer", integrationName, physicalAVR);
       clearTimeout(timer);
     }
     this.timers.clear();

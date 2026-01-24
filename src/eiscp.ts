@@ -1,3 +1,13 @@
+import net from "net";
+import dgram from "dgram";
+import log from "./loggers.js";
+
+import EventEmitter from "events";;
+import { eiscpCommands } from "./eiscp-commands.js";
+import { eiscpMappings } from "./eiscp-mappings.js";
+import { avrStateManager } from "./state.js";
+import { DEFAULT_QUEUE_THRESHOLD, buildEntityId } from "./configManager.js";
+
 export interface EiscpConfig {
   host?: string;
   port?: number;
@@ -9,14 +19,7 @@ export interface EiscpConfig {
   receive_delay?: number;
   netMenuDelay?: number;
 }
-import net from "net";
-import dgram from "dgram";
 
-import EventEmitter from "events";;
-import { eiscpCommands } from "./eiscp-commands.js";
-import { eiscpMappings } from "./eiscp-mappings.js";
-import { avrStateManager } from "./state.js";
-import { DEFAULT_QUEUE_THRESHOLD, buildEntityId } from "./configManager.js";
 const COMMANDS = eiscpCommands.commands;
 const COMMAND_MAPPINGS = eiscpMappings.command_mappings;
 const VALUE_MAPPINGS = eiscpMappings.value_mappings;
@@ -143,7 +146,7 @@ export class EiscpDriver extends EventEmitter {
   private setupErrorHandler() {
     if (this.listenerCount("error") === 0) {
       this.on("error", (err: Error) => {
-        console.error("eiscp error (unhandled):", err);
+        log.error("eiscp error (unhandled):", err);
       });
     }
   }
@@ -458,7 +461,7 @@ export class EiscpDriver extends EventEmitter {
       }
       client
         .on("error", (err: Error) => {
-          console.error("[EiscpDriver] UDP error:", err);
+          log.error("[EiscpDriver] UDP error:", err);
           try {
             client.close();
           } catch {}
@@ -491,7 +494,7 @@ export class EiscpDriver extends EventEmitter {
           client.send(buffer, 0, buffer.length, opts.port, opts.address, (err) => {
             if (err) {
               // Log but don't fail - network might not be ready yet (ENETUNREACH)
-              console.error(`[EiscpDriver] UDP send error (network may not be ready):`, err);
+              log.error(`[EiscpDriver] UDP send error (network may not be ready):`, err);
               // Close client and resolve with empty result - configured AVRs will still be tried
               clearTimeout(timeout_timer);
               close();
@@ -500,10 +503,10 @@ export class EiscpDriver extends EventEmitter {
           timeout_timer = setTimeout(close, opts.timeout * 1000);
         })
         .on("close", () => {
-          console.log("[EiscpDriver] UDP socket closed");
+          log.info("[EiscpDriver] UDP socket closed");
         })
         .bind(0, undefined, (err?: Error) => {
-          if (err) console.error("[EiscpDriver] UDP bind error:", err);
+          if (err) log.error("[EiscpDriver] UDP bind error:", err);
         });
     });
   }
@@ -520,7 +523,7 @@ export class EiscpDriver extends EventEmitter {
         this.config.port = Number(h.port);
         this.config.model = h.model;
       } else {
-        console.error("[EiscpDriver] No AVR found during discovery.");
+        log.error("[EiscpDriver] No AVR found during discovery.");
         return null;
       }
     }
@@ -548,7 +551,8 @@ export class EiscpDriver extends EventEmitter {
           setTimeout(() => this.connect(), this.config.reconnect_sleep! * 1000);
         }
       })
-      .on("error", () => {
+      .on("error", (err) => {
+        log.error("eiscp error (unhandled):", err);
         this.is_connected = false;
         this.eiscp?.destroy();
       })
@@ -557,7 +561,7 @@ export class EiscpDriver extends EventEmitter {
         let command = iscp_message.slice(0, 3);
         let value = iscp_message.slice(3);
         
-        // console.log("%s RAW (0) RECEIVE: [%s] %s %s", integrationName, command, value);
+        // log.info("%s RAW (0) RECEIVE: [%s] %s %s", integrationName, command, value);
 
         // Ignore messages we don't care about
         if (IGNORED_COMMANDS.has(command)) {
@@ -632,7 +636,7 @@ export class EiscpDriver extends EventEmitter {
       await delay(this.config.receive_delay!);
       this.emit("data", data);
     }).catch((err) => {
-      console.error("Error processing queued incoming message:", err);
+      log.error("Error processing queued incoming message:", err);
     });
   }
 
@@ -648,10 +652,10 @@ export class EiscpDriver extends EventEmitter {
     // Check if command contains a network service selection (NLSLx), this handles both direct NLSL commands and embedded ones like "SLINLSL1"
     const nlslMatch = iscpCommand.match(/NLSL[0-9A-Fa-f]/);
     if (nlslMatch) {
-      console.debug("%s Sending SLI2B (NET input) before %s", integrationName, nlslMatch[0]);
+      log.debug("%s Sending SLI2B (NET input) before %s", integrationName, nlslMatch[0]);
       await this.raw("SLI2B"); // Select NET input first
       await delay(this.config.netMenuDelay ?? 2500); // Wait for AVR to fully load NET menu
-      console.debug("%s Sending network service command: %s", integrationName, nlslMatch[0]);
+      log.debug("%s Sending network service command: %s", integrationName, nlslMatch[0]);
       await this.raw(nlslMatch[0]); // Send just the NLSL command
       await this.raw("SLIQSTN"); // Query input-selector to ensure source state updates
       return;
@@ -701,7 +705,7 @@ export class EiscpDriver extends EventEmitter {
       value = (+args!).toString(16).toUpperCase();
       value = value.length < 2 ? "0" + value : value;
     } else {
-      console.log("%s not found in JSON: %s %s", integrationName, command, args);
+      log.warn("%s not found in JSON: %s %s", integrationName, command, args);
       value = String(args ?? "");
     }
 
