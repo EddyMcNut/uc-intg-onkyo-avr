@@ -88,18 +88,22 @@ class AvrStateManager {
   }
 
   /** Query AVR state and clear media attributes on source change */
-  private refreshAvrState(
+  private async refreshAvrState(
     entityId: string,
     eiscpInstance?: EiscpDriver,
     zone?: string,
-    driver?: uc.IntegrationAPI
-  ): void {
+    driver?: uc.IntegrationAPI,
+    queueThreshold?: number
+  ): Promise<void> {
     if (!eiscpInstance || !zone || !driver || !entityId) {
       return;
     }
 
+    // Use provided queueThreshold or fallback to default
+    const threshold = queueThreshold ?? (typeof eiscpInstance["config"]?.send_delay === "number" ? eiscpInstance["config"].send_delay : 250);
+
     console.log("%s [%s] querying volume for zone '%s'", integrationName, entityId, zone);
-    eiscpInstance.command({ zone, command: "volume", args: "query" });
+    await eiscpInstance.command({ zone, command: "volume", args: "query" });
     
     // Clear media attributes so they can be updated with new data
     // Prevents showing old data if new source does not deliver similar info
@@ -114,12 +118,13 @@ class AvrStateManager {
 
     // Reset Audio/Video sensors
     console.log("%s [%s] querying AV-info for zone '%s'", integrationName, entityId, zone);
-    eiscpInstance.command({ zone, command: "audio-information", args: "query" });
-    eiscpInstance.command({ zone, command: "video-information", args: "query" });
+    await eiscpInstance.command({ zone, command: "audio-information", args: "query" });
+    await eiscpInstance.command({ zone, command: "video-information", args: "query" });
 
     // To make sure the sensor also updates (in case a message is missed)
-    eiscpInstance.command({ zone, command: "input-selector", args: "query" });
-    eiscpInstance.command({ zone, command: "fp-display", args: "query" });
+    await eiscpInstance.command({ zone, command: "input-selector", args: "query" });
+    await new Promise((resolve) => setTimeout(resolve, threshold * 3));
+    await eiscpInstance.command({ zone, command: "fp-display", args: "query" });
   }
 }
 

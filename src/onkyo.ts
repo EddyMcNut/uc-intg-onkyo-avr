@@ -552,7 +552,7 @@ export default class OnkyoDriver {
       await eiscp.command({ zone, command: "volume", args: "query" });
       await new Promise((resolve) => setTimeout(resolve, queueThreshold));
       await eiscp.command({ zone, command: "audio-muting", args: "query" });
-      await new Promise((resolve) => setTimeout(resolve, queueThreshold * 2));
+      await new Promise((resolve) => setTimeout(resolve, queueThreshold * 3));
       await eiscp.command({ zone, command: "fp-display", args: "query" });
     } catch (queryErr) {
       console.warn(`${integrationName} [${avrEntry}] Failed to query AVR state (${context}):`, queryErr);

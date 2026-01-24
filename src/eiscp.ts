@@ -14,11 +14,12 @@ import dgram from "dgram";
 
 import EventEmitter from "events";;
 import { eiscpCommands } from "./eiscp-commands.js";
+import { eiscpMappings } from "./eiscp-mappings.js";
 import { avrStateManager } from "./state.js";
 import { DEFAULT_QUEUE_THRESHOLD, buildEntityId } from "./configManager.js";
 const COMMANDS = eiscpCommands.commands;
-const COMMAND_MAPPINGS = eiscpCommands.command_mappings;
-const VALUE_MAPPINGS = eiscpCommands.value_mappings;
+const COMMAND_MAPPINGS = eiscpMappings.command_mappings;
+const VALUE_MAPPINGS = eiscpMappings.value_mappings;
 const integrationName = "Onkyo-Integration eISCP:";
 const IGNORED_COMMANDS = new Set(["NMS", "NPB", "NST"]); // Commands to ignore from AVR (NMS=menu, NPB=playback, NST=net status)
 const THROTTLED_COMMANDS = new Set(["IFA", "IFV", "FLD"]); // Commands to send to incoming queue for throttling
