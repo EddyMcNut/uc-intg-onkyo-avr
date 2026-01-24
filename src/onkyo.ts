@@ -6,7 +6,6 @@ import { ConfigManager, OnkyoConfig, AvrConfig, AvrZone, AVR_DEFAULTS, MAX_LENGT
 import { DEFAULT_QUEUE_THRESHOLD } from "./configManager.js";
 import { OnkyoCommandSender } from "./onkyoCommandSender.js";
 import { OnkyoCommandReceiver } from "./onkyoCommandReceiver.js";
-import { EntityMigration } from "./entityMigration.js";
 import { ReconnectionManager } from "./reconnectionManager.js";
 
 const integrationName = "Onkyo-Integration: ";
@@ -86,7 +85,6 @@ interface SetupData {
   zoneCount?: string | number;
   createSensors?: string | boolean;
   netMenuDelay?: string | number;
-  remotePinCode?: string;
 }
 
 /** Parsed setup data with concrete types (after validation/conversion) */
@@ -145,8 +143,7 @@ export default class OnkyoDriver {
       adjustVolumeDispl,
       zoneCount,
       createSensors,
-      netMenuDelay,
-      remotePinCode
+      netMenuDelay
     } = setupData;
 
     console.log(
@@ -294,33 +291,6 @@ export default class OnkyoDriver {
     this.config = ConfigManager.load();
     this.registerAvailableEntities();
 
-    
-    // Perform entity migration ONLY if:
-    // 1. Remote PIN provided (user wants migration)
-    // 2. At least one AVR entity is configured (entities exist to migrate)
-    // This ensures user has already configured entities (first setup)
-    // and is now reconfiguring with migration parameters (second setup)
-    if (remotePinCode) {      
-      // Security: Validate PIN code (must be exactly 4 digits)
-      const pinTrimmed = remotePinCode.trim();
-      if (!PATTERNS.PIN_CODE.test(pinTrimmed)) {
-        console.error("%s Invalid PIN code format (must be exactly 4 digits)", integrationName);
-        return new uc.SetupError("OTHER");
-      }
-      const configuredEntities = this.driver.getConfiguredEntities();
-      const entities = configuredEntities ? configuredEntities.getEntities() : [];
-      const hasConfiguredEntities = entities && entities.length > 0;
-      if (hasConfiguredEntities) {
-        console.log("%s Remote PIN provided, %d entities configured, attempting migration...", integrationName, entities.length);
-        await this.performEntityMigration(pinTrimmed);
-      } else {
-        console.log("%s Remote PIN provided, but no entities configured yet", integrationName);
-        console.log("%s Please configure entities first, then reconfigure integration with Remote PIN for migration", integrationName);
-      }
-    } else {
-      console.log("%s No Remote PIN provided, skipping entity migration", integrationName);
-    }
-
     // Now connect to the AVRs
     await this.handleConnect();
 
@@ -345,26 +315,6 @@ export default class OnkyoDriver {
       } else {
         console.log("%s [%s] Sensor entities disabled by user preference", integrationName, avrEntry);
       }
-    }
-  }
-
-  private async performEntityMigration(remotePinCode: string): Promise<void> {
-    console.log("%s Starting entity migration process...", integrationName);
-    
-    // EntityMigration with Remote PIN for authentication
-    const migration = new EntityMigration(
-      this.driver,
-      this.config,
-      remotePinCode
-    );
-
-    migration.logMigrationStatus();
-
-    if (migration.needsMigration()) {
-      console.log("%s Migration needed, performing entity replacement in activities...", integrationName);
-      await migration.migrate();
-    } else {
-      console.log("%s No migration needed - no old entity mappings found", integrationName);
     }
   }
 

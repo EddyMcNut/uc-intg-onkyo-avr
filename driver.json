@@ -1,6 +1,6 @@
 {
   "driver_id": "onkyo_avr_custom_driver",
-  "version": "0.7.3",
+  "version": "0.8.0",
   "min_core_api": "0.20.0",
   "name": { "en": "Onkyo AVR" },
   "icon": "uc:music",
@@ -210,30 +210,6 @@
             "value": {
               "en": "If your AVR is not auto-discoverable, you may need to adjust the on-sequence settings of your Activities to ensure proper communication. Some models disconnect during power on, in that case you need to add a delay between 'AVR switch on' and the next AVR command of approx 5 seconds."
             }
-          }
-        }
-      },
-      {
-        "id": "infoThree",
-        "label": {
-          "en": "Entity migration (multi-zone upgrade)"
-        },
-        "field": {
-          "label": {
-            "value": {
-              "en": "If upgrading from v0.6.5 or lower, run setup again after AVR entity is configured and selected. Then provide the Remote's 4-digit PIN code below to automatically update the AVR entity in your activities to the new entity name including zone. This is a one-time action."
-            }
-          }
-        }
-      },
-      {
-        "id": "remotePinCode",
-        "label": {
-          "en": "Remote 4-digit PIN code (for AVR entity migration)"
-        },
-        "field": {
-          "password": {
-            "value": ""
           }
         }
       }
