@@ -3,7 +3,7 @@ import { EiscpDriver } from "./eiscp.js";
 import { DEFAULT_QUEUE_THRESHOLD, MAX_LENGTHS, PATTERNS, OnkyoConfig } from "./configManager.js";
 import log from "./loggers.js";
 
-const integrationName = "Onkyo-Integration (sender):";
+const integrationName = "sender:";
 
 export class OnkyoCommandSender {
   private driver: uc.IntegrationAPI;

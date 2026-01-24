@@ -23,7 +23,7 @@ export interface EiscpConfig {
 const COMMANDS = eiscpCommands.commands;
 const COMMAND_MAPPINGS = eiscpMappings.command_mappings;
 const VALUE_MAPPINGS = eiscpMappings.value_mappings;
-const integrationName = "Onkyo-Integration eISCP:";
+const integrationName = "eISCP:";
 const IGNORED_COMMANDS = new Set(["NMS", "NPB", "NST"]); // Commands to ignore from AVR (NMS=menu, NPB=playback, NST=net status)
 const THROTTLED_COMMANDS = new Set(["IFA", "IFV", "FLD"]); // Commands to send to incoming queue for throttling
 const FLD_VOLUME_HEX_PREFIX = "566F6C756D65"; // "Volume" in hex - skip these FLD messages

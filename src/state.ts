@@ -2,7 +2,7 @@ import * as uc from "@unfoldedcircle/integration-api";
 import { EiscpDriver } from "./eiscp.js";
 import log from "./loggers.js";
 
-const integrationName = "Onkyo-Integration (state):";
+const integrationName = "state:";
 
 /** State for a single AVR entity */
 interface EntityState {

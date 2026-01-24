@@ -1,7 +1,7 @@
 import EiscpDriver from "./eiscp.js";
 import log from "./loggers.js";
 
-const integrationName = "Onkyo-Integration:";
+const integrationName = "conmgr:";
 
 /** Configuration for reconnection behavior */
 export interface ReconnectionConfig {

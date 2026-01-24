@@ -5,7 +5,7 @@ import { OnkyoConfig, buildEntityId } from "./configManager.js";
 import { EiscpDriver } from "./eiscp.js";
 import log from "./loggers.js";
 
-const integrationName = "Onkyo-Integration (receiver):";
+const integrationName = "receiver:";
 
 const SENSOR_SUFFIXES = [
   "_mute_sensor",

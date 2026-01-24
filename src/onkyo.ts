@@ -9,7 +9,7 @@ import { OnkyoCommandReceiver } from "./onkyoCommandReceiver.js";
 import { ReconnectionManager } from "./reconnectionManager.js";
 import log from "./loggers.js";
 
-const integrationName = "Onkyo-Integration: ";
+const integrationName = "driver:";
 
 /** Parse a boolean value from string, boolean, or undefined */
 function parseBoolean(value: unknown, defaultValue: boolean): boolean {
@@ -45,19 +45,19 @@ function validateIpAddress(ip: string, fieldName: string): string | null {
   const trimmedIp = ip.trim();
   
   if (trimmedIp.length > MAX_LENGTHS.IP_ADDRESS) {
-    log.error(`${integrationName}${fieldName} too long`);
+    log.error(`${integrationName} ${fieldName} too long`);
     return null;
   }
   
   if (!PATTERNS.IP_ADDRESS.test(trimmedIp)) {
-    log.error(`${integrationName}Invalid ${fieldName} format`);
+    log.error(`${integrationName} Invalid ${fieldName} format`);
     return null;
   }
   
   // Validate IP octets are in valid range
   const octets = trimmedIp.split('.').map(Number);
   if (!octets.every((octet: number) => octet >= 0 && octet <= 255)) {
-    log.error(`${integrationName}${fieldName} octets out of range`);
+    log.error(`${integrationName} ${fieldName} octets out of range`);
     return null;
   }
   
