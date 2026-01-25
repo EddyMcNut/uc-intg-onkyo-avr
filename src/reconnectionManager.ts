@@ -1,7 +1,7 @@
 import EiscpDriver from "./eiscp.js";
 import log from "./loggers.js";
 
-const integrationName = "conmgr:";
+const integrationName = "reconmgr:";
 
 /** Configuration for reconnection behavior */
 export interface ReconnectionConfig {
