@@ -88,7 +88,25 @@ jobs:
 
           mv dist artifacts/
           mv artifacts/dist artifacts/bin
-          mv artifacts/bin/index.js artifacts/bin/driver.js
+
+          # If build output is under artifacts/bin/src, move files up so packaging is consistent
+          if [ -d artifacts/bin/src ]; then
+            mv artifacts/bin/src/* artifacts/bin/ || true
+            rmdir artifacts/bin/src || true
+          fi
+
+          # Now expect artifacts/bin/index.js to exist
+          if [ -f artifacts/bin/index.js ]; then
+            mv artifacts/bin/index.js artifacts/bin/driver.js
+          else
+            echo "ERROR: artifacts/bin/index.js missing after layout normalization" >&2
+            echo "Contents of artifacts/bin:" && ls -la artifacts/bin || true
+            exit 1
+          fi
+
+          # Show for debugging
+          echo "Artifacts bin contents after normalization:" && ls -la artifacts/bin || true
+
           cp package.json artifacts/bin/
           mv node_modules artifacts/bin/
           cp driver.json artifacts/
