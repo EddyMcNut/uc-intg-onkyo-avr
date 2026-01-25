@@ -52,6 +52,19 @@ jobs:
           npm install
           npm run build
 
+      - name: Run tests
+        run: |
+          npm test
+        continue-on-error: false
+
+      - name: Upload test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: test-results.xml
+          if-no-files-found: ignore
+
       - name: Remove config.json
         run: rm -f config.json
 
@@ -70,6 +83,9 @@ jobs:
         id: set-artifact
         shell: bash
         run: |
+          # Remove compiled tests to keep the artifact small
+          rm -rf dist/test
+
           mv dist artifacts/
           mv artifacts/dist artifacts/bin
           mv artifacts/bin/index.js artifacts/bin/driver.js

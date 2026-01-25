@@ -145,6 +145,155 @@ export default class OnkyoDriver {
     log.info("%s ===== SETUP HANDLER CALLED =====", integrationName);
     log.info("%s Setup message:", integrationName, JSON.stringify(msg, null, 2));
 
+    // ----- Support Integration Manager backup/restore flow -----
+    // Flow summary (how uc-intg-manager interacts):
+    // 1) manager calls start_setup(reconfigure=true)
+    // 2) manager calls get_setup() and expects a dropdown choice (id 'choice') to be present
+    // 3) manager sends send_setup_input with { choice: <id>, action: 'backup', backup_data: '[]' }
+    // 4) driver should respond with a page containing a textarea 'backup_data' with the backup JSON
+    // For restore the manager will send action: 'restore' with backup_data containing the JSON to apply.
+
+    if (msg instanceof uc.DriverSetupRequest && msg.reconfigure) {
+      const setupData = (msg as uc.DriverSetupRequest).setupData ?? {};
+
+      // If caller just started reconfigure and no choice selected, present backup/restore options
+      if (!setupData || !Object.prototype.hasOwnProperty.call(setupData, "choice")) {
+        // Provide a dropdown with default choice set to 'backup' so manager can pick it
+        return new uc.RequestUserInput("Backup & Restore", [
+          {
+            id: "choice",
+            label: { en: "Action" },
+            field: {
+              dropdown: {
+                value: "backup",
+                items: [
+                  { id: "backup", label: { en: "Backup configuration" } },
+                  { id: "restore", label: { en: "Restore configuration" } },
+                  { id: "configure", label: { en: "Run regular setup" } }
+                ]
+              }
+            }
+          }
+        ]);
+      }
+    }
+
+    // If the UI submitted input values (e.g., manager sent action=backup/restore), handle them
+    if (msg instanceof uc.UserDataResponse) {
+      const input = (msg as uc.UserDataResponse).inputValues || {};
+      const action = String(input.action ?? "").toLowerCase();
+
+      if (action === "backup") {
+        // Ensure latest config loaded from disk (useful if another module wrote the config file)
+        try {
+          ConfigManager.load();
+        } catch (err) {
+          log.warn(`${integrationName} Failed to reload config before backup:`, err);
+        }
+
+        // Build backup data - include current config and some metadata
+        // Read driver.json safely (works in ESM runtime)
+        let driverId = "unknown";
+        let driverVersion = "unknown";
+        try {
+          const fs = await import('fs');
+          const path = await import('path');
+          const driverJsonPath = path.resolve(process.cwd(), 'driver.json');
+          const driverJsonRaw = fs.readFileSync(driverJsonPath, 'utf-8');
+          const driverJson = JSON.parse(driverJsonRaw);
+          driverId = driverJson.driver_id || driverId;
+          driverVersion = driverJson.version || driverVersion;
+        } catch (err) {
+          log.warn(`${integrationName} Could not read driver.json metadata for backup:`, err);
+        }
+
+        // Try to read the config directly from the driver's config path to avoid
+        // any module-instance discrepancies (tests import modules in different
+        // ways which can result in duplicate module instances with separate
+        // static state). Fall back to ConfigManager.get() if file not present.
+        let configData: any = {};
+        try {
+          const fs2 = await import('fs');
+          const path2 = await import('path');
+          const cfgPath = path2.resolve(this.driver.getConfigDirPath ? this.driver.getConfigDirPath() : process.cwd(), 'config.json');
+          if (fs2.existsSync(cfgPath)) {
+            const rawCfg = fs2.readFileSync(cfgPath, 'utf-8');
+            configData = JSON.parse(rawCfg);
+          } else {
+            log.info('%s Config file not present at %s, falling back to ConfigManager.get()', integrationName, cfgPath);
+            configData = ConfigManager.get();
+          }
+        } catch (err) {
+          log.warn(`${integrationName} Failed to read config file for backup, falling back to in-memory ConfigManager:`, err);
+          configData = ConfigManager.get();
+        }
+
+        const backupPayload = {
+          meta: {
+            driver_id: driverId,
+            version: driverVersion,
+            timestamp: new Date().toISOString()
+          },
+          config: configData
+        };
+        const backupString = JSON.stringify(backupPayload, null, 2);
+
+        // Return a page containing the backup data in a textarea field (manager will extract it)
+        return new uc.RequestUserInput("Backup data", [
+          {
+            id: "backup_data",
+            label: { en: "Backup data (JSON)" },
+            field: {
+              textarea: {
+                value: backupString
+              }
+            }
+          }
+        ]);
+      }
+
+      if (action === "restore") {
+        const raw = String(input.backup_data ?? "").trim();
+        if (!raw) {
+          log.warn("%s No backup_data provided for restore", integrationName);
+          return new uc.SetupError("OTHER");
+        }
+        try {
+          const parsed = JSON.parse(raw);
+          // Expect either full payload {config: {...}} or bare config object
+          const newConfig = parsed && parsed.config ? parsed.config : parsed;
+          // Validate basic shape before applying
+          if (!newConfig || (!Array.isArray((newConfig as any).avrs) && !newConfig.model && !newConfig.avrs)) {
+            log.warn("%s Provided restore data does not look like a valid config", integrationName);
+            return new uc.SetupError("OTHER");
+          }
+
+          // Apply and persist config
+          ConfigManager.save(newConfig as Partial<OnkyoConfig>);
+
+          // Reload runtime config and (re)register entities
+          this.config = ConfigManager.load();
+          this.registerAvailableEntities();
+
+          // Optionally trigger connect to reflect new config immediately
+          await this.handleConnect();
+
+          return new uc.SetupComplete();
+        } catch (err) {
+          log.error("%s Failed to parse or apply restore data:", integrationName, err);
+          return new uc.SetupError("OTHER");
+        }
+      }
+
+      // If choice was 'configure', fall through to normal setup below (user wants to re-run setup)
+      if (String(input.choice ?? "").toLowerCase() === "configure") {
+        // Let the normal setup handling below proceed using any provided setup fields
+      } else {
+        // If no recognized action, fall back to showing the current setup page (continue to normal handler)
+      }
+    }
+
+    // Normal setup path follows... (parse settings if provided)
     const setupData = (msg as unknown as { setupData?: SetupData }).setupData ?? {};
     const {
       model,
