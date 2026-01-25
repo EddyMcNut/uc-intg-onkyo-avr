@@ -2,7 +2,7 @@
 "use strict";
 import * as uc from "@unfoldedcircle/integration-api";
 import EiscpDriver from "./eiscp.js";
-import { ConfigManager, OnkyoConfig, AvrConfig, AvrZone, AVR_DEFAULTS, MAX_LENGTHS, PATTERNS, buildEntityId, buildPhysicalAvrId } from "./configManager.js";
+import { ConfigManager, setConfigDir, OnkyoConfig, AvrConfig, AvrZone, AVR_DEFAULTS, MAX_LENGTHS, PATTERNS, buildEntityId, buildPhysicalAvrId } from "./configManager.js";
 import { DEFAULT_QUEUE_THRESHOLD } from "./configManager.js";
 import { OnkyoCommandSender } from "./onkyoCommandSender.js";
 import { OnkyoCommandReceiver } from "./onkyoCommandReceiver.js";
@@ -116,8 +116,20 @@ export default class OnkyoDriver {
 
   constructor() {
     this.driver = new uc.IntegrationAPI();
-    this.config = ConfigManager.load();
+    // Initialize driver first so we can determine the correct config directory
     this.driver.init("driver.json", this.handleDriverSetup.bind(this));
+
+    // Ensure ConfigManager uses the Integration API config dir so the Integration
+    // Manager can back up and restore the same files
+    try {
+      const configDir = this.driver.getConfigDirPath();
+      setConfigDir(configDir);
+    } catch (err) {
+      log.warn("%s Could not determine driver config directory, falling back to environment or CWD", integrationName);
+    }
+
+    // Now load config from the correct path and continue setup
+    this.config = ConfigManager.load();
     this.setupDriverEvents();
     this.setupEventHandlers();
     log.info("Loaded config at startup:", this.config);
