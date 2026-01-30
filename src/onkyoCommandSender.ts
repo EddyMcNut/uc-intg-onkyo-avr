@@ -68,6 +68,9 @@ export class OnkyoCommandSender {
     };
 
     const now = Date.now();
+    // Determine queue threshold: prefer explicit config, then eISCP driver's send_delay, else default
+    const queueThreshold = this.config.queueThreshold ?? (typeof this.eiscp["config"]?.send_delay === "number" ? this.eiscp["config"].send_delay : DEFAULT_QUEUE_THRESHOLD);
+
     switch (cmdId) {
       case uc.MediaPlayerCommands.On:
         await this.eiscp.command(formatCommand("system-power on"));
@@ -82,13 +85,13 @@ export class OnkyoCommandSender {
         await this.eiscp.command(formatCommand("audio-muting toggle"));
         break;
       case uc.MediaPlayerCommands.VolumeUp:
-        if (now - this.lastCommandTime > (this.config.queueThreshold ?? DEFAULT_QUEUE_THRESHOLD)) {
+        if (now - this.lastCommandTime > queueThreshold) {
           this.lastCommandTime = now;
           await this.eiscp.command(formatCommand("volume level-up-1db-step"));
         }
         break;
       case uc.MediaPlayerCommands.VolumeDown:
-        if (now - this.lastCommandTime > (this.config.queueThreshold ?? DEFAULT_QUEUE_THRESHOLD)) {
+        if (now - this.lastCommandTime > queueThreshold) {
           this.lastCommandTime = now;
           await this.eiscp.command(formatCommand("volume level-down-1db-step"));
         }
@@ -192,8 +195,10 @@ export class OnkyoCommandSender {
         await this.eiscp.command(formatCommand("setup right"));
         break;
       case uc.MediaPlayerCommands.Info:
+        await this.eiscp.command({ zone, command: "input-selector", args: "query" });
         await this.eiscp.command(formatCommand("audio-information query"));
         await this.eiscp.command(formatCommand("video-information query"));
+        await new Promise((resolve) => setTimeout(resolve, queueThreshold * 3));
         await this.eiscp.command(formatCommand("fp-display query"));
         break;
       default:
