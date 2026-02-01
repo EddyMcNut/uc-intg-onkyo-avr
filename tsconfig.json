@@ -11,6 +11,6 @@
     "baseUrl": ".",
     "resolveJsonModule": true
   },
-  "include": ["src/**/*", "types/**/*"],
+  "include": ["src/**/*", "test/**/*", "types/**/*"],
   "exclude": ["node_modules", "dist"]
 }

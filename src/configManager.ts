@@ -1,11 +1,29 @@
 import path from "path";
 import fs from "fs";
+import log from "./loggers.js";
 
 export const DEFAULT_QUEUE_THRESHOLD = 100;
 
-// Use UC_CONFIG_HOME if available, otherwise fallback to process.cwd()
-const CONFIG_DIR = process.env.UC_CONFIG_HOME || process.cwd();
-const CONFIG_PATH = path.resolve(CONFIG_DIR, "config.json");
+// Config directory is configurable at runtime to support integration manager backups/restores
+let CONFIG_DIR = process.env.UC_CONFIG_HOME || process.cwd();
+let CONFIG_PATH = path.resolve(CONFIG_DIR, "config.json");
+
+/**
+ * Set the configuration directory explicitly (used by the driver when the
+ * Integration API exposes the proper config dir). This ensures the
+ * integration reads/writes the same files the Integration Manager will back up.
+ */
+export function setConfigDir(dir: string) {
+  CONFIG_DIR = dir || process.env.UC_CONFIG_HOME || process.cwd();
+  CONFIG_PATH = path.resolve(CONFIG_DIR, "config.json");
+}
+
+/**
+ * Helper to get current config path (useful for testing/manager compatibility)
+ */
+export function getConfigPath(): string {
+  return CONFIG_PATH;
+}
 
 /** Security: Maximum input lengths for validation */
 export const MAX_LENGTHS = {
@@ -159,7 +177,7 @@ export class ConfigManager {
         }
       }
     } catch (err) {
-      console.error("Failed to load config:", err);
+      log.error("Failed to load config:", err);
       this.config = {};
     }
     return this.config;
@@ -170,7 +188,7 @@ export class ConfigManager {
     try {
       fs.writeFileSync(CONFIG_PATH, JSON.stringify(this.config, null, 2), "utf-8");
     } catch (err) {
-      console.error("Failed to save config:", err);
+      log.error("Failed to save config:", err);
     }
   }
 
@@ -188,7 +206,7 @@ export class ConfigManager {
     const existingIndex = this.config.avrs.findIndex((a) => a.ip === normalizedAvr.ip && a.zone === normalizedAvr.zone);
     if (existingIndex >= 0) {
       // AVR already exists, update it with new settings from setup
-      console.log(`ConfigManager: Updating existing AVR at ${normalizedAvr.ip} zone ${normalizedAvr.zone}`);
+      log.info(`ConfigManager: Updating existing AVR at ${normalizedAvr.ip} zone ${normalizedAvr.zone}`);
       this.config.avrs[existingIndex] = normalizedAvr;
       this.save(this.config);
       return;
