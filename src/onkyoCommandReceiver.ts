@@ -4,6 +4,8 @@ import crypto from "crypto";
 import { OnkyoConfig, buildEntityId } from "./configManager.js";
 import { EiscpDriver } from "./eiscp.js";
 import { SelectAttributes } from "./selectEntity.js";
+import { getCompatibleListeningModes, detectAudioFormatType } from "./listeningModeFilters.js";
+import { eiscpMappings } from "./eiscp-mappings.js";
 import log from "./loggers.js";
 
 const integrationName = "receiver:";
@@ -91,6 +93,9 @@ export class OnkyoCommandReceiver {
               [uc.MediaPlayerAttributes.State]: powerState
             });
             log.info("%s [%s] power set to: %s", integrationName, entityId, powerState);
+
+            // Track power state in state manager
+            avrStateManager.setPowerState(entityId, avrUpdates.argument as string);
 
             // When AVR is off, set all sensor states to standby
             if (avrUpdates.argument !== "on") {
@@ -180,13 +185,17 @@ export class OnkyoCommandReceiver {
           case "listening-mode": {
             // Handle both string and array (take first element if array)
             const listeningMode = Array.isArray(avrUpdates.argument) ? avrUpdates.argument[0] : (avrUpdates.argument as string);
-            log.info("%s [%s] listening-mode set to: %s", integrationName, entityId, listeningMode);
-            
-            // Update the listening mode select entity
-            const selectEntityId = `${entityId}_listening_mode`;
-            this.driver.updateEntityAttributes(selectEntityId, {
-              [SelectAttributes.CurrentOption]: listeningMode
-            });
+            if (listeningMode === "undefined" || listeningMode === "unknown") {
+              log.info("%s [%s] listening-mode '%s', re-query...", integrationName, entityId, listeningMode);
+              this.eiscpInstance.command("listening-mode query");
+            } else {
+              log.info("%s [%s] listening-mode set to: %s", integrationName, entityId, listeningMode);
+              // Update the listening mode select entity
+              const selectEntityId = `${entityId}_listening_mode`;
+              this.driver.updateEntityAttributes(selectEntityId, {
+                [SelectAttributes.CurrentOption]: listeningMode
+              });
+            }
             break;
           }
           case "IFA": {
@@ -202,6 +211,34 @@ export class OnkyoCommandReceiver {
                 [uc.SensorAttributes.State]: uc.SensorStates.On,
                 [uc.SensorAttributes.Value]: audioInputValue
               });
+
+              // Detect and track audio format type
+              const audioFormatType = detectAudioFormatType(audioInputValue);
+              const formatChanged = avrStateManager.setAudioFormat(entityId, audioFormatType, this.driver);
+
+              // If audio format changed, update listening mode select entity options
+              if (formatChanged) {
+                const selectEntityId = `${entityId}_listening_mode`;
+                const compatibleModes = getCompatibleListeningModes(audioFormatType);
+                
+                if (compatibleModes) {
+                  // Get all listening modes from mappings
+                  const lmdMappings = eiscpMappings.value_mappings.LMD;
+                  const excludeKeys = ["up", "down", "movie", "music", "game", "query"];
+                  const allModes = Object.keys(lmdMappings).filter(key => !excludeKeys.includes(key));
+                  
+                  // Filter to compatible modes and sort alphabetically
+                  const filteredOptions = allModes.filter(mode => compatibleModes.includes(mode)).sort();
+                  
+                  log.info("%s [%s] updating listening mode options for format: %s (%d modes)", integrationName, entityId, audioFormatType, filteredOptions.length);
+                  
+                  // Update select entity with filtered options
+                  // TypeScript doesn't recognize that options can be an array, but the API supports it
+                  this.driver.updateEntityAttributes(selectEntityId, {
+                    [SelectAttributes.Options]: filteredOptions as any
+                  });
+                }
+              }
             }
 
             if (audioOutputValue) {

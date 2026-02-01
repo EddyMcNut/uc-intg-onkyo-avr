@@ -10,6 +10,8 @@ import { ReconnectionManager } from "./reconnectionManager.js";
 import { Select, SelectStates, SelectAttributes, SelectCommands } from "./selectEntity.js";
 import { eiscpCommands } from "./eiscp-commands.js";
 import { eiscpMappings } from "./eiscp-mappings.js";
+import { getCompatibleListeningModes } from "./listeningModeFilters.js";
+import { avrStateManager } from "./state.js";
 import log from "./loggers.js";
 
 const integrationName = "driver:";
@@ -712,12 +714,20 @@ export default class OnkyoDriver {
     return sensors;
   }
 
-  private getListeningModeOptions(): string[] {
+  private getListeningModeOptions(audioFormat?: string): string[] {
     // Extract listening mode names from eiscpMappings, excluding control commands
     const lmdMappings = eiscpMappings.value_mappings.LMD;
     const excludeKeys = ["up", "down", "movie", "music", "game", "query"];
     
-    return Object.keys(lmdMappings).filter(key => !excludeKeys.includes(key));
+    const allModes = Object.keys(lmdMappings).filter(key => !excludeKeys.includes(key));
+    
+    // Filter by audio format if provided
+    const compatibleModes = getCompatibleListeningModes(audioFormat);
+    if (compatibleModes) {
+      return allModes.filter(mode => compatibleModes.includes(mode)).sort();
+    }
+    
+    return allModes.sort();
   }
 
   /**
@@ -770,9 +780,12 @@ export default class OnkyoDriver {
     }
 
     try {
-      const options = this.getListeningModeOptions();
+      // Get current audio format for filtering
+      const audioFormat = avrStateManager.getAudioFormat(avrEntry);
+      const options = this.getListeningModeOptions(audioFormat !== "unknown" ? audioFormat : undefined);
       const currentAttrs = entity.attributes || {};
       const currentOption = currentAttrs[SelectAttributes.CurrentOption] as string || "";
+      const queueThreshold = instance?.config.queueThreshold ?? DEFAULT_QUEUE_THRESHOLD;
 
       let newOption: string | undefined;
 
@@ -822,24 +835,11 @@ export default class OnkyoDriver {
       // Send the listening mode command to the AVR
       log.info("%s [%s] Setting listening mode to: %s", integrationName, entity.id, newOption);
       
-      await physicalConnection.eiscp.command({
-        zone: instance.config.zone,
-        command: "listening-mode",
-        args: newOption
-      });
+      await physicalConnection.eiscp.command({zone: instance.config.zone, command: "listening-mode", args: newOption});
 
       // Update entity attributes
       this.driver.updateEntityAttributes(entity.id, {
         [SelectAttributes.CurrentOption]: newOption
-      });
-
-      // Emit entity_change event for the Remote to update UI
-      (this.driver as any).emit("entity_change", {
-        entity_type: "select",
-        entity_id: entity.id,
-        attributes: {
-          [SelectAttributes.CurrentOption]: newOption
-        }
       });
 
       return uc.StatusCodes.Ok;
@@ -884,6 +884,14 @@ export default class OnkyoDriver {
     for (const [avrEntry, instance] of this.avrInstances) {
       const entryPhysicalAVR = buildPhysicalAvrId(instance.config.model, instance.config.ip);
       if (entryPhysicalAVR === physicalAVR) {
+        // For non-initial queries, only query zones that are powered on
+        // Initial queries (after connection) will query all zones to get power state
+        const isInitialQuery = context.includes("after reconnection") || context.includes("after connection");
+        if (!isInitialQuery && !avrStateManager.isEntityOn(avrEntry)) {
+          log.debug("%s [%s] Skipping query for zone in standby (%s)", integrationName, avrEntry, context);
+          continue;
+        }
+
         const queueThreshold = instance.config.queueThreshold ?? DEFAULT_QUEUE_THRESHOLD;
         // Wait between zones (except first) to give AVR time to process
         if (!firstZone) {

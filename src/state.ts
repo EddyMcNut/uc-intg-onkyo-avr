@@ -8,6 +8,8 @@ const integrationName = "state:";
 interface EntityState {
   source: string;
   subSource: string;
+  audioFormat: string;
+  powerState: string;
 }
 
 /**
@@ -21,7 +23,7 @@ class AvrStateManager {
   private getState(entityId: string): EntityState {
     let state = this.states.get(entityId);
     if (!state) {
-      state = { source: "unknown", subSource: "unknown" };
+      state = { source: "unknown", subSource: "unknown", audioFormat: "unknown", powerState: "unknown" };
       this.states.set(entityId, state);
     }
     return state;
@@ -35,6 +37,55 @@ class AvrStateManager {
   /** Get current sub-source for an entity */
   getSubSource(entityId: string): string {
     return this.getState(entityId).subSource;
+  }
+
+  /** Get current audio format for an entity */
+  getAudioFormat(entityId: string): string {
+    return this.getState(entityId).audioFormat;
+  }
+
+  /** Get current power state for an entity */
+  getPowerState(entityId: string): string {
+    return this.getState(entityId).powerState;
+  }
+
+  /** Set audio format for an entity, returns true if changed */
+  setAudioFormat(
+    entityId: string,
+    audioFormat: string,
+    driver?: uc.IntegrationAPI
+  ): boolean {
+    const state = this.getState(entityId);
+    const normalizedFormat = audioFormat.toLowerCase();
+    
+    if (state.audioFormat !== normalizedFormat) {
+      log.info("%s [%s] audio format changed from '%s' to '%s'", integrationName, entityId, state.audioFormat, audioFormat);
+      state.audioFormat = normalizedFormat;
+      return true;
+    }
+    return false;
+  }
+
+  /** Set power state for an entity, returns true if changed */
+  setPowerState(
+    entityId: string,
+    powerState: string
+  ): boolean {
+    const state = this.getState(entityId);
+    const normalizedPowerState = powerState.toLowerCase();
+    
+    if (state.powerState !== normalizedPowerState) {
+      log.info("%s [%s] power state changed from '%s' to '%s'", integrationName, entityId, state.powerState, powerState);
+      state.powerState = normalizedPowerState;
+      return true;
+    }
+    return false;
+  }
+
+  /** Check if entity is powered on */
+  isEntityOn(entityId: string): boolean {
+    const powerState = this.getState(entityId).powerState;
+    return powerState === "on";
   }
 
   /** Set source for an entity, returns true if changed */
