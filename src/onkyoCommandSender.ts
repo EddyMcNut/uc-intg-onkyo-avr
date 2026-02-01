@@ -1,6 +1,7 @@
 import * as uc from "@unfoldedcircle/integration-api";
 import { EiscpDriver } from "./eiscp.js";
 import { DEFAULT_QUEUE_THRESHOLD, MAX_LENGTHS, PATTERNS, OnkyoConfig } from "./configManager.js";
+import { avrStateManager } from "./state.js";
 import log from "./loggers.js";
 
 const integrationName = "sender:";
@@ -195,11 +196,7 @@ export class OnkyoCommandSender {
         await this.eiscp.command(formatCommand("setup right"));
         break;
       case uc.MediaPlayerCommands.Info:
-        await this.eiscp.command({ zone, command: "input-selector", args: "query" });
-        await this.eiscp.command(formatCommand("audio-information query"));
-        await this.eiscp.command(formatCommand("video-information query"));
-        await new Promise((resolve) => setTimeout(resolve, queueThreshold * 3));
-        await this.eiscp.command(formatCommand("fp-display query"));
+        await avrStateManager.refreshAvrState(entity.id, this.eiscp, zone, this.driver, queueThreshold);
         break;
       default:
         return uc.StatusCodes.NotImplemented;

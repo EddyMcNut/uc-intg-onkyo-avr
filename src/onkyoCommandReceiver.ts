@@ -3,6 +3,7 @@ import { avrStateManager } from "./state.js";
 import crypto from "crypto";
 import { OnkyoConfig, buildEntityId } from "./configManager.js";
 import { EiscpDriver } from "./eiscp.js";
+import { SelectAttributes } from "./selectEntity.js";
 import log from "./loggers.js";
 
 const integrationName = "receiver:";
@@ -173,6 +174,18 @@ export class OnkyoCommandReceiver {
             this.driver.updateEntityAttributes(sourceSensorId, {
               [uc.SensorAttributes.State]: uc.SensorStates.On,
               [uc.SensorAttributes.Value]: source.toUpperCase()
+            });
+            break;
+          }
+          case "listening-mode": {
+            // Handle both string and array (take first element if array)
+            const listeningMode = Array.isArray(avrUpdates.argument) ? avrUpdates.argument[0] : (avrUpdates.argument as string);
+            log.info("%s [%s] listening-mode set to: %s", integrationName, entityId, listeningMode);
+            
+            // Update the listening mode select entity
+            const selectEntityId = `${entityId}_listening_mode`;
+            this.driver.updateEntityAttributes(selectEntityId, {
+              [SelectAttributes.CurrentOption]: listeningMode
             });
             break;
           }

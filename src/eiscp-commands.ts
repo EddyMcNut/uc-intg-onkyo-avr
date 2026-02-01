@@ -568,72 +568,29 @@ export const eiscpCommands = {
         "42": { name: "thx-cinema", description: "sets THX Cinema" },
         "43": { name: "thx-surround-ex", description: "sets THX Surround EX" },
         "44": { name: "thx-music", description: "sets THX Music" },
-        "45": { name: "thx-games", description: "sets THX Games" },
-        "50": {
-          name: ["thx-u2", "s2", "i", "s-cinema", "cinema2"],
-          description: "sets THX U2/S2/I/S Cinema/Cinema2"
-        },
-        "51": {
-          name: ["thx-musicmode", "thx-u2", "s2", "i", "s-music"],
-          description: "sets THX MusicMode,THX U2/S2/I/S Music"
-        },
-        "52": {
-          name: ["thx-games", "thx-u2", "s2", "i", "s-games"],
-          description: "sets THX Games Mode,THX U2/S2/I/S Games"
-        },
-        "80": { name: ["plii", "pliix-movie"], description: "sets PLII/PLIIx Movie" },
-        "81": { name: ["plii", "pliix-music"], description: "sets PLII/PLIIx Music" },
-        "82": {
-          name: ["neo-6-cinema", "neo-x-cinema"],
-          description: "sets Neo:6 Cinema/Neo:X Cinema"
-        },
-        "83": {
-          name: ["neo-6-music", "neo-x-music"],
-          description: "sets Neo:6 Music/Neo:X Music"
-        },
-        "84": {
-          name: ["plii", "pliix-thx-cinema"],
-          description: "sets PLII/PLIIx THX Cinema"
-        },
-        "85": {
-          name: ["neo-6", "neo-x-thx-cinema"],
-          description: "sets Neo:6/Neo:X THX Cinema"
-        },
-        "86": { name: ["plii", "pliix-game"], description: "sets PLII/PLIIx Game" },
+        "50": { name: ["thx-u2", "s-cinema", "cinema2"], description: "sets THX U2/S2/I/S Cinema/Cinema2" },
+        "51": { name: ["thx-musicmode", "s-music"], description: "sets THX MusicMode, S Music" },
+        "52": { name: ["thx-games", "thx-u2", "s2", "i", "s-games"], description: "sets THX Games Mode,THX U2/S2/I/S Games" },
+        "80": { name: "pliix-movie", description: "sets PLII/PLIIx Movie" },
+        "81": { name: "pliix-music", description: "sets PLII/PLIIx Music" },
+        "82": { name: ["neo-6-cinema", "neo-x-cinema"], description: "sets Neo:6 Cinema/Neo:X Cinema" },
+        "83": { name: ["neo-6-music", "neo-x-music"], description: "sets Neo:6 Music/Neo:X Music" },
+        "84": { name: "pliix-thx-cinema", description: "sets PLII/PLIIx THX Cinema" },
+        "85": { name: ["neo-6", "neo-x-thx-cinema"], description: "sets Neo:6/Neo:X THX Cinema" },
+        "86": { name: ["pliix-game"], description: "sets PLIIx Game" },
         "87": { name: "neural-surr", description: "sets Neural Surr" },
-        "88": {
-          name: ["neural-thx", "neural-surround"],
-          description: "sets Neural THX/Neural Surround"
-        },
-        "89": { name: ["plii", "pliix-thx-games"], description: "sets PLII/PLIIx THX Games" },
+        "88": { name: ["neural-thx", "neural-surround"], description: "sets Neural THX/Neural Surround" },
+        "89": { name: ["pliix-thx-games"], description: "sets PLIIx THX Games" },
         "90": { name: "pliiz-height", description: "sets PLIIz Height" },
-        "91": {
-          name: "neo-6-cinema-dts-surround-sensation",
-          description: "sets Neo:6 Cinema DTS Surround Sensation"
-        },
-        "92": {
-          name: "neo-6-music-dts-surround-sensation",
-          description: "sets Neo:6 Music DTS Surround Sensation"
-        },
+        "91": { name: "neo-6-cinema-dts-surround-sensation", description: "sets Neo:6 Cinema DTS Surround Sensation" },
+        "92": { name: "neo-6-music-dts-surround-sensation", description: "sets Neo:6 Music DTS Surround Sensation" },
         "93": { name: "neural-digital-music", description: "sets Neural Digital Music" },
-        "94": {
-          name: "pliiz-height-thx-cinema",
-          description: "sets PLIIz Height + THX Cinema"
-        },
+        "94": { name: "pliiz-height-thx-cinema", description: "sets PLIIz Height + THX Cinema" },
         "95": { name: "pliiz-height-thx-music", description: "sets PLIIz Height + THX Music" },
         "96": { name: "pliiz-height-thx-games", description: "sets PLIIz Height + THX Games" },
-        "97": {
-          name: ["pliiz-height-thx-u2", "s2-cinema"],
-          description: "sets PLIIz Height + THX U2/S2 Cinema"
-        },
-        "98": {
-          name: ["pliiz-height-thx-u2", "s2-music"],
-          description: "sets PLIIz Height + THX U2/S2 Music"
-        },
-        "99": {
-          name: ["pliiz-height-thx-u2", "s2-games"],
-          description: "sets PLIIz Height + THX U2/S2 Games"
-        },
+        "97": { name: ["s2-cinema"], description: "sets S2 Cinema" },
+        "98": { name: ["s2-music"], description: "sets S2 Music" },
+        "99": { name: ["s2-games"], description: "sets S2 Games" },
         "00": { name: "stereo", description: "sets STEREO" },
         "01": { name: "direct", description: "sets DIRECT" },
         "02": { name: "surround", description: "sets SURROUND" },
@@ -648,54 +605,17 @@ export const eiscpCommands = {
         "0B": { name: "tv-logic", description: "sets TV LOGIC" },
         "0C": { name: "all-ch-stereo", description: "sets ALL CH STEREO" },
         "0D": { name: "theater-dimensional", description: "sets THEATER-DIMENSIONAL" },
-        "0E": {
-          name: ["enhanced-7", "enhance", "game-sports"],
-          description: "sets ENHANCED 7/ENHANCE, Game-Sports"
-        },
+        "0E": { name: ["enhanced-7", "enhance", "game-sports"], description: "sets ENHANCED 7/ENHANCE, Game-Sports" },
         "0F": { name: "mono", description: "sets MONO" },
         "1F": { name: "whole-house", description: "sets Whole House Mode" },
-        "8A": {
-          name: ["neo-6", "neo-x-thx-games"],
-          description: "sets Neo:6/Neo:X THX Games"
-        },
-        "8B": { name: ["plii", "pliix-thx-music"], description: "sets PLII/PLIIx THX Music" },
-        "8C": {
-          name: ["neo-6", "neo-x-thx-music"],
-          description: "sets Neo:6/Neo:X THX Music"
-        },
+        "8A": { name: ["neo-x-thx-games"], description: "sets Neo:X THX Games" },
+        "8B": { name: ["pliix-thx-music"], description: "sets PLIIx THX Music" },
+        "8C": { name: ["neo-x-thx-music"], description: "sets Neo:X THX Music" },
         "8D": { name: "neural-thx-cinema", description: "sets Neural THX Cinema" },
         "8E": { name: "neural-thx-music", description: "sets Neural THX Music" },
         "8F": { name: "neural-thx-games", description: "sets Neural THX Games" },
         "9A": { name: "neo-x-game", description: "sets Neo:X Game" },
-        A0: {
-          name: ["pliix", "plii-movie-audyssey-dsx"],
-          description: "sets PLIIx/PLII Movie + Audyssey DSX"
-        },
-        A1: {
-          name: ["pliix", "plii-music-audyssey-dsx"],
-          description: "sets PLIIx/PLII Music + Audyssey DSX"
-        },
-        A2: {
-          name: ["pliix", "plii-game-audyssey-dsx"],
-          description: "sets PLIIx/PLII Game + Audyssey DSX"
-        },
-        A3: {
-          name: "neo-6-cinema-audyssey-dsx",
-          description: "sets Neo:6 Cinema + Audyssey DSX"
-        },
-        A4: {
-          name: "neo-6-music-audyssey-dsx",
-          description: "sets Neo:6 Music + Audyssey DSX"
-        },
-        A5: {
-          name: "neural-surround-audyssey-dsx",
-          description: "sets Neural Surround + Audyssey DSX"
-        },
-        A6: {
-          name: "neural-digital-music-audyssey-dsx",
-          description: "sets Neural Digital Music + Audyssey DSX"
-        },
-        A7: { name: "dolby-ex-audyssey-dsx", description: "sets Dolby EX + Audyssey DSX" },
+        "A2": { name: ["pliix"], description: "sets PLIIx" },
         UP: { name: "up", description: "sets Listening Mode Wrap-Around Up" },
         DOWN: { name: "down", description: "sets Listening Mode Wrap-Around Down" },
         MOVIE: { name: "movie", description: "sets Listening Mode Wrap-Around Up" },

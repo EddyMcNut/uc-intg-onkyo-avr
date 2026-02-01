@@ -89,7 +89,7 @@ class AvrStateManager {
   }
 
   /** Query AVR state and clear media attributes on source change */
-  private async refreshAvrState(
+  async refreshAvrState(
     entityId: string,
     eiscpInstance?: EiscpDriver,
     zone?: string,
@@ -121,10 +121,12 @@ class AvrStateManager {
     log.info("%s [%s] querying AV-info for zone '%s'", integrationName, entityId, zone);
     await eiscpInstance.command({ zone, command: "audio-information", args: "query" });
     await eiscpInstance.command({ zone, command: "video-information", args: "query" });
+    
 
     // To make sure the sensor also updates (in case a message is missed)
     await eiscpInstance.command({ zone, command: "input-selector", args: "query" });
     await new Promise((resolve) => setTimeout(resolve, threshold * 3));
+    await eiscpInstance.command({ zone, command: "listening-mode", args: "query" });
     await eiscpInstance.command({ zone, command: "fp-display", args: "query" });
   }
 }

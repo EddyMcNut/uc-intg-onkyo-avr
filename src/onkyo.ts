@@ -9,6 +9,7 @@ import { OnkyoCommandReceiver } from "./onkyoCommandReceiver.js";
 import { ReconnectionManager } from "./reconnectionManager.js";
 import { Select, SelectStates, SelectAttributes, SelectCommands } from "./selectEntity.js";
 import { eiscpCommands } from "./eiscp-commands.js";
+import { eiscpMappings } from "./eiscp-mappings.js";
 import log from "./loggers.js";
 
 const integrationName = "driver:";
@@ -711,12 +712,12 @@ export default class OnkyoDriver {
     return sensors;
   }
 
-  /**
-   * Get listening mode options - simplified for testing
-   * Returns an array with two test options
-   */
   private getListeningModeOptions(): string[] {
-    return ["ja", "nee"];
+    // Extract listening mode names from eiscpMappings, excluding control commands
+    const lmdMappings = eiscpMappings.value_mappings.LMD;
+    const excludeKeys = ["up", "down", "movie", "music", "game", "query"];
+    
+    return Object.keys(lmdMappings).filter(key => !excludeKeys.includes(key));
   }
 
   /**
@@ -818,24 +819,14 @@ export default class OnkyoDriver {
         return uc.StatusCodes.BadRequest;
       }
 
-      // Send the command to the AVR based on selected option
-      log.info("%s [%s] Setting test option to: %s", integrationName, entity.id, newOption);
+      // Send the listening mode command to the AVR
+      log.info("%s [%s] Setting listening mode to: %s", integrationName, entity.id, newOption);
       
-      if (newOption === "ja") {
-        // Toggle audio muting
-        await physicalConnection.eiscp.command({
-          zone: instance.config.zone,
-          command: "audio-muting",
-          args: "toggle"
-        });
-      } else if (newOption === "nee") {
-        // Query input selector
-        await physicalConnection.eiscp.command({
-          zone: instance.config.zone,
-          command: "input-selector",
-          args: "query"
-        });
-      }
+      await physicalConnection.eiscp.command({
+        zone: instance.config.zone,
+        command: "listening-mode",
+        args: newOption
+      });
 
       // Update entity attributes
       this.driver.updateEntityAttributes(entity.id, {
@@ -878,6 +869,8 @@ export default class OnkyoDriver {
       await eiscp.command({ zone, command: "volume", args: "query" });
       await new Promise((resolve) => setTimeout(resolve, queueThreshold));
       await eiscp.command({ zone, command: "audio-muting", args: "query" });
+      await new Promise((resolve) => setTimeout(resolve, queueThreshold));
+      await eiscp.command({ zone, command: "listening-mode", args: "query" });
       await new Promise((resolve) => setTimeout(resolve, queueThreshold * 3));
       await eiscp.command({ zone, command: "fp-display", args: "query" });
     } catch (queryErr) {
