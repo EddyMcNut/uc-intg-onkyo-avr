@@ -7,6 +7,8 @@ import { DEFAULT_QUEUE_THRESHOLD } from "./configManager.js";
 import { OnkyoCommandSender } from "./onkyoCommandSender.js";
 import { OnkyoCommandReceiver } from "./onkyoCommandReceiver.js";
 import { ReconnectionManager } from "./reconnectionManager.js";
+import { Select, SelectStates, SelectAttributes, SelectCommands } from "./selectEntity.js";
+import { eiscpCommands } from "./eiscp-commands.js";
 import log from "./loggers.js";
 
 const integrationName = "driver:";
@@ -476,6 +478,11 @@ export default class OnkyoDriver {
       } else {
         log.info("%s [%s] Sensor entities disabled by user preference", integrationName, avrEntry);
       }
+      
+      // Register Listening Mode select entity
+      const listeningModeEntity = this.createListeningModeSelectEntity(avrEntry);
+      this.driver.addAvailableEntity(listeningModeEntity);
+      log.info("%s [%s] Listening Mode select entity registered", integrationName, avrEntry);
     }
   }
 
@@ -702,6 +709,153 @@ export default class OnkyoDriver {
     sensors.push(muteSensor);
 
     return sensors;
+  }
+
+  /**
+   * Get listening mode options - simplified for testing
+   * Returns an array with two test options
+   */
+  private getListeningModeOptions(): string[] {
+    return ["ja", "nee"];
+  }
+
+  /**
+   * Create Listening Mode select entity
+   */
+  private createListeningModeSelectEntity(avrEntry: string): Select {
+    const options = this.getListeningModeOptions();
+    
+    const selectEntity = new Select(
+      `${avrEntry}_listening_mode`,
+      { en: `${avrEntry} Listening Mode` },
+      {
+        attributes: {
+          state: SelectStates.On,
+          current_option: "nee",
+          options: options
+        }
+      }
+    );
+    
+    selectEntity.setCmdHandler(this.handleListeningModeCmd.bind(this));
+    return selectEntity;
+  }
+
+  /**
+   * Handle Listening Mode select entity commands
+   */
+  private async handleListeningModeCmd(
+    entity: uc.Entity,
+    cmdId: string,
+    params?: { [key: string]: string | number | boolean }
+  ): Promise<uc.StatusCodes> {
+    log.info("%s [%s] Listening Mode command: %s", integrationName, entity.id, cmdId, params);
+    
+    // Extract avrEntry from entity ID (format: "model_ip_zone_listening_mode")
+    const avrEntry = entity.id.replace("_listening_mode", "");
+    const instance = this.avrInstances.get(avrEntry);
+    
+    if (!instance) {
+      log.error("%s [%s] No AVR instance found", integrationName, entity.id);
+      return uc.StatusCodes.NotFound;
+    }
+
+    const physicalAVR = buildPhysicalAvrId(instance.config.model, instance.config.ip);
+    const physicalConnection = this.physicalConnections.get(physicalAVR);
+    
+    if (!physicalConnection || !physicalConnection.eiscp.connected) {
+      log.warn("%s [%s] AVR not connected", integrationName, entity.id);
+      return uc.StatusCodes.ServiceUnavailable;
+    }
+
+    try {
+      const options = this.getListeningModeOptions();
+      const currentAttrs = entity.attributes || {};
+      const currentOption = currentAttrs[SelectAttributes.CurrentOption] as string || "";
+
+      let newOption: string | undefined;
+
+      switch (cmdId) {
+        case SelectCommands.SelectOption:
+          newOption = params?.option as string;
+          break;
+          
+        case SelectCommands.SelectFirst:
+          newOption = options[0];
+          break;
+          
+        case SelectCommands.SelectLast:
+          newOption = options[options.length - 1];
+          break;
+          
+        case SelectCommands.SelectNext: {
+          const currentIndex = options.indexOf(currentOption);
+          if (currentIndex >= 0 && currentIndex < options.length - 1) {
+            newOption = options[currentIndex + 1];
+          } else if (params?.cycle === true) {
+            newOption = options[0]; // Wrap to first
+          }
+          break;
+        }
+          
+        case SelectCommands.SelectPrevious: {
+          const currentIndex = options.indexOf(currentOption);
+          if (currentIndex > 0) {
+            newOption = options[currentIndex - 1];
+          } else if (params?.cycle === true) {
+            newOption = options[options.length - 1]; // Wrap to last
+          }
+          break;
+        }
+          
+        default:
+          log.warn("%s [%s] Unknown command: %s", integrationName, entity.id, cmdId);
+          return uc.StatusCodes.BadRequest;
+      }
+
+      if (!newOption) {
+        log.warn("%s [%s] No option selected", integrationName, entity.id);
+        return uc.StatusCodes.BadRequest;
+      }
+
+      // Send the command to the AVR based on selected option
+      log.info("%s [%s] Setting test option to: %s", integrationName, entity.id, newOption);
+      
+      if (newOption === "ja") {
+        // Toggle audio muting
+        await physicalConnection.eiscp.command({
+          zone: instance.config.zone,
+          command: "audio-muting",
+          args: "toggle"
+        });
+      } else if (newOption === "nee") {
+        // Query input selector
+        await physicalConnection.eiscp.command({
+          zone: instance.config.zone,
+          command: "input-selector",
+          args: "query"
+        });
+      }
+
+      // Update entity attributes
+      this.driver.updateEntityAttributes(entity.id, {
+        [SelectAttributes.CurrentOption]: newOption
+      });
+
+      // Emit entity_change event for the Remote to update UI
+      (this.driver as any).emit("entity_change", {
+        entity_type: "select",
+        entity_id: entity.id,
+        attributes: {
+          [SelectAttributes.CurrentOption]: newOption
+        }
+      });
+
+      return uc.StatusCodes.Ok;
+    } catch (err) {
+      log.error("%s [%s] Failed to set listening mode:", integrationName, entity.id, err);
+      return uc.StatusCodes.ServerError;
+    }
   }
 
   private async queryAvrState(avrEntry: string, eiscp: EiscpDriver, context: string): Promise<void> {
