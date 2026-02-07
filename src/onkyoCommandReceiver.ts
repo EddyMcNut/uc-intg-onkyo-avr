@@ -33,12 +33,14 @@ export class OnkyoCommandReceiver {
   private lastImageHash: string = "";
   private currentTrackId: string = "";
   private zone: string = "";
+  private driverVersion: string;
 
-  constructor(driver: uc.IntegrationAPI, config: OnkyoConfig, eiscpInstance: EiscpDriver) {
+  constructor(driver: uc.IntegrationAPI, config: OnkyoConfig, eiscpInstance: EiscpDriver, driverVersion: string = "unknown") {
     this.driver = driver;
     this.config = config;
     this.eiscpInstance = eiscpInstance;
     this.zone = this.config.avrs && this.config.avrs.length > 0 ? this.config.avrs[0].zone || "main" : "main";
+    this.driverVersion = driverVersion;
   }
 
   private async getImageHash(url: string): Promise<string> {
@@ -92,7 +94,7 @@ export class OnkyoCommandReceiver {
             this.driver.updateEntityAttributes(entityId, {
               [uc.MediaPlayerAttributes.State]: powerState
             });
-            log.info("%s [%s] power set to: %s", integrationName, entityId, powerState);
+            log.info("%s [%s] power set to: %s (driver v%s)", integrationName, entityId, powerState, this.driverVersion);
 
             // Track power state in state manager
             avrStateManager.setPowerState(entityId, avrUpdates.argument as string);

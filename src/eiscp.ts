@@ -546,13 +546,18 @@ export class EiscpDriver extends EventEmitter {
         this.emit("connect"); // Emit connect event for waitForConnect()
       })
       .on("close", () => {
+        const wasConnected = this.is_connected;
         this.is_connected = false;
+        if (wasConnected) {
+          log.warn("[EiscpDriver] Connection closed for %s at %s:%d", this.config.model, this.config.host, this.config.port || 60128);
+        }
         if (this.config.reconnect) {
+          log.info("[EiscpDriver] Scheduling reconnection in %ds", this.config.reconnect_sleep);
           setTimeout(() => this.connect(), this.config.reconnect_sleep! * 1000);
         }
       })
       .on("error", (err) => {
-        log.error("eiscp error (unhandled):", err);
+        log.error("[EiscpDriver] Socket error for %s at %s:%d - %s", this.config.model, this.config.host, this.config.port || 60128, err.message);
         this.is_connected = false;
         this.eiscp?.destroy();
       })
