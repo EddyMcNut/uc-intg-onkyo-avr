@@ -110,6 +110,7 @@ export default class OnkyoDriver {
   private avrInstances: Map<string, AvrInstance> = new Map(); // One instance per zone
   private remoteInStandby: boolean = false; // Track Remote standby state
   private reconnectionManager: ReconnectionManager = new ReconnectionManager();
+  private driverVersion: string = "unknown";
   private lastSetupData: ParsedSetupData = {
     queueThreshold: AVR_DEFAULTS.queueThreshold,
     albumArtURL: AVR_DEFAULTS.albumArtURL,
@@ -123,6 +124,18 @@ export default class OnkyoDriver {
     this.driver = new uc.IntegrationAPI();
     // Initialize driver first so we can determine the correct config directory
     this.driver.init("driver.json", this.handleDriverSetup.bind(this));
+
+    // Read driver version early so it's available when creating command receivers
+    try {
+      const fs = require('fs');
+      const path = require('path');
+      const driverJsonPath = path.resolve(process.cwd(), 'driver.json');
+      const driverJsonRaw = fs.readFileSync(driverJsonPath, 'utf-8');
+      const driverJson = JSON.parse(driverJsonRaw);
+      this.driverVersion = driverJson.version || "unknown";
+    } catch (err) {
+      log.warn("%s Could not read driver version in constructor:", integrationName, err);
+    }
 
     // Ensure ConfigManager uses the Integration API config dir so the Integration
     // Manager can back up and restore the same files
@@ -499,7 +512,8 @@ export default class OnkyoDriver {
         const driverJsonPath = path.resolve(process.cwd(), 'driver.json');
         const driverJsonRaw = fs.readFileSync(driverJsonPath, 'utf-8');
         const driverJson = JSON.parse(driverJsonRaw);
-        log.info(`${integrationName} Driver version: ${driverJson.version}`);
+        this.driverVersion = driverJson.version || "unknown";
+        log.info(`${integrationName} Driver version: ${this.driverVersion}`);
       } catch (err) {
         log.warn(`${integrationName} Could not read driver version from driver.json:`, err);
       }
@@ -774,9 +788,45 @@ export default class OnkyoDriver {
     const physicalAVR = buildPhysicalAvrId(instance.config.model, instance.config.ip);
     const physicalConnection = this.physicalConnections.get(physicalAVR);
     
-    if (!physicalConnection || !physicalConnection.eiscp.connected) {
-      log.warn("%s [%s] AVR not connected", integrationName, entity.id);
+    if (!physicalConnection) {
+      log.error("%s [%s] No physical connection found", integrationName, entity.id);
       return uc.StatusCodes.ServiceUnavailable;
+    }
+
+    // Check if connected, and trigger reconnection if needed (same logic as media player commands)
+    if (!physicalConnection.eiscp.connected) {
+      log.info("%s [%s] Command received while disconnected, triggering reconnection...", integrationName, entity.id);
+      try {
+        await physicalConnection.eiscp.connect({
+          model: instance.config.model,
+          host: instance.config.ip,
+          port: instance.config.port
+        });
+        await physicalConnection.eiscp.waitForConnect(3000);
+        log.info("%s [%s] Reconnected on command", integrationName, entity.id);
+      } catch (connectErr) {
+        log.warn("%s [%s] Failed to reconnect on command: %s", integrationName, entity.id, connectErr);
+        // Fall through to retry logic below
+      }
+    }
+
+    // Wait for connection with retries (same logic as media player commands)
+    try {
+      await physicalConnection.eiscp.waitForConnect();
+    } catch (err) {
+      log.warn("%s [%s] Could not send command, AVR not connected: %s", integrationName, entity.id, err);
+      for (let attempt = 1; attempt <= 5; attempt++) {
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+        try {
+          await physicalConnection.eiscp.waitForConnect();
+          break;
+        } catch (retryErr) {
+          if (attempt === 5) {
+            log.warn("%s [%s] Could not connect to AVR after 5 attempts: %s", integrationName, entity.id, retryErr);
+            return uc.StatusCodes.Timeout;
+          }
+        }
+      }
     }
 
     try {
@@ -972,7 +1022,7 @@ export default class OnkyoDriver {
         const avrSpecificConfig = this.createAvrSpecificConfig(avrConfig);
 
         // Create command receiver for this physical AVR (shared by all zones)
-        const commandReceiver = new OnkyoCommandReceiver(this.driver, avrSpecificConfig, eiscpInstance);
+        const commandReceiver = new OnkyoCommandReceiver(this.driver, avrSpecificConfig, eiscpInstance, this.driverVersion);
         commandReceiver.setupEiscpListener();
 
         // ALWAYS store physical connection object (even if connection fails)
@@ -983,9 +1033,13 @@ export default class OnkyoDriver {
         };
         this.physicalConnections.set(physicalAVR, physicalConnection);
 
-        // Setup error handler
+        // Setup error and close handlers
         eiscpInstance.on("error", (err: Error) => {
           log.error("%s [%s] EiscpDriver error:", integrationName, physicalAVR, err);
+        });
+
+        eiscpInstance.on("close", () => {
+          log.warn("%s [%s] Connection to AVR lost", integrationName, physicalAVR);
         });
 
         // Now try to connect (but don't block zone instance creation if this fails)
