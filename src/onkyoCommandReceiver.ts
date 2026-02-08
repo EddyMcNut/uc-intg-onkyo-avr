@@ -94,7 +94,8 @@ export class OnkyoCommandReceiver {
             this.driver.updateEntityAttributes(entityId, {
               [uc.MediaPlayerAttributes.State]: powerState
             });
-            log.info("%s [%s] power set to: %s (driver v%s)", integrationName, entityId, powerState, this.driverVersion);
+            log.info("Onkyo AVR custom integration version %s", this.driverVersion);
+            log.info("%s [%s] power set to: %s", integrationName, entityId, powerState);
 
             // Track power state in state manager
             avrStateManager.setPowerState(entityId, avrUpdates.argument as string);
