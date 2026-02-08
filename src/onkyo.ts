@@ -358,16 +358,56 @@ export default class OnkyoDriver {
 
   /** Create OnkyoConfig for a specific AVR zone */
   private createAvrSpecificConfig(avrConfig: AvrConfig): OnkyoConfig {
+    // Defensive coercion/normalization for runtime config values
+    const queueThreshold = (() => {
+      const v = avrConfig.queueThreshold ?? AVR_DEFAULTS.queueThreshold;
+      const n = typeof v === "number" ? v : parseInt(String(v ?? ""), 10);
+      return isNaN(n) || n < 0 ? DEFAULT_QUEUE_THRESHOLD : n;
+    })();
+
+    const albumArtURL = typeof avrConfig.albumArtURL === "string" && avrConfig.albumArtURL.trim() !== "" ? avrConfig.albumArtURL.trim() : AVR_DEFAULTS.albumArtURL;
+
+    const volumeScale = (() => {
+      const v = typeof avrConfig.volumeScale === "number" ? avrConfig.volumeScale : parseInt(String(avrConfig.volumeScale ?? ""), 10);
+      return v === 80 || v === 100 ? v : AVR_DEFAULTS.volumeScale;
+    })();
+
+    const adjustVolumeDispl = Boolean(avrConfig.adjustVolumeDispl ?? AVR_DEFAULTS.adjustVolumeDispl);
+    const createSensors = Boolean(avrConfig.createSensors ?? AVR_DEFAULTS.createSensors);
+
+    const netMenuDelay = (() => {
+      const v = typeof avrConfig.netMenuDelay === "number" ? avrConfig.netMenuDelay : parseInt(String(avrConfig.netMenuDelay ?? ""), 10);
+      return isNaN(v) || v < 0 ? AVR_DEFAULTS.netMenuDelay : v;
+    })();
+
+    const port = (() => {
+      const p = typeof avrConfig.port === "number" ? avrConfig.port : parseInt(String(avrConfig.port ?? ""), 10);
+      return isNaN(p) || p < 1 || p > 65535 ? AVR_DEFAULTS.port : p;
+    })();
+
     return {
-      avrs: [avrConfig],
-      queueThreshold: avrConfig.queueThreshold ?? DEFAULT_QUEUE_THRESHOLD,
-      albumArtURL: avrConfig.albumArtURL ?? AVR_DEFAULTS.albumArtURL,
-      volumeScale: avrConfig.volumeScale ?? AVR_DEFAULTS.volumeScale,
-      adjustVolumeDispl: avrConfig.adjustVolumeDispl ?? true,
+      avrs: [
+        {
+          model: avrConfig.model,
+          ip: avrConfig.ip,
+          port: port,
+          zone: avrConfig.zone,
+          queueThreshold,
+          albumArtURL,
+          volumeScale,
+          adjustVolumeDispl,
+          createSensors,
+          netMenuDelay
+        }
+      ],
+      queueThreshold,
+      albumArtURL,
+      volumeScale,
+      adjustVolumeDispl,
       // Backward compatibility fields for existing code
       model: avrConfig.model,
       ip: avrConfig.ip,
-      port: avrConfig.port
+      port: port
     };
   }
 
@@ -520,7 +560,14 @@ export default class OnkyoDriver {
 
   /** Handle subscription for a single entity - attempts connection if needed */
   private async handleEntitySubscription(entityId: string): Promise<void> {
-    const instance = this.avrInstanceManager.getInstance(entityId);
+    // Normalize entity id to base AVR entry for sensor/select subscriptions
+    // e.g. "MODEL IP zone_volume_sensor" -> "MODEL IP zone"
+    const baseEntityId = entityId.replace(
+      /_(volume_sensor|audio_input_sensor|audio_output_sensor|source_sensor|video_input_sensor|video_output_sensor|output_display_sensor|front_panel_display_sensor|mute_sensor|listening_mode)$/,
+      ""
+    );
+
+    const instance = this.avrInstanceManager.getInstance(baseEntityId);
     if (!instance) {
       log.info("%s [%s] Subscribed entity has no instance yet, waiting for Connect event", integrationName, entityId);
       return;

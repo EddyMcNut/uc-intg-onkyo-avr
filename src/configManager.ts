@@ -84,7 +84,7 @@ export const AVR_DEFAULTS = {
   queueThreshold: DEFAULT_QUEUE_THRESHOLD,
   albumArtURL: "album_art.cgi",
   volumeScale: 100,
-  adjustVolumeDispl: false,
+  adjustVolumeDispl: true,
   createSensors: true,
   netMenuDelay: 500,
   port: 60128

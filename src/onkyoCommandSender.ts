@@ -111,6 +111,19 @@ export class OnkyoCommandSender {
           const eiscpValue = adjustVolumeDispl ? avrDisplayValue * 2 : avrDisplayValue;
           const hexVolume = eiscpValue.toString(16).toUpperCase().padStart(2, "0");
 
+          // Debug logging for volume conversion
+          log.info(
+            "%s [%s] volume conversion: slider=%d volumeScale=%d adjustVolumeDispl=%s avrDisplay=%d eiscpValue=%d hex=%s",
+            integrationName,
+            entity.id,
+            sliderValue,
+            volumeScale,
+            String(adjustVolumeDispl),
+            avrDisplayValue,
+            eiscpValue,
+            hexVolume
+          );
+
           // Use zone-specific volume command prefix
           let volumePrefix = "MVL"; // main zone
           if (zone === "zone2") {
