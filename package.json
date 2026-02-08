@@ -43,13 +43,13 @@
     "@typescript-eslint/eslint-plugin": "^8.8.1",
     "@typescript-eslint/parser": "^8.8.1",
     "ava": "^6.1.3",
-    "tap-junit": "^2.1.0",
     "eslint": "^8.57.1",
     "eslint-config-prettier": "^9.1.0",
     "eslint-config-semistandard": "^17.0.0",
     "eslint-plugin-prettier": "^5.2.1",
     "eslint-plugin-promise": "^6.6.0",
     "prettier": "3.6.2",
+    "tap-junit": "^5.0.4",
     "ts-node": "^10.9.2",
     "typescript": "5.5.x"
   }
