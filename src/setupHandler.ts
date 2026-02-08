@@ -1,6 +1,7 @@
 /*jslint node:true nomen:true*/
 "use strict";
 import * as uc from "@unfoldedcircle/integration-api";
+import EiscpDriver from "./eiscp.js";
 import { ConfigManager, parseBoolean, OnkyoConfig, AvrConfig, AvrZone, AVR_DEFAULTS } from "./configManager.js";
 import log from "./loggers.js";
 
@@ -394,11 +395,78 @@ export default class SetupHandler {
   }
 
   private async handleManualConfiguration(input: any): Promise<uc.SetupAction> {
-    // Normalize inputs
-    const modelName = String(input.model).trim();
-    const ipVal = String(input.ipAddress).trim();
+    // Normalize inputs safely (avoid String(undefined) -> "undefined")
+    const modelName = (input.model ?? "").toString().trim();
+    const ipVal = (input.ipAddress ?? "").toString().trim();
+
+    // If user left both model and ip blank, attempt autodiscovery
+    if (modelName === "" && ipVal === "") {
+      try {
+        const e = new EiscpDriver();
+        const hosts = await e.discover({ address: "255.255.255.255", timeout: 3, devices: 1 });
+        if (!hosts || hosts.length === 0) {
+          return new uc.RequestUserInput("Manual configuration", [
+            {
+              id: "info",
+              label: { en: "Auto-discovery failed" },
+              field: {
+                label: {
+                  value: {
+                    en: "No Onkyo AVR found on the network during auto-discovery. Please enter the AVR model and IP address manually."
+                  }
+                }
+              }
+            },
+            {
+              id: "model",
+              label: { en: "AVR Model (or a name you prefer)" },
+              field: { text: { value: "" } }
+            },
+            {
+              id: "ipAddress",
+              label: { en: "AVR IP Address (for example `192.168.1.100`)" },
+              field: { text: { value: "" } }
+            }
+          ]);
+        }
+
+        const found = hosts[0];
+        const discoveredAvr: Partial<AvrConfig> = {
+          model: found.model,
+          ip: found.host,
+          port: Number(found.port) || AVR_DEFAULTS.port,
+          zone: "main"
+        };
+
+        // Save discovered AVR
+        ConfigManager.addAvr(discoveredAvr);
+        await this.host.onConfigSaved();
+        this.host.log.info("%s Auto-discovered AVR and saved configuration: %s", integrationName, JSON.stringify(discoveredAvr));
+        return new uc.SetupComplete();
+      } catch (err) {
+        this.host.log.error("%s Failed during auto-discovery:", integrationName, err);
+        return new uc.RequestUserInput("Manual configuration", [
+          {
+            id: "info",
+            label: { en: "Auto-discovery error" },
+            field: { label: { value: { en: "Auto-discovery failed due to an unexpected error. Please enter the AVR model and IP address manually." } } }
+          },
+          {
+            id: "model",
+            label: { en: "AVR Model (or a name you prefer)" },
+            field: { text: { value: "" } }
+          },
+          {
+            id: "ipAddress",
+            label: { en: "AVR IP Address (for example `192.168.1.100`)" },
+            field: { text: { value: "" } }
+          }
+        ]);
+      }
+    }
+
     const portNum = (() => {
-      const p = parseInt(String(input.port), 10);
+      const p = parseInt((input.port ?? "").toString(), 10);
       return isNaN(p) ? AVR_DEFAULTS.port : p;
     })();
 
