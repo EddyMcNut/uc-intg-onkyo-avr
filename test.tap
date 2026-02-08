@@ -5,17 +5,17 @@ ok 3 - connect-coordinator › connect handles reconnection when physical connec
 ok 4 - avr-instance-manager › ensureZoneInstances creates zone instances when physical connection present
 ok 5 - avr-instance-manager › ensureZoneInstances skips when no physical connection present
 ok 6 - avr-instance-manager › set/get/has/remove/clear operations work
-ok 7 - entity-registrar › EntityRegistrar builds entities correctly
-ok 8 - setup-handler › handleRestorePayload: applies valid payload and calls onConfigSaved
-ok 9 - setup-handler › handleRestorePayload: invalid payload returns RequestUserInput with preserved textarea
-ok 10 - setup-handler › handleDeleteConfigPayload: confirm=false prompts and confirm=true clears config
-ok 11 - connection-manager › schedule and cancel scheduled reconnection
-ok 12 - setup-handler › handleManualConfiguration: valid input creates AVR entries
-ok 13 - setup-handler › handleManualConfiguration: invalid input returns RequestUserInput with errors
-ok 14 - connection-manager › attemptReconnection delegates to reconnection manager and returns result
-ok 15 - connection-manager › clearAllConnections removes stored connections
-ok 16 - setup-backup › backup flow returns backup_data JSON
-ok 17 - setup-handler › handleBackupPayload: returns backup data JSON textarea
+ok 7 - connection-manager › schedule and cancel scheduled reconnection
+ok 8 - connection-manager › attemptReconnection delegates to reconnection manager and returns result
+ok 9 - connection-manager › clearAllConnections removes stored connections
+ok 10 - entity-registrar › EntityRegistrar builds entities correctly
+ok 11 - setup-handler › handleRestorePayload: applies valid payload and calls onConfigSaved
+ok 12 - setup-handler › handleRestorePayload: invalid payload returns RequestUserInput with preserved textarea
+ok 13 - setup-handler › handleDeleteConfigPayload: confirm=false prompts and confirm=true clears config
+ok 14 - setup-handler › handleManualConfiguration: valid input creates AVR entries
+ok 15 - setup-handler › handleManualConfiguration: invalid input returns RequestUserInput with errors
+ok 16 - setup-handler › handleBackupPayload: returns backup data JSON textarea
+ok 17 - setup-backup › backup flow returns backup_data JSON
 ok 18 - setup-backup › restore flow applies provided backup_data
 
 1..18

@@ -267,7 +267,10 @@ export default class SetupHandler {
   }
 
   private async handleBackupPayload(backup_data?: string): Promise<uc.SetupAction> {
-    if (backup_data) return new uc.SetupComplete();
+    // Integration Manager sends a placeholder value of "[]" when requesting a backup.
+    // Treat undefined, empty or the placeholder as a request for us to produce the backup data.
+    const provided = typeof backup_data === "string" ? backup_data.trim() : "";
+    if (provided && provided !== "[]") return new uc.SetupComplete();
 
     const backupString = await this.buildBackupString();
 
