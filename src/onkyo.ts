@@ -303,16 +303,93 @@ export default class OnkyoDriver {
         }
       }
 
-      // If choice was 'configure', fall through to normal setup below (user wants to re-run setup)
+      // If choice was 'configure', present manual configuration fields dynamically
       if (String(input.choice ?? "").toLowerCase() === "configure") {
-        // Let the normal setup handling below proceed using any provided setup fields
+        // If user has already submitted manual fields, treat them as setup data
+        const hasManualFields = Boolean(
+          input.model ||
+          input.ipAddress ||
+          input.port ||
+          input.queueThreshold ||
+          input.albumArtURL ||
+          input.volumeScale ||
+          input.adjustVolumeDispl ||
+          input.zoneCount ||
+          input.createSensors ||
+          input.netMenuDelay
+        );
+
+        if (!hasManualFields) {
+          // Show manual configuration form to the user (manager will display this)
+          // Use current config or defaults as initial values
+          const currentAvr = (this.config.avrs && this.config.avrs.length > 0) ? this.config.avrs[0] : undefined;
+          const initialModel = currentAvr ? currentAvr.model : "";
+          const initialIp = currentAvr ? currentAvr.ip : "";
+          const initialPort = currentAvr ? currentAvr.port : AVR_DEFAULTS.port;
+
+          return new uc.RequestUserInput("Manual configuration", [
+            {
+              id: "model",
+              label: { en: "AVR Model (or a name you prefer)" },
+              field: { text: { value: initialModel } }
+            },
+            {
+              id: "ipAddress",
+              label: { en: "AVR IP Address (for example `192.168.1.100`)" },
+              field: { text: { value: initialIp } }
+            },
+            {
+              id: "port",
+              label: { en: "AVR Port (default `60128`)" },
+              field: { number: { value: initialPort } }
+            },
+            {
+              id: "albumArtURL",
+              label: { en: "AVR AlbumArt endpoint. Default `album_art.cgi`, if not known set to `na`." },
+              field: { text: { value: AVR_DEFAULTS.albumArtURL } }
+            },
+            {
+              id: "queueThreshold",
+              label: { en: "Message queue threshold. Default `100`" },
+              field: { number: { value: AVR_DEFAULTS.queueThreshold } }
+            },
+            {
+              id: "netMenuDelay",
+              label: { en: "NET sub-source selection delay. Default `500`" },
+              field: { number: { value: AVR_DEFAULTS.netMenuDelay } }
+            },
+            {
+              id: "volumeScale",
+              label: { en: "Volume scale (0-80 or 0-100)" },
+              field: { dropdown: { value: String(AVR_DEFAULTS.volumeScale), items: [{ id: "100", label: { en: "0-100" } }, { id: "80", label: { en: "0-80" } }] } }
+            },
+            {
+              id: "adjustVolumeDispl",
+              label: { en: "Adjust volume display" },
+              field: { dropdown: { value: "true", items: [{ id: "true", label: { en: "Yes - eISCP divided by 2" } }, { id: "false", label: { en: "No - just eISCP" } }] } }
+            },
+            {
+              id: "zoneCount",
+              label: { en: "Number of zones to configure" },
+              field: { dropdown: { value: "1", items: [{ id: "1", label: { en: "1 zone (Main only)" } }, { id: "2", label: { en: "2 zones (Main + Zone 2)" } }, { id: "3", label: { en: "3 zones (Main + Zone 2 + Zone 3)" } }] } }
+            },
+            {
+              id: "createSensors",
+              label: { en: "Create sensor entities?" },
+              field: { dropdown: { value: "true", items: [{ id: "true", label: { en: "Yes" } }, { id: "false", label: { en: "No" } }] } }
+            }
+          ]);
+        }
+        // else fall through to process submitted manual fields as setupData
       } else {
         // If no recognized action, fall back to showing the current setup page (continue to normal handler)
       }
     }
 
     // Normal setup path follows... (parse settings if provided)
-    const setupData = (msg as unknown as { setupData?: SetupData }).setupData ?? {};
+    // Accept setup data from either DriverSetupRequest.setupData or UserDataResponse.inputValues
+    const setupDataSource = (msg as any).setupData ?? (msg instanceof uc.UserDataResponse ? (msg as uc.UserDataResponse).inputValues : {});
+    const setupData = setupDataSource as SetupData;
     const {
       model,
       ipAddress,
