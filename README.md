@@ -1,6 +1,6 @@
 # uc-intg-onkyo-avr
 
-Onkyo AVR custom integration for Unfolded Circle remotes. Also reported to work with Pioneer AVR. 
+Onkyo AVR custom integration for Unfolded Circle remotes. Also reported to work with Pioneer AVR.
 
 [![GitHub Release](https://img.shields.io/github/v/release/EddyMcNut/uc-intg-onkyo-avr)](https://github.com/EddyMcNut/uc-intg-onkyo-avr/releases)
 [![License](https://img.shields.io/badge/license-MPL--2.0-blue.svg)](https://github.com/EddyMcNut/uc-intg-onkyo-avr/blob/main/LICENSE)
@@ -23,7 +23,7 @@ Read this readme completely, it contains some tips for known issues and it also 
 - Your Onkyo AVR(s) needs to be connected to the same network as you UC Remote (if AVR IP is 192.168.1.x then UC Remote IP must also start with 192.168.1).
 - Your Onkyo AVR(s) needs to be ON or STANDBY.
 - Your UC Remote needs to have `New reconnect logic` enabled.
-    ![](./screenshots/new-reconnect-logic.png)
+  ![](./screenshots/new-reconnect-logic.png)
 
 If your AVR is disconnected from power (off) this integration will fail. If your AVR has been disconnected from power, it could be that you first have to switch on your AVR manually one time before network commands work again (depends on the model), waking up after STANDBY should then work again.
 

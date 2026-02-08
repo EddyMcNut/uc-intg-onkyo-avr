@@ -336,10 +336,10 @@ export const eiscpCommands = {
       name: "fp-display",
       description: "FP Display Information Command",
       values: {
-        '{xx}{xx}{xx}{xx}{xx}x': {
-          description: "FP Display Information Character Code for FP Display (UTF-8 encoded)",
+        "{xx}{xx}{xx}{xx}{xx}x": {
+          description: "FP Display Information Character Code for FP Display (UTF-8 encoded)"
         },
-        QSTN: {name: "query", description: "gets FP Display Information" }
+        QSTN: { name: "query", description: "gets FP Display Information" }
       }
     },
     SLI: {
@@ -378,16 +378,16 @@ export const eiscpCommands = {
         "2B": { name: ["net", "network"], description: "sets NETWORK, NET" },
         "2C": { name: "usbt", description: "sets USB(toggle)" },
         "2E": { name: "bluetooth", description: "sets bluetooth" },
-        "NLSL0": { name: "tunein", description: "UC integration automatically selects TuneIn after selecting NET" },
-        "NLSL1": { name: "spotify", description: "UC integration automatically selects Spotify after selecting NET" },
-        "NLSL2": { name: "deezer", description: "UC integration automatically selects Deezer after selecting NET" },
-        "NLSL3": { name: "tidal", description: "UC integration automatically selects Tidal after selecting NET" },
-        "NLSL4": { name: "amazonmusic", description: "UC integration automatically selects AmazonMusic after selecting NET" },
-        "NLSL5": { name: "chromecast", description: "UC integration automatically selects Chromecast after selecting NET" },
-        "NLSL6": { name: "dts-play-fi", description: "UC integration automatically selects DTS-Play-Fi after selecting NET" },
-        "NLSL7": { name: "airplay", description: "UC integration automatically selects AirPlay after selecting NET" },
-        "NLSL8": { name: "alexa", description: "UC integration automatically selects Alexa after selecting NET" },
-        "NLSL9": { name: "music-server", description: "UC integration automatically selects Music-Server after selecting NET" },
+        NLSL0: { name: "tunein", description: "UC integration automatically selects TuneIn after selecting NET" },
+        NLSL1: { name: "spotify", description: "UC integration automatically selects Spotify after selecting NET" },
+        NLSL2: { name: "deezer", description: "UC integration automatically selects Deezer after selecting NET" },
+        NLSL3: { name: "tidal", description: "UC integration automatically selects Tidal after selecting NET" },
+        NLSL4: { name: "amazonmusic", description: "UC integration automatically selects AmazonMusic after selecting NET" },
+        NLSL5: { name: "chromecast", description: "UC integration automatically selects Chromecast after selecting NET" },
+        NLSL6: { name: "dts-play-fi", description: "UC integration automatically selects DTS-Play-Fi after selecting NET" },
+        NLSL7: { name: "airplay", description: "UC integration automatically selects AirPlay after selecting NET" },
+        NLSL8: { name: "alexa", description: "UC integration automatically selects Alexa after selecting NET" },
+        NLSL9: { name: "music-server", description: "UC integration automatically selects Music-Server after selecting NET" },
         UP: { name: "up", description: "sets Selector Position Wrap-Around Up" },
         DOWN: { name: "down", description: "sets Selector Position Wrap-Around Down" },
         QSTN: { name: "query", description: "gets The Selector Position" }
@@ -615,7 +615,7 @@ export const eiscpCommands = {
         "8E": { name: "neural-thx-music", description: "sets Neural THX Music" },
         "8F": { name: "neural-thx-games", description: "sets Neural THX Games" },
         "9A": { name: "neo-x-game", description: "sets Neo:X Game" },
-        "A2": { name: ["pliix"], description: "sets PLIIx" },
+        A2: { name: ["pliix"], description: "sets PLIIx" },
         UP: { name: "up", description: "sets Listening Mode Wrap-Around Up" },
         DOWN: { name: "down", description: "sets Listening Mode Wrap-Around Down" },
         MOVIE: { name: "movie", description: "sets Listening Mode Wrap-Around Up" },

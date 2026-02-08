@@ -50,14 +50,10 @@ class AvrStateManager {
   }
 
   /** Set audio format for an entity, returns true if changed */
-  setAudioFormat(
-    entityId: string,
-    audioFormat: string,
-    driver?: uc.IntegrationAPI
-  ): boolean {
+  setAudioFormat(entityId: string, audioFormat: string): boolean {
     const state = this.getState(entityId);
     const normalizedFormat = audioFormat.toLowerCase();
-    
+
     if (state.audioFormat !== normalizedFormat) {
       log.info("%s [%s] audio format changed from '%s' to '%s'", integrationName, entityId, state.audioFormat, audioFormat);
       state.audioFormat = normalizedFormat;
@@ -67,13 +63,10 @@ class AvrStateManager {
   }
 
   /** Set power state for an entity, returns true if changed */
-  setPowerState(
-    entityId: string,
-    powerState: string
-  ): boolean {
+  setPowerState(entityId: string, powerState: string): boolean {
     const state = this.getState(entityId);
     const normalizedPowerState = powerState.toLowerCase();
-    
+
     if (state.powerState !== normalizedPowerState) {
       log.info("%s [%s] power state changed from '%s' to '%s'", integrationName, entityId, state.powerState, powerState);
       state.powerState = normalizedPowerState;
@@ -89,41 +82,29 @@ class AvrStateManager {
   }
 
   /** Set source for an entity, returns true if changed */
-  setSource(
-    entityId: string,
-    source: string,
-    eiscpInstance?: EiscpDriver,
-    zone?: string,
-    driver?: uc.IntegrationAPI
-  ): boolean {
+  setSource(entityId: string, source: string, eiscpInstance?: EiscpDriver, zone?: string, _driver?: uc.IntegrationAPI): boolean {
     const state = this.getState(entityId);
     const normalizedSource = source.toLowerCase();
-    
+
     if (state.source !== normalizedSource) {
       log.info("%s [%s] source changed from '%s' to '%s'", integrationName, entityId, state.source, source);
       state.source = normalizedSource;
       state.subSource = "unknown"; // Reset sub-source on source change
-      this.refreshAvrState(entityId, eiscpInstance, zone, driver);
+      this.refreshAvrState(entityId, eiscpInstance, zone, _driver);
       return true;
     }
     return false;
   }
 
   /** Set sub-source for an entity, returns true if changed */
-  setSubSource(
-    entityId: string,
-    subSource: string,
-    eiscpInstance?: EiscpDriver,
-    zone?: string,
-    driver?: uc.IntegrationAPI
-  ): boolean {
+  setSubSource(entityId: string, subSource: string, eiscpInstance?: EiscpDriver, zone?: string, _driver?: uc.IntegrationAPI): boolean {
     const state = this.getState(entityId);
     const normalizedSubSource = subSource.toLowerCase();
-    
+
     if (state.subSource !== normalizedSubSource) {
       log.info("%s [%s] sub-source changed from '%s' to '%s'", integrationName, entityId, state.subSource, subSource);
       state.subSource = normalizedSubSource;
-      this.refreshAvrState(entityId, eiscpInstance, zone, driver);
+      this.refreshAvrState(entityId, eiscpInstance, zone, _driver);
       return true;
     }
     return false;
@@ -140,13 +121,7 @@ class AvrStateManager {
   }
 
   /** Query AVR state and clear media attributes on source change */
-  async refreshAvrState(
-    entityId: string,
-    eiscpInstance?: EiscpDriver,
-    zone?: string,
-    driver?: uc.IntegrationAPI,
-    queueThreshold?: number
-  ): Promise<void> {
+  async refreshAvrState(entityId: string, eiscpInstance?: EiscpDriver, zone?: string, driver?: uc.IntegrationAPI, queueThreshold?: number): Promise<void> {
     if (!eiscpInstance || !zone || !driver || !entityId) {
       return;
     }
@@ -156,7 +131,7 @@ class AvrStateManager {
 
     log.info("%s [%s] querying volume for zone '%s'", integrationName, entityId, zone);
     await eiscpInstance.command({ zone, command: "volume", args: "query" });
-    
+
     // Clear media attributes so they can be updated with new data
     // Prevents showing old data if new source does not deliver similar info
     driver.updateEntityAttributes(entityId, {
@@ -172,13 +147,36 @@ class AvrStateManager {
     log.info("%s [%s] querying AV-info for zone '%s'", integrationName, entityId, zone);
     await eiscpInstance.command({ zone, command: "audio-information", args: "query" });
     await eiscpInstance.command({ zone, command: "video-information", args: "query" });
-    
 
     // To make sure the sensor also updates (in case a message is missed)
     await eiscpInstance.command({ zone, command: "input-selector", args: "query" });
     await new Promise((resolve) => setTimeout(resolve, threshold * 3));
     await eiscpInstance.command({ zone, command: "listening-mode", args: "query" });
     await eiscpInstance.command({ zone, command: "fp-display", args: "query" });
+  }
+
+  /** Query AVR system & general state: power, input, volume, muting, listening mode, fp-display */
+  async queryAvrState(entityId: string, eiscpInstance: EiscpDriver, zone: string, context: string, queueThreshold?: number): Promise<void> {
+    if (!eiscpInstance || !zone || !entityId) return;
+
+    const threshold = queueThreshold ?? (typeof eiscpInstance["config"]?.send_delay === "number" ? eiscpInstance["config"].send_delay : 250);
+
+    log.info(`${integrationName} [%s] Querying AVR state for zone %s (%s)...`, entityId, zone, context);
+    try {
+      await eiscpInstance.command({ zone, command: "system-power", args: "query" });
+      await new Promise((resolve) => setTimeout(resolve, threshold));
+      await eiscpInstance.command({ zone, command: "input-selector", args: "query" });
+      await new Promise((resolve) => setTimeout(resolve, threshold));
+      await eiscpInstance.command({ zone, command: "volume", args: "query" });
+      await new Promise((resolve) => setTimeout(resolve, threshold));
+      await eiscpInstance.command({ zone, command: "audio-muting", args: "query" });
+      await new Promise((resolve) => setTimeout(resolve, threshold));
+      await eiscpInstance.command({ zone, command: "listening-mode", args: "query" });
+      await new Promise((resolve) => setTimeout(resolve, threshold * 3));
+      await eiscpInstance.command({ zone, command: "fp-display", args: "query" });
+    } catch (err) {
+      log.warn(`${integrationName} [%s] Failed to query AVR state (%s):`, entityId, context, err);
+    }
   }
 }
 

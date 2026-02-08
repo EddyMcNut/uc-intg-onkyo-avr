@@ -20,26 +20,24 @@ test.serial("backup flow returns backup_data JSON", async (t) => {
 
     // Seed a sample config
     const sampleConfig = {
-      avrs: [
-        { model: "TX-RZ50", ip: "192.168.2.103", port: 60128, zone: "main" },
-      ],
+      avrs: [{ model: "TX-RZ50", ip: "192.168.2.103", port: 60128, zone: "main" }]
     } as any as Partial<import("../src/configManager.js").OnkyoConfig>;
     ConfigManager.save(sampleConfig);
-    console.log('on-disk-config (after src save):', fs.readFileSync(path.join(tmp, 'config.json'), 'utf-8'));
+    console.log("on-disk-config (after src save):", fs.readFileSync(path.join(tmp, "config.json"), "utf-8"));
 
     // Import compiled driver using a file:// URL (required on Windows ESM loader)
-    const { pathToFileURL } = await import('url');
+    const { pathToFileURL } = await import("url");
     const driverModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/onkyo.js")).href);
     const OnkyoDriver = driverModule.default as any;
     // Ensure the compiled ConfigManager uses the same temp config dir at runtime
     const configManagerModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/configManager.js")).href);
-    if (configManagerModule && typeof configManagerModule.setConfigDir === 'function') {
+    if (configManagerModule && typeof configManagerModule.setConfigDir === "function") {
       configManagerModule.setConfigDir(tmp);
-      console.log('dist config path set to', configManagerModule.getConfigPath && configManagerModule.getConfigPath());
+      console.log("dist config path set to", configManagerModule.getConfigPath && configManagerModule.getConfigPath());
       // Ensure dist config actually loads from disk
-      if (typeof configManagerModule.load === 'function') {
+      if (typeof configManagerModule.load === "function") {
         const loaded = configManagerModule.load();
-        console.log('dist config after load:', JSON.stringify(loaded));
+        console.log("dist config after load:", JSON.stringify(loaded));
       }
     }
 
@@ -69,7 +67,7 @@ test.serial("backup flow returns backup_data JSON", async (t) => {
     const parsed = JSON.parse(backupString);
 
     t.truthy(parsed.meta);
-    const driverJson = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), 'driver.json'), 'utf-8'));
+    const driverJson = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), "driver.json"), "utf-8"));
     t.is(parsed.meta.driver_id, driverJson.driver_id);
     t.truthy(parsed.config);
     t.is(parsed.config.avrs?.[0].model, sampleConfig.avrs?.[0].model);
@@ -88,21 +86,21 @@ test.serial("restore flow applies provided backup_data", async (t) => {
 
     // Start with an empty/other config so we can see it change
     ConfigManager.save({ avrs: [{ model: "OLD", ip: "0.0.0.0", port: 60128, zone: "main" }] });
-    console.log('on-disk-config (after src save - restore test):', fs.readFileSync(path.join(tmp, 'config.json'), 'utf-8'));
+    console.log("on-disk-config (after src save - restore test):", fs.readFileSync(path.join(tmp, "config.json"), "utf-8"));
 
     // Import compiled driver using a file:// URL (required on Windows ESM loader)
-    const { pathToFileURL } = await import('url');
+    const { pathToFileURL } = await import("url");
     const driverModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/onkyo.js")).href);
     const OnkyoDriver = driverModule.default as any;
     // Ensure the compiled ConfigManager uses the same temp config dir at runtime
     const configManagerModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/configManager.js")).href);
-    if (configManagerModule && typeof configManagerModule.setConfigDir === 'function') {
+    if (configManagerModule && typeof configManagerModule.setConfigDir === "function") {
       configManagerModule.setConfigDir(tmp);
-      console.log('dist config path set to', configManagerModule.getConfigPath && configManagerModule.getConfigPath());
+      console.log("dist config path set to", configManagerModule.getConfigPath && configManagerModule.getConfigPath());
       // Ensure dist config actually loads from disk
-      if (typeof configManagerModule.load === 'function') {
+      if (typeof configManagerModule.load === "function") {
         const loaded = configManagerModule.load();
-        console.log('dist config after load:', JSON.stringify(loaded));
+        console.log("dist config after load:", JSON.stringify(loaded));
       }
     }
 
@@ -114,7 +112,7 @@ test.serial("restore flow applies provided backup_data", async (t) => {
     (drv as any).registerAvailableEntities = (OnkyoDriver.prototype as any).registerAvailableEntities.bind(drv);
 
     // Create a backup payload to restore
-    const driverJson = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), 'driver.json'), 'utf-8'));
+    const driverJson = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), "driver.json"), "utf-8"));
     const targetConfig = { avrs: [{ model: "TX-RZ50", ip: "192.168.2.103", port: 60128, zone: "main" }] } as any;
     const payload = { meta: { driver_id: driverJson.driver_id, version: driverJson.version }, config: targetConfig };
     const payloadString = JSON.stringify(payload);

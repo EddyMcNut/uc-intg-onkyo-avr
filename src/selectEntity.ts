@@ -1,17 +1,17 @@
 /**
  * Select entity implementation for Unfolded Circle Integration API
- * 
+ *
  * This is a custom implementation since the TypeScript integration library
  * doesn't yet support select entities (as of the current version).
- * 
+ *
  * Based on the Unfolded Circle Core API spec:
  * https://unfoldedcircle.github.io/core-api/entities/entity_select.html
- * 
+ *
  * @copyright (c) 2024 by Unfolded Circle ApS.
  * @license Apache License 2.0, see LICENSE for more details.
  */
 
-import { Entity, EntityName, CommandHandler, StatusCodes } from "@unfoldedcircle/integration-api";
+import { Entity, EntityName, CommandHandler } from "@unfoldedcircle/integration-api";
 
 /**
  * Select entity states
@@ -57,7 +57,7 @@ export interface SelectParams {
 
 /**
  * Select entity class
- * 
+ *
  * This entity offers a limited set of selectable options.
  */
 export class Select extends Entity {
@@ -68,11 +68,7 @@ export class Select extends Entity {
    * @param name The human-readable name of the entity.
    * @param params Entity parameters.
    */
-  constructor(
-    id: string,
-    name: EntityName,
-    { attributes = {}, area, cmdHandler }: SelectParams = {}
-  ) {
+  constructor(id: string, name: EntityName, { attributes = {}, area, cmdHandler }: SelectParams = {}) {
     // Convert options array to required format for API
     const apiAttributes: { [key: string]: string | number | boolean | string[] } = {
       [SelectAttributes.State]: attributes.state || SelectStates.On,

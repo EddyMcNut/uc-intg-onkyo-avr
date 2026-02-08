@@ -119,14 +119,7 @@ const dtsModes = [
 ];
 
 /** Listening modes that work with Dolby TrueHD sources */
-const dolbyTrueHDModes = [
-  ...dolbyDigitalModes,
-  "pliiz-height",
-  "pliiz-height-thx-cinema",
-  "pliiz-height-thx-games",
-  "pliiz-height-thx-music",
-  "pliiz-height-thx-u2"
-];
+const dolbyTrueHDModes = [...dolbyDigitalModes, "pliiz-height", "pliiz-height-thx-cinema", "pliiz-height-thx-games", "pliiz-height-thx-music", "pliiz-height-thx-u2"];
 
 /** Listening modes that work with DTS-HD sources */
 const dtsHDModes = [
@@ -143,30 +136,16 @@ const dtsHDModes = [
 ];
 
 /** Listening modes that work with Dolby Atmos sources */
-const dolbyAtmosModes = [
-  ...dolbyTrueHDModes
-];
+const dolbyAtmosModes = [...dolbyTrueHDModes];
 
 /** Listening modes that work with DTS:X sources */
-const dtsXModes = [
-  ...dtsHDModes
-];
+const dtsXModes = [...dtsHDModes];
 
 /** Listening modes that work with multichannel PCM */
-const multichannelPCMModes = [
-  ...stereoCompatibleModes,
-  "action",
-  "film",
-  "mono-movie",
-  "musical",
-  "straight-decode",
-  "surround"
-];
+const multichannelPCMModes = [...stereoCompatibleModes, "action", "film", "mono-movie", "musical", "straight-decode", "surround"];
 
 /** Listening modes that work with analog inputs */
-const analogModes = [
-  ...stereoCompatibleModes
-];
+const analogModes = [...stereoCompatibleModes];
 
 /**
  * Get compatible listening modes based on audio format

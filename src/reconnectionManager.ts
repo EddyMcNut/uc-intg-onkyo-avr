@@ -52,24 +52,11 @@ export class ReconnectionManager {
    * Attempt to reconnect with progressive timeouts.
    * @returns Result indicating success and number of attempts made
    */
-  async attemptReconnection(
-    physicalAVR: string,
-    eiscp: EiscpDriver,
-    connectionInfo: ConnectionInfo,
-    context: string = "reconnection"
-  ): Promise<ReconnectionResult> {
+  async attemptReconnection(physicalAVR: string, eiscp: EiscpDriver, connectionInfo: ConnectionInfo, context: string = "reconnection"): Promise<ReconnectionResult> {
     for (let attempt = 0; attempt < this.config.timeouts.length; attempt++) {
       const timeout = this.config.timeouts[attempt];
       try {
-        log.info(
-          "%s [%s] %s attempt %d/%d (timeout: %dms)...",
-          integrationName,
-          physicalAVR,
-          context,
-          attempt + 1,
-          this.config.timeouts.length,
-          timeout
-        );
+        log.info("%s [%s] %s attempt %d/%d (timeout: %dms)...", integrationName, physicalAVR, context, attempt + 1, this.config.timeouts.length, timeout);
 
         await eiscp.connect({
           model: connectionInfo.model,
@@ -82,15 +69,7 @@ export class ReconnectionManager {
         log.info("%s [%s] Successfully reconnected to AVR (%s)", integrationName, physicalAVR, context);
         return { success: true, attempts: attempt + 1 };
       } catch (err) {
-        log.warn(
-          "%s [%s] %s attempt %d/%d failed: %s",
-          integrationName,
-          physicalAVR,
-          context,
-          attempt + 1,
-          this.config.timeouts.length,
-          err
-        );
+        log.warn("%s [%s] %s attempt %d/%d failed: %s", integrationName, physicalAVR, context, attempt + 1, this.config.timeouts.length, err);
       }
     }
 
@@ -102,22 +81,11 @@ export class ReconnectionManager {
    * Schedule a reconnection attempt after the configured delay.
    * Clears any existing scheduled attempt for this AVR.
    */
-  scheduleReconnection(
-    physicalAVR: string,
-    eiscp: EiscpDriver,
-    connectionInfo: ConnectionInfo,
-    shouldSkip: ShouldSkipCallback,
-    onReconnected: OnReconnectedCallback
-  ): void {
+  scheduleReconnection(physicalAVR: string, eiscp: EiscpDriver, connectionInfo: ConnectionInfo, shouldSkip: ShouldSkipCallback, onReconnected: OnReconnectedCallback): void {
     // Clear any existing timer
     this.cancelScheduledReconnection(physicalAVR);
 
-    log.info(
-      "%s [%s] Scheduling reconnection attempt in %d seconds...",
-      integrationName,
-      physicalAVR,
-      this.config.scheduleDelay / 1000
-    );
+    log.info("%s [%s] Scheduling reconnection attempt in %d seconds...", integrationName, physicalAVR, this.config.scheduleDelay / 1000);
 
     const timer = setTimeout(async () => {
       log.info("%s [%s] Attempting scheduled reconnection...", integrationName, physicalAVR);
@@ -136,12 +104,7 @@ export class ReconnectionManager {
         await onReconnected(physicalAVR);
       } else {
         // Schedule another attempt
-        log.info(
-          "%s [%s] All scheduled reconnection attempts failed, will retry again in %d seconds",
-          integrationName,
-          physicalAVR,
-          this.config.scheduleDelay / 1000
-        );
+        log.info("%s [%s] All scheduled reconnection attempts failed, will retry again in %d seconds", integrationName, physicalAVR, this.config.scheduleDelay / 1000);
         this.scheduleReconnection(physicalAVR, eiscp, connectionInfo, shouldSkip, onReconnected);
       }
     }, this.config.scheduleDelay);
