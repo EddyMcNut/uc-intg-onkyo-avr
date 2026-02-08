@@ -13,6 +13,9 @@ import log from "./loggers.js";
 import SetupHandler from "./setupHandler.js";
 import EntityRegistrar from "./entityRegistrar.js";
 import ConnectionManager from "./connectionManager.js";
+import AvrInstanceManager from "./avrInstanceManager.js";
+import fs from "fs";
+import path from "path";
 const integrationName = "driver:";
 
 /** Parsed setup data with concrete types (after validation/conversion) */
@@ -31,7 +34,7 @@ export default class OnkyoDriver {
   private remoteInStandby: boolean = false; // Track Remote standby state
   private reconnectionManager: ReconnectionManager = new ReconnectionManager();
   private connectionManager: import("./connectionManager.js").default;
-  private avrInstanceManager: import("./avrInstanceManager.js").default = new (require("./avrInstanceManager.js").default)();
+  private avrInstanceManager: import("./avrInstanceManager.js").default = new AvrInstanceManager();
   private connectCoordinator?: import("./connectCoordinator.js").default;
   private driverVersion: string = "unknown";
   private lastSetupData: ParsedSetupData = {

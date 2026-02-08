@@ -1,6 +1,6 @@
 /*jslint node:true nomen:true*/
 "use strict";
-import { AvrConfig } from "./configManager.js";
+import { AvrConfig, buildEntityId } from "./configManager.js";
 import { OnkyoCommandSender } from "./onkyoCommandSender.js";
 import { buildPhysicalAvrId } from "./configManager.js";
 import log from "./loggers.js";
@@ -57,7 +57,7 @@ export default class AvrInstanceManager {
   ): Promise<void> {
     for (const avrConfig of avrs) {
       const physicalAVR = buildPhysicalAvrId(avrConfig.model, avrConfig.ip);
-      const avrEntry = `${avrConfig.model}_${avrConfig.ip}_${avrConfig.zone}`; // same format as buildEntityId but avoid import cycle
+      const avrEntry = buildEntityId(avrConfig.model, avrConfig.ip, avrConfig.zone);
 
       if (this.hasInstance(avrEntry)) {
         log.info("%s [%s] Zone instance already exists", integrationName, avrEntry);
