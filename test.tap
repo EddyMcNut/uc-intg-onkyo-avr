@@ -5,35 +5,23 @@ ok 3 - avr-instance-manager › set/get/has/remove/clear operations work
 ok 4 - connect-coordinator › connect returns false when no avrs configured
 ok 5 - connect-coordinator › connect creates physical connections and zone instances when missing
 ok 6 - connect-coordinator › connect handles reconnection when physical connection exists but disconnected
-ok 7 - entity-registrar › EntityRegistrar builds entities correctly
-ok 8 - connection-manager › schedule and cancel scheduled reconnection
-ok 9 - connection-manager › attemptReconnection delegates to reconnection manager and returns result
-ok 10 - connection-manager › clearAllConnections removes stored connections
-ok 11 - setup-handler › handleRestorePayload: applies valid payload and calls onConfigSaved
-ok 12 - setup-handler › handleRestorePayload: invalid payload returns RequestUserInput with preserved textarea
-ok 13 - setup-handler › handleDeleteConfigPayload: confirm=false prompts and confirm=true clears config
-ok 14 - setup-handler › handleManualConfiguration: valid input creates AVR entries
-ok 15 - setup-handler › handleManualConfiguration: invalid input returns RequestUserInput with errors
-ok 16 - setup-handler › handleBackupPayload: returns backup data JSON textarea
-not ok 17 - config-coercions › createAvrSpecificConfig coerces types correctly
-  ---
-    name: AssertionError
-    assertion: t.is()
-    details:
-      'Difference (- actual, + expected):': |-
-        - true
-        + false
-    message: ''
-    at: >-
-      ExecutionContext.is
-      (file:///E:/Ed/repos/uc-intg-onkyo-avr/node_modules/ava/lib/assert.js:309:16)
-  ...
-ok 18 - config-coercions › OnkyoCommandSender volume conversion respects adjustVolumeDispl
+ok 7 - setup-handler › handleRestorePayload: applies valid payload and calls onConfigSaved
+ok 8 - setup-handler › handleRestorePayload: invalid payload returns RequestUserInput with preserved textarea
+ok 9 - setup-handler › handleDeleteConfigPayload: confirm=false prompts and confirm=true clears config
+ok 10 - config-coercions › createAvrSpecificConfig coerces types correctly
+ok 11 - setup-handler › handleManualConfiguration: valid input creates AVR entries
+ok 12 - setup-handler › handleManualConfiguration: invalid input returns RequestUserInput with errors
+ok 13 - setup-handler › handleBackupPayload: returns backup data JSON textarea
+ok 14 - config-coercions › OnkyoCommandSender volume conversion respects adjustVolumeDispl
+ok 15 - entity-registrar › EntityRegistrar builds entities correctly
+ok 16 - connection-manager › schedule and cancel scheduled reconnection
+ok 17 - connection-manager › attemptReconnection delegates to reconnection manager and returns result
+ok 18 - connection-manager › clearAllConnections removes stored connections
 ok 19 - setup-backup › backup flow returns backup_data JSON
 ok 20 - setup-backup › restore flow applies provided backup_data
 
 1..20
 # tests 20
-# pass 19
-# fail 1
+# pass 20
+# fail 0
 

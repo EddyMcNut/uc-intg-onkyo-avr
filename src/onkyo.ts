@@ -10,6 +10,7 @@ import { ReconnectionManager } from "./reconnectionManager.js";
 import { SelectAttributes, SelectCommands } from "./selectEntity.js";
 import { avrStateManager } from "./state.js";
 import log from "./loggers.js";
+import { parseBoolean } from "./configManager.js";
 import SetupHandler from "./setupHandler.js";
 import EntityRegistrar from "./entityRegistrar.js";
 import ConnectionManager from "./connectionManager.js";
@@ -372,8 +373,8 @@ export default class OnkyoDriver {
       return v === 80 || v === 100 ? v : AVR_DEFAULTS.volumeScale;
     })();
 
-    const adjustVolumeDispl = Boolean(avrConfig.adjustVolumeDispl ?? AVR_DEFAULTS.adjustVolumeDispl);
-    const createSensors = Boolean(avrConfig.createSensors ?? AVR_DEFAULTS.createSensors);
+    const adjustVolumeDispl = parseBoolean(avrConfig.adjustVolumeDispl, AVR_DEFAULTS.adjustVolumeDispl);
+    const createSensors = parseBoolean(avrConfig.createSensors, AVR_DEFAULTS.createSensors);
 
     const netMenuDelay = (() => {
       const v = typeof avrConfig.netMenuDelay === "number" ? avrConfig.netMenuDelay : parseInt(String(avrConfig.netMenuDelay ?? ""), 10);
