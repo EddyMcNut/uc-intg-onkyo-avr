@@ -1,6 +1,6 @@
 {
   "driver_id": "onkyo_avr_custom_driver",
-  "version": "0.8.0-beta5",
+  "version": "0.8.0-beta8",
   "min_core_api": "0.20.0",
   "name": { "en": "Onkyo AVR" },
   "icon": "uc:music",

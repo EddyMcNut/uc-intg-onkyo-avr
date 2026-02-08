@@ -2,7 +2,7 @@
 "use strict";
 import * as uc from "@unfoldedcircle/integration-api";
 import EiscpDriver from "./eiscp.js";
-import { ConfigManager, setConfigDir, OnkyoConfig, AvrConfig, AvrZone, AVR_DEFAULTS, MAX_LENGTHS, PATTERNS, buildEntityId, buildPhysicalAvrId } from "./configManager.js";
+import { ConfigManager, parseBoolean, setConfigDir, OnkyoConfig, AvrConfig, AvrZone, AVR_DEFAULTS, MAX_LENGTHS, PATTERNS, buildEntityId, buildPhysicalAvrId } from "./configManager.js";
 import { DEFAULT_QUEUE_THRESHOLD } from "./configManager.js";
 import { OnkyoCommandSender } from "./onkyoCommandSender.js";
 import { OnkyoCommandReceiver } from "./onkyoCommandReceiver.js";
@@ -16,19 +16,7 @@ import log from "./loggers.js";
 
 const integrationName = "driver:";
 
-/** Parse a boolean value from string, boolean, or undefined */
-function parseBoolean(value: unknown, defaultValue: boolean): boolean {
-  if (value === undefined || value === null || value === "") {
-    return defaultValue;
-  }
-  if (typeof value === "boolean") {
-    return value;
-  }
-  if (typeof value === "string") {
-    return value.toLowerCase() === "true";
-  }
-  return defaultValue;
-}
+
 
 /** Parse an integer with validation and default */
 function parseIntWithDefault(value: unknown, defaultValue: number, validator?: (n: number) => boolean): number {
@@ -45,29 +33,7 @@ function parseIntWithDefault(value: unknown, defaultValue: number, validator?: (
   return parsed;
 }
 
-// Security: Helper function to validate IP addresses
-function validateIpAddress(ip: string, fieldName: string): string | null {
-  const trimmedIp = ip.trim();
-  
-  if (trimmedIp.length > MAX_LENGTHS.IP_ADDRESS) {
-    log.error(`${integrationName} ${fieldName} too long`);
-    return null;
-  }
-  
-  if (!PATTERNS.IP_ADDRESS.test(trimmedIp)) {
-    log.error(`${integrationName} Invalid ${fieldName} format`);
-    return null;
-  }
-  
-  // Validate IP octets are in valid range
-  const octets = trimmedIp.split('.').map(Number);
-  if (!octets.every((octet: number) => octet >= 0 && octet <= 255)) {
-    log.error(`${integrationName} ${fieldName} octets out of range`);
-    return null;
-  }
-  
-  return trimmedIp;
-}
+
 
 interface PhysicalAvrConnection {
   eiscp: EiscpDriver;
@@ -174,20 +140,165 @@ export default class OnkyoDriver {
     if (msg instanceof uc.DriverSetupRequest && msg.reconfigure) {
       const setupData = (msg as uc.DriverSetupRequest).setupData ?? {};
 
-      // If caller just started reconfigure and no choice selected, present backup/restore options
+      // If caller already selected an action, respond accordingly (manager may call get_setup with setupData containing 'choice')
+      if (setupData && Object.prototype.hasOwnProperty.call(setupData, "choice")) {
+        const selected = String(setupData.choice ?? "").toLowerCase();
+
+        if (selected === "restore") {
+          // If caller has not provided backup_data yet, ask for it
+          if (!setupData.backup_data) {
+            return new uc.RequestUserInput("Restore data", [
+              {
+                id: "backup_data",
+                label: { en: "Configuration Backup Data" },
+                field: { textarea: { value: "" } }
+              }
+            ]);
+          }
+
+          // Process provided backup_data
+          try {
+            const raw = String(setupData.backup_data ?? "").trim();
+            const parsed = JSON.parse(raw);
+            const newConfigObj = parsed && parsed.config ? parsed.config : parsed;
+
+            // Validate payload strictly
+            const validation = ConfigManager.validateConfigPayload(newConfigObj);
+            if (validation.errors && validation.errors.length > 0) {
+              // Return the restore page with errors so user can correct and resubmit
+              return new uc.RequestUserInput("Restore data", [
+                {
+                  id: "info",
+                  label: { en: "Restore validation errors" },
+                  field: { label: { value: { en: `Errors:\n- ${validation.errors.join('\n- ')}` } } }
+                },
+                {
+                  id: "backup_data",
+                  label: { en: "Configuration Backup Data" },
+                  field: { textarea: { value: raw } }
+                }
+              ]);
+            }
+
+            // Persist validated and normalized config
+            ConfigManager.save(validation.normalized as Partial<OnkyoConfig>);
+            this.config = ConfigManager.load();
+            this.registerAvailableEntities();
+            await this.handleConnect();
+            return new uc.SetupComplete();
+          } catch (err) {
+            log.error("%s Failed to parse or apply restore data (reconfigure):", integrationName, err);
+            return new uc.SetupError("OTHER");
+          }
+        }
+
+        if (selected === "backup") {
+          // If backup_data already supplied (user clicked Next), finish the flow
+          if (setupData.backup_data) {
+            return new uc.SetupComplete();
+          }
+
+          // Build backup payload (same logic as the UserDataResponse branch)
+          let driverId = "unknown";
+          let driverVersion = "unknown";
+          try {
+            const fs = await import('fs');
+            const path = await import('path');
+            const driverJsonPath = path.resolve(process.cwd(), 'driver.json');
+            const driverJsonRaw = fs.readFileSync(driverJsonPath, 'utf-8');
+            const driverJson = JSON.parse(driverJsonRaw);
+            driverId = driverJson.driver_id || driverId;
+            driverVersion = driverJson.version || driverVersion;
+          } catch (err) {
+            log.warn(`${integrationName} Could not read driver.json metadata for backup:`, err);
+          }
+
+          let configData: any = {};
+          try {
+            const fs2 = await import('fs');
+            const path2 = await import('path');
+            const cfgPath = path2.resolve(this.driver.getConfigDirPath ? this.driver.getConfigDirPath() : process.cwd(), 'config.json');
+            if (fs2.existsSync(cfgPath)) {
+              const rawCfg = fs2.readFileSync(cfgPath, 'utf-8');
+              configData = JSON.parse(rawCfg);
+            } else {
+              log.info('%s Config file not present at %s, falling back to ConfigManager.get()', integrationName, cfgPath);
+              configData = ConfigManager.get();
+            }
+          } catch (err) {
+            log.warn(`${integrationName} Failed to read config file for backup, falling back to in-memory ConfigManager:`, err);
+            configData = ConfigManager.get();
+          }
+
+          const backupPayload = {
+            meta: {
+              driver_id: driverId,
+              version: driverVersion,
+              timestamp: new Date().toISOString()
+            },
+            config: configData
+          };
+          const backupString = JSON.stringify(backupPayload, null, 2);
+
+          return new uc.RequestUserInput("Backup data", [
+            {
+              id: "backup_data",
+              label: { en: "Backup data (JSON)" },
+              field: {
+                textarea: {
+                  value: backupString
+                }
+              }
+            }
+          ]);
+        }
+
+        if (selected === "delete_config" && !setupData.confirm_delete_config) {
+          return new uc.RequestUserInput("Confirm delete", [
+            {
+              id: "info",
+              label: { en: "Delete config" },
+              field: { label: { value: { en: "This will remove all configured AVRs and reset integration state. This action cannot be undone." } } }
+            },
+            {
+              id: "confirm_delete_config",
+              label: { en: "Confirm delete config" },
+              field: { checkbox: { value: false } }
+            }
+          ]);
+        }
+
+        if (selected === "delete_config" && setupData.confirm_delete_config) {
+          try {
+            ConfigManager.clear();
+            this.config = ConfigManager.load();
+            this.avrInstances.clear();
+            this.physicalConnections.clear();
+            await this.driver.setDeviceState(uc.DeviceStates.Disconnected);
+            log.info("%s Configuration deleted by user (via reconfigure)", integrationName);
+            return new uc.SetupComplete();
+          } catch (err) {
+            log.error("%s Failed to delete configuration (via reconfigure):", integrationName, err);
+            return new uc.SetupError("OTHER");
+          }
+        }
+      }
+
+      // If caller just started reconfigure and no choice selected, present options
       if (!setupData || !Object.prototype.hasOwnProperty.call(setupData, "choice")) {
-        // Provide a dropdown with default choice set to 'backup' so manager can pick it
-        return new uc.RequestUserInput("Backup & Restore", [
+        // Provide a dropdown with default choice set to 'configure'
+        return new uc.RequestUserInput("Configuration", [
           {
             id: "choice",
             label: { en: "Action" },
             field: {
               dropdown: {
-                value: "backup",
+                value: "configure",
                 items: [
-                  { id: "backup", label: { en: "Backup configuration" } },
-                  { id: "restore", label: { en: "Restore configuration" } },
-                  { id: "configure", label: { en: "Run regular setup" } }
+                  { id: "configure", label: { en: "Configure" } },
+                  { id: "backup", label: { en: "Create configuration backup" } },
+                  { id: "restore", label: { en: "Restore configuration from backup" } },
+                  { id: "delete_config", label: { en: "Delete config" } }
                 ]
               }
             }
@@ -196,12 +307,61 @@ export default class OnkyoDriver {
       }
     }
 
-    // If the UI submitted input values (e.g., manager sent action=backup/restore), handle them
+    // Initial setup (first-time install) - offer a single choice to configure/backup/restore
+    if (msg instanceof uc.DriverSetupRequest && !(msg as uc.DriverSetupRequest).reconfigure) {
+      return new uc.RequestUserInput("Initial setup", [
+        {
+          id: "info",
+          label: { en: "Setup" },
+          field: {
+            label: {
+              value: {
+                en: "Choose whether to configure the integration manually, create a backup, or restore from a backup."
+              }
+            }
+          }
+        },
+        {
+          id: "choice",
+          label: { en: "Action" },
+          field: {
+            dropdown: {
+              value: "configure",
+              items: [
+                { id: "configure", label: { en: "Configure" } },
+                { id: "backup", label: { en: "Create configuration backup" } },
+                { id: "restore", label: { en: "Restore configuration from backup" } }
+              ]
+            }
+          }
+        }
+      ]);
+    }
+
+    // If the UI submitted input values (e.g., manager sent action=backup/restore/configure), handle them
     if (msg instanceof uc.UserDataResponse) {
       const input = (msg as uc.UserDataResponse).inputValues || {};
-      const action = String(input.action ?? "").toLowerCase();
+      const action = String(input.action ?? input.choice ?? "").toLowerCase();
+
+      // If the user chose restore, show the restore textarea (unless backup_data already provided)
+      if (action === "restore" && !input.backup_data) {
+        return new uc.RequestUserInput("Restore data", [
+          {
+            id: "backup_data",
+            label: { en: "Configuration Backup Data" },
+            field: { textarea: { value: "" } }
+          }
+        ]);
+      }
 
       if (action === "backup") {
+        // If backup_data already supplied (user clicked Next), finish the flow
+        if (input.backup_data) {
+          return new uc.SetupComplete();
+        }
+
+        // ensure latest config
+
         // Ensure latest config loaded from disk (useful if another module wrote the config file)
         try {
           ConfigManager.load();
@@ -270,6 +430,37 @@ export default class OnkyoDriver {
         ]);
       }
 
+      if (action === "delete_config" && !input.confirm_delete_config) {
+        return new uc.RequestUserInput("Confirm delete", [
+          {
+            id: "info",
+            label: { en: "Delete config" },
+            field: { label: { value: { en: "This will remove all configured AVRs and reset integration state. This action cannot be undone." } } }
+          },
+          {
+            id: "confirm_delete_config",
+            label: { en: "Confirm delete config" },
+            field: { checkbox: { value: false } }
+          }
+        ]);
+      }
+
+      if (action === "delete_config") {
+        try {
+          ConfigManager.clear();
+          this.config = ConfigManager.load();
+          // Reset runtime state
+          this.avrInstances.clear();
+          this.physicalConnections.clear();
+          await this.driver.setDeviceState(uc.DeviceStates.Disconnected);
+          log.info("%s Configuration deleted by user", integrationName);
+          return new uc.SetupComplete();
+        } catch (err) {
+          log.error("%s Failed to delete configuration:", integrationName, err);
+          return new uc.SetupError("OTHER");
+        }
+      }
+
       if (action === "restore") {
         const raw = String(input.backup_data ?? "").trim();
         if (!raw) {
@@ -279,15 +470,28 @@ export default class OnkyoDriver {
         try {
           const parsed = JSON.parse(raw);
           // Expect either full payload {config: {...}} or bare config object
-          const newConfig = parsed && parsed.config ? parsed.config : parsed;
-          // Validate basic shape before applying
-          if (!newConfig || (!Array.isArray((newConfig as any).avrs) && !newConfig.model && !newConfig.avrs)) {
-            log.warn("%s Provided restore data does not look like a valid config", integrationName);
-            return new uc.SetupError("OTHER");
+          const newConfigObj = parsed && parsed.config ? parsed.config : parsed;
+
+          // Strict validation
+          const validation = ConfigManager.validateConfigPayload(newConfigObj);
+          if (validation.errors && validation.errors.length > 0) {
+            // Return restore page with errors so user can correct
+            return new uc.RequestUserInput("Restore data", [
+              {
+                id: "info",
+                label: { en: "Restore validation errors" },
+                field: { label: { value: { en: `Errors:\n- ${validation.errors.join('\n- ')}` } } }
+              },
+              {
+                id: "backup_data",
+                label: { en: "Configuration Backup Data" },
+                field: { textarea: { value: raw } }
+              }
+            ]);
           }
 
-          // Apply and persist config
-          ConfigManager.save(newConfig as Partial<OnkyoConfig>);
+          // Apply and persist normalized config
+          ConfigManager.save(validation.normalized as Partial<OnkyoConfig>);
 
           // Reload runtime config and (re)register entities
           this.config = ConfigManager.load();
@@ -443,60 +647,105 @@ export default class OnkyoDriver {
 
     try {
       if (hasManualConfig) {
-        // Security: Validate model name
-        const modelName = model.trim();
-        if (modelName.length > MAX_LENGTHS.MODEL_NAME) {
-          log.error("%s Model name too long (%d chars), max %d", integrationName, modelName.length, MAX_LENGTHS.MODEL_NAME);
-          return new uc.SetupError("OTHER");
-        }
-        if (!PATTERNS.MODEL_NAME.test(modelName)) {
-          log.error("%s Model name contains invalid characters", integrationName);
-          return new uc.SetupError("OTHER");
-        }
-        
-        // Security: Validate IP address
-        const ip = validateIpAddress(ipAddress, "IP address");
-        if (!ip) {
-          return new uc.SetupError("OTHER");
-        }
-        
-        // Security: Validate port
+        // Build base payload from submitted fields
+        const modelName = String(model).trim();
+        const ipVal = String(ipAddress).trim();
         const portNum = parseIntWithDefault(port, AVR_DEFAULTS.port, (n) => n >= 1 && n <= 65535);
-        if (portNum < 1 || portNum > 65535) {
-          log.error("%s Invalid port number: %d", integrationName, portNum);
-          return new uc.SetupError("OTHER");
-        }
-        
-        // Security: Validate album art URL
-        if (albumArtURLValue.length > MAX_LENGTHS.ALBUM_ART_URL) {
-          log.error("%s Album art URL too long (%d chars), max %d", integrationName, albumArtURLValue.length, MAX_LENGTHS.ALBUM_ART_URL);
-          return new uc.SetupError("OTHER");
-        }
-        if (!PATTERNS.ALBUM_ART_URL.test(albumArtURLValue)) {
-          log.error("%s Album art URL contains invalid characters", integrationName);
-          return new uc.SetupError("OTHER");
-        }
-        
-        // Add manually configured AVR
+
+        const basePayload: any = {
+          model: modelName,
+          ip: ipVal,
+          port: portNum,
+          queueThreshold: queueThresholdValue,
+          albumArtURL: albumArtURLValue,
+          volumeScale: volumeScaleValue,
+          adjustVolumeDispl: adjustVolumeDisplValue,
+          createSensors: createSensorsValue,
+          netMenuDelay: netMenuDelayValue
+        };
+
         const zones: AvrZone[] = ["main"];
         if (zoneCountValue >= 2) zones.push("zone2");
         if (zoneCountValue >= 3) zones.push("zone3");
 
+        const errors: string[] = [];
+        const normalizedAvrs: AvrConfig[] = [];
+
         for (const zone of zones) {
-          const avrConfig: AvrConfig = {
-            model: modelName,
-            ip: ip,
-            port: portNum,
-            zone: zone,
-            queueThreshold: queueThresholdValue,
-            albumArtURL: albumArtURLValue,
-            volumeScale: volumeScaleValue,
-            adjustVolumeDispl: adjustVolumeDisplValue,
-            createSensors: createSensorsValue,
-            netMenuDelay: netMenuDelayValue
-          };
-          log.info("%s Adding AVR config for zone %s with volumeScale: %d, adjustVolumeDispl: %s, createSensors: %s, netMenuDelay: %d", integrationName, zone, avrConfig.volumeScale, avrConfig.adjustVolumeDispl, avrConfig.createSensors, avrConfig.netMenuDelay);
-          ConfigManager.addAvr(avrConfig);
+          const payload = { ...basePayload, zone };
+          const res = ConfigManager.validateAvrPayload(payload);
+          if (res.errors.length > 0) {
+            errors.push(`zone ${zone}: ${res.errors.join('; ')}`);
+          } else if (res.normalized) {
+            normalizedAvrs.push(res.normalized);
+          }
+        }
+
+        if (errors.length > 0) {
+          // Return manual configuration page with errors and prefilled values so user can correct
+          return new uc.RequestUserInput("Manual configuration", [
+            {
+              id: "info",
+              label: { en: "Validation errors" },
+              field: { label: { value: { en: `Errors:\n- ${errors.join('\n- ')}` } } }
+            },
+            {
+              id: "model",
+              label: { en: "AVR Model (or a name you prefer)" },
+              field: { text: { value: modelName } }
+            },
+            {
+              id: "ipAddress",
+              label: { en: "AVR IP Address (for example `192.168.1.100`)" },
+              field: { text: { value: ipVal } }
+            },
+            {
+              id: "port",
+              label: { en: "AVR Port (default `60128`)" },
+              field: { number: { value: portNum } }
+            },
+            {
+              id: "albumArtURL",
+              label: { en: "AVR AlbumArt endpoint. Default `album_art.cgi`, if not known set to `na`." },
+              field: { text: { value: albumArtURLValue } }
+            },
+            {
+              id: "queueThreshold",
+              label: { en: "Message queue threshold. Default `100`" },
+              field: { number: { value: queueThresholdValue } }
+            },
+            {
+              id: "netMenuDelay",
+              label: { en: "NET sub-source selection delay. Default `500`" },
+              field: { number: { value: netMenuDelayValue } }
+            },
+            {
+              id: "volumeScale",
+              label: { en: "Volume scale (0-80 or 0-100)" },
+              field: { dropdown: { value: String(volumeScaleValue), items: [{ id: "100", label: { en: "0-100" } }, { id: "80", label: { en: "0-80" } }] } }
+            },
+            {
+              id: "adjustVolumeDispl",
+              label: { en: "Adjust volume display" },
+              field: { dropdown: { value: String(adjustVolumeDisplValue), items: [{ id: "true", label: { en: "Yes - eISCP divided by 2" } }, { id: "false", label: { en: "No - just eISCP" } }] } }
+            },
+            {
+              id: "zoneCount",
+              label: { en: "Number of zones to configure" },
+              field: { dropdown: { value: String(zoneCountValue), items: [{ id: "1", label: { en: "1 zone (Main only)" } }, { id: "2", label: { en: "2 zones (Main + Zone 2)" } }, { id: "3", label: { en: "3 zones (Main + Zone 2 + Zone 3)" } }] } }
+            },
+            {
+              id: "createSensors",
+              label: { en: "Create sensor entities?" },
+              field: { dropdown: { value: String(createSensorsValue), items: [{ id: "true", label: { en: "Yes" } }, { id: "false", label: { en: "No" } }] } }
+            }
+          ]);
+        }
+
+        // Persist normalized AVRs
+        for (const avrCfg of normalizedAvrs) {
+          log.info("%s Adding AVR config for zone %s with volumeScale: %d, adjustVolumeDispl: %s, createSensors: %s, netMenuDelay: %d", integrationName, avrCfg.zone, avrCfg.volumeScale, avrCfg.adjustVolumeDispl, avrCfg.createSensors, avrCfg.netMenuDelay);
+          ConfigManager.addAvr(avrCfg);
         }
       } else {
         // No manual config - run autodiscovery
