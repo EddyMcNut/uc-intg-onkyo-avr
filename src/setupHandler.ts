@@ -124,8 +124,12 @@ export default class SetupHandler {
     }
 
     if (action === "backup") {
-      if (input.backup_data) return new uc.SetupComplete();
-      return this.handleBackupPayload();
+      // Integration Manager uses a placeholder of "[]" when requesting a backup.
+      // Treat undefined/empty or placeholder as a request for us to generate and
+      // return the backup textarea instead of treating it as a completed request.
+      const provided = typeof input.backup_data === "string" ? String(input.backup_data).trim() : "";
+      if (provided && provided !== "[]") return new uc.SetupComplete();
+      return this.handleBackupPayload(provided || undefined);
     }
 
     if (action === "delete_config") {

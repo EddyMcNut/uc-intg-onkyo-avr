@@ -52,28 +52,47 @@ test.serial("backup flow returns backup_data JSON", async (t) => {
     const startResp = await drv.handleDriverSetup(new uc.DriverSetupRequest(true, {}));
     t.true(startResp instanceof uc.RequestUserInput);
 
-    // Step 2: ask for backup action
+    // Step 2a: ask for backup action (no placeholder)
     const backupResp = await drv.handleDriverSetup(new uc.UserDataResponse({ action: "backup" }));
     t.true(backupResp instanceof uc.RequestUserInput);
 
-    // Find backup_data textarea value
-    const settings = (backupResp as uc.RequestUserInput).settings as any[];
-    const backupSetting = settings.find((s: any) => s.id === "backup_data");
-    t.truthy(backupSetting);
-    t.truthy(backupSetting.field && (backupSetting.field as any).textarea && (backupSetting.field as any).textarea.value);
+    // Also simulate manager's PUT with action=backup and placeholder backup_data
+    const managerReqResp = await drv.handleDriverSetup(new uc.UserDataResponse({ action: "backup", backup_data: "[]" }));
+    t.true(managerReqResp instanceof uc.RequestUserInput);
 
-    const backupString = (backupSetting.field as any).textarea.value as string;
-    console.log("BACKUPSTRING:", backupString);
+    // Function to extract backup_data field from RequestUserInput
+    function extractBackup(resp: uc.RequestUserInput): string {
+      const settings = resp.settings as any[];
+      const backupSetting = settings.find((s: any) => s.id === "backup_data");
+      t.truthy(backupSetting);
+      t.truthy(backupSetting.field && (backupSetting.field as any).textarea && (backupSetting.field as any).textarea.value);
+      return (backupSetting.field as any).textarea.value as string;
+    }
+
+    const backupString = extractBackup(backupResp as uc.RequestUserInput);
+    const backupStringManager = extractBackup(managerReqResp as uc.RequestUserInput);
+
+    console.log("BACKUPSTRING (no placeholder):", backupString);
+    console.log("BACKUPSTRING (manager placeholder):", backupStringManager);
+
     const parsed = JSON.parse(backupString);
+    const parsedManager = JSON.parse(backupStringManager);
 
     t.truthy(parsed.meta);
+    t.truthy(parsedManager.meta);
     const driverJson = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), "driver.json"), "utf-8"));
     t.is(parsed.meta.driver_id, driverJson.driver_id);
+    t.is(parsedManager.meta.driver_id, driverJson.driver_id);
     t.truthy(parsed.config);
+    t.truthy(parsedManager.config);
     t.is(parsed.config.avrs?.[0].model, sampleConfig.avrs?.[0].model);
     t.is(parsed.config.avrs?.[0].ip, sampleConfig.avrs?.[0].ip);
     t.is(parsed.config.avrs?.[0].port, sampleConfig.avrs?.[0].port);
     t.is(parsed.config.avrs?.[0].zone, sampleConfig.avrs?.[0].zone);
+    t.is(parsedManager.config.avrs?.[0].model, sampleConfig.avrs?.[0].model);
+    t.is(parsedManager.config.avrs?.[0].ip, sampleConfig.avrs?.[0].ip);
+    t.is(parsedManager.config.avrs?.[0].port, sampleConfig.avrs?.[0].port);
+    t.is(parsedManager.config.avrs?.[0].zone, sampleConfig.avrs?.[0].zone);
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
   }
