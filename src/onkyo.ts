@@ -145,6 +145,21 @@ export default class OnkyoDriver {
       const listeningModeEntity = this.entityRegistrar.createListeningModeSelectEntity(avrEntry, this.handleListeningModeCmd.bind(this));
       this.driver.addAvailableEntity(listeningModeEntity);
       log.info("%s [%s] Listening Mode select entity registered", integrationName, avrEntry);
+
+      // Ensure the runtime select-entity options reflect any (re)configured per-AVR list immediately
+      // If the Integration API supports updating attributes at runtime,
+      // set the select-entity options immediately from saved config.
+      const options = this.entityRegistrar.getListeningModeOptions(undefined, avrEntry);
+      if (options && options.length > 0 && typeof this.driver.updateEntityAttributes === "function") {
+        this.driver.updateEntityAttributes(`${avrEntry}_listening_mode`, {
+          [SelectAttributes.Options]: options as any
+        });
+      }
+
+      // Log when a user-configured list is present so operators can verify at boot
+      if (Array.isArray(avrConfig.listeningModeOptions) && avrConfig.listeningModeOptions.length > 0) {
+        log.info("%s [%s] Loaded %d user-configured listeningModeOptions", integrationName, avrEntry, avrConfig.listeningModeOptions.length);
+      }
     }
   }
 
@@ -251,7 +266,7 @@ export default class OnkyoDriver {
     try {
       // Get current audio format for filtering
       const audioFormat = avrStateManager.getAudioFormat(avrEntry);
-      const options = this.entityRegistrar.getListeningModeOptions(audioFormat !== "unknown" ? audioFormat : undefined);
+      const options = this.entityRegistrar.getListeningModeOptions(audioFormat !== "unknown" ? audioFormat : undefined, avrEntry);
       const currentAttrs = entity.attributes || {};
       const currentOption = (currentAttrs[SelectAttributes.CurrentOption] as string) || "";
 
@@ -398,7 +413,12 @@ export default class OnkyoDriver {
           volumeScale,
           adjustVolumeDispl,
           createSensors,
-          netMenuDelay
+          netMenuDelay,
+          // Preserve user-configured listening mode options so command receivers
+          // and runtime logic can honour them after restart.
+          listeningModeOptions: Array.isArray((avrConfig as any).listeningModeOptions)
+            ? (avrConfig as any).listeningModeOptions.map((s: string) => s.trim())
+            : undefined
         }
       ],
       queueThreshold,

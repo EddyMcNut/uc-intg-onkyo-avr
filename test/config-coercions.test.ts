@@ -20,7 +20,8 @@ test.serial("createAvrSpecificConfig coerces types correctly", async (t) => {
     volumeScale: "80",
     adjustVolumeDispl: "false",
     createSensors: "false",
-    netMenuDelay: "120"
+    netMenuDelay: "120",
+    listeningModeOptions: ["stereo","straight-decode"]
   };
 
   const config = drv.createAvrSpecificConfig(avrPayload) as any;
@@ -32,6 +33,7 @@ test.serial("createAvrSpecificConfig coerces types correctly", async (t) => {
   t.is(config.avrs[0].netMenuDelay, 120);
   t.is(config.avrs[0].port, 60128);
   t.is(config.avrs[0].albumArtURL, "album_art.cgi");
+  t.deepEqual(config.avrs[0].listeningModeOptions, ["stereo","straight-decode"]);
 });
 
 // Mock eISCP for capturing raw commands

@@ -225,21 +225,30 @@ export class OnkyoCommandReceiver {
                 const compatibleModes = getCompatibleListeningModes(audioFormatType);
 
                 if (compatibleModes) {
-                  // Get all listening modes from mappings
-                  const lmdMappings = eiscpMappings.value_mappings.LMD;
-                  const excludeKeys = ["up", "down", "movie", "music", "game", "query"];
-                  const allModes = Object.keys(lmdMappings).filter((key) => !excludeKeys.includes(key));
+                  // If user configured a custom listeningModeOptions for this AVR, honor it exactly
+                  const cfgAvr = this.config.avrs ? this.config.avrs.find((a) => buildEntityId(a.model, a.ip, a.zone) === entityId) : undefined;
+                  if (cfgAvr && Array.isArray(cfgAvr.listeningModeOptions) && cfgAvr.listeningModeOptions.length > 0) {
+                    log.info("%s [%s] using user-configured listeningModeOptions (%d entries)", integrationName, entityId, cfgAvr.listeningModeOptions.length);
+                    this.driver.updateEntityAttributes(selectEntityId, {
+                      [SelectAttributes.Options]: cfgAvr.listeningModeOptions as any
+                    });
+                  } else {
+                    // Get all listening modes from mappings
+                    const lmdMappings = eiscpMappings.value_mappings.LMD;
+                    const excludeKeys = ["up", "down", "movie", "music", "game", "query"];
+                    const allModes = Object.keys(lmdMappings).filter((key) => !excludeKeys.includes(key));
 
-                  // Filter to compatible modes and sort alphabetically
-                  const filteredOptions = allModes.filter((mode) => compatibleModes.includes(mode)).sort();
+                    // Filter to compatible modes and sort alphabetically
+                    const filteredOptions = allModes.filter((mode) => compatibleModes.includes(mode)).sort();
 
-                  log.info("%s [%s] updating listening mode options for format: %s (%d modes)", integrationName, entityId, audioFormatType, filteredOptions.length);
+                    log.info("%s [%s] updating listening mode options for format: %s (%d modes)", integrationName, entityId, audioFormatType, filteredOptions.length);
 
-                  // Update select entity with filtered options
-                  // TypeScript doesn't recognize that options can be an array, but the API supports it
-                  this.driver.updateEntityAttributes(selectEntityId, {
-                    [SelectAttributes.Options]: filteredOptions as any
-                  });
+                    // Update select entity with filtered options
+                    // TypeScript doesn't recognize that options can be an array, but the API supports it
+                    this.driver.updateEntityAttributes(selectEntityId, {
+                      [SelectAttributes.Options]: filteredOptions as any
+                    });
+                  }
                 }
               }
             }

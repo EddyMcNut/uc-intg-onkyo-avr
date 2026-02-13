@@ -1,5 +1,7 @@
 ## Installation and usage
 
+++ update to match the new setup flow including not needing to add entities after setup since 2.8.3
+
 ### Installation
 
 - Make sure your AVR is ON or STANDBY.

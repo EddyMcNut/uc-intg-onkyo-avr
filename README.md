@@ -87,6 +87,10 @@ Users report it also to work with:
 
 [Sensors](./docs/sensor.md)
 
+## Selects
+
+[Selects](./docs/select.md)
+
 ## Listening modes
 
 [Listening modes](./docs/listening-modes.md)
@@ -111,6 +115,10 @@ Users report it also to work with:
 ## Raw messages
 
 [Raw messages](./docs/raw.md)
+
+## Backup and Restore
+
+[Backup and Restore](./docs/backup-restore.md)
 
 ## Collect logs
 

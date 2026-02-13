@@ -157,6 +157,7 @@ export default class SetupHandler {
           input.port ||
           input.queueThreshold ||
           input.albumArtURL ||
+          input.listeningModeOptions ||
           input.volumeScale ||
           input.adjustVolumeDispl ||
           input.zoneCount ||
@@ -170,6 +171,7 @@ export default class SetupHandler {
         const initialModel = currentAvr ? currentAvr.model : "";
         const initialIp = currentAvr ? currentAvr.ip : "";
         const initialPort = currentAvr ? currentAvr.port : AVR_DEFAULTS.port;
+        const initialListeningModes = currentAvr && Array.isArray(currentAvr.listeningModeOptions) ? currentAvr.listeningModeOptions.join('; ') : "";
 
         return new uc.RequestUserInput("Manual configuration", [
           {
@@ -191,6 +193,12 @@ export default class SetupHandler {
             id: "albumArtURL",
             label: { en: "AVR AlbumArt endpoint. Default `album_art.cgi`, if not known set to `na`." },
             field: { text: { value: AVR_DEFAULTS.albumArtURL } }
+          },
+          {
+            id: "listeningModeOptions",
+            label: { en: "Listening mode select options (semicolon-separated, leave empty to show all)" },
+            field: { text: { value: initialListeningModes } },
+            description: { en: "Optional — provide a semicolon-separated list (e.g. stereo; straight-decode; neural-thx). If left empty the driver will show dynamic options based on audio format." }
           },
           {
             id: "queueThreshold",
@@ -254,6 +262,12 @@ export default class SetupHandler {
                 ]
               }
             }
+          },
+          {
+            id: "listeningModeOptions",
+            label: { en: "Listening mode select options (semicolon-separated, leave empty to show all)" },
+            field: { text: { value: initialListeningModes } },
+            description: { en: "Optional — provide a semicolon-separated list (e.g. stereo; straight-decode; neural-thx). If left empty the driver will show dynamic options based on audio format." }
           }
         ]);
       }
@@ -508,6 +522,7 @@ export default class SetupHandler {
       port: portNum,
       queueThreshold: queueThresholdValue,
       albumArtURL: albumArtURLValue,
+      listeningModeOptions: input.listeningModeOptions,
       volumeScale: volumeScaleValue,
       adjustVolumeDispl: adjustVolumeDisplValue,
       createSensors: createSensorsValue,
@@ -557,6 +572,12 @@ export default class SetupHandler {
           id: "albumArtURL",
           label: { en: "AVR AlbumArt endpoint. Default `album_art.cgi`, if not known set to `na`." },
           field: { text: { value: albumArtURLValue } }
+        },
+        {
+          id: "listeningModeOptions",
+          label: { en: "Listening mode select options (semicolon-separated, leave empty to show all)" },
+          field: { text: { value: String(input.listeningModeOptions ?? "") } },
+          description: { en: "Optional — provide a semicolon-separated list (e.g. stereo; straight-decode; neural-thx). If left empty the driver will show dynamic options based on audio format." }
         },
         {
           id: "queueThreshold",

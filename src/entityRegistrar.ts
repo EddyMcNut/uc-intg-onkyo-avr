@@ -4,11 +4,32 @@ import * as uc from "@unfoldedcircle/integration-api";
 import { Select, SelectStates } from "./selectEntity.js";
 import { eiscpMappings } from "./eiscp-mappings.js";
 import { getCompatibleListeningModes } from "./listeningModeFilters.js";
+import { ConfigManager, buildEntityId } from "./configManager.js";
 
 export default class EntityRegistrar {
   constructor() {}
 
-  getListeningModeOptions(audioFormat?: string): string[] {
+  /**
+   * Return listening mode options. If an AVR-specific `listeningModeOptions`
+   * is configured, return it exactly. Otherwise fall back to dynamic filtering
+   * by audio format (or return all available modes).
+   */
+  getListeningModeOptions(audioFormat?: string, avrEntry?: string): string[] {
+    // If avrEntry provided and config contains user-specified options, return them
+    if (avrEntry) {
+      try {
+        const cfg = ConfigManager.get();
+        if (cfg && Array.isArray(cfg.avrs)) {
+          const match = cfg.avrs.find((a) => buildEntityId(a.model, a.ip, a.zone) === avrEntry);
+          if (match && Array.isArray(match.listeningModeOptions) && match.listeningModeOptions.length > 0) {
+            return match.listeningModeOptions.map((s) => s.trim());
+          }
+        }
+      } catch (err) {
+        // ignore and fall back to defaults
+      }
+    }
+
     const lmdMappings = eiscpMappings.value_mappings.LMD;
     const excludeKeys = ["up", "down", "movie", "music", "game", "query"];
     const allModes = Object.keys(lmdMappings).filter((key) => !excludeKeys.includes(key));
@@ -203,8 +224,11 @@ export default class EntityRegistrar {
     return sensors;
   }
 
-  createListeningModeSelectEntity(avrEntry: string, cmdHandler?: (entity: uc.Entity, cmdId: string, params?: { [key: string]: string | number | boolean }) => Promise<uc.StatusCodes>): Select {
-    const options = this.getListeningModeOptions();
+  createListeningModeSelectEntity(
+    avrEntry: string,
+    cmdHandler?: (entity: uc.Entity, cmdId: string, params?: { [key: string]: string | number | boolean }) => Promise<uc.StatusCodes>
+  ): Select {
+    const options = this.getListeningModeOptions(undefined, avrEntry);
     const selectEntity = new Select(
       `${avrEntry}_listening_mode`,
       { en: `${avrEntry} Listening Mode` },

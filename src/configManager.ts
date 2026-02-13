@@ -101,6 +101,8 @@ export interface AvrConfig {
   adjustVolumeDispl?: boolean; // true = use 0.5 dB steps (×2 / ÷2), false = direct EISCP value
   createSensors?: boolean; // true = create sensor entities for this AVR
   netMenuDelay?: number; // delay in ms for NET menu to load (default 2500)
+  /** Optional user-configured listening mode options. When present the select-entity will show these exactly */
+  listeningModeOptions?: string[];
 }
 
 export interface OnkyoConfig {
@@ -132,7 +134,8 @@ export class ConfigManager {
       volumeScale: avr.volumeScale ?? AVR_DEFAULTS.volumeScale,
       adjustVolumeDispl: avr.adjustVolumeDispl ?? AVR_DEFAULTS.adjustVolumeDispl,
       createSensors: avr.createSensors ?? AVR_DEFAULTS.createSensors,
-      netMenuDelay: avr.netMenuDelay ?? AVR_DEFAULTS.netMenuDelay
+      netMenuDelay: avr.netMenuDelay ?? AVR_DEFAULTS.netMenuDelay,
+      listeningModeOptions: avr.listeningModeOptions ?? undefined
     };
   }
 
@@ -339,6 +342,35 @@ export class ConfigManager {
       }
     }
 
+    // listeningModeOptions (optional) - allow array or semicolon-separated string in payload
+    if (avr.listeningModeOptions !== undefined) {
+      const raw = avr.listeningModeOptions;
+      let arr: string[] = [];
+      if (typeof raw === "string") {
+        arr = raw
+          .split(";")
+          .map((s: string) => s.trim())
+          .filter((s: string) => s !== "");
+      } else if (Array.isArray(raw)) {
+        arr = raw.map((s: any) => (typeof s === "string" ? s.trim() : String(s))).filter(Boolean);
+      } else {
+        errors.push("listeningModeOptions must be an array of strings or a semicolon-separated string");
+      }
+
+      if (arr.length > 0) {
+        for (const opt of arr) {
+          if (opt.length > MAX_LENGTHS.USER_COMMAND) {
+            errors.push(`listeningModeOptions entry too long (max ${MAX_LENGTHS.USER_COMMAND}): ${opt}`);
+            break;
+          }
+          if (!PATTERNS.USER_COMMAND.test(opt)) {
+            errors.push(`listeningModeOptions contains invalid characters: ${opt}`);
+            break;
+          }
+        }
+      }
+    }
+
     if (errors.length > 0) {
       return { errors };
     }
@@ -354,7 +386,16 @@ export class ConfigManager {
       volumeScale: typeof avr.volumeScale === "string" ? parseInt(avr.volumeScale, 10) : avr.volumeScale,
       adjustVolumeDispl: parseBoolean(avr.adjustVolumeDispl, AVR_DEFAULTS.adjustVolumeDispl),
       createSensors: parseBoolean(avr.createSensors, AVR_DEFAULTS.createSensors),
-      netMenuDelay: typeof avr.netMenuDelay === "string" ? parseInt(avr.netMenuDelay, 10) : avr.netMenuDelay
+      netMenuDelay: typeof avr.netMenuDelay === "string" ? parseInt(avr.netMenuDelay, 10) : avr.netMenuDelay,
+      listeningModeOptions:
+        typeof avr.listeningModeOptions === "string"
+          ? (avr.listeningModeOptions as string)
+              .split(";")
+              .map((s: string) => s.trim())
+              .filter((s: string) => s !== "")
+          : Array.isArray(avr.listeningModeOptions)
+          ? (avr.listeningModeOptions as string[]).map((s) => s.trim())
+          : undefined
     });
 
     return { errors: [], normalized };

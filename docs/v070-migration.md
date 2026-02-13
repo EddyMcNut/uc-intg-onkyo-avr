@@ -4,7 +4,7 @@ Normally when you install a new version, as long as you kept the AVR name and IP
 
 Version v0.7.0 however has two changes compared to lower versions which break the mappings in your activities, but with running a **one-time extra setup step**, you can get the integration to repair the already existing activities which use AVR entities created with v0.6.5 or lower.
 
-The below easy migration path is available in in all v0.7.x versions. If you are currently running V0.6.5 or lower and want to migrate to V0.8.0 or higher then _first install v0.7.0 and run the migration, after that you can install v0.8.0 or higher_.
+**The below easy migration path is available in in all v0.7.x versions. If you are currently running V0.6.5 or lower and want to migrate to V0.8.0 or higher then _first install v0.7.0 and run the migration, after that you can install v0.8.0 or higher_.**
 
 ## Breaking changes
 
