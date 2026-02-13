@@ -1,13 +1,12 @@
 import test from "ava";
 import fs from "fs";
+import os from "os";
 import path from "path";
 import { pathToFileURL } from "url";
 import { setConfigDir, ConfigManager } from "../src/configManager.js";
 
 function mkTmpDir(prefix = "onkyo-test-") {
-  const os = require("os");
-  const base = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
-  return base;
+  return fs.mkdtempSync(path.join(os.tmpdir(), prefix));
 }
 
 // Ensure registerAvailableEntities re-applies listening-mode options after config change
