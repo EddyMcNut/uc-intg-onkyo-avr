@@ -20,12 +20,15 @@ export enum AudioFormatType {
 /** Listening modes that work with stereo sources (2.0 audio) */
 const stereoCompatibleModes = [
   "all-ch-stereo",
+  "extended-stereo",
   "direct",
   "dolby-virtual",
   "dts-surround-sensation",
   "enhance",
-  "enhanced-7",
+  "enhance-7",
+  "dolby-surround-sports",
   "full-mono",
+  "extended-mono",
   "mono",
   "neo-6",
   "neo-6-cinema",
@@ -37,16 +40,22 @@ const stereoCompatibleModes = [
   "neural-surr",
   "neural-surround",
   "orchestra",
+  "dolby-surround-classical",
   "plii",
   "pliix",
   "pliix-game",
   "pliix-movie",
+  "dolby-surround",
   "pliix-music",
   "pure-audio",
+  "pure-direct",
   "stereo",
   "studio-mix",
+  "dolby-surround-entertainment-show",
   "theater-dimensional",
+  "dolby-surround-front-stage-surround",
   "tv-logic",
+  "dolby-surround-drama",
   "unplugged",
   "whole-house"
 ];
@@ -94,6 +103,7 @@ const dtsModes = [
   "musical",
   "neo-6",
   "neo-6-cinema",
+  "dts-neural:x",
   "neo-6-cinema-dts-surround-sensation",
   "neo-6-music",
   "neo-6-music-dts-surround-sensation",
@@ -119,14 +129,7 @@ const dtsModes = [
 ];
 
 /** Listening modes that work with Dolby TrueHD sources */
-const dolbyTrueHDModes = [
-  ...dolbyDigitalModes,
-  "pliiz-height",
-  "pliiz-height-thx-cinema",
-  "pliiz-height-thx-games",
-  "pliiz-height-thx-music",
-  "pliiz-height-thx-u2"
-];
+const dolbyTrueHDModes = [...dolbyDigitalModes, "pliiz-height", "pliiz-height-thx-cinema", "pliiz-height-thx-games", "pliiz-height-thx-music", "pliiz-height-thx-u2"];
 
 /** Listening modes that work with DTS-HD sources */
 const dtsHDModes = [
@@ -143,30 +146,16 @@ const dtsHDModes = [
 ];
 
 /** Listening modes that work with Dolby Atmos sources */
-const dolbyAtmosModes = [
-  ...dolbyTrueHDModes
-];
+const dolbyAtmosModes = [...dolbyTrueHDModes];
 
 /** Listening modes that work with DTS:X sources */
-const dtsXModes = [
-  ...dtsHDModes
-];
+const dtsXModes = [...dtsHDModes];
 
 /** Listening modes that work with multichannel PCM */
-const multichannelPCMModes = [
-  ...stereoCompatibleModes,
-  "action",
-  "film",
-  "mono-movie",
-  "musical",
-  "straight-decode",
-  "surround"
-];
+const multichannelPCMModes = [...stereoCompatibleModes, "action", "film", "mono-movie", "musical", "straight-decode", "surround"];
 
 /** Listening modes that work with analog inputs */
-const analogModes = [
-  ...stereoCompatibleModes
-];
+const analogModes = [...stereoCompatibleModes];
 
 /**
  * Get compatible listening modes based on audio format

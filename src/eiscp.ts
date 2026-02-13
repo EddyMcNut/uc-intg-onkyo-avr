@@ -2,7 +2,7 @@ import net from "net";
 import dgram from "dgram";
 import log from "./loggers.js";
 
-import EventEmitter from "events";;
+import EventEmitter from "events";
 import { eiscpCommands } from "./eiscp-commands.js";
 import { eiscpMappings } from "./eiscp-mappings.js";
 import { avrStateManager } from "./state.js";
@@ -45,12 +45,8 @@ const ZONE3_COMMAND_MAP: Record<string, string> = {
 };
 
 // Reverse mappings (zone-specific -> main) for parsing incoming commands
-const ZONE2_REVERSE_MAP = Object.fromEntries(
-  Object.entries(ZONE2_COMMAND_MAP).map(([k, v]) => [v, k])
-);
-const ZONE3_REVERSE_MAP = Object.fromEntries(
-  Object.entries(ZONE3_COMMAND_MAP).map(([k, v]) => [v, k])
-);
+const ZONE2_REVERSE_MAP = Object.fromEntries(Object.entries(ZONE2_COMMAND_MAP).map(([k, v]) => [v, k]));
+const ZONE3_REVERSE_MAP = Object.fromEntries(Object.entries(ZONE3_COMMAND_MAP).map(([k, v]) => [v, k]));
 
 // Known network streaming services - when FLD starts with one of these, emit once and suppress scroll updates
 const NETWORK_SERVICES = ["TuneIn", "Spotify", "Deezer", "Tidal", "AmazonMusic", "Chromecast built-in", "DTS Play-Fi", "AirPlay", "Alexa", "Music Server", "USB", "Play Queue"];
@@ -95,9 +91,6 @@ interface CommandInput {
   args: string | number;
 }
 
-/** Standard Node-style callback */
-type NodeCallback<T = null> = (err: Error | null, result: T) => void;
-
 /** Helper to create a delay promise */
 const delay = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -124,7 +117,7 @@ export class EiscpDriver extends EventEmitter {
     NTI: (value, cmd, result) => this.handleMetadata(value, cmd, result),
     NAL: (value, cmd, result) => this.handleMetadata(value, cmd, result),
     DSN: (value, _cmd, result) => this.handleDSN(value, result),
-    FLD: (value, _cmd, result) => this.handleFLD(value, result),
+    FLD: (value, _cmd, result) => this.handleFLD(value, result)
   };
 
   constructor(config?: EiscpConfig) {
@@ -307,10 +300,10 @@ export class EiscpDriver extends EventEmitter {
     // Construct entityId from config and zone
     const entityId = buildEntityId(this.config.model!, this.config.host!, result.zone);
     const currentSource = avrStateManager.getSource(entityId);
-    
+
     // Check if FLD content matches a network service (regardless of current source)
     const detectedService = NETWORK_SERVICES.find((service) => ascii.startsWith(service));
-    
+
     switch (currentSource) {
       case "net": {
         if (detectedService) {
@@ -565,7 +558,7 @@ export class EiscpDriver extends EventEmitter {
         const iscp_message = this.eiscp_packet_extract(data);
         let command = iscp_message.slice(0, 3);
         let value = iscp_message.slice(3);
-        
+
         // log.info("%s RAW (0) RECEIVE: [%s] %s %s", integrationName, command, value);
 
         // Ignore messages we don't care about
@@ -637,12 +630,14 @@ export class EiscpDriver extends EventEmitter {
 
   /** Enqueue an incoming message to be emitted with throttle delay */
   private enqueueIncoming(data: DataPayload): void {
-    this.receiveQueue = this.receiveQueue.then(async () => {
-      await delay(this.config.receive_delay!);
-      this.emit("data", data);
-    }).catch((err) => {
-      log.error("Error processing queued incoming message:", err);
-    });
+    this.receiveQueue = this.receiveQueue
+      .then(async () => {
+        await delay(this.config.receive_delay!);
+        this.emit("data", data);
+      })
+      .catch((err) => {
+        log.error("Error processing queued incoming message:", err);
+      });
   }
 
   /** Send a raw ISCP command */

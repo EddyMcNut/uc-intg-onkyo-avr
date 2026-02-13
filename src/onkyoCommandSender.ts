@@ -110,7 +110,20 @@ export class OnkyoCommandSender {
           // Convert to EISCP: some models use 0.5 dB steps (×2), others show EISCP value directly
           const eiscpValue = adjustVolumeDispl ? avrDisplayValue * 2 : avrDisplayValue;
           const hexVolume = eiscpValue.toString(16).toUpperCase().padStart(2, "0");
-          
+
+          // Debug logging for volume conversion
+          log.info(
+            "%s [%s] volume conversion: slider=%d volumeScale=%d adjustVolumeDispl=%s avrDisplay=%d eiscpValue=%d hex=%s",
+            integrationName,
+            entity.id,
+            sliderValue,
+            volumeScale,
+            String(adjustVolumeDispl),
+            avrDisplayValue,
+            eiscpValue,
+            hexVolume
+          );
+
           // Use zone-specific volume command prefix
           let volumePrefix = "MVL"; // main zone
           if (zone === "zone2") {
@@ -131,36 +144,36 @@ export class OnkyoCommandSender {
         if (params?.source) {
           if (typeof params.source === "string" && params.source.toLowerCase().startsWith("raw")) {
             const rawCmd = (params.source as string).substring(3).trim().toUpperCase();
-            
+
             // Security: Validate raw command length
             if (rawCmd.length > MAX_LENGTHS.RAW_COMMAND) {
               log.error("%s [%s] Raw command too long (%d chars), rejecting", integrationName, entity.id, rawCmd.length);
               return uc.StatusCodes.BadRequest;
             }
-            
+
             // Security: Validate raw command characters (alphanumeric only)
             if (!PATTERNS.RAW_COMMAND.test(rawCmd)) {
               log.error("%s [%s] Raw command contains invalid characters, rejecting", integrationName, entity.id);
               return uc.StatusCodes.BadRequest;
             }
-            
+
             log.info("%s [%s] sending raw command: %s", integrationName, entity.id, rawCmd);
             await this.eiscp.raw(rawCmd);
           } else if (typeof params.source === "string") {
             const userCmd = params.source.toLowerCase();
-            
+
             // Security: Validate user command length
             if (userCmd.length > MAX_LENGTHS.USER_COMMAND) {
               log.error("%s [%s] Command too long (%d chars), rejecting", integrationName, entity.id, userCmd.length);
               return uc.StatusCodes.BadRequest;
             }
-            
+
             // Security: Validate user command characters
             if (!PATTERNS.USER_COMMAND.test(userCmd)) {
               log.error("%s [%s] Command contains invalid characters, rejecting", integrationName, entity.id);
               return uc.StatusCodes.BadRequest;
             }
-            
+
             await this.eiscp.command(formatCommand(userCmd));
           }
         }

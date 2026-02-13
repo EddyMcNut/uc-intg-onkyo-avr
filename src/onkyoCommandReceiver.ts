@@ -94,7 +94,8 @@ export class OnkyoCommandReceiver {
             this.driver.updateEntityAttributes(entityId, {
               [uc.MediaPlayerAttributes.State]: powerState
             });
-            log.info("%s [%s] power set to: %s (driver v%s)", integrationName, entityId, powerState, this.driverVersion);
+            log.info("** Onkyo AVR custom integration version %s **", this.driverVersion);
+            log.info("%s [%s] power set to: %s", integrationName, entityId, powerState);
 
             // Track power state in state manager
             avrStateManager.setPowerState(entityId, avrUpdates.argument as string);
@@ -103,7 +104,7 @@ export class OnkyoCommandReceiver {
             if (avrUpdates.argument !== "on") {
               for (const suffix of SENSOR_SUFFIXES) {
                 this.driver.updateEntityAttributes(`${entityId}${suffix}`, {
-                  [uc.SensorAttributes.Value]: "no data",
+                  [uc.SensorAttributes.Value]: "no data"
                 });
               }
             }
@@ -158,14 +159,14 @@ export class OnkyoCommandReceiver {
               [uc.MediaPlayerAttributes.Source]: source
             });
             log.info("%s [%s] input-selector (source) set to: %s", integrationName, entityId, source);
-            
+
             // Reset track info on source change to ensure fresh updates
             this.currentTrackId = "";
             nowPlaying.title = undefined;
             nowPlaying.artist = undefined;
             nowPlaying.album = undefined;
             nowPlaying.station = undefined;
-            
+
             switch (source) {
               case "dab":
                 this.eiscpInstance.raw("DSNQSTN");
@@ -216,29 +217,38 @@ export class OnkyoCommandReceiver {
 
               // Detect and track audio format type
               const audioFormatType = detectAudioFormatType(audioInputValue);
-              const formatChanged = avrStateManager.setAudioFormat(entityId, audioFormatType, this.driver);
+              const formatChanged = avrStateManager.setAudioFormat(entityId, audioFormatType);
 
               // If audio format changed, update listening mode select entity options
               if (formatChanged) {
                 const selectEntityId = `${entityId}_listening_mode`;
                 const compatibleModes = getCompatibleListeningModes(audioFormatType);
-                
+
                 if (compatibleModes) {
-                  // Get all listening modes from mappings
-                  const lmdMappings = eiscpMappings.value_mappings.LMD;
-                  const excludeKeys = ["up", "down", "movie", "music", "game", "query"];
-                  const allModes = Object.keys(lmdMappings).filter(key => !excludeKeys.includes(key));
-                  
-                  // Filter to compatible modes and sort alphabetically
-                  const filteredOptions = allModes.filter(mode => compatibleModes.includes(mode)).sort();
-                  
-                  log.info("%s [%s] updating listening mode options for format: %s (%d modes)", integrationName, entityId, audioFormatType, filteredOptions.length);
-                  
-                  // Update select entity with filtered options
-                  // TypeScript doesn't recognize that options can be an array, but the API supports it
-                  this.driver.updateEntityAttributes(selectEntityId, {
-                    [SelectAttributes.Options]: filteredOptions as any
-                  });
+                  // If user configured a custom listeningModeOptions for this AVR, honor it exactly
+                  const cfgAvr = this.config.avrs ? this.config.avrs.find((a) => buildEntityId(a.model, a.ip, a.zone) === entityId) : undefined;
+                  if (cfgAvr && Array.isArray(cfgAvr.listeningModeOptions) && cfgAvr.listeningModeOptions.length > 0) {
+                    log.info("%s [%s] using user-configured listeningModeOptions (%d entries)", integrationName, entityId, cfgAvr.listeningModeOptions.length);
+                    this.driver.updateEntityAttributes(selectEntityId, {
+                      [SelectAttributes.Options]: cfgAvr.listeningModeOptions as any
+                    });
+                  } else {
+                    // Get all listening modes from mappings
+                    const lmdMappings = eiscpMappings.value_mappings.LMD;
+                    const excludeKeys = ["up", "down", "movie", "music", "game", "query"];
+                    const allModes = Object.keys(lmdMappings).filter((key) => !excludeKeys.includes(key));
+
+                    // Filter to compatible modes and sort alphabetically
+                    const filteredOptions = allModes.filter((mode) => compatibleModes.includes(mode)).sort();
+
+                    log.info("%s [%s] updating listening mode options for format: %s (%d modes)", integrationName, entityId, audioFormatType, filteredOptions.length);
+
+                    // Update select entity with filtered options
+                    // TypeScript doesn't recognize that options can be an array, but the API supports it
+                    this.driver.updateEntityAttributes(selectEntityId, {
+                      [SelectAttributes.Options]: filteredOptions as any
+                    });
+                  }
                 }
               }
             }
@@ -313,10 +323,10 @@ export class OnkyoCommandReceiver {
                   [uc.SensorAttributes.Value]: frontPanelText
                 });
                 // Query metadata when switching to a new network service
-                const hasSongInfo = SONG_INFO.some(name => frontPanelText.toLowerCase().includes(name));
+                const hasSongInfo = SONG_INFO.some((name) => frontPanelText.toLowerCase().includes(name));
                 if (hasSongInfo) {
                   this.eiscpInstance.raw("NATQSTN"); // Query title
-                  this.eiscpInstance.raw("NTIQSTN"); // Query artist  
+                  this.eiscpInstance.raw("NTIQSTN"); // Query artist
                   this.eiscpInstance.raw("NALQSTN"); // Query album
                 }
               }
@@ -339,7 +349,7 @@ export class OnkyoCommandReceiver {
           }
           case "metadata": {
             const currentSubSource = avrStateManager.getSubSource(entityId);
-            const hasSongInfo = SONG_INFO.some(name => currentSubSource.includes(name));
+            const hasSongInfo = SONG_INFO.some((name) => currentSubSource.includes(name));
             if (hasSongInfo) {
               if (typeof avrUpdates.argument === "object" && avrUpdates.argument !== null) {
                 nowPlaying.title = (avrUpdates.argument as Record<string, string>).title || "unknown";
@@ -364,10 +374,10 @@ export class OnkyoCommandReceiver {
                 [uc.MediaPlayerAttributes.MediaTitle]: nowPlaying.title || "unknown",
                 [uc.MediaPlayerAttributes.MediaAlbum]: nowPlaying.album || "unknown"
               });
-              const hasAlbumArt = ALBUM_ART.some(name => entitySubSource.includes(name));
+              const hasAlbumArt = ALBUM_ART.some((name) => entitySubSource.includes(name));
               if (hasAlbumArt) {
                 await this.maybeUpdateImage(entityId);
-              }else {
+              } else {
                 // Clear image URL if source does not support album art
                 this.driver.updateEntityAttributes(entityId, {
                   [uc.MediaPlayerAttributes.MediaImageUrl]: ""

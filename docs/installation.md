@@ -13,22 +13,24 @@
 
 - In webconfigurator, go to `Integrations`, `Add new`, `Install custom`, select the `uc-intg-onkyo-avr-x.y.z.tar.gz` and then `Upload`.
 - Uploading can take a few seconds.
+- In `Integrations` select `Onkyo AVR custom` and click `next`.
+- If you have stored a backup of a previous *integration configuration*, you can restore is like described [here](./backup-restore.md), otherwise continue with the next steps.
+- Select the `configure` option and click `next`.
 - For the next step, it depends on your AVR model if it supports autodiscover, if it does:
-  - In `Integrations` select `Onkyo AVR custom`.
   - Leave the input fields `AVR Model` and `AVR IP Address` empty.
-  - Check if the endpoint for Album Art corresponds with your AVR model, if it does not have an Album Art endpoint, set it to `na` to prevent errors.
-  - Click `Next`, click `Done`.
-- If auto discover fails, remove the integration completely, upload it again and then after upload:
-  - In `Integrations` select `Onkyo AVR custom`.
+- If auto discover fails:
+  - Remove the integration completely, upload it again and then after upload:
   - Populate `AVR Model` and `AVR IP Address`.
-  - Check if the endpoint for Album Art corresponds with your AVR model, if it does not have an Album Art endpoint, set it to `na` to prevent errors.
-  - Click `Next`, click `Done`.
-- Add your AVR as entity: In `Integrations` select `Onkyo AVR custom`, click the `+` next to `Configured entities`, add your AVR
+- Check if the endpoint for Album Art corresponds with your AVR model, if it does not have an Album Art endpoint, set it to `na` to prevent errors.
+- Configure also the other settings for your AVR.
+- Click `Next`.
+- Click `Add all`, click `Done`.
 
-  *next to the AVR entity, the integration also creates several [sensors](./sensor.md), you can decide for yourself if you also want to use these sensors, to control your AVR you only have to select the AVR entity*
+### Available entities
+  _next to the AVR entity, the integration also creates several [sensors](./sensor.md) and [selects](./select.md), you can decide for yourself if you also want to use these sensors, to control your AVR you only have to select the AVR entity_
 
   **the AVR entity has the🎵icon**
- 
+
   ![](../screenshots/configured-entities.png)
 
   ![](../screenshots/select-entity.png)

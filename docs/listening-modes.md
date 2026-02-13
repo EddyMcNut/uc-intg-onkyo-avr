@@ -28,4 +28,6 @@ However, most models `auto-select` the correct mode when the input signal is `Do
 
 ![](../screenshots/straight-decode.png)
 
+As from version 0.8.0, the integration offers a `select` widget for listening modes, see [this doc](select-listening-mode.md).
+
 [back to main README](../README.md#listening-modes)
