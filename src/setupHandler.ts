@@ -262,12 +262,6 @@ export default class SetupHandler {
                 ]
               }
             }
-          },
-          {
-            id: "listeningModeOptions",
-            label: { en: "Listening mode select options (semicolon-separated, leave empty to show all)" },
-            field: { text: { value: initialListeningModes } },
-            description: { en: "Optional — provide a semicolon-separated list (e.g. stereo; straight-decode; neural-thx). If left empty the driver will show dynamic options based on audio format." }
           }
         ]);
       }
