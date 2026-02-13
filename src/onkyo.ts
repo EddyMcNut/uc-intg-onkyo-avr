@@ -150,7 +150,13 @@ export default class OnkyoDriver {
       // If the Integration API supports updating attributes at runtime,
       // set the select-entity options immediately from saved config.
       const options = this.entityRegistrar.getListeningModeOptions(undefined, avrEntry);
-      if (options && options.length > 0 && typeof this.driver.updateEntityAttributes === "function") {
+      // Always refresh the listening-mode select options at registration time from
+      // the current persisted config. Previously we only updated when a
+      // non-empty user-configured list existed which could leave stale options
+      // visible in other activities after reconfigure. Ensure we always call
+      // updateEntityAttributes so both running and available activity views
+      // receive the updated options (including empty arrays).
+      if (typeof this.driver.updateEntityAttributes === "function") {
         this.driver.updateEntityAttributes(`${avrEntry}_listening_mode`, {
           [SelectAttributes.Options]: options as any
         });
