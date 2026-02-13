@@ -246,3 +246,52 @@ test.serial("handleBackupPayload: returns backup data JSON textarea", async (t) 
     fs.rmSync(tmp, { recursive: true, force: true });
   }
 });
+
+// Ensure listeningModeOptions provided during initial setup + autodiscovery are persisted
+test.serial("handleManualConfiguration: autodiscovery should persist listeningModeOptions when supplied", async (t) => {
+  const tmp = mkTmpDir();
+  try {
+    const configModule = await importDistModule("dist/src/configManager.js");
+    const SetupHandlerModule = await importDistModule("dist/src/setupHandler.js");
+    const EiscpModule = await importDistModule("dist/src/eiscp.js");
+
+    const ConfigManager = configModule.ConfigManager;
+    if (typeof configModule.setConfigDir === "function") configModule.setConfigDir(tmp);
+
+    // Stub discovery to return a host
+    const originalDiscover = EiscpModule.default.prototype.discover;
+    EiscpModule.default.prototype.discover = async () => [{ model: "TX-RZ50", host: "192.168.2.103", port: 60128 }];
+
+    let saved = false;
+    const host: any = {
+      driver: {},
+      getConfigDirPath: () => tmp,
+      onConfigSaved: async () => {
+        saved = true;
+      },
+      onConfigCleared: async () => {},
+      log: console
+    };
+
+    const setup = new SetupHandlerModule.default(host);
+
+    const input = {
+      model: "",
+      ipAddress: "",
+      listeningModeOptions: "stereo; straight-decode"
+    };
+
+    const res = await (setup as any).handleManualConfiguration(input);
+    t.true(res instanceof uc.SetupComplete);
+    t.true(saved);
+
+    const reloaded = ConfigManager.load();
+    t.truthy(reloaded.avrs && reloaded.avrs[0].listeningModeOptions);
+    t.deepEqual(reloaded.avrs![0].listeningModeOptions, ["stereo", "straight-decode"]);
+
+    // restore stub
+    EiscpModule.default.prototype.discover = originalDiscover;
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});

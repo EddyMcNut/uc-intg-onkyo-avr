@@ -453,6 +453,18 @@ export default class SetupHandler {
           zone: "main"
         };
 
+        // If user supplied listeningModeOptions during setup, include them (normalize string -> array)
+        if (input.listeningModeOptions !== undefined && input.listeningModeOptions !== null && String(input.listeningModeOptions).trim() !== "") {
+          discoveredAvr.listeningModeOptions = typeof input.listeningModeOptions === "string"
+            ? (input.listeningModeOptions as string)
+                .split(";")
+                .map((s: string) => s.trim())
+                .filter((s: string) => s !== "")
+            : Array.isArray(input.listeningModeOptions)
+            ? (input.listeningModeOptions as string[]).map((s) => String(s).trim()).filter(Boolean)
+            : undefined;
+        }
+
         // Save discovered AVR
         ConfigManager.addAvr(discoveredAvr);
         await this.host.onConfigSaved();
