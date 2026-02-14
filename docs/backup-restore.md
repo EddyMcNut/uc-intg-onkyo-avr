@@ -8,7 +8,7 @@ Backup/Restore is compatible with [Integration Manager](https://github.com/JackJ
 In the driver setup flow choose the `Create configuration backup` and `Restore configuration from backup` actions.
 
 ## What `Backup` does
-- Selecting **Create configuration backup** will open a textarea containing a JSON payload representing the current configuration and driver metadata.
+- Selecting **Create configuration backup** will open a textarea containing a JSON payload representing the current configuration.
 - The payload includes a `meta` section (driver id, version, timestamp) and a `config` section (the `config.json` contents). Example:
 
 ```json
