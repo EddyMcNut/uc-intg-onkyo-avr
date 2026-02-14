@@ -5,7 +5,7 @@ As from v0.8.0 the integration offers the option to backup and restore the confi
 Version 0.8.0 is compatible with [Integration Manager](https://github.com/JackJPowell/uc-intg-manager). If you don't use that Integration Manager, continue reading here. 
 
 ## Installing a new version directly within the web configurator
-Installing a new version is done by removing the current version. **As long as you make sure that during setup of the new version the selected AVR has the exact name and IP as in the current version, all your mappings in your activities will be preserved.**
+Installing a new version by using the web configurator is done by removing the current version. **As long as you make sure that during setup of the new version the selected AVR has the exact name and IP as in the current version, all your mappings in your activities will be preserved.**
 If your AVR was autodiscovered, the name will be the same when you let it be autodiscovered again, as long as the IP address stays the same.
 
 1. create a backup of the *remote*
