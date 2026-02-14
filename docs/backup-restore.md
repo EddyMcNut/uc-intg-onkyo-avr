@@ -5,8 +5,7 @@ As from v0.8.0 this integration offers the option to backup and restore your con
 Backup/Restore is compatible with [Integration Manager](https://github.com/JackJPowell/uc-intg-manager).
 
 ## Where to find the options
-- In the driver setup flow choose **Backup** or **Restore**.
-- The `Configure` flow also exposes the `Create configuration backup` and `Restore configuration from backup` actions.
+In the driver setup flow choose the `Create configuration backup` and `Restore configuration from backup` actions.
 
 ## What `Backup` does
 - Selecting **Create configuration backup** will open a textarea containing a JSON payload representing the current configuration and driver metadata.
