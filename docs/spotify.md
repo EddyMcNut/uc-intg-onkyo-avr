@@ -1,10 +1,8 @@
 ## Spotify
 
-Let's say that you select the AVR in the Spotify app on your phone and your AVR switches source to Spotify, the remote will sense that and will try to collect the album art, artist, title and album. All this is collected from the AVR, this integration does not communicate with Spotify directly. Also `play/pause`, `next` and `previous` will be send to the AVR, the AVR will handle the communicatio with your Spotify app.
-
 It's best to create an activity for Spotify and select it when you send music from your Spotify app to your AVR. Next time you select this activity and hit `play` on the remote, it will try to continue where you left it last time.
 
-In future releases of Unfolded Circle, one activity could activate another activity. When that is possible this integration will be adjusted to automatically switch to the Spotify activity once it detects that the AVR switched to streaming Spotify.
+This integration will try to collect the album art, artist, title and album. All this is collected from the AVR, this integration does not communicate with Spotify directly. Also `play/pause`, `next` and `previous` will be send to the AVR, the AVR will handle the communicatio with your Spotify app.
 
 ### Spotify activity
 
