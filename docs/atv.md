@@ -12,7 +12,7 @@ To set up an Activity for AppleTV, have a look at these screenshots:
 
   ![](../screenshots/appletv-on.png)
 
-- User interface, add mediawidget for the AVR with maximum size
+- User interface, add mediawidget for the AppleTV with maximum size
 
   ![](../screenshots/appletv-mediawidget.png)
 
