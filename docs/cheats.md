@@ -1,6 +1,6 @@
 ## Cheats
 
-In the new Activity, `User interface`, add `Text Button` and select `Input source`, because there is a text field where you can type anything, we can give all kinds of commands, like presets or input sources:
+In an Activity goto `User interface`, add `Text Button` and select `Input source`, because there is a text field where you can type anything, we can give all kinds of commands, like presets or input sources:
 
 ![](../screenshots/input-selectorFM.png)
 
