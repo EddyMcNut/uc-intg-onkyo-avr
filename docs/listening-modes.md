@@ -28,6 +28,27 @@ However, most models `auto-select` the correct mode when the input signal is `Do
 
 ![](../screenshots/straight-decode.png)
 
+## Select widget
 As from version 0.8.0, the integration offers a `select` widget for listening modes, see [this doc](select-listening-mode.md).
+
+## Pioneer models
+| Listening modes known to be accepted by Pioneer |
+|-------------------------------------------------|
+| direct                                          |
+| dolby-surround                                  |
+| dolby-surround-classical                        |
+| dolby-surround-drama                            |
+| dolby-surround-entertainment-show               |
+| dolby-surround-front-stage-surround             |
+| dolby-surround-sports                           |
+| dolby-surround-unplugged                        |
+| dts-neural:x                                    |
+| extended-mono                                   |
+| extended-stereo                                 |
+| mono                                            |
+| pure-direct                                     |
+| stereo                                          |
+
+The already mentioned [JSON](../src/eiscp-commands.ts) shows how these are mapped to the listening modes known by Onkyo models.
 
 [back to main README](../README.md#listening-modes)

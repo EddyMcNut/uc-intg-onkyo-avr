@@ -57,6 +57,7 @@ const stereoCompatibleModes = [
   "tv-logic",
   "dolby-surround-drama",
   "unplugged",
+  "dolby-surround-unplugged",
   "whole-house"
 ];
 

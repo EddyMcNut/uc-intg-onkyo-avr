@@ -600,7 +600,7 @@ export const eiscpCommands = {
         "06": { name: ["musical", "game-rock"], description: "sets MUSICAL, Game-Rock" },
         "07": { name: "mono-movie", description: "sets MONO MOVIE" },
         "08": { name: ["orchestra", "dolby-surround-classical"], description: "sets ORCHESTRA" },
-        "09": { name: "unplugged", description: "sets UNPLUGGED" },
+        "09": { name: ["unplugged", "dolby-surround-unplugged"], description: "sets UNPLUGGED" },
         "0A": { name: ["studio-mix", "dolby-surround-entertainment-show"], description: "sets STUDIO-MIX" },
         "0B": { name: ["tv-logic", "dolby-surround-drama"], description: "sets TV LOGIC" },
         "0C": { name: ["all-ch-stereo", "extended-stereo"], description: "sets ALL CH STEREO" },

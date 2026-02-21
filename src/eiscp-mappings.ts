@@ -485,6 +485,7 @@ export const eiscpMappings = {
       orchestra: { value: "08" },
       "dolby-surround-classical": { value: "08" },
       unplugged: { value: "09" },
+      "dolby-surround-unplugged": { value: "09" },
       "studio-mix": { value: "0A" },
       "dolby-surround-entertainment-show": { value: "0A" },
       "tv-logic": { value: "0B" },
