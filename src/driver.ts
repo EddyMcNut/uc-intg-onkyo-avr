@@ -15,6 +15,8 @@ import ConnectionManager from "./connectionManager.js";
 import AvrInstanceManager from "./avrInstanceManager.js";
 import ListeningModeHandler from "./listeningModeHandler.js";
 import SubscriptionHandler from "./subscriptionHandler.js";
+import fs from "fs";
+import path from "path";
 const integrationName = "driver:";
 
 /** Parsed setup data with concrete types (after validation/conversion) */
