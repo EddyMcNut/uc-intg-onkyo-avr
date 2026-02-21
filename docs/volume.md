@@ -44,14 +44,10 @@ As from v0.6.1, this integration support the use of the Slider to control the AV
 
 ![](../screenshots/volume-scale.png)
 
-In the Activity, User interface, add a `Media Widget` for your Onkyo AVR and you can then control the volume with the slider.
+In the Activity, `Button mapping`, click the `Touch slider`, select your Onkyo AVR as `Entity`, and Volume as `Feature`.
 
-If you already have a Media Widget in that activity for a different device, let's say an AppleTV, just add a new widget for your AVR. The slider will work if the Media Widget for the AVR is the last Media Widget on that page. In other words the Media Widget that is closest to the Slider on the remote.
-
-![](../screenshots//slider-widget.png)
+![](../screenshots/slider.png)
 
 Now you can control the AVR volume with the Slider.
-
-_note: after installing a new version of the integration or after a reboot of the remote, it might be needed to close screen on the remote and enter the already active activity again to get the slider to work_
 
 [back to main README](../README.md#volume)
