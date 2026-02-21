@@ -2,6 +2,8 @@ import path from "path";
 import fs from "fs";
 import log from "./loggers.js";
 
+const integrationName = "configManager:";
+
 export const DEFAULT_QUEUE_THRESHOLD = 100;
 
 // Config directory is configurable at runtime to support integration manager backups/restores
@@ -194,7 +196,7 @@ export class ConfigManager {
         }
       }
     } catch (err) {
-      log.error("Failed to load config:", err);
+      log.error(`${integrationName} Failed to load config:`, err);
       this.config = {};
     }
     return this.config;
@@ -205,7 +207,7 @@ export class ConfigManager {
     try {
       fs.writeFileSync(CONFIG_PATH, JSON.stringify(this.config, null, 2), "utf-8");
     } catch (err) {
-      log.error("Failed to save config:", err);
+      log.error(`${integrationName} Failed to save config:`, err);
     }
   }
 
@@ -223,7 +225,7 @@ export class ConfigManager {
     const existingIndex = this.config.avrs.findIndex((a) => a.ip === normalizedAvr.ip && a.zone === normalizedAvr.zone);
     if (existingIndex >= 0) {
       // AVR already exists, update it with new settings from setup
-      log.info(`ConfigManager: Updating existing AVR at ${normalizedAvr.ip} zone ${normalizedAvr.zone}`);
+      log.info(`${integrationName} Updating existing AVR at ${normalizedAvr.ip} zone ${normalizedAvr.zone}`);
       this.config.avrs[existingIndex] = normalizedAvr;
       this.save(this.config);
       return;
@@ -239,9 +241,9 @@ export class ConfigManager {
     this.config = {} as OnkyoConfig;
     try {
       fs.writeFileSync(CONFIG_PATH, JSON.stringify(this.config, null, 2), "utf-8");
-      log.info("ConfigManager: Cleared configuration and persisted empty config file");
+      log.info(`${integrationName} Cleared configuration and persisted empty config file`);
     } catch (err) {
-      log.error("Failed to clear config:", err);
+      log.error(`${integrationName} Failed to clear config:`, err);
     }
   }
 

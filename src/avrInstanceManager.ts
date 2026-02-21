@@ -1,15 +1,15 @@
 /*jslint node:true nomen:true*/
 "use strict";
 import { AvrConfig, buildEntityId } from "./configManager.js";
-import { OnkyoCommandSender } from "./onkyoCommandSender.js";
+import { CommandSender } from "./commandSender.js";
 import { buildPhysicalAvrId } from "./configManager.js";
 import log from "./loggers.js";
 
-const integrationName = "driver:";
+const integrationName = "avrInstanceManager:";
 
 export interface AvrInstance {
   config: AvrConfig;
-  commandSender: OnkyoCommandSender;
+  commandSender: CommandSender;
 }
 
 import { PhysicalConnection, CreateCommandSenderFn } from "./types.js";

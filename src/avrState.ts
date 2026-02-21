@@ -2,7 +2,7 @@ import * as uc from "@unfoldedcircle/integration-api";
 import { EiscpDriver } from "./eiscp.js";
 import log from "./loggers.js";
 
-const integrationName = "state:";
+const integrationName = "avrState:";
 
 /** State for a single AVR entity */
 interface EntityState {
@@ -18,6 +18,9 @@ interface EntityState {
  */
 class AvrStateManager {
   private states: Map<string, EntityState> = new Map();
+  // reuse the existing state map to also track last query timestamps
+  private lastQueries: Map<string, number> = new Map();
+  private readonly QUERY_TTL = 5000; // ms
 
   /** Get or create state for an entity */
   private getState(entityId: string): EntityState {
@@ -156,7 +159,37 @@ class AvrStateManager {
   }
 
   /** Query AVR system & general state: power, input, volume, muting, listening mode, fp-display */
+  /**
+   * Determine whether enough time has passed since the last state query for
+   * this entity.  Public because callers outside the state manager (e.g.
+   * SubscriptionHandler) need to consult it.
+   */
+  public shouldQuery(entityId: string): boolean {
+    const last = this.lastQueries.get(entityId) || 0;
+    return Date.now() - last > this.QUERY_TTL;
+  }
+
+  /** Record that we just queried the given entity. */
+  public recordQuery(entityId: string): void {
+    this.lastQueries.set(entityId, Date.now());
+  }
+
+  /** Record multiple queries at once (used by batch operations). */
+  public recordQueries(avrEntries: Iterable<string>): void {
+    const now = Date.now();
+    for (const e of avrEntries) {
+      this.lastQueries.set(e, now);
+    }
+  }
+
   async queryAvrState(entityId: string, eiscpInstance: EiscpDriver, zone: string, context: string, queueThreshold?: number): Promise<void> {
+    if (!eiscpInstance || !zone || !entityId) return;
+
+    if (!this.shouldQuery(entityId)) {
+      log.debug(`${integrationName} [%s] skipping redundant query (%s)`, entityId, context);
+      return;
+    }
+    this.recordQuery(entityId);
     if (!eiscpInstance || !zone || !entityId) return;
 
     const threshold = queueThreshold ?? (typeof eiscpInstance["config"]?.send_delay === "number" ? eiscpInstance["config"].send_delay : 250);

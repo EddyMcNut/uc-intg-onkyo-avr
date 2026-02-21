@@ -5,7 +5,7 @@ import log from "./loggers.js";
 import EventEmitter from "events";
 import { eiscpCommands } from "./eiscp-commands.js";
 import { eiscpMappings } from "./eiscp-mappings.js";
-import { avrStateManager } from "./state.js";
+import { avrStateManager } from "./avrState.js";
 import { DEFAULT_QUEUE_THRESHOLD, buildEntityId } from "./configManager.js";
 
 export interface EiscpConfig {
@@ -139,7 +139,7 @@ export class EiscpDriver extends EventEmitter {
   private setupErrorHandler() {
     if (this.listenerCount("error") === 0) {
       this.on("error", (err: Error) => {
-        log.error("eiscp error (unhandled):", err);
+        log.error("%s eiscp error (unhandled):", integrationName, err);
       });
     }
   }
@@ -454,7 +454,7 @@ export class EiscpDriver extends EventEmitter {
       }
       client
         .on("error", (err: Error) => {
-          log.error("[EiscpDriver] UDP error:", err);
+          log.error("%s UDP error:", integrationName, err);
           try {
             client.close();
           } catch {}
@@ -487,7 +487,7 @@ export class EiscpDriver extends EventEmitter {
           client.send(buffer, 0, buffer.length, opts.port, opts.address, (err) => {
             if (err) {
               // Log but don't fail - network might not be ready yet (ENETUNREACH)
-              log.error(`[EiscpDriver] UDP send error (network may not be ready):`, err);
+              log.error("%s UDP send error (network may not be ready):", integrationName, err);
               // Close client and resolve with empty result - configured AVRs will still be tried
               clearTimeout(timeout_timer);
               close();
@@ -496,10 +496,10 @@ export class EiscpDriver extends EventEmitter {
           timeout_timer = setTimeout(close, opts.timeout * 1000);
         })
         .on("close", () => {
-          log.info("[EiscpDriver] UDP socket closed");
+          log.info("%s UDP socket closed", integrationName);
         })
         .bind(0, undefined, (err?: Error) => {
-          if (err) log.error("[EiscpDriver] UDP bind error:", err);
+          if (err) log.error("%s UDP bind error:", integrationName, err);
         });
     });
   }
@@ -516,7 +516,7 @@ export class EiscpDriver extends EventEmitter {
         this.config.port = Number(h.port);
         this.config.model = h.model;
       } else {
-        log.error("[EiscpDriver] No AVR found during discovery.");
+        log.error("%s No AVR found during discovery.", integrationName);
         return null;
       }
     }
@@ -542,15 +542,15 @@ export class EiscpDriver extends EventEmitter {
         const wasConnected = this.is_connected;
         this.is_connected = false;
         if (wasConnected) {
-          log.warn("[EiscpDriver] Connection closed for %s at %s:%d", this.config.model, this.config.host, this.config.port || 60128);
+          log.warn("%s Connection closed for %s at %s:%d", integrationName, this.config.model, this.config.host, this.config.port || 60128);
         }
         if (this.config.reconnect) {
-          log.info("[EiscpDriver] Scheduling reconnection in %ds", this.config.reconnect_sleep);
+          log.info("%s Scheduling reconnection in %ds", integrationName, this.config.reconnect_sleep);
           setTimeout(() => this.connect(), this.config.reconnect_sleep! * 1000);
         }
       })
       .on("error", (err) => {
-        log.error("[EiscpDriver] Socket error for %s at %s:%d - %s", this.config.model, this.config.host, this.config.port || 60128, err.message);
+        log.error("%s Socket error for %s at %s:%d - %s", integrationName, this.config.model, this.config.host, this.config.port || 60128, err.message);
         this.is_connected = false;
         this.eiscp?.destroy();
       })
@@ -636,7 +636,7 @@ export class EiscpDriver extends EventEmitter {
         this.emit("data", data);
       })
       .catch((err) => {
-        log.error("Error processing queued incoming message:", err);
+        log.error("%s Error processing queued incoming message:", integrationName, err);
       });
   }
 

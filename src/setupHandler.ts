@@ -5,7 +5,7 @@ import EiscpDriver from "./eiscp.js";
 import { ConfigManager, parseBoolean, OnkyoConfig, AvrConfig, AvrZone, AVR_DEFAULTS } from "./configManager.js";
 import log from "./loggers.js";
 
-const integrationName = "driver:";
+const integrationName = "setupHandler:";
 
 type SetupHost = {
   driver: uc.IntegrationAPI;

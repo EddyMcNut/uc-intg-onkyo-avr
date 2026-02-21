@@ -1,11 +1,12 @@
 import test from "ava";
+import type { IntegrationAPI } from "@unfoldedcircle/integration-api";
 import { pathToFileURL } from "url";
 import path from "path";
 
-test.serial("OnkyoCommandReceiver preserves user-configured listeningModeOptions across IFA/source events", async (t) => {
-  const crModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/onkyoCommandReceiver.js")).href) as any;
+test.serial("CommandReceiver preserves user-configured listeningModeOptions across IFA/source events", async (t) => {
+  const crModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/commandReceiver.js")).href) as any;
   const ConfigModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/configManager.js")).href) as any;
-  const { OnkyoCommandReceiver } = crModule;
+  const { CommandReceiver } = crModule;
   const { ConfigManager } = ConfigModule;
 
   // Prepare config with user-specified listeningModeOptions
@@ -13,10 +14,13 @@ test.serial("OnkyoCommandReceiver preserves user-configured listeningModeOptions
   ConfigManager.save(cfg);
 
   // Capture attribute updates from the driver
-  const updates: Array<{ id: string; attrs: any }> = [];
-  const mockDriver = {
-    updateEntityAttributes: (id: string, attrs: any) => updates.push({ id, attrs })
-  } as any;
+  const updates: Array<{ id: string; attrs: { [key: string]: string|number|boolean } }> = [];
+  const mockDriver: Partial<IntegrationAPI> = {
+    updateEntityAttributes: (id: string, attrs: { [key: string]: string|number|boolean }) => {
+      updates.push({ id, attrs });
+      return true;
+    }
+  };
 
   // Minimal mock eISCP that allows emitting 'data' events
   class MockEiscp {
@@ -34,9 +38,9 @@ test.serial("OnkyoCommandReceiver preserves user-configured listeningModeOptions
 
   const mockEiscp = new MockEiscp();
 
-  // Construct OnkyoCommandReceiver with the persisted config
+  // Construct CommandReceiver with the persisted config
   const onkyoCfg = ConfigManager.load();
-  const receiver = new OnkyoCommandReceiver(mockDriver, onkyoCfg, mockEiscp as any, "v-test");
+  const receiver = new CommandReceiver(mockDriver, onkyoCfg, mockEiscp as any, "v-test");
   receiver.setupEiscpListener();
 
   // Emit an IFA event that would normally trigger listening-mode option filtering

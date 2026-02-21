@@ -1,5 +1,5 @@
 import * as uc from "@unfoldedcircle/integration-api";
-import { avrStateManager } from "./state.js";
+import { avrStateManager } from "./avrState.js";
 import crypto from "crypto";
 import { OnkyoConfig, buildEntityId } from "./configManager.js";
 import { EiscpDriver } from "./eiscp.js";
@@ -8,7 +8,7 @@ import { getCompatibleListeningModes, detectAudioFormatType } from "./listeningM
 import { eiscpMappings } from "./eiscp-mappings.js";
 import log from "./loggers.js";
 
-const integrationName = "receiver:";
+const integrationName = "commandReceiver:";
 
 const SENSOR_SUFFIXES = [
   "_mute_sensor",
@@ -25,7 +25,7 @@ const SENSOR_SUFFIXES = [
 const ALBUM_ART = ["spotify", "deezer", "tidal", "amazonmusic", "dts-play-fi"];
 const SONG_INFO = ["spotify", "deezer", "tidal", "amazonmusic", "dts-play-fi", "airplay"];
 
-export class OnkyoCommandReceiver {
+export class CommandReceiver {
   private driver: uc.IntegrationAPI;
   private config: OnkyoConfig;
   private eiscpInstance: EiscpDriver;
@@ -230,7 +230,8 @@ export class OnkyoCommandReceiver {
                   if (cfgAvr && Array.isArray(cfgAvr.listeningModeOptions) && cfgAvr.listeningModeOptions.length > 0) {
                     log.info("%s [%s] using user-configured listeningModeOptions (%d entries)", integrationName, entityId, cfgAvr.listeningModeOptions.length);
                     this.driver.updateEntityAttributes(selectEntityId, {
-                      [SelectAttributes.Options]: cfgAvr.listeningModeOptions as any
+                      // options is a simple string array
+                      [SelectAttributes.Options]: cfgAvr.listeningModeOptions
                     });
                   } else {
                     // Get all listening modes from mappings
@@ -246,7 +247,7 @@ export class OnkyoCommandReceiver {
                     // Update select entity with filtered options
                     // TypeScript doesn't recognize that options can be an array, but the API supports it
                     this.driver.updateEntityAttributes(selectEntityId, {
-                      [SelectAttributes.Options]: filteredOptions as any
+                      [SelectAttributes.Options]: filteredOptions
                     });
                   }
                 }
@@ -259,8 +260,6 @@ export class OnkyoCommandReceiver {
                 [uc.SensorAttributes.Value]: audioOutputValue
               });
             }
-
-            // log.info("%s [%s] IFA parsed input: %s | output: %s", integrationName, entityId, audioInputValue, audioOutputValue);
             break;
           }
           case "IFV": {
@@ -293,7 +292,6 @@ export class OnkyoCommandReceiver {
                 [uc.SensorAttributes.Value]: videoOutputDisplay
               });
             }
-            // log.info("%s [%s] IFV parsed input: %s | output: %s", integrationName, entityId, videoInputValue, videoOutputValue);
             break;
           }
           case "DSN": {
