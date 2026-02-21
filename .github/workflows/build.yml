@@ -95,11 +95,18 @@ jobs:
             rmdir artifacts/bin/src || true
           fi
 
-          # Now expect artifacts/bin/index.js to exist
-          if [ -f artifacts/bin/index.js ]; then
+          # Ensure artifacts/bin/driver.js is the entry point the remote manager uses.
+          # If driver.ts was compiled directly to driver.js (e.g. after renaming onkyo.ts→driver.ts)
+          # the class already lives in driver.js; just remove the now-redundant index.js stub
+          # (which imports ./driver.js and would create a circular reference if renamed).
+          # Otherwise fall back to the original behaviour of renaming index.js → driver.js.
+          if [ -f artifacts/bin/driver.js ]; then
+            echo "driver.js already present (compiled from driver.ts) – removing index.js stub to avoid circular import"
+            rm -f artifacts/bin/index.js
+          elif [ -f artifacts/bin/index.js ]; then
             mv artifacts/bin/index.js artifacts/bin/driver.js
           else
-            echo "ERROR: artifacts/bin/index.js missing after layout normalization" >&2
+            echo "ERROR: neither artifacts/bin/driver.js nor artifacts/bin/index.js found after layout normalization" >&2
             echo "Contents of artifacts/bin:" && ls -la artifacts/bin || true
             exit 1
           fi

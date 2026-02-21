@@ -15,7 +15,7 @@ interface EntityState {
 /**
  * Manages per-entity state for AVR sources.
  * Each entity (AVR zone) has its own independent source tracking.
- */
+ */ 
 class AvrStateManager {
   private states: Map<string, EntityState> = new Map();
   // reuse the existing state map to also track last query timestamps
