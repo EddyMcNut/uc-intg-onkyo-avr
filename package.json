@@ -9,6 +9,7 @@
     "code-check": "prettier --check . && eslint .",
     "lint": "eslint --fix",
     "build": "tsc",
+    "postbuild": "node -e \"const fs=require('fs'); if (fs.existsSync('driver.js')) fs.copyFileSync('driver.js','dist/driver.js');\"",
     "test": "npm run build && ava --tap > test.tap && npx tap-junit < test.tap > test-results.xml",
     "start": "npm run build && node dist/src/index.js"
   },
