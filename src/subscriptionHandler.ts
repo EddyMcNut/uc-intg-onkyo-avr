@@ -48,7 +48,6 @@ export default class SubscriptionHandler {
     if (physicalConnection.eiscp.connected) {
       const queueThreshold = instance.config.queueThreshold ?? 0;
       log.info("%s [%s] Subscribed entity connected, querying state (threshold: %dms)", integrationName, entityId, queueThreshold);
-      avrStateManager.recordQuery(baseEntityId);
       await avrStateManager.queryAvrState(baseEntityId, physicalConnection.eiscp, "on subscribe", instance.config.zone, queueThreshold);
       return;
     }

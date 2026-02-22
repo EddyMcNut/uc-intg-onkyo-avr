@@ -275,7 +275,6 @@ export default class OnkyoDriver {
       log.debug(`${integrationName} [${avrEntry}] Skipping repeated state query (${context})`);
       return;
     }
-    avrStateManager.recordQuery(avrEntry);
 
     // Extract zone from avrEntry (format: "model ip zone")
     const instance = this.avrInstanceManager.getInstance(avrEntry);
