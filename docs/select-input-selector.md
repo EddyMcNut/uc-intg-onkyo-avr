@@ -23,6 +23,6 @@ As the list of all known options is very long, you can configure which options y
   - If you enter `none` the select-entity will not be created.
   - The configured list is saved, included in backups, and persists across reboots.
 
-[back to Listening modes](./input-selector.md)
+[back to Input Selector](./input-selector.md)
 
 [back to main README](../README.md#input-source)
