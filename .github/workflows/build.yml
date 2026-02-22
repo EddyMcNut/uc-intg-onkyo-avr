@@ -95,11 +95,27 @@ jobs:
             rmdir artifacts/bin/src || true
           fi
 
-          # Now expect artifacts/bin/index.js to exist
-          if [ -f artifacts/bin/index.js ]; then
+          # Ensure artifacts/bin/driver.js is the bootstrapping entry point that
+          # instantiates OnkyoDriver.  index.js (compiled from index.ts) does this.
+          #
+          # If driver.ts was renamed from onkyo.ts, both driver.js (class) and
+          # index.js (bootstrapper) now exist.  We can't simply rename index.js
+          # over driver.js because index.js imports "./driver.js" – making it
+          # reference itself.  Instead:
+          #   1. rename driver.js (class) → onkyodriver.js
+          #   2. patch the import in index.js to point to onkyodriver.js
+          #   3. rename index.js → driver.js  (entry point with instantiation)
+          if [ -f artifacts/bin/driver.js ] && [ -f artifacts/bin/index.js ]; then
+            echo "Both driver.js and index.js found – renaming class to onkyodriver.js to avoid circular import"
+            mv artifacts/bin/driver.js artifacts/bin/onkyodriver.js
+            sed -i 's|from "\./driver\.js"|from "./onkyodriver.js"|g' artifacts/bin/index.js
             mv artifacts/bin/index.js artifacts/bin/driver.js
+          elif [ -f artifacts/bin/index.js ]; then
+            mv artifacts/bin/index.js artifacts/bin/driver.js
+          elif [ -f artifacts/bin/driver.js ]; then
+            echo "Only driver.js found – using as entry point as-is"
           else
-            echo "ERROR: artifacts/bin/index.js missing after layout normalization" >&2
+            echo "ERROR: neither artifacts/bin/driver.js nor artifacts/bin/index.js found after layout normalization" >&2
             echo "Contents of artifacts/bin:" && ls -la artifacts/bin || true
             exit 1
           fi

@@ -1,10 +1,11 @@
 # Select
 
-As from v0.8.0 this integration offers its first `select` entity, more select entities will be added in future versions.
+This integration offers `select entities`.
 
-Current `Select` entities:
+Current available `Select` entities (v0.8.1):
 - [Listening Mode](select-listening-mode.md)
+- [Input Selector](select-input-selector.md)
 
-After (re)configuring the options, you might need to reboot the remote to see the newly configured values.
+If after (re)configuring the options you don't see the changes on your remote, reboot the remote to force it do update.
 
 [back to main README](../README.md#selects)

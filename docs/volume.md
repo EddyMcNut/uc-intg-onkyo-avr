@@ -16,7 +16,7 @@ The AVR itself may display the volume as dB (relative) or as an absolute number,
 
 The volume command uses a range of 0-200 to represent volume levels from 0.0 to 100.0 in 0.5 steps. Why This Design?
 
-- AVR Precision: Many Onkyo/Integra receivers can be configured to adjust volume in 0.5 dB increments for finer control.
+- AVR Precision: Many Onkyo/Integra/Pioneer receivers can be configured to adjust volume in 0.5 dB increments for finer control.
 - Protocol Flexibility: Using 0-200 range allows the protocol to handle both 0.5 dB and 1 dB step configurations with a single integer-based command.
 - Backward Compatibility: The protocol can support different AVR models with different volume ranges and step sizes.
 

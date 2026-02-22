@@ -28,6 +28,27 @@ However, most models `auto-select` the correct mode when the input signal is `Do
 
 ![](../screenshots/straight-decode.png)
 
-As from version 0.8.0, the integration offers a `select` widget for listening modes, see [this doc](select-listening-mode.md).
+## Select widget
+As from version 0.8.0, the integration offers a `select` widget for listening modes, see [this doc](select-listening-mode.md). 
+
+Different models sometimes use different names for a single listening mode, You can use that functionality to quickly discover which listening modes are accepted by your AVR model.
+
+## Example of known Pioneer listening modes
+| Listening modes known to be accepted by Pioneer |
+|-------------------------------------------------|
+| direct                                          |
+| dolby-surround                                  |
+| dolby-surround-classical                        |
+| dolby-surround-drama                            |
+| dolby-surround-entertainment-show               |
+| dolby-surround-front-stage-surround             |
+| dolby-surround-sports                           |
+| dolby-surround-unplugged                        |
+| dts-neural:x                                    |
+| extended-mono                                   |
+| extended-stereo                                 |
+| mono                                            |
+| pure-direct                                     |
+| stereo                                          |
 
 [back to main README](../README.md#listening-modes)

@@ -2,13 +2,13 @@
 "use strict";
 
 import { EiscpDriver } from "./eiscp.js";
-import { OnkyoCommandSender } from "./onkyoCommandSender.js";
-import { OnkyoCommandReceiver } from "./onkyoCommandReceiver.js";
+import { CommandSender as CommandSenderClass } from "./commandSender.js";
+import { CommandReceiver as CommandReceiverClass } from "./commandReceiver.js";
 import { AvrConfig } from "./configManager.js";
 
 export type EiscpInstance = EiscpDriver;
-export type CommandSender = OnkyoCommandSender;
-export type CommandReceiver = OnkyoCommandReceiver;
+export type CommandSender = CommandSenderClass;
+export type CommandReceiver = CommandReceiverClass;
 
 export type PhysicalConnection = {
   eiscp: EiscpInstance;

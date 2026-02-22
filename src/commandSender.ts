@@ -1,12 +1,12 @@
 import * as uc from "@unfoldedcircle/integration-api";
 import { EiscpDriver } from "./eiscp.js";
 import { DEFAULT_QUEUE_THRESHOLD, MAX_LENGTHS, PATTERNS, OnkyoConfig } from "./configManager.js";
-import { avrStateManager } from "./state.js";
+import { avrStateManager } from "./avrState.js";
 import log from "./loggers.js";
 
-const integrationName = "sender:";
+const integrationName = "commandSender:";
 
-export class OnkyoCommandSender {
+export class CommandSender {
   private driver: uc.IntegrationAPI;
   private config: OnkyoConfig;
   private eiscp: EiscpDriver;

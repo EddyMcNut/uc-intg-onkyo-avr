@@ -3,6 +3,7 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 import * as uc from "@unfoldedcircle/integration-api";
+import type { IntegrationAPI } from "@unfoldedcircle/integration-api";
 import { setConfigDir, ConfigManager } from "../src/configManager.js";
 
 function mkTmpDir(prefix = "onkyo-test-") {
@@ -10,7 +11,7 @@ function mkTmpDir(prefix = "onkyo-test-") {
   return base;
 }
 
-// NOTE: We dynamically import the compiled driver (dist/onkyo.js) at runtime
+// NOTE: We dynamically import the compiled driver (dist/driver.js) at runtime
 // so the tests run against the build artifact (matching CI: build then test).
 
 test.serial("backup flow returns backup_data JSON", async (t) => {
@@ -21,13 +22,13 @@ test.serial("backup flow returns backup_data JSON", async (t) => {
     // Seed a sample config
     const sampleConfig = {
       avrs: [{ model: "TX-RZ50", ip: "192.168.2.103", port: 60128, zone: "main" }]
-    } as any as Partial<import("../src/configManager.js").OnkyoConfig>;
+    } as Partial<import("../src/configManager.js").OnkyoConfig>;
     ConfigManager.save(sampleConfig);
     console.log("on-disk-config (after src save):", fs.readFileSync(path.join(tmp, "config.json"), "utf-8"));
 
     // Import compiled driver using a file:// URL (required on Windows ESM loader)
     const { pathToFileURL } = await import("url");
-    const driverModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/onkyo.js")).href);
+    const driverModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/driver.js")).href);
     const OnkyoDriver = driverModule.default as any;
     // Ensure the compiled ConfigManager uses the same temp config dir at runtime
     const configManagerModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/configManager.js")).href);
@@ -42,31 +43,39 @@ test.serial("backup flow returns backup_data JSON", async (t) => {
     }
 
     // Create a driver-like object without invoking constructor to avoid starting the API server
-    const drv: any = Object.create(OnkyoDriver.prototype);
-    drv.driver = { addAvailableEntity: () => {}, getConfigDirPath: () => tmp, setDeviceState: async () => {}, getConfiguredEntities: () => ({}) };
+    interface DriverLike {
+      driver?: Partial<IntegrationAPI>;
+      config?: any;
+      handleConnect?: () => Promise<void>;
+      registerAvailableEntities?: () => Promise<void>;
+      handleDriverSetup?: Function;
+    }
+    const drv = Object.create(OnkyoDriver.prototype) as DriverLike;
+    drv.driver = { addAvailableEntity: () => {}, getConfigDirPath: () => tmp, setDeviceState: async () => {}, getConfiguredEntities: () => ({}) } as unknown as Partial<IntegrationAPI>;
     drv.config = ConfigManager.load();
     drv.handleConnect = async () => {};
-    (drv as any).registerAvailableEntities = (OnkyoDriver.prototype as any).registerAvailableEntities.bind(drv);
+    drv.registerAvailableEntities = (OnkyoDriver.prototype as any).registerAvailableEntities.bind(drv);
 
     // Step 1: start reconfigure (manager would do this)
-    const startResp = await drv.handleDriverSetup(new uc.DriverSetupRequest(true, {}));
+    const startResp = await drv.handleDriverSetup?.(new uc.DriverSetupRequest(true, {}));
     t.true(startResp instanceof uc.RequestUserInput);
 
     // Step 2a: ask for backup action (no placeholder)
-    const backupResp = await drv.handleDriverSetup(new uc.UserDataResponse({ action: "backup" }));
+    const backupResp = await drv.handleDriverSetup?.(new uc.UserDataResponse({ action: "backup" }));
     t.true(backupResp instanceof uc.RequestUserInput);
 
     // Also simulate manager's PUT with action=backup and placeholder backup_data
-    const managerReqResp = await drv.handleDriverSetup(new uc.UserDataResponse({ action: "backup", backup_data: "[]" }));
+    const managerReqResp = await drv.handleDriverSetup?.(new uc.UserDataResponse({ action: "backup", backup_data: "[]" }));
     t.true(managerReqResp instanceof uc.RequestUserInput);
 
     // Function to extract backup_data field from RequestUserInput
     function extractBackup(resp: uc.RequestUserInput): string {
-      const settings = resp.settings as any[];
-      const backupSetting = settings.find((s: any) => s.id === "backup_data");
+      const settings = resp.settings as Array<{ id: string; field?: { textarea?: { value: string } } }>;
+      const backupSetting = settings.find((s) => s.id === "backup_data");
       t.truthy(backupSetting);
-      t.truthy(backupSetting.field && (backupSetting.field as any).textarea && (backupSetting.field as any).textarea.value);
-      return (backupSetting.field as any).textarea.value as string;
+      t.truthy(backupSetting);
+      t.truthy(backupSetting?.field?.textarea?.value);
+      return backupSetting!.field!.textarea!.value;
     }
 
     const backupString = extractBackup(backupResp as uc.RequestUserInput);
@@ -109,7 +118,7 @@ test.serial("restore flow applies provided backup_data", async (t) => {
 
     // Import compiled driver using a file:// URL (required on Windows ESM loader)
     const { pathToFileURL } = await import("url");
-    const driverModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/onkyo.js")).href);
+    const driverModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/driver.js")).href);
     const OnkyoDriver = driverModule.default as any;
     // Ensure the compiled ConfigManager uses the same temp config dir at runtime
     const configManagerModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/configManager.js")).href);
@@ -124,27 +133,34 @@ test.serial("restore flow applies provided backup_data", async (t) => {
     }
 
     // Create a driver-like object without invoking constructor to avoid starting the API server
-    const drv: any = Object.create(OnkyoDriver.prototype);
-    drv.driver = { addAvailableEntity: () => {}, getConfigDirPath: () => tmp, setDeviceState: async () => {}, getConfiguredEntities: () => ({}) };
+    interface DriverLike {
+      driver?: Partial<IntegrationAPI>;
+      config?: any;
+      handleConnect?: () => Promise<void>;
+      registerAvailableEntities?: () => Promise<void>;
+      handleDriverSetup?: Function;
+    }
+    const drv = Object.create(OnkyoDriver.prototype) as DriverLike;
+    drv.driver = { addAvailableEntity: () => {}, getConfigDirPath: () => tmp, setDeviceState: async () => {}, getConfiguredEntities: () => ({}) } as unknown as Partial<IntegrationAPI>;
     drv.config = ConfigManager.load();
     drv.handleConnect = async () => {};
-    (drv as any).registerAvailableEntities = (OnkyoDriver.prototype as any).registerAvailableEntities.bind(drv);
+    drv.registerAvailableEntities = (OnkyoDriver.prototype as any).registerAvailableEntities.bind(drv);
 
     // Create a backup payload to restore
     const driverJson = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), "driver.json"), "utf-8"));
-    const targetConfig = { avrs: [{ model: "TX-RZ50", ip: "192.168.2.103", port: 60128, zone: "main" }] } as any;
+    const targetConfig = { avrs: [{ model: "TX-RZ50", ip: "192.168.2.103", port: 60128, zone: "main" }] } as Partial<import("../src/configManager.js").OnkyoConfig>;
     const payload = { meta: { driver_id: driverJson.driver_id, version: driverJson.version }, config: targetConfig };
     const payloadString = JSON.stringify(payload);
 
     // Perform restore via setup input
-    const restoreResp = await drv.handleDriverSetup(new uc.UserDataResponse({ action: "restore", backup_data: payloadString }));
+    const restoreResp = await drv.handleDriverSetup?.(new uc.UserDataResponse({ action: "restore", backup_data: payloadString }));
     t.true(restoreResp instanceof uc.SetupComplete);
 
     // Verify config applied
     const reloaded = ConfigManager.load();
     t.truthy(reloaded.avrs);
-    t.is(reloaded.avrs?.[0].model, targetConfig.avrs[0].model);
-    t.is(reloaded.avrs?.[0].ip, targetConfig.avrs[0].ip);
+    t.is(reloaded.avrs?.[0].model, targetConfig.avrs![0].model);
+    t.is(reloaded.avrs?.[0].ip, targetConfig.avrs![0].ip);
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
   }

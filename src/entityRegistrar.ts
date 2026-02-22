@@ -243,4 +243,48 @@ export default class EntityRegistrar {
     if (cmdHandler) selectEntity.setCmdHandler(cmdHandler);
     return selectEntity;
   }
+
+  /**
+   * Return input selector options for the given AVR entry. If a user-configured
+   * `inputSelectorOptions` list is present it is returned exactly; otherwise all
+   * SLI keys (excluding navigation/query keys) are returned sorted.
+   */
+  getInputSelectorOptions(avrEntry?: string): string[] {
+    if (avrEntry) {
+      try {
+        const cfg = ConfigManager.get();
+        if (cfg && Array.isArray(cfg.avrs)) {
+          const match = cfg.avrs.find((a) => buildEntityId(a.model, a.ip, a.zone) === avrEntry);
+          if (match && Array.isArray(match.inputSelectorOptions) && match.inputSelectorOptions.length > 0) {
+            return match.inputSelectorOptions.map((s) => s.trim());
+          }
+        }
+      } catch (err) {
+        // ignore and fall back to defaults
+      }
+    }
+    const sliMappings = eiscpMappings.value_mappings.SLI;
+    const excludeKeys = ["up", "down", "query"];
+    return Object.keys(sliMappings).filter((key) => !excludeKeys.includes(key)).sort();
+  }
+
+  createInputSelectorSelectEntity(
+    avrEntry: string,
+    cmdHandler?: (entity: uc.Entity, cmdId: string, params?: { [key: string]: string | number | boolean }) => Promise<uc.StatusCodes>
+  ): Select {
+    const options = this.getInputSelectorOptions(avrEntry);
+    const selectEntity = new Select(
+      `${avrEntry}_input_selector`,
+      { en: `${avrEntry} Input Selector` },
+      {
+        attributes: {
+          state: SelectStates.On,
+          current_option: "",
+          options: options
+        }
+      }
+    );
+    if (cmdHandler) selectEntity.setCmdHandler(cmdHandler);
+    return selectEntity;
+  }
 }

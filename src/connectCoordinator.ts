@@ -6,7 +6,7 @@ import ConnectionManager from "./connectionManager.js";
 import AvrInstanceManager from "./avrInstanceManager.js";
 import { DEFAULT_QUEUE_THRESHOLD } from "./configManager.js";
 
-const integrationName = "driver:";
+const integrationName = "connectCoordinator:";
 
 import { CreateCommandReceiverFactory, CreateCommandSenderFn, QueryAvrStateFn, QueryAllZonesStateFn } from "./types.js";
 
