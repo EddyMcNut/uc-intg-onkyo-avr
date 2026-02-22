@@ -44,6 +44,7 @@ export const PATTERNS = {
   ALBUM_ART_URL: /^[a-zA-Z0-9._\-/]+$/,
   PIN_CODE: /^\d{4}$/,
   USER_COMMAND: /^[a-z0-9\-\s.:=]+$/i, // Letters, numbers, hyphens, spaces, delimiters
+  SELECT_OPTION: /^[a-zA-Z0-9-]+$/, // Select-entity option entries: letters, numbers, hyphens only
   RAW_COMMAND: /^[A-Z0-9]+$/ // Uppercase letters and numbers only
 } as const;
 
@@ -60,7 +61,7 @@ export function parseSelectOptions(raw: unknown): string[] | null {
     const trimmed = raw.trim();
     if (trimmed.toLowerCase() === "none") return null;
     return trimmed
-      .split(";")
+      .split(/[;,]/)
       .map((s) => s.trim())
       .filter((s) => s !== "");
   }
@@ -396,8 +397,8 @@ export class ConfigManager {
           errors.push(`${fieldName} entry too long (max ${MAX_LENGTHS.USER_COMMAND}): ${opt}`);
           return undefined;
         }
-        if (!PATTERNS.USER_COMMAND.test(opt)) {
-          errors.push(`${fieldName} contains invalid characters: ${opt}`);
+        if (!PATTERNS.SELECT_OPTION.test(opt)) {
+          errors.push(`${fieldName} entry contains invalid characters (only letters, numbers and hyphens allowed): ${opt}`);
           return undefined;
         }
       }
