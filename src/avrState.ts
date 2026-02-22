@@ -13,7 +13,7 @@ interface EntityState {
 }
 
 /**
- * Manages per-entity state for AVR sources.
+ * Manages per-entity state for AVR sources. 
  * Each entity (AVR zone) has its own independent source tracking.
  */
 class AvrStateManager {
