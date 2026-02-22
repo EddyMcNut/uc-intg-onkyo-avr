@@ -16,7 +16,7 @@ As from v0.7.0, this integration can handle multiple zones for each configured A
 
 - Most models allow to switch on zone 2 or 3 while the main zone is in standby, as this integration creates an entity per zone you can just select that entity for an activity, adding all zones in one activity is also possible of course.
 
-- As the integration offers you a full AVR entity per zone, you can use the slider to control the volume for a specific zone, just by selecting that zone entity in the [MediaWidget](volume.md#slider). However the slider and volume buttons can only work if in your AVR the zone is set to have variable volume level, not a fixed volume level.
+- As the integration offers you a full AVR entity per zone, you can use the slider to control the volume for a specific zone, just by selecting that zone entity in the [Slider](volume.md#slider). However the slider and volume buttons can only work if in your AVR the zone is set to have variable volume level, not a fixed volume level.
 
 _note 1: when you have configured multiple zones, it takes a couple of seconds longer to recover from a reboot of the UC Remote compared to just having only the main zone configured_
 
