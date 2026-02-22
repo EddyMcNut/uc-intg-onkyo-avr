@@ -29,9 +29,11 @@ However, most models `auto-select` the correct mode when the input signal is `Do
 ![](../screenshots/straight-decode.png)
 
 ## Select widget
-As from version 0.8.0, the integration offers a `select` widget for listening modes, see [this doc](select-listening-mode.md).
+As from version 0.8.0, the integration offers a `select` widget for listening modes, see [this doc](select-listening-mode.md). 
 
-## Pioneer models
+Different models sometimes use different names for a single listening mode, You can use that functionality to quickly discover which listening modes are accepted by your AVR model.
+
+## Example of known Pioneer listening modes
 | Listening modes known to be accepted by Pioneer |
 |-------------------------------------------------|
 | direct                                          |
@@ -48,7 +50,5 @@ As from version 0.8.0, the integration offers a `select` widget for listening mo
 | mono                                            |
 | pure-direct                                     |
 | stereo                                          |
-
-The already mentioned [JSON](../src/eiscp-commands.ts) shows how these are mapped to the listening modes known by Onkyo models.
 
 [back to main README](../README.md#listening-modes)

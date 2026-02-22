@@ -1,6 +1,6 @@
-# uc-intg-onkyo-avr
+# Onkyo AVR / Pioneer AVR / Integra AVR
 
-Onkyo AVR custom integration for Unfolded Circle remotes. Also reported to work with Pioneer AVR.
+Custom integration for Unfolded Circle remotes to control your Onkyo / Pioneer / Integra AVR.
 
 [![GitHub Release](https://img.shields.io/github/v/release/EddyMcNut/uc-intg-onkyo-avr)](https://github.com/EddyMcNut/uc-intg-onkyo-avr/releases)
 [![License](https://img.shields.io/badge/license-MPL--2.0-blue.svg)](https://github.com/EddyMcNut/uc-intg-onkyo-avr/blob/main/LICENSE)
@@ -19,9 +19,9 @@ You use this integration at your own risk!
 
 Read this readme completely, it contains some tips for known issues and it also explains how to use `Input source` in a flexibale way so you can send a lot of different commands to your AVR.
 
-- Your Onkyo AVR(s) needs a fixed IP address.
-- Your Onkyo AVR(s) needs to be connected to the same network as you UC Remote (if AVR IP is 192.168.1.x then UC Remote IP must also start with 192.168.1).
-- Your Onkyo AVR(s) needs to be ON or STANDBY.
+- Your AVR(s) needs a fixed IP address.
+- Your AVR(s) needs to be connected to the same network as you UC Remote (if AVR IP is 192.168.1.x then UC Remote IP must also start with 192.168.1).
+- Your AVR(s) needs to be ON or STANDBY.
 - Your UC Remote needs to have `New reconnect logic` enabled.
   ![](./screenshots/new-reconnect-logic.png)
 
@@ -45,6 +45,7 @@ Users report it also to work with:
 - TX-NR6100
 - Pioneer VSX-932
 - Pioneer VSX-LX305
+- Pioneer VSA-LX805
 - Integra (model unknown)
 
 ## Known issues and solutions
