@@ -2,7 +2,7 @@
 "use strict";
 import * as uc from "@unfoldedcircle/integration-api";
 import EiscpDriver from "./eiscp.js";
-import { ConfigManager, parseBoolean, OnkyoConfig, AvrConfig, AvrZone, AVR_DEFAULTS } from "./configManager.js";
+import { ConfigManager, parseBoolean, parseSelectOptions, OnkyoConfig, AvrConfig, AvrZone, AVR_DEFAULTS } from "./configManager.js";
 import log from "./loggers.js";
 
 const integrationName = "setupHandler:";
@@ -158,6 +158,7 @@ export default class SetupHandler {
           input.queueThreshold ||
           input.albumArtURL ||
           input.listeningModeOptions ||
+          input.inputSelectorOptions ||
           input.volumeScale ||
           input.adjustVolumeDispl ||
           input.zoneCount ||
@@ -171,7 +172,8 @@ export default class SetupHandler {
         const initialModel = currentAvr ? currentAvr.model : "";
         const initialIp = currentAvr ? currentAvr.ip : "";
         const initialPort = currentAvr ? currentAvr.port : AVR_DEFAULTS.port;
-        const initialListeningModes = currentAvr && Array.isArray(currentAvr.listeningModeOptions) ? currentAvr.listeningModeOptions.join('; ') : "";
+        const initialListeningModes = currentAvr && Array.isArray(currentAvr.listeningModeOptions) ? currentAvr.listeningModeOptions.join('; ') : currentAvr?.listeningModeOptions === null ? "none" : "";
+        const initialInputSelectorOpts = currentAvr && Array.isArray(currentAvr.inputSelectorOptions) ? currentAvr.inputSelectorOptions.join('; ') : currentAvr?.inputSelectorOptions === null ? "none" : "";
 
         return new uc.RequestUserInput("Manual configuration", [
           {
@@ -196,9 +198,15 @@ export default class SetupHandler {
           },
           {
             id: "listeningModeOptions",
-            label: { en: "Listening mode select options (semicolon-separated, leave empty to show all)" },
+            label: { en: "Listening mode select options (semicolon-separated, 'none' to disable, empty shows all)" },
             field: { text: { value: initialListeningModes } },
-            description: { en: "Optional — provide a semicolon-separated list (e.g. stereo; straight-decode; neural-thx). If left empty the driver will show dynamic options based on audio format." }
+            description: { en: "Optional — semicolon-separated list (e.g. stereo; straight-decode; neural-thx). Leave empty for dynamic options, enter 'none' to hide this entity." }
+          },
+          {
+            id: "inputSelectorOptions",
+            label: { en: "Input selector options (semicolon-separated, 'none' to disable, empty shows all)" },
+            field: { text: { value: initialInputSelectorOpts } },
+            description: { en: "Optional — semicolon-separated list (e.g. dvd; bd; net; bluetooth). Leave empty to show all inputs, enter 'none' to hide this entity." }
           },
           {
             id: "queueThreshold",
@@ -453,16 +461,14 @@ export default class SetupHandler {
           zone: "main"
         };
 
-        // If user supplied listeningModeOptions during setup, include them (normalize string -> array)
-        if (input.listeningModeOptions !== undefined && input.listeningModeOptions !== null && String(input.listeningModeOptions).trim() !== "") {
-          discoveredAvr.listeningModeOptions = typeof input.listeningModeOptions === "string"
-            ? (input.listeningModeOptions as string)
-                .split(";")
-                .map((s: string) => s.trim())
-                .filter((s: string) => s !== "")
-            : Array.isArray(input.listeningModeOptions)
-            ? (input.listeningModeOptions as string[]).map((s) => String(s).trim()).filter(Boolean)
-            : undefined;
+        // Use parseSelectOptions which handles the 'none' sentinel (-> null = don't create entity)
+        const lmoResult = parseSelectOptions(input.listeningModeOptions);
+        if (lmoResult === null || (Array.isArray(lmoResult) && lmoResult.length > 0)) {
+          discoveredAvr.listeningModeOptions = lmoResult;
+        }
+        const isoResult = parseSelectOptions(input.inputSelectorOptions);
+        if (isoResult === null || (Array.isArray(isoResult) && isoResult.length > 0)) {
+          discoveredAvr.inputSelectorOptions = isoResult;
         }
 
         // Save discovered AVR
@@ -529,6 +535,7 @@ export default class SetupHandler {
       queueThreshold: queueThresholdValue,
       albumArtURL: albumArtURLValue,
       listeningModeOptions: input.listeningModeOptions,
+      inputSelectorOptions: input.inputSelectorOptions,
       volumeScale: volumeScaleValue,
       adjustVolumeDispl: adjustVolumeDisplValue,
       createSensors: createSensorsValue,
@@ -581,9 +588,15 @@ export default class SetupHandler {
         },
         {
           id: "listeningModeOptions",
-          label: { en: "Listening mode select options (semicolon-separated, leave empty to show all)" },
+          label: { en: "Listening mode select options (semicolon-separated, 'none' to disable, empty shows all)" },
           field: { text: { value: String(input.listeningModeOptions ?? "") } },
-          description: { en: "Optional — provide a semicolon-separated list (e.g. stereo; straight-decode; neural-thx). If left empty the driver will show dynamic options based on audio format." }
+          description: { en: "Optional — semicolon-separated list (e.g. stereo; straight-decode; neural-thx). Leave empty for dynamic options, enter 'none' to hide this entity." }
+        },
+        {
+          id: "inputSelectorOptions",
+          label: { en: "Input selector options (semicolon-separated, 'none' to disable, empty shows all)" },
+          field: { text: { value: String(input.inputSelectorOptions ?? "") } },
+          description: { en: "Optional — semicolon-separated list (e.g. dvd; bd; net; bluetooth). Leave empty to show all inputs, enter 'none' to hide this entity." }
         },
         {
           id: "queueThreshold",

@@ -159,6 +159,11 @@ export class CommandReceiver {
               [uc.MediaPlayerAttributes.Source]: source
             });
             log.info("%s [%s] input-selector (source) set to: %s", integrationName, entityId, source);
+            // Mirror the current value into the input-selector select entity
+            const inputSelectorEntityId = `${entityId}_input_selector`;
+            this.driver.updateEntityAttributes(inputSelectorEntityId, {
+              [SelectAttributes.CurrentOption]: source
+            });
 
             // Reset track info on source change to ensure fresh updates
             this.currentTrackId = "";

@@ -21,7 +21,7 @@ export default class SubscriptionHandler {
   public async handle(entityId: string): Promise<void> {
     // Normalize to base AVR entry (remove sensor/select suffix)
     const baseEntityId = entityId.replace(
-      /_(volume_sensor|audio_input_sensor|audio_output_sensor|source_sensor|video_input_sensor|video_output_sensor|output_display_sensor|front_panel_display_sensor|mute_sensor|listening_mode)$/,
+      /_(volume_sensor|audio_input_sensor|audio_output_sensor|source_sensor|video_input_sensor|video_output_sensor|output_display_sensor|front_panel_display_sensor|mute_sensor|listening_mode|input_selector)$/,
       ""
     );
 

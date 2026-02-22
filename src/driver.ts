@@ -14,6 +14,7 @@ import EntityRegistrar from "./entityRegistrar.js";
 import ConnectionManager from "./connectionManager.js";
 import AvrInstanceManager from "./avrInstanceManager.js";
 import ListeningModeHandler from "./listeningModeHandler.js";
+import InputSelectorHandler from "./inputSelectorHandler.js";
 import SubscriptionHandler from "./subscriptionHandler.js";
 import fs from "fs";
 import path from "path";
@@ -51,6 +52,7 @@ export default class OnkyoDriver {
   private setupHandler?: InstanceType<typeof SetupHandler>;
   private entityRegistrar: EntityRegistrar;
   private listeningModeHandler: ListeningModeHandler;
+  private inputSelectorHandler: InputSelectorHandler;
   private subscriptionHandler: SubscriptionHandler;
 
   constructor() {
@@ -90,6 +92,7 @@ export default class OnkyoDriver {
 
     // initialize helpers
     this.listeningModeHandler = new ListeningModeHandler(this.driver, this.connectionManager, this.avrInstanceManager, this.entityRegistrar);
+    this.inputSelectorHandler = new InputSelectorHandler(this.driver, this.connectionManager, this.avrInstanceManager, this.entityRegistrar);
     this.subscriptionHandler = new SubscriptionHandler(this.connectionManager, this.avrInstanceManager);
 
     // Instance manager already created as a property; create connect coordinator lazily when needed
@@ -155,34 +158,62 @@ export default class OnkyoDriver {
       // Register Listening Mode select entity.  In unit tests we sometimes
       // use a partial driver-like object that doesn't initialize the
       // handler, so fall back gracefully to a no-op to avoid exceptions.
-      const lmHandler =
-        this.listeningModeHandler?.handle.bind(this.listeningModeHandler) ||
-        (async () => uc.StatusCodes.Ok);
-      const listeningModeEntity = this.entityRegistrar.createListeningModeSelectEntity(avrEntry, lmHandler);
-      this.driver.addAvailableEntity(listeningModeEntity);
-      log.info("%s [%s] Listening Mode select entity registered", integrationName, avrEntry);
+      // Skip if user configured 'none' for this entity.
+      if (avrConfig.listeningModeOptions !== null) {
+        const lmHandler =
+          this.listeningModeHandler?.handle.bind(this.listeningModeHandler) ||
+          (async () => uc.StatusCodes.Ok);
+        const listeningModeEntity = this.entityRegistrar.createListeningModeSelectEntity(avrEntry, lmHandler);
+        this.driver.addAvailableEntity(listeningModeEntity);
+        log.info("%s [%s] Listening Mode select entity registered", integrationName, avrEntry);
 
-      // Ensure the runtime select-entity options reflect any (re)configured per-AVR list immediately
-      // If the Integration API supports updating attributes at runtime,
-      // set the select-entity options immediately from saved config.
-      const options = this.entityRegistrar.getListeningModeOptions(undefined, avrEntry);
-      // Always refresh the listening-mode select options at registration time from
-      // the current persisted config. Previously we only updated when a
-      // non-empty user-configured list existed which could leave stale options
-      // visible in other activities after reconfigure. Ensure we always call
-      // updateEntityAttributes so both running and available activity views
-      // receive the updated options (including empty arrays).
-      if (typeof this.driver.updateEntityAttributes === "function") {
-        // `options` is a string[]; augmentation above allows us to pass it
-        // directly without casting.
-        this.driver.updateEntityAttributes(`${avrEntry}_listening_mode`, {
-          [SelectAttributes.Options]: options
-        });
+        // Ensure the runtime select-entity options reflect any (re)configured per-AVR list immediately
+        // If the Integration API supports updating attributes at runtime,
+        // set the select-entity options immediately from saved config.
+        const options = this.entityRegistrar.getListeningModeOptions(undefined, avrEntry);
+        // Always refresh the listening-mode select options at registration time from
+        // the current persisted config. Previously we only updated when a
+        // non-empty user-configured list existed which could leave stale options
+        // visible in other activities after reconfigure. Ensure we always call
+        // updateEntityAttributes so both running and available activity views
+        // receive the updated options (including empty arrays).
+        if (typeof this.driver.updateEntityAttributes === "function") {
+          // `options` is a string[]; augmentation above allows us to pass it
+          // directly without casting.
+          this.driver.updateEntityAttributes(`${avrEntry}_listening_mode`, {
+            [SelectAttributes.Options]: options
+          });
+        }
+
+        // Log when a user-configured list is present so operators can verify at boot
+        if (Array.isArray(avrConfig.listeningModeOptions) && avrConfig.listeningModeOptions.length > 0) {
+          log.info("%s [%s] Loaded %d user-configured listeningModeOptions", integrationName, avrEntry, avrConfig.listeningModeOptions.length);
+        }
+      } else {
+        log.info("%s [%s] Listening Mode select entity disabled by user preference (none)", integrationName, avrEntry);
       }
 
-      // Log when a user-configured list is present so operators can verify at boot
-      if (Array.isArray(avrConfig.listeningModeOptions) && avrConfig.listeningModeOptions.length > 0) {
-        log.info("%s [%s] Loaded %d user-configured listeningModeOptions", integrationName, avrEntry, avrConfig.listeningModeOptions.length);
+      // Register Input Selector select entity. Skip if user configured 'none'.
+      if (avrConfig.inputSelectorOptions !== null) {
+        const isHandler =
+          this.inputSelectorHandler?.handle.bind(this.inputSelectorHandler) ||
+          (async () => uc.StatusCodes.Ok);
+        const inputSelectorEntity = this.entityRegistrar.createInputSelectorSelectEntity(avrEntry, isHandler);
+        this.driver.addAvailableEntity(inputSelectorEntity);
+        log.info("%s [%s] Input Selector select entity registered", integrationName, avrEntry);
+
+        const isOptions = this.entityRegistrar.getInputSelectorOptions(avrEntry);
+        if (typeof this.driver.updateEntityAttributes === "function") {
+          this.driver.updateEntityAttributes(`${avrEntry}_input_selector`, {
+            [SelectAttributes.Options]: isOptions
+          });
+        }
+
+        if (Array.isArray(avrConfig.inputSelectorOptions) && avrConfig.inputSelectorOptions.length > 0) {
+          log.info("%s [%s] Loaded %d user-configured inputSelectorOptions", integrationName, avrEntry, avrConfig.inputSelectorOptions.length);
+        }
+      } else {
+        log.info("%s [%s] Input Selector select entity disabled by user preference (none)", integrationName, avrEntry);
       }
     }
   }

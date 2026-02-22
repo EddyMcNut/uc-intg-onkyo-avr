@@ -47,6 +47,31 @@ export const PATTERNS = {
   RAW_COMMAND: /^[A-Z0-9]+$/ // Uppercase letters and numbers only
 } as const;
 
+/**
+ * Parse a select-entity options field from user input.
+ * - Returns `null` when the user typed 'none' (signal: don't create the entity).
+ * - Returns an empty array when the input is blank / undefined (use driver defaults).
+ * - Returns the trimmed, non-empty items otherwise.
+ */
+export function parseSelectOptions(raw: unknown): string[] | null {
+  if (raw === null) return null;
+  if (raw === undefined || raw === "") return [];
+  if (typeof raw === "string") {
+    const trimmed = raw.trim();
+    if (trimmed.toLowerCase() === "none") return null;
+    return trimmed
+      .split(";")
+      .map((s) => s.trim())
+      .filter((s) => s !== "");
+  }
+  if (Array.isArray(raw)) {
+    const arr = (raw as unknown[]).map((s) => String(s).trim()).filter(Boolean);
+    if (arr.length === 1 && arr[0].toLowerCase() === "none") return null;
+    return arr;
+  }
+  return [];
+}
+
 /** Parse a boolean-like value from string/boolean/undefined */
 export function parseBoolean(value: unknown, defaultValue: boolean): boolean {
   if (value === undefined || value === null || value === "") {
@@ -103,8 +128,20 @@ export interface AvrConfig {
   adjustVolumeDispl?: boolean; // true = use 0.5 dB steps (×2 / ÷2), false = direct EISCP value
   createSensors?: boolean; // true = create sensor entities for this AVR
   netMenuDelay?: number; // delay in ms for NET menu to load (default 2500)
-  /** Optional user-configured listening mode options. When present the select-entity will show these exactly */
-  listeningModeOptions?: string[];
+  /**
+   * Optional user-configured listening mode options.
+   * - `undefined` / `[]`: show all/dynamic options.
+   * - Non-empty array: show exactly these options.
+   * - `null`: do not create the Listening Mode select entity.
+   */
+  listeningModeOptions?: string[] | null;
+  /**
+   * Optional user-configured input selector options.
+   * - `undefined` / `[]`: show all available inputs.
+   * - Non-empty array: show exactly these options.
+   * - `null`: do not create the Input Selector select entity.
+   */
+  inputSelectorOptions?: string[] | null;
 }
 
 export interface OnkyoConfig {
@@ -137,7 +174,8 @@ export class ConfigManager {
       adjustVolumeDispl: avr.adjustVolumeDispl ?? AVR_DEFAULTS.adjustVolumeDispl,
       createSensors: avr.createSensors ?? AVR_DEFAULTS.createSensors,
       netMenuDelay: avr.netMenuDelay ?? AVR_DEFAULTS.netMenuDelay,
-      listeningModeOptions: avr.listeningModeOptions ?? undefined
+      listeningModeOptions: avr.listeningModeOptions,
+      inputSelectorOptions: avr.inputSelectorOptions
     };
   }
 
@@ -344,34 +382,30 @@ export class ConfigManager {
       }
     }
 
-    // listeningModeOptions (optional) - allow array or semicolon-separated string in payload
-    if (avr.listeningModeOptions !== undefined) {
-      const raw = avr.listeningModeOptions;
-      let arr: string[] = [];
-      if (typeof raw === "string") {
-        arr = raw
-          .split(";")
-          .map((s: string) => s.trim())
-          .filter((s: string) => s !== "");
-      } else if (Array.isArray(raw)) {
-        arr = raw.map((s: any) => (typeof s === "string" ? s.trim() : String(s))).filter(Boolean);
-      } else {
-        errors.push("listeningModeOptions must be an array of strings or a semicolon-separated string");
+    // Validate a select-options field (listeningModeOptions / inputSelectorOptions)
+    const validateSelectOptions = (raw: unknown, fieldName: string): string[] | null | undefined => {
+      if (raw === undefined) return undefined;
+      const parsed = parseSelectOptions(raw);
+      if (parsed === null) return null; // 'none' sentinel: don't create entity
+      if (typeof raw !== "string" && !Array.isArray(raw) && raw !== null) {
+        errors.push(`${fieldName} must be an array of strings or a semicolon-separated string`);
+        return undefined;
       }
-
-      if (arr.length > 0) {
-        for (const opt of arr) {
-          if (opt.length > MAX_LENGTHS.USER_COMMAND) {
-            errors.push(`listeningModeOptions entry too long (max ${MAX_LENGTHS.USER_COMMAND}): ${opt}`);
-            break;
-          }
-          if (!PATTERNS.USER_COMMAND.test(opt)) {
-            errors.push(`listeningModeOptions contains invalid characters: ${opt}`);
-            break;
-          }
+      for (const opt of parsed) {
+        if (opt.length > MAX_LENGTHS.USER_COMMAND) {
+          errors.push(`${fieldName} entry too long (max ${MAX_LENGTHS.USER_COMMAND}): ${opt}`);
+          return undefined;
+        }
+        if (!PATTERNS.USER_COMMAND.test(opt)) {
+          errors.push(`${fieldName} contains invalid characters: ${opt}`);
+          return undefined;
         }
       }
-    }
+      return parsed;
+    };
+
+    const lmoParsed = validateSelectOptions(avr.listeningModeOptions, "listeningModeOptions");
+    const isoParsed = validateSelectOptions(avr.inputSelectorOptions, "inputSelectorOptions");
 
     if (errors.length > 0) {
       return { errors };
@@ -389,15 +423,8 @@ export class ConfigManager {
       adjustVolumeDispl: parseBoolean(avr.adjustVolumeDispl, AVR_DEFAULTS.adjustVolumeDispl),
       createSensors: parseBoolean(avr.createSensors, AVR_DEFAULTS.createSensors),
       netMenuDelay: typeof avr.netMenuDelay === "string" ? parseInt(avr.netMenuDelay, 10) : avr.netMenuDelay,
-      listeningModeOptions:
-        typeof avr.listeningModeOptions === "string"
-          ? (avr.listeningModeOptions as string)
-              .split(";")
-              .map((s: string) => s.trim())
-              .filter((s: string) => s !== "")
-          : Array.isArray(avr.listeningModeOptions)
-          ? (avr.listeningModeOptions as string[]).map((s) => s.trim())
-          : undefined
+      listeningModeOptions: lmoParsed,
+      inputSelectorOptions: isoParsed
     });
 
     return { errors: [], normalized };
