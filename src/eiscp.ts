@@ -648,15 +648,46 @@ export class EiscpDriver extends EventEmitter {
     return this.enqueueSend(data);
   }
 
+  private async handleTIPsend(iscpCommand: string): Promise<void> {
+    // Assumes TuneIn is already the active source.
+    const preset = iscpCommand.slice(3);
+    // const presetNum = parseInt(presetHex, 16);
+    // if (isNaN(presetNum) || presetNum < 1) {
+    //   log.warn("%s handleTIPsend: invalid preset number in command %s", integrationName, iscpCommand);
+    //   return;
+    // }
+    const presetIndex = String(preset).padStart(5, "0");
+    const menuDelay = this.config.netMenuDelay ?? 2500;
+
+    log.info("%s TuneIn preset %d: navigating to My Presets, selecting index %s", integrationName, preset, presetIndex);
+
+    await this.raw("NTCTOP");          // Go to TuneIn top menu
+    await delay(menuDelay*2);
+    await this.raw("NTCSELECT");       // Confirm / enter
+    await delay(menuDelay*2);
+    await this.raw("NLSL1");           // Enter My Presets
+    await delay(menuDelay*2);
+    await this.raw("NTCSELECT");       // Confirm / enter
+    await delay(menuDelay*2);
+    await this.raw(`NLSI${presetIndex}`); // Select preset by index
+  }
+
   private async sendIscp(iscpCommand: string): Promise<void> {
-    // Check if command contains a network service selection (NLSLx), this handles both direct NLSL commands and embedded ones like "SLINLSL1"
-    const nlslMatch = iscpCommand.match(/SSNLSL[0-9A-Fa-f]/);
-    if (nlslMatch) {
-      log.debug("%s Sending SLI2B (NET input) before %s", integrationName, nlslMatch[0]);
+    // Handle TuneIn preset navigation
+    if (iscpCommand.match(/^TIP[0-9A-Fa-f]+$/)) {
+      return this.handleTIPsend(iscpCommand);
+    }
+
+    // Check if command contains a network service selection (NSSxx), this handles both direct NSS commands and embedded ones like "SLINSS01"
+    const nssMatch = iscpCommand.match(/NSS[0-9]{2}/);
+    if (nssMatch) {
+      log.debug("%s Sending SLI2B (NET input) before %s", integrationName, nssMatch[0]);
       await this.raw("SLI2B"); // Select NET input first
       await delay(this.config.netMenuDelay ?? 2500); // Wait for AVR to fully load NET menu
-      log.debug("%s Sending network service command: %s", integrationName, nlslMatch[0]);
-      await this.raw(nlslMatch[0]); // Send just the NLSL command
+      const subsource =  String(nssMatch[0].slice(-2)).padStart(5, "0");
+      log.debug("%s Sending network service command: %s", integrationName, nssMatch[0]);
+      await this.raw(`NLSI${subsource}`);
+      await delay(this.config.netMenuDelay ?? 2500);
       await this.raw("SLIQSTN"); // Query input-selector to ensure source state updates
       return;
     }

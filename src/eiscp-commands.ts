@@ -378,16 +378,16 @@ export const eiscpCommands = {
         "2B": { name: ["net", "network"], description: "sets NETWORK, NET" },
         "2C": { name: "usbt", description: "sets USB(toggle)" },
         "2E": { name: "bluetooth", description: "sets bluetooth" },
-        SSNLSL0: { name: "tunein", description: "UC integration automatically selects TuneIn after selecting NET" },
-        SSNLSL1: { name: "spotify", description: "UC integration automatically selects Spotify after selecting NET" },
-        SSNLSL2: { name: "deezer", description: "UC integration automatically selects Deezer after selecting NET" },
-        SSNLSL3: { name: "tidal", description: "UC integration automatically selects Tidal after selecting NET" },
-        SSNLSL4: { name: "amazonmusic", description: "UC integration automatically selects AmazonMusic after selecting NET" },
-        SSNLSL5: { name: "chromecast", description: "UC integration automatically selects Chromecast after selecting NET" },
-        SSNLSL6: { name: "dts-play-fi", description: "UC integration automatically selects DTS-Play-Fi after selecting NET" },
-        SSNLSL7: { name: "airplay", description: "UC integration automatically selects AirPlay after selecting NET" },
-        SSNLSL8: { name: "alexa", description: "UC integration automatically selects Alexa after selecting NET" },
-        SSNLSL9: { name: "music-server", description: "UC integration automatically selects Music-Server after selecting NET" },
+        NSS01: { name: "tunein", description: "UC integration automatically selects TuneIn after selecting NET" },
+        NSS02: { name: "spotify", description: "UC integration automatically selects Spotify after selecting NET" },
+        NSS03: { name: "deezer", description: "UC integration automatically selects Deezer after selecting NET" },
+        NSS04: { name: "tidal", description: "UC integration automatically selects Tidal after selecting NET" },
+        NSS05: { name: "amazonmusic", description: "UC integration automatically selects AmazonMusic after selecting NET" },
+        NSS06: { name: "chromecast", description: "UC integration automatically selects Chromecast after selecting NET" },
+        NSS07: { name: "dts-play-fi", description: "UC integration automatically selects DTS-Play-Fi after selecting NET" },
+        NSS08: { name: "airplay", description: "UC integration automatically selects AirPlay after selecting NET" },
+        NSS09: { name: "alexa", description: "UC integration automatically selects Alexa after selecting NET" },
+        NSS10: { name: "music-server", description: "UC integration automatically selects Music-Server after selecting NET" },
         UP: { name: "up", description: "sets Selector Position Wrap-Around Up" },
         DOWN: { name: "down", description: "sets Selector Position Wrap-Around Down" },
         QSTN: { name: "query", description: "gets The Selector Position" }
@@ -757,7 +757,7 @@ export const eiscpCommands = {
       }
     },
     TIP: {
-      name: "tune-in-preset",
+      name: "tunein-preset",
       description: "Preset Command for TuneIn",
       values: {
         "1,999": {

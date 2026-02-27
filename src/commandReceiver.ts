@@ -22,8 +22,8 @@ const SENSOR_SUFFIXES = [
   "_front_panel_display_sensor"
 ];
 
-const ALBUM_ART = ["spotify", "deezer", "tidal", "amazonmusic", "dts-play-fi"];
-const SONG_INFO = ["spotify", "deezer", "tidal", "amazonmusic", "dts-play-fi", "airplay"];
+const ALBUM_ART = ["tunein", "spotify", "deezer", "tidal", "amazonmusic", "dts-play-fi"];
+const SONG_INFO = ["tunein", "spotify", "deezer", "tidal", "amazonmusic", "dts-play-fi", "airplay"];
 
 export class CommandReceiver {
   private driver: uc.IntegrationAPI;
