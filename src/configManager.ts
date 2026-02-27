@@ -40,7 +40,7 @@ export const MAX_LENGTHS = {
 /** Security: Validation patterns */
 export const PATTERNS = {
   IP_ADDRESS: /^(\d{1,3}\.){3}\d{1,3}$/,
-  MODEL_NAME: /^[a-zA-Z0-9\-_ ]+$/,
+  MODEL_NAME: /^[a-zA-Z0-9\-_.() ]+$/,
   ALBUM_ART_URL: /^[a-zA-Z0-9._\-/]+$/,
   PIN_CODE: /^\d{4}$/,
   USER_COMMAND: /^[a-z0-9\-\s.:=]+$/i, // Letters, numbers, hyphens, spaces, delimiters

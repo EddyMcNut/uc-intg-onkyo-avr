@@ -650,7 +650,7 @@ export class EiscpDriver extends EventEmitter {
 
   private async sendIscp(iscpCommand: string): Promise<void> {
     // Check if command contains a network service selection (NLSLx), this handles both direct NLSL commands and embedded ones like "SLINLSL1"
-    const nlslMatch = iscpCommand.match(/NLSL[0-9A-Fa-f]/);
+    const nlslMatch = iscpCommand.match(/SSNLSL[0-9A-Fa-f]/);
     if (nlslMatch) {
       log.debug("%s Sending SLI2B (NET input) before %s", integrationName, nlslMatch[0]);
       await this.raw("SLI2B"); // Select NET input first
