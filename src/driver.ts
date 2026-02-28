@@ -459,7 +459,7 @@ export default class OnkyoDriver {
         [avrConfig],
         (p) => this.connectionManager.getPhysicalConnection(p),
         this.createAvrSpecificConfig.bind(this),
-        (avrSpecificConfig, eiscp) => new CommandSender(this.driver, avrSpecificConfig, eiscp)
+        (avrSpecificConfig, eiscp, commandReceiver) => new CommandSender(this.driver, avrSpecificConfig, eiscp, commandReceiver)
       );
 
       const created = this.avrInstanceManager.getInstance(avrEntry);

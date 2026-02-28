@@ -12,11 +12,13 @@ export class CommandSender {
   private config: OnkyoConfig;
   private eiscp: EiscpDriver;
   private lastCommandTime: number = 0;
+  private commandReceiver: any; // CommandReceiver type to avoid circular dependency
 
-  constructor(driver: uc.IntegrationAPI, config: OnkyoConfig, eiscp: EiscpDriver) {
+  constructor(driver: uc.IntegrationAPI, config: OnkyoConfig, eiscp: EiscpDriver, commandReceiver: any) {
     this.driver = driver;
     this.config = config;
     this.eiscp = eiscp;
+    this.commandReceiver = commandReceiver;
   }
 
   async sharedCmdHandler(entity: uc.Entity, cmdId: string, params?: { [key: string]: string | number | boolean }): Promise<uc.StatusCodes> {
@@ -210,7 +212,7 @@ export class CommandSender {
         await this.eiscp.command(formatCommand("setup right"));
         break;
       case uc.MediaPlayerCommands.Info:
-        await avrStateManager.refreshAvrState(entity.id, this.eiscp, zone, this.driver, queueThreshold);
+        await avrStateManager.refreshAvrState(entity.id, this.eiscp, zone, this.driver, queueThreshold, this.commandReceiver);
         break;
       default:
         return uc.StatusCodes.NotImplemented;

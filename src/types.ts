@@ -18,6 +18,6 @@ export type PhysicalConnection = {
 
 export type CreateCommandReceiverFn = (eiscp: EiscpInstance) => CommandReceiver;
 export type CreateCommandReceiverFactory = (avrConfig: AvrConfig) => CreateCommandReceiverFn;
-export type CreateCommandSenderFn = (avrSpecificConfig: any, eiscp: EiscpInstance) => CommandSender;
+export type CreateCommandSenderFn = (avrSpecificConfig: any, eiscp: EiscpInstance, commandReceiver: CommandReceiver) => CommandSender;
 export type QueryAvrStateFn = (avrEntry: string, eiscp: EiscpInstance, context: string) => Promise<void>;
 export type QueryAllZonesStateFn = (physicalAvr: string, eiscp: EiscpInstance, context: string) => Promise<void>;

@@ -2,6 +2,8 @@ import * as uc from "@unfoldedcircle/integration-api";
 import { EiscpDriver } from "./eiscp.js";
 import log from "./loggers.js";
 import { delay } from "./utils.js";
+import { ALBUM_ART } from "./constants.js";
+import type { CommandReceiver } from "./commandReceiver.js";
 
 const integrationName = "avrState:";
 
@@ -125,7 +127,14 @@ class AvrStateManager {
   }
 
   /** Query AVR state and clear media attributes on source change */
-  async refreshAvrState(entityId: string, eiscpInstance?: EiscpDriver, zone?: string, driver?: uc.IntegrationAPI, queueThreshold?: number): Promise<void> {
+  async refreshAvrState(
+    entityId: string,
+    eiscpInstance?: EiscpDriver,
+    zone?: string,
+    driver?: uc.IntegrationAPI,
+    queueThreshold?: number,
+    commandReceiver?: CommandReceiver
+  ): Promise<void> {
     if (!eiscpInstance || !zone || !driver || !entityId) {
       return;
     }
@@ -157,14 +166,16 @@ class AvrStateManager {
     await delay(threshold * 3);
     await eiscpInstance.command({ zone, command: "listening-mode", args: "query" });
     await eiscpInstance.command({ zone, command: "fp-display", args: "query" });
+
+    // Force refresh album art for network services that support it
+    const currentSubSource = this.getSubSource(entityId);
+    const hasAlbumArt = ALBUM_ART.some((name) => currentSubSource.toLowerCase().includes(name));
+    if (hasAlbumArt && commandReceiver) {
+      log.info("%s [%s] forcing album art refresh for subsource '%s'", integrationName, entityId, currentSubSource);
+      await commandReceiver.maybeUpdateImage(entityId, true);
+    }
   }
 
-  /** Query AVR system & general state: power, input, volume, muting, listening mode, fp-display */
-  /**
-   * Determine whether enough time has passed since the last state query for
-   * this entity.  Public because callers outside the state manager (e.g.
-   * SubscriptionHandler) need to consult it.
-   */
   public shouldQuery(entityId: string): boolean {
     const last = this.lastQueries.get(entityId) || 0;
     return Date.now() - last > this.QUERY_TTL;

@@ -8,6 +8,7 @@ import { eiscpMappings } from "./eiscp-mappings.js";
 import { avrStateManager } from "./avrState.js";
 import { DEFAULT_QUEUE_THRESHOLD, buildEntityId } from "./configManager.js";
 import { delay } from "./utils.js";
+import { NETWORK_SERVICES, NO_TITLE } from "./constants.js";
 
 export interface EiscpConfig {
   host?: string;
@@ -48,11 +49,6 @@ const ZONE3_COMMAND_MAP: Record<string, string> = {
 // Reverse mappings (zone-specific -> main) for parsing incoming commands
 const ZONE2_REVERSE_MAP = Object.fromEntries(Object.entries(ZONE2_COMMAND_MAP).map(([k, v]) => [v, k]));
 const ZONE3_REVERSE_MAP = Object.fromEntries(Object.entries(ZONE3_COMMAND_MAP).map(([k, v]) => [v, k]));
-
-// Known network streaming services - when FLD starts with one of these, emit once and suppress scroll updates
-const NETWORK_SERVICES = ["TuneIn", "Spotify", "Deezer", "Tidal", "AmazonMusic", "Chromecast built-in", "DTS Play-Fi", "AirPlay", "Alexa", "Music Server", "USB", "Play Queue"];
-
-const NO_TITLE = ["TuneIn"];
 
 interface Metadata {
   title?: string;

@@ -8,6 +8,7 @@ import { getCompatibleListeningModes, detectAudioFormatType } from "./listeningM
 import { eiscpMappings } from "./eiscp-mappings.js";
 import log from "./loggers.js";
 import { delay } from "./utils.js";
+import { ALBUM_ART, SONG_INFO } from "./constants.js";
 
 const integrationName = "commandReceiver:";
 
@@ -22,9 +23,6 @@ const SENSOR_SUFFIXES = [
   "_output_display_sensor",
   "_front_panel_display_sensor"
 ];
-
-const ALBUM_ART = ["tunein", "spotify", "deezer", "tidal", "amazonmusic", "dts-play-fi"];
-const SONG_INFO = ["tunein", "spotify", "deezer", "tidal", "amazonmusic", "dts-play-fi", "airplay"];
 
 export class CommandReceiver {
   private driver: uc.IntegrationAPI;
@@ -56,13 +54,16 @@ export class CommandReceiver {
     }
   }
 
-  async maybeUpdateImage(entityId: string) {
+  async maybeUpdateImage(entityId: string, force: boolean = false) {
     if (!this.config.albumArtURL || this.config.albumArtURL === "na") return;
+
+    if (force) {
+      this.lastImageHash = ""; // reset hash to force update on next check
+    }
 
     let imageUrl = `http://${this.config.ip}/${this.config.albumArtURL}`;
     let newHash = await this.getImageHash(imageUrl);
     let attempts = 0;
-
     while (newHash === this.lastImageHash && attempts < 3) {
       attempts++;
       await delay(500);
@@ -400,9 +401,9 @@ export class CommandReceiver {
                 [uc.MediaPlayerAttributes.MediaTitle]: nowPlaying.title || "unknown",
                 [uc.MediaPlayerAttributes.MediaAlbum]: nowPlaying.album || "unknown"
               });
-              const hasAlbumArt = ALBUM_ART.some((name) => entitySubSource.includes(name));
+              const hasAlbumArt = ALBUM_ART.some((name) => entitySubSource.toLowerCase().includes(name));
               if (hasAlbumArt) {
-                await this.maybeUpdateImage(entityId);
+                await this.maybeUpdateImage(entityId, false);
               } else {
                 // Clear image URL if source does not support album art
                 this.driver.updateEntityAttributes(entityId, {

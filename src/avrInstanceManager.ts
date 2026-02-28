@@ -74,7 +74,7 @@ export default class AvrInstanceManager {
       const avrSpecificConfig = createAvrSpecificConfig(avrConfig);
 
       // Create command sender for this zone (uses shared eiscp from physical connection)
-      const commandSender = createCommandSender(avrSpecificConfig, physicalConnection.eiscp);
+      const commandSender = createCommandSender(avrSpecificConfig, physicalConnection.eiscp, physicalConnection.commandReceiver);
 
       // Store zone instance (references shared eiscp)
       this.setInstance(avrEntry, {
