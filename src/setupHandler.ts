@@ -163,7 +163,8 @@ export default class SetupHandler {
           input.adjustVolumeDispl ||
           input.zoneCount ||
           input.createSensors ||
-          input.netMenuDelay
+          input.netMenuDelay ||
+          input.tuneinPresetPosition
       );
 
       if (!hasManualFields) {
@@ -174,6 +175,16 @@ export default class SetupHandler {
         const initialPort = currentAvr ? currentAvr.port : AVR_DEFAULTS.port;
         const initialListeningModes = currentAvr && Array.isArray(currentAvr.listeningModeOptions) ? currentAvr.listeningModeOptions.join('; ') : currentAvr?.listeningModeOptions === null ? "none" : "";
         const initialInputSelectorOpts = currentAvr && Array.isArray(currentAvr.inputSelectorOptions) ? currentAvr.inputSelectorOptions.join('; ') : currentAvr?.inputSelectorOptions === null ? "none" : "";
+        const initialAlbumArtURL = currentAvr?.albumArtURL ?? AVR_DEFAULTS.albumArtURL;
+        const initialQueueThreshold = currentAvr?.queueThreshold ?? AVR_DEFAULTS.queueThreshold;
+        const initialNetMenuDelay = currentAvr?.netMenuDelay ?? AVR_DEFAULTS.netMenuDelay;
+        const initialTuneinPresetPosition = currentAvr?.tuneinPresetPosition ?? AVR_DEFAULTS.tuneinPresetPosition;
+        const initialVolumeScale = currentAvr?.volumeScale ?? AVR_DEFAULTS.volumeScale;
+        const initialAdjustVolumeDispl = currentAvr?.adjustVolumeDispl ?? true;
+        // Determine zone count by counting zones for this physical AVR
+        const initialZoneCount = currentAvr && cfg.avrs ? 
+          cfg.avrs.filter(a => a.model === currentAvr.model && a.ip === currentAvr.ip).length : 1;
+        const initialCreateSensors = currentAvr?.createSensors ?? AVR_DEFAULTS.createSensors;
 
         return new uc.RequestUserInput("Manual configuration", [
           {
@@ -194,7 +205,7 @@ export default class SetupHandler {
           {
             id: "albumArtURL",
             label: { en: "AVR AlbumArt endpoint. Default `album_art.cgi`, if not known set to `na`." },
-            field: { text: { value: AVR_DEFAULTS.albumArtURL } }
+            field: { text: { value: initialAlbumArtURL } }
           },
           {
             id: "listeningModeOptions",
@@ -211,19 +222,25 @@ export default class SetupHandler {
           {
             id: "queueThreshold",
             label: { en: "Message queue threshold. Default `100`" },
-            field: { number: { value: AVR_DEFAULTS.queueThreshold } }
+            field: { number: { value: initialQueueThreshold } }
           },
           {
             id: "netMenuDelay",
             label: { en: "NET sub-source selection delay. Default `500`" },
-            field: { number: { value: AVR_DEFAULTS.netMenuDelay } }
+            field: { number: { value: initialNetMenuDelay } }
+          },
+          {
+            id: "tuneinPresetPosition",
+            label: { en: "TuneIn 'My Presets' menu position (1-9). Default `1`" },
+            field: { number: { value: initialTuneinPresetPosition } },
+            description: { en: "Position of 'My Presets' in your AVR's TuneIn menu (1=first, 2=second, etc.)" }
           },
           {
             id: "volumeScale",
             label: { en: "Volume scale (0-80 or 0-100)" },
             field: {
               dropdown: {
-                value: String(AVR_DEFAULTS.volumeScale),
+                value: String(initialVolumeScale),
                 items: [
                   { id: "100", label: { en: "0-100" } },
                   { id: "80", label: { en: "0-80" } }
@@ -236,7 +253,7 @@ export default class SetupHandler {
             label: { en: "Adjust volume display" },
             field: {
               dropdown: {
-                value: "true",
+                value: String(initialAdjustVolumeDispl),
                 items: [
                   { id: "true", label: { en: "Yes - eISCP divided by 2" } },
                   { id: "false", label: { en: "No - just eISCP" } }
@@ -249,7 +266,7 @@ export default class SetupHandler {
             label: { en: "Number of zones to configure" },
             field: {
               dropdown: {
-                value: "1",
+                value: String(initialZoneCount),
                 items: [
                   { id: "1", label: { en: "1 zone (Main only)" } },
                   { id: "2", label: { en: "2 zones (Main + Zone 2)" } },
@@ -263,7 +280,7 @@ export default class SetupHandler {
             label: { en: "Create sensor entities?" },
             field: {
               dropdown: {
-                value: "true",
+                value: String(initialCreateSensors),
                 items: [
                   { id: "true", label: { en: "Yes" } },
                   { id: "false", label: { en: "No" } }
@@ -522,6 +539,12 @@ export default class SetupHandler {
       return isNaN(parsed) ? AVR_DEFAULTS.netMenuDelay : parsed;
     })(input.netMenuDelay);
 
+    const tuneinPresetPositionValue = ((value) => {
+      const parsed = parseInt(String(value), 10);
+      if (isNaN(parsed)) return AVR_DEFAULTS.tuneinPresetPosition;
+      return parsed >= 1 && parsed <= 9 ? parsed : AVR_DEFAULTS.tuneinPresetPosition;
+    })(input.tuneinPresetPosition);
+
     const zoneCountValue = ((value) => {
       const parsed = parseInt(String(value), 10);
       if (isNaN(parsed)) return 1;
@@ -539,7 +562,8 @@ export default class SetupHandler {
       volumeScale: volumeScaleValue,
       adjustVolumeDispl: adjustVolumeDisplValue,
       createSensors: createSensorsValue,
-      netMenuDelay: netMenuDelayValue
+      netMenuDelay: netMenuDelayValue,
+      tuneinPresetPosition: tuneinPresetPositionValue
     };
 
     const zones: AvrZone[] = ["main"];
@@ -609,6 +633,12 @@ export default class SetupHandler {
           field: { number: { value: netMenuDelayValue } }
         },
         {
+          id: "tuneinPresetPosition",
+          label: { en: "TuneIn 'My Presets' menu position (1-9). Default `1`" },
+          field: { number: { value: tuneinPresetPositionValue } },
+          description: { en: "Position of 'My Presets' in your AVR's TuneIn menu (1=first, 2=second, etc.)" }
+        },
+        {
           id: "volumeScale",
           label: { en: "Volume scale (0-80 or 0-100)" },
           field: {
@@ -666,13 +696,14 @@ export default class SetupHandler {
 
     for (const avrCfg of normalizedAvrs) {
       this.host.log.info(
-        "%s Adding AVR config for zone %s with volumeScale: %d, adjustVolumeDispl: %s, createSensors: %s, netMenuDelay: %d",
+        "%s Adding AVR config for zone %s with volumeScale: %d, adjustVolumeDispl: %s, createSensors: %s, netMenuDelay: %d, tuneinPresetPosition: %d",
         integrationName,
         avrCfg.zone,
         avrCfg.volumeScale,
         avrCfg.adjustVolumeDispl,
         avrCfg.createSensors,
-        avrCfg.netMenuDelay
+        avrCfg.netMenuDelay,
+        avrCfg.tuneinPresetPosition
       );
       ConfigManager.addAvr(avrCfg);
     }

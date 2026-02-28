@@ -115,6 +115,7 @@ export const AVR_DEFAULTS = {
   adjustVolumeDispl: true,
   createSensors: true,
   netMenuDelay: 500,
+  tuneinPresetPosition: 1,
   port: 60128
 } as const;
 
@@ -129,6 +130,7 @@ export interface AvrConfig {
   adjustVolumeDispl?: boolean; // true = use 0.5 dB steps (×2 / ÷2), false = direct EISCP value
   createSensors?: boolean; // true = create sensor entities for this AVR
   netMenuDelay?: number; // delay in ms for NET menu to load (default 2500)
+  tuneinPresetPosition?: number; // position of "My Presets" in TuneIn menu (1-9, default 1)
   /**
    * Optional user-configured listening mode options.
    * - `undefined` / `[]`: show all/dynamic options.
@@ -175,6 +177,7 @@ export class ConfigManager {
       adjustVolumeDispl: avr.adjustVolumeDispl ?? AVR_DEFAULTS.adjustVolumeDispl,
       createSensors: avr.createSensors ?? AVR_DEFAULTS.createSensors,
       netMenuDelay: avr.netMenuDelay ?? AVR_DEFAULTS.netMenuDelay,
+      tuneinPresetPosition: avr.tuneinPresetPosition ?? AVR_DEFAULTS.tuneinPresetPosition,
       listeningModeOptions: avr.listeningModeOptions,
       inputSelectorOptions: avr.inputSelectorOptions
     };
@@ -383,6 +386,14 @@ export class ConfigManager {
       }
     }
 
+    // tuneinPresetPosition
+    if (avr.tuneinPresetPosition !== undefined) {
+      const tp = typeof avr.tuneinPresetPosition === "number" ? avr.tuneinPresetPosition : parseInt(String(avr.tuneinPresetPosition), 10);
+      if (isNaN(tp) || tp < 1 || tp > 9) {
+        errors.push("tuneinPresetPosition must be an integer between 1 and 9");
+      }
+    }
+
     // Validate a select-options field (listeningModeOptions / inputSelectorOptions)
     const validateSelectOptions = (raw: unknown, fieldName: string): string[] | null | undefined => {
       if (raw === undefined) return undefined;
@@ -424,6 +435,7 @@ export class ConfigManager {
       adjustVolumeDispl: parseBoolean(avr.adjustVolumeDispl, AVR_DEFAULTS.adjustVolumeDispl),
       createSensors: parseBoolean(avr.createSensors, AVR_DEFAULTS.createSensors),
       netMenuDelay: typeof avr.netMenuDelay === "string" ? parseInt(avr.netMenuDelay, 10) : avr.netMenuDelay,
+      tuneinPresetPosition: typeof avr.tuneinPresetPosition === "string" ? parseInt(avr.tuneinPresetPosition, 10) : avr.tuneinPresetPosition,
       listeningModeOptions: lmoParsed,
       inputSelectorOptions: isoParsed
     });

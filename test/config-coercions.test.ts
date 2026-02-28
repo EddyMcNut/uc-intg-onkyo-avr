@@ -22,6 +22,7 @@ test.serial("createAvrSpecificConfig coerces types correctly", async (t) => {
     adjustVolumeDispl: "false",
     createSensors: "false",
     netMenuDelay: "120",
+    tuneinPresetPosition: "3",
     listeningModeOptions: ["stereo","straight-decode"]
   };
 
@@ -32,6 +33,7 @@ test.serial("createAvrSpecificConfig coerces types correctly", async (t) => {
   t.is(config.avrs[0].adjustVolumeDispl, false);
   t.is(config.avrs[0].createSensors, false);
   t.is(config.avrs[0].netMenuDelay, 120);
+  t.is(config.avrs[0].tuneinPresetPosition, 3);
   t.is(config.avrs[0].port, 60128);
   t.is(config.avrs[0].albumArtURL, "album_art.cgi");
   t.deepEqual(config.avrs[0].listeningModeOptions, ["stereo","straight-decode"]);

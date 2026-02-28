@@ -20,6 +20,7 @@ export interface EiscpConfig {
   send_delay?: number;
   receive_delay?: number;
   netMenuDelay?: number;
+  tuneinPresetPosition?: number;
 }
 
 const COMMANDS = eiscpCommands.commands;
@@ -128,7 +129,8 @@ export class EiscpDriver extends EventEmitter {
       verify_commands: config?.verify_commands ?? false,
       send_delay: config?.send_delay ?? DEFAULT_QUEUE_THRESHOLD,
       receive_delay: config?.receive_delay ?? DEFAULT_QUEUE_THRESHOLD,
-      netMenuDelay: config?.netMenuDelay ?? 2500
+      netMenuDelay: config?.netMenuDelay ?? 2500,
+      tuneinPresetPosition: config?.tuneinPresetPosition ?? 1
     };
     this.setupErrorHandler();
   }
@@ -703,18 +705,17 @@ export class EiscpDriver extends EventEmitter {
     const preset = iscpCommand.slice(3);
     const presetIndex = String(preset).padStart(5, "0");
     const menuDelay = this.config.netMenuDelay ?? 2500;
+    const myPresetsPosition = String(this.config.tuneinPresetPosition ?? 1).padStart(5, "0");
 
-    log.info("%s TuneIn preset %d: navigating to My Presets, selecting index %s", integrationName, preset, presetIndex);
+    log.info("%s TuneIn preset %d: navigating to My Presets (position %s), selecting index %s", integrationName, preset, myPresetsPosition, presetIndex);
 
-    await this.raw("NTCTOP");          // Go to TuneIn top menu
+    await this.raw("NTCTOP");                   // Go to TuneIn top menu
     await delay(menuDelay);
-    await this.raw("NTCSELECT");       // Confirm / enter
-    await delay(menuDelay);
-    await this.raw("NLSL1");           // Enter My Presets
+    await this.raw("NTCSELECT");                // Confirm / enter  
     await delay(menuDelay*3);
-    await this.raw("NTCSELECT");       // Confirm / enter
+    await this.raw(`NLSI${myPresetsPosition}`); // Navigate down to My Presets (first position)
     await delay(menuDelay*2);
-    await this.raw(`NLSI${presetIndex}`); // Select preset by index
+    await this.raw(`NLSI${presetIndex}`);       // Select preset by index
   }
 
   private async sendIscp(iscpCommand: string): Promise<void> {

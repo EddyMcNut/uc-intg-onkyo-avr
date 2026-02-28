@@ -342,6 +342,12 @@ export default class OnkyoDriver {
       return isNaN(v) || v < 0 ? AVR_DEFAULTS.netMenuDelay : v;
     })();
 
+    const tuneinPresetPosition = (() => {
+      const v = typeof avrConfig.tuneinPresetPosition === "number" ? avrConfig.tuneinPresetPosition : parseInt(String(avrConfig.tuneinPresetPosition ?? ""), 10);
+      if (isNaN(v) || v < 1 || v > 9) return AVR_DEFAULTS.tuneinPresetPosition;
+      return v;
+    })();
+
     const port = (() => {
       const p = typeof avrConfig.port === "number" ? avrConfig.port : parseInt(String(avrConfig.port ?? ""), 10);
       return isNaN(p) || p < 1 || p > 65535 ? AVR_DEFAULTS.port : p;
@@ -360,6 +366,7 @@ export default class OnkyoDriver {
           adjustVolumeDispl,
           createSensors,
           netMenuDelay,
+          tuneinPresetPosition,
           // Preserve user-configured listening mode options so command receivers
           // and runtime logic can honour them after restart.
           listeningModeOptions: Array.isArray((avrConfig as any).listeningModeOptions)
@@ -414,19 +421,24 @@ export default class OnkyoDriver {
           return commandReceiver;
         });
         physicalConnection = physicalConn;
-      } else if (!physicalConnection.eiscp.connected) {
+      } else {
+        // Physical connection exists - update its config in case settings changed
+        this.connectionManager.updateConnectionConfig(physicalAVR, avrConfig);
+        
+        if (!physicalConnection.eiscp.connected) {
         // Physical connection exists but is disconnected, try to reconnect
         log.info("%s [%s] TCP connection lost, reconnecting to AVR...", integrationName, physicalAVR);
 
         const result = await this.connectionManager.attemptReconnection(physicalAVR);
 
-        if (result.success) {
-          // Cancel any scheduled reconnection since we're now connected
-          this.connectionManager.cancelScheduledReconnection(physicalAVR);
+          if (result.success) {
+            // Cancel any scheduled reconnection since we're now connected
+            this.connectionManager.cancelScheduledReconnection(physicalAVR);
 
-          // Query state for all zones after successful reconnection
-          await this.queryAllZonesState(physicalAVR, physicalConnection.eiscp, "after reconnection in handleConnect");
-          alreadyQueriedAvrs.add(physicalAVR);
+            // Query state for all zones after successful reconnection
+            await this.queryAllZonesState(physicalAVR, physicalConnection.eiscp, "after reconnection in handleConnect");
+            alreadyQueriedAvrs.add(physicalAVR);
+          }
         }
       }
     }
