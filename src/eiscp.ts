@@ -52,6 +52,8 @@ const ZONE3_REVERSE_MAP = Object.fromEntries(Object.entries(ZONE3_COMMAND_MAP).m
 // Known network streaming services - when FLD starts with one of these, emit once and suppress scroll updates
 const NETWORK_SERVICES = ["TuneIn", "Spotify", "Deezer", "Tidal", "AmazonMusic", "Chromecast built-in", "DTS Play-Fi", "AirPlay", "Alexa", "Music Server", "USB", "Play Queue"];
 
+const NO_TITLE = ["TuneIn"];
+
 interface Metadata {
   title?: string;
   artist?: string;
@@ -262,21 +264,43 @@ export class EiscpDriver extends EventEmitter {
     const parts = combined.split(/ISCP(?:[$.!]1|\$!1)/);
     let foundMatch = false;
 
+    // Get current subsource to override artist for certain streaming services
+    const entityId = buildEntityId(this.config.model!, this.config.host!, result.zone);
+    const currentSubSource = avrStateManager.getSubSource(entityId);
+
     for (const part of parts) {
       if (!part.trim()) continue;
       const match = part.trim().match(/^([A-Z]{3})\s*(.*)$/s);
       if (match) {
         foundMatch = true;
         const type = match[1];
-        const val = match[2].trim();
-        if (type === "NAT") this.currentMetadata.title = val;
+        let val = match[2].trim();
+        if (type === "NAT") {
+          // Override artist with service name for configured streaming services
+          if (NO_TITLE.map(s => s.toLowerCase()).includes(currentSubSource)) {
+            // Find matching service name from NETWORK_SERVICES (case-insensitive)
+            const serviceName = NETWORK_SERVICES.find((s) => s.toLowerCase() === currentSubSource);
+            this.currentMetadata.title = serviceName || val;
+          } else {
+            this.currentMetadata.title = val;
+          }
+        }
         if (type === "NTI") this.currentMetadata.artist = val;
         if (type === "NAL") this.currentMetadata.album = val;
       }
     }
 
     if (!foundMatch) {
-      if (command === "NAT") this.currentMetadata.title = originalValue;
+      if (command === "NAT") {
+        // Override artist with service name for configured streaming services
+        if (NO_TITLE.map(s => s.toLowerCase()).includes(currentSubSource)) {
+          // Find matching service name from NETWORK_SERVICES (case-insensitive)
+          const serviceName = NETWORK_SERVICES.find((s) => s.toLowerCase() === currentSubSource);
+          this.currentMetadata.title = serviceName || originalValue;
+        } else {
+          this.currentMetadata.title = originalValue;
+        }
+      }
       if (command === "NTI") this.currentMetadata.artist = originalValue;
       if (command === "NAL") this.currentMetadata.album = originalValue;
     }
