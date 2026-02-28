@@ -2,7 +2,7 @@ import * as uc from "@unfoldedcircle/integration-api";
 import { EiscpDriver } from "./eiscp.js";
 import log from "./loggers.js";
 import { delay } from "./utils.js";
-import { ALBUM_ART } from "./constants.js";
+import { ALBUM_ART, SONG_INFO } from "./constants.js";
 import type { CommandReceiver } from "./commandReceiver.js";
 
 const integrationName = "avrState:";
@@ -173,6 +173,15 @@ class AvrStateManager {
     if (hasAlbumArt && commandReceiver) {
       log.info("%s [%s] forcing album art refresh for subsource '%s'", integrationName, entityId, currentSubSource);
       await commandReceiver.maybeUpdateImage(entityId, true);
+    }
+
+    // Requery metadata for network services that support it
+    const hasSongInfo = SONG_INFO.some((name) => currentSubSource.toLowerCase().includes(name));
+    if (hasSongInfo) {
+      log.debug("%s [%s] requerying metadata for subsource '%s'", integrationName, entityId, currentSubSource);
+      await eiscpInstance.raw("NATQSTN"); // Query artist
+      await eiscpInstance.raw("NTIQSTN"); // Query title
+      await eiscpInstance.raw("NALQSTN"); // Query album
     }
   }
 
