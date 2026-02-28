@@ -30,7 +30,7 @@ To set up an Activity for TuneIn, have a look at these screenshots:
 
   ![](../screenshots/tunein-ui.png)
 
-- User interface, add buttons for the presets known by the AVR: `tunein-preset x`
+- User interface, add buttons for the presets known by the AVR: `tunein-preset x`, the x is the positions on your Preset list.
 
   ![](../screenshots/tunein-preset.png)
 
