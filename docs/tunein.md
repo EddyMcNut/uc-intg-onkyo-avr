@@ -36,9 +36,15 @@ To set up an Activity for TuneIn, have a look at these screenshots:
 
   **Note: `tunein-preset` only works when AVR already has selected TuneIn as source**
 
-- Now, when you select your TuneIn activity and then select one of your presets on the screen of your remote, the integration will select that TuneIn preset and play it
+- Now, when you select your TuneIn activity and then select one of your presets on the screen of your remote, the integration will select that TuneIn preset and play it, **as the integration needs to navigate the TuneIn menu, it needs a few seconds before the station starts playing**
 
   ![](../screenshots/tunein-ui-pic.jpg)
+
+- Preset switch can fail when TuneIn itself is broadcasting a commercial.
+
+- If selecting preset is not always working, consider running setup again and set `NET sub source selection delay` to a higher value.
+
+  ![](/screenshots/net-subsource-delay.png)
 
 _note: after installing a new version of the integration or after a reboot of the remote, it might be needed to close screen on the remote and enter the already active activity again to get the MediaWidget to work_
 
