@@ -1,6 +1,7 @@
 import * as uc from "@unfoldedcircle/integration-api";
 import { EiscpDriver } from "./eiscp.js";
 import log from "./loggers.js";
+import { delay } from "./utils.js";
 
 const integrationName = "avrState:";
 
@@ -153,7 +154,7 @@ class AvrStateManager {
 
     // To make sure the sensor also updates (in case a message is missed)
     await eiscpInstance.command({ zone, command: "input-selector", args: "query" });
-    await new Promise((resolve) => setTimeout(resolve, threshold * 3));
+    await delay(threshold * 3);
     await eiscpInstance.command({ zone, command: "listening-mode", args: "query" });
     await eiscpInstance.command({ zone, command: "fp-display", args: "query" });
   }
@@ -197,15 +198,15 @@ class AvrStateManager {
     log.info(`${integrationName} [%s] Querying AVR state for zone %s (%s)...`, entityId, zone, context);
     try {
       await eiscpInstance.command({ zone, command: "system-power", args: "query" });
-      await new Promise((resolve) => setTimeout(resolve, threshold));
+      await delay(threshold);
       await eiscpInstance.command({ zone, command: "input-selector", args: "query" });
-      await new Promise((resolve) => setTimeout(resolve, threshold));
+      await delay(threshold);
       await eiscpInstance.command({ zone, command: "volume", args: "query" });
-      await new Promise((resolve) => setTimeout(resolve, threshold));
+      await delay(threshold);
       await eiscpInstance.command({ zone, command: "audio-muting", args: "query" });
-      await new Promise((resolve) => setTimeout(resolve, threshold));
+      await delay(threshold);
       await eiscpInstance.command({ zone, command: "listening-mode", args: "query" });
-      await new Promise((resolve) => setTimeout(resolve, threshold * 3));
+      await delay(threshold * 3);
       await eiscpInstance.command({ zone, command: "fp-display", args: "query" });
     } catch (err) {
       log.warn(`${integrationName} [%s] Failed to query AVR state (%s):`, entityId, context, err);

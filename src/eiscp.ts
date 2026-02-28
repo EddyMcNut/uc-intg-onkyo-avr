@@ -7,6 +7,7 @@ import { eiscpCommands } from "./eiscp-commands.js";
 import { eiscpMappings } from "./eiscp-mappings.js";
 import { avrStateManager } from "./avrState.js";
 import { DEFAULT_QUEUE_THRESHOLD, buildEntityId } from "./configManager.js";
+import { delay } from "./utils.js";
 
 export interface EiscpConfig {
   host?: string;
@@ -90,9 +91,6 @@ interface CommandInput {
   command: string;
   args: string | number;
 }
-
-/** Helper to create a delay promise */
-const delay = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
 /** Handler function type for special command parsing */
 type CommandHandler = (value: string, command: string, result: CommandResult) => CommandResult;
@@ -559,7 +557,7 @@ export class EiscpDriver extends EventEmitter {
         let command = iscp_message.slice(0, 3);
         let value = iscp_message.slice(3);
 
-        // log.info("%s RAW (0) RECEIVE: [%s] %s %s", integrationName, command, value);
+        log.info("%s RAW (0) RECEIVE: [%s] %s %s", integrationName, command, value);
 
         // Ignore messages we don't care about
         if (IGNORED_COMMANDS.has(command)) {
@@ -651,22 +649,17 @@ export class EiscpDriver extends EventEmitter {
   private async handleTIPsend(iscpCommand: string): Promise<void> {
     // Assumes TuneIn is already the active source.
     const preset = iscpCommand.slice(3);
-    // const presetNum = parseInt(presetHex, 16);
-    // if (isNaN(presetNum) || presetNum < 1) {
-    //   log.warn("%s handleTIPsend: invalid preset number in command %s", integrationName, iscpCommand);
-    //   return;
-    // }
     const presetIndex = String(preset).padStart(5, "0");
     const menuDelay = this.config.netMenuDelay ?? 2500;
 
     log.info("%s TuneIn preset %d: navigating to My Presets, selecting index %s", integrationName, preset, presetIndex);
 
     await this.raw("NTCTOP");          // Go to TuneIn top menu
-    await delay(menuDelay*2);
+    await delay(menuDelay);
     await this.raw("NTCSELECT");       // Confirm / enter
-    await delay(menuDelay*2);
+    await delay(menuDelay);
     await this.raw("NLSL1");           // Enter My Presets
-    await delay(menuDelay*2);
+    await delay(menuDelay*3);
     await this.raw("NTCSELECT");       // Confirm / enter
     await delay(menuDelay*2);
     await this.raw(`NLSI${presetIndex}`); // Select preset by index
@@ -688,6 +681,7 @@ export class EiscpDriver extends EventEmitter {
       log.debug("%s Sending network service command: %s", integrationName, nssMatch[0]);
       await this.raw(`NLSI${subsource}`);
       await delay(this.config.netMenuDelay ?? 2500);
+      // avrStateManager.setSubSource(buildEntityId(this.config.model!, this.config.host!, "main"), nssMatch[0]); // Update subSource in state manager
       await this.raw("SLIQSTN"); // Query input-selector to ensure source state updates
       return;
     }

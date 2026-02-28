@@ -7,6 +7,7 @@ import { SelectAttributes } from "./selectEntity.js";
 import { getCompatibleListeningModes, detectAudioFormatType } from "./listeningModeFilters.js";
 import { eiscpMappings } from "./eiscp-mappings.js";
 import log from "./loggers.js";
+import { delay } from "./utils.js";
 
 const integrationName = "commandReceiver:";
 
@@ -64,7 +65,7 @@ export class CommandReceiver {
 
     while (newHash === this.lastImageHash && attempts < 3) {
       attempts++;
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      await delay(500);
       newHash = await this.getImageHash(imageUrl);
     }
     if (newHash !== this.lastImageHash) {

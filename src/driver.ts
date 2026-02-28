@@ -19,6 +19,7 @@ import SubscriptionHandler from "./subscriptionHandler.js";
 import fs from "fs";
 import path from "path";
 const integrationName = "driver:";
+import { delay } from "./utils.js";
 
 /** Parsed setup data with concrete types (after validation/conversion) */
 interface ParsedSetupData {
@@ -303,7 +304,7 @@ export default class OnkyoDriver {
         const queueThreshold = instance.config.queueThreshold ?? DEFAULT_QUEUE_THRESHOLD;
         // Wait between zones (except first) to give AVR time to process
         if (!firstZone) {
-          await new Promise((resolve) => setTimeout(resolve, queueThreshold));
+          await delay(queueThreshold);
         }
         firstZone = false;
 
@@ -482,7 +483,7 @@ export default class OnkyoDriver {
         const queueThreshold = instance.config.queueThreshold ?? DEFAULT_QUEUE_THRESHOLD;
         // If we already queried a zone for this physical AVR, wait before next zone
         if (queriedPhysicalAvrs.has(physicalAVR)) {
-          await new Promise((resolve) => setTimeout(resolve, queueThreshold));
+          await delay(queueThreshold);
         }
         queriedPhysicalAvrs.add(physicalAVR);
         await this.queryAvrState(avrEntry, physicalConnection.eiscp, "after connection");

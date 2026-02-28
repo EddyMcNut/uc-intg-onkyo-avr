@@ -3,6 +3,7 @@ import { EiscpDriver } from "./eiscp.js";
 import { DEFAULT_QUEUE_THRESHOLD, MAX_LENGTHS, PATTERNS, OnkyoConfig } from "./configManager.js";
 import { avrStateManager } from "./avrState.js";
 import log from "./loggers.js";
+import { delay } from "./utils.js";
 
 const integrationName = "commandSender:";
 
@@ -48,7 +49,7 @@ export class CommandSender {
     } catch (err) {
       log.warn("%s [%s] Could not send command, AVR not connected: %s", integrationName, entity.id, err);
       for (let attempt = 1; attempt <= 5; attempt++) {
-        await new Promise((resolve) => setTimeout(resolve, 1000));
+        await delay(1000);
         try {
           await this.eiscp.waitForConnect();
           break;

@@ -5,6 +5,7 @@ import { OnkyoConfig, AvrConfig, buildPhysicalAvrId } from "./configManager.js";
 import ConnectionManager from "./connectionManager.js";
 import AvrInstanceManager from "./avrInstanceManager.js";
 import { DEFAULT_QUEUE_THRESHOLD } from "./configManager.js";
+import { delay } from "./utils.js";
 
 const integrationName = "connectCoordinator:";
 
@@ -78,7 +79,7 @@ export default class ConnectCoordinator {
       if (physicalConnection) {
         const queueThreshold = instance.config.queueThreshold ?? DEFAULT_QUEUE_THRESHOLD;
         if (queriedPhysicalAvrs.has(physicalAVR)) {
-          await new Promise((resolve) => setTimeout(resolve, queueThreshold));
+          await delay(queueThreshold);
         }
         queriedPhysicalAvrs.add(physicalAVR);
         await this.queryAvrState(avrEntry, physicalConnection.eiscp, "after connection");
