@@ -115,7 +115,8 @@ export class EiscpDriver extends EventEmitter {
     NTI: (value, cmd, result) => this.handleMetadata(value, cmd, result),
     NAL: (value, cmd, result) => this.handleMetadata(value, cmd, result),
     DSN: (value, _cmd, result) => this.handleDSN(value, result),
-    FLD: (value, _cmd, result) => this.handleFLD(value, result)
+    FLD: (value, _cmd, result) => this.handleFLD(value, result),
+    NLT: (value, _cmd, result) => this.handleNLT(value, result)
   };
 
   constructor(config?: EiscpConfig) {
@@ -288,6 +289,37 @@ export class EiscpDriver extends EventEmitter {
   private handleDSN(value: string, result: CommandResult): CommandResult {
     result.command = "DSN";
     result.argument = value;
+    return result;
+  }
+
+  private handleNLT(value: string, result: CommandResult): CommandResult {
+    // NLT format: hex data followed by ASCII text (e.g., "0E01000000090100FF0E00TuneIn Radio")
+    // Extract ASCII text portion after hex prefix
+    const textMatch = value.match(/[A-Z][a-z]/); // Find where actual text starts
+    if (!textMatch || textMatch.index === undefined) {
+      return result; // No text found, skip
+    }
+
+    const text = value.substring(textMatch.index).trim();
+    const entityId = buildEntityId(this.config.model!, this.config.host!, result.zone);
+    const currentSource = avrStateManager.getSource(entityId);
+
+    // Only process if source is NET
+    if (currentSource !== "net") {
+      return result;
+    }
+
+    // Check if the title contains a known network service name
+    const detectedService = NETWORK_SERVICES.find((service) => text.includes(service));
+    if (detectedService) {
+      const currentSubSource = avrStateManager.getSubSource(entityId);
+      if (currentSubSource !== detectedService.toLowerCase()) {
+        result.command = "NLT";
+        result.argument = detectedService;
+        return result;
+      }
+    }
+
     return result;
   }
 
@@ -557,7 +589,7 @@ export class EiscpDriver extends EventEmitter {
         let command = iscp_message.slice(0, 3);
         let value = iscp_message.slice(3);
 
-        log.info("%s RAW (0) RECEIVE: [%s] %s %s", integrationName, command, value);
+        // log.info("%s RAW (0) RECEIVE: [%s] %s %s", integrationName, command, value);
 
         // Ignore messages we don't care about
         if (IGNORED_COMMANDS.has(command)) {

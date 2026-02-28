@@ -307,6 +307,28 @@ export class CommandReceiver {
             log.info("%s [%s] DAB station set to: %s", integrationName, entityId, avrUpdates.argument.toString());
             break;
           }
+          case "NLT": {
+            // NLT = Net List Title - navigation breadcrumb showing current network service
+            const serviceName = avrUpdates.argument.toString();
+            const currentSource = avrStateManager.getSource(entityId);
+            const frontPanelDisplaySensorId = `${entityId}_front_panel_display_sensor`;
+
+            if (currentSource === "net") {
+              avrStateManager.setSubSource(entityId, serviceName, this.eiscpInstance, eventZone, this.driver);
+              this.driver.updateEntityAttributes(frontPanelDisplaySensorId, {
+                [uc.SensorAttributes.State]: uc.SensorStates.On,
+                [uc.SensorAttributes.Value]: serviceName
+              });
+              // Query metadata when switching to a new network service
+              const hasSongInfo = SONG_INFO.some((name) => serviceName.toLowerCase().includes(name));
+              if (hasSongInfo) {
+                this.eiscpInstance.raw("NATQSTN"); // Query title
+                this.eiscpInstance.raw("NTIQSTN"); // Query artist
+                this.eiscpInstance.raw("NALQSTN"); // Query album
+              }
+            }
+            break;
+          }
           case "FLD": {
             const frontPanelText = avrUpdates.argument.toString();
             const currentSource = avrStateManager.getSource(entityId);
