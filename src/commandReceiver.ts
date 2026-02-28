@@ -7,6 +7,8 @@ import { SelectAttributes } from "./selectEntity.js";
 import { getCompatibleListeningModes, detectAudioFormatType } from "./listeningModeFilters.js";
 import { eiscpMappings } from "./eiscp-mappings.js";
 import log from "./loggers.js";
+import { delay } from "./utils.js";
+import { ALBUM_ART, SONG_INFO } from "./constants.js";
 
 const integrationName = "commandReceiver:";
 
@@ -21,9 +23,6 @@ const SENSOR_SUFFIXES = [
   "_output_display_sensor",
   "_front_panel_display_sensor"
 ];
-
-const ALBUM_ART = ["spotify", "deezer", "tidal", "amazonmusic", "dts-play-fi"];
-const SONG_INFO = ["spotify", "deezer", "tidal", "amazonmusic", "dts-play-fi", "airplay"];
 
 export class CommandReceiver {
   private driver: uc.IntegrationAPI;
@@ -55,16 +54,19 @@ export class CommandReceiver {
     }
   }
 
-  async maybeUpdateImage(entityId: string) {
+  async maybeUpdateImage(entityId: string, force: boolean = false) {
     if (!this.config.albumArtURL || this.config.albumArtURL === "na") return;
+
+    if (force) {
+      this.lastImageHash = ""; // reset hash to force update on next check
+    }
 
     let imageUrl = `http://${this.config.ip}/${this.config.albumArtURL}`;
     let newHash = await this.getImageHash(imageUrl);
     let attempts = 0;
-
     while (newHash === this.lastImageHash && attempts < 3) {
       attempts++;
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      await delay(500);
       newHash = await this.getImageHash(imageUrl);
     }
     if (newHash !== this.lastImageHash) {
@@ -306,6 +308,28 @@ export class CommandReceiver {
             log.info("%s [%s] DAB station set to: %s", integrationName, entityId, avrUpdates.argument.toString());
             break;
           }
+          case "NLT": {
+            // NLT = Net List Title - navigation breadcrumb showing current network service
+            const serviceName = avrUpdates.argument.toString();
+            const currentSource = avrStateManager.getSource(entityId);
+            const frontPanelDisplaySensorId = `${entityId}_front_panel_display_sensor`;
+
+            if (currentSource === "net") {
+              avrStateManager.setSubSource(entityId, serviceName, this.eiscpInstance, eventZone, this.driver);
+              this.driver.updateEntityAttributes(frontPanelDisplaySensorId, {
+                [uc.SensorAttributes.State]: uc.SensorStates.On,
+                [uc.SensorAttributes.Value]: serviceName
+              });
+              // Query metadata when switching to a new network service
+              const hasSongInfo = SONG_INFO.some((name) => serviceName.toLowerCase().includes(name));
+              if (hasSongInfo) {
+                this.eiscpInstance.raw("NATQSTN"); // Query title
+                this.eiscpInstance.raw("NTIQSTN"); // Query artist
+                this.eiscpInstance.raw("NALQSTN"); // Query album
+              }
+            }
+            break;
+          }
           case "FLD": {
             const frontPanelText = avrUpdates.argument.toString();
             const currentSource = avrStateManager.getSource(entityId);
@@ -377,9 +401,9 @@ export class CommandReceiver {
                 [uc.MediaPlayerAttributes.MediaTitle]: nowPlaying.title || "unknown",
                 [uc.MediaPlayerAttributes.MediaAlbum]: nowPlaying.album || "unknown"
               });
-              const hasAlbumArt = ALBUM_ART.some((name) => entitySubSource.includes(name));
+              const hasAlbumArt = ALBUM_ART.some((name) => entitySubSource.toLowerCase().includes(name));
               if (hasAlbumArt) {
-                await this.maybeUpdateImage(entityId);
+                await this.maybeUpdateImage(entityId, false);
               } else {
                 // Clear image URL if source does not support album art
                 this.driver.updateEntityAttributes(entityId, {

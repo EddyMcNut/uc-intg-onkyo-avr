@@ -18,7 +18,7 @@ test.serial("ensureZoneInstances creates zone instances when physical connection
   const createAvrSpecificConfig = (cfg: any) => ({ ...cfg });
 
   // createCommandSender returns a dummy object referencing eiscp
-  const createCommandSender = (_cfg: any, eiscp: any) => ({ eiscp });
+  const createCommandSender = (_cfg: any, eiscp: any, _commandReceiver: any) => ({ eiscp });
 
   await manager.ensureZoneInstances(avrs, getPhysicalConnection, createAvrSpecificConfig, createCommandSender);
 
@@ -42,7 +42,7 @@ test.serial("ensureZoneInstances skips when no physical connection present", asy
 
   const getPhysicalConnection = (_physicalAvr: string) => undefined;
   const createAvrSpecificConfig = (cfg: any) => ({ ...cfg });
-  const createCommandSender = (_cfg: any, eiscp: any) => ({ eiscp });
+  const createCommandSender = (_cfg: any, eiscp: any, _commandReceiver: any) => ({ eiscp });
 
   await manager.ensureZoneInstances(avrs, getPhysicalConnection, createAvrSpecificConfig, createCommandSender);
 

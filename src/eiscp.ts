@@ -7,6 +7,8 @@ import { eiscpCommands } from "./eiscp-commands.js";
 import { eiscpMappings } from "./eiscp-mappings.js";
 import { avrStateManager } from "./avrState.js";
 import { DEFAULT_QUEUE_THRESHOLD, buildEntityId } from "./configManager.js";
+import { delay } from "./utils.js";
+import { NETWORK_SERVICES, NO_TITLE } from "./constants.js";
 
 export interface EiscpConfig {
   host?: string;
@@ -18,6 +20,7 @@ export interface EiscpConfig {
   send_delay?: number;
   receive_delay?: number;
   netMenuDelay?: number;
+  tuneinPresetPosition?: number;
 }
 
 const COMMANDS = eiscpCommands.commands;
@@ -47,9 +50,6 @@ const ZONE3_COMMAND_MAP: Record<string, string> = {
 // Reverse mappings (zone-specific -> main) for parsing incoming commands
 const ZONE2_REVERSE_MAP = Object.fromEntries(Object.entries(ZONE2_COMMAND_MAP).map(([k, v]) => [v, k]));
 const ZONE3_REVERSE_MAP = Object.fromEntries(Object.entries(ZONE3_COMMAND_MAP).map(([k, v]) => [v, k]));
-
-// Known network streaming services - when FLD starts with one of these, emit once and suppress scroll updates
-const NETWORK_SERVICES = ["TuneIn", "Spotify", "Deezer", "Tidal", "AmazonMusic", "Chromecast built-in", "DTS Play-Fi", "AirPlay", "Alexa", "Music Server", "USB", "Play Queue"];
 
 interface Metadata {
   title?: string;
@@ -91,9 +91,6 @@ interface CommandInput {
   args: string | number;
 }
 
-/** Helper to create a delay promise */
-const delay = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
-
 /** Handler function type for special command parsing */
 type CommandHandler = (value: string, command: string, result: CommandResult) => CommandResult;
 
@@ -117,7 +114,8 @@ export class EiscpDriver extends EventEmitter {
     NTI: (value, cmd, result) => this.handleMetadata(value, cmd, result),
     NAL: (value, cmd, result) => this.handleMetadata(value, cmd, result),
     DSN: (value, _cmd, result) => this.handleDSN(value, result),
-    FLD: (value, _cmd, result) => this.handleFLD(value, result)
+    FLD: (value, _cmd, result) => this.handleFLD(value, result),
+    NLT: (value, _cmd, result) => this.handleNLT(value, result)
   };
 
   constructor(config?: EiscpConfig) {
@@ -131,7 +129,8 @@ export class EiscpDriver extends EventEmitter {
       verify_commands: config?.verify_commands ?? false,
       send_delay: config?.send_delay ?? DEFAULT_QUEUE_THRESHOLD,
       receive_delay: config?.receive_delay ?? DEFAULT_QUEUE_THRESHOLD,
-      netMenuDelay: config?.netMenuDelay ?? 2500
+      netMenuDelay: config?.netMenuDelay ?? 2500,
+      tuneinPresetPosition: config?.tuneinPresetPosition ?? 1
     };
     this.setupErrorHandler();
   }
@@ -263,21 +262,43 @@ export class EiscpDriver extends EventEmitter {
     const parts = combined.split(/ISCP(?:[$.!]1|\$!1)/);
     let foundMatch = false;
 
+    // Get current subsource to override artist for certain streaming services
+    const entityId = buildEntityId(this.config.model!, this.config.host!, result.zone);
+    const currentSubSource = avrStateManager.getSubSource(entityId);
+
     for (const part of parts) {
       if (!part.trim()) continue;
       const match = part.trim().match(/^([A-Z]{3})\s*(.*)$/s);
       if (match) {
         foundMatch = true;
         const type = match[1];
-        const val = match[2].trim();
-        if (type === "NAT") this.currentMetadata.title = val;
+        let val = match[2].trim();
+        if (type === "NAT") {
+          // Override artist with service name for configured streaming services
+          if (NO_TITLE.map(s => s.toLowerCase()).includes(currentSubSource)) {
+            // Find matching service name from NETWORK_SERVICES (case-insensitive)
+            const serviceName = NETWORK_SERVICES.find((s) => s.toLowerCase() === currentSubSource);
+            this.currentMetadata.title = serviceName || val;
+          } else {
+            this.currentMetadata.title = val;
+          }
+        }
         if (type === "NTI") this.currentMetadata.artist = val;
         if (type === "NAL") this.currentMetadata.album = val;
       }
     }
 
     if (!foundMatch) {
-      if (command === "NAT") this.currentMetadata.title = originalValue;
+      if (command === "NAT") {
+        // Override artist with service name for configured streaming services
+        if (NO_TITLE.map(s => s.toLowerCase()).includes(currentSubSource)) {
+          // Find matching service name from NETWORK_SERVICES (case-insensitive)
+          const serviceName = NETWORK_SERVICES.find((s) => s.toLowerCase() === currentSubSource);
+          this.currentMetadata.title = serviceName || originalValue;
+        } else {
+          this.currentMetadata.title = originalValue;
+        }
+      }
       if (command === "NTI") this.currentMetadata.artist = originalValue;
       if (command === "NAL") this.currentMetadata.album = originalValue;
     }
@@ -290,6 +311,37 @@ export class EiscpDriver extends EventEmitter {
   private handleDSN(value: string, result: CommandResult): CommandResult {
     result.command = "DSN";
     result.argument = value;
+    return result;
+  }
+
+  private handleNLT(value: string, result: CommandResult): CommandResult {
+    // NLT format: hex data followed by ASCII text (e.g., "0E01000000090100FF0E00TuneIn Radio")
+    // Extract ASCII text portion after hex prefix
+    const textMatch = value.match(/[A-Z][a-z]/); // Find where actual text starts
+    if (!textMatch || textMatch.index === undefined) {
+      return result; // No text found, skip
+    }
+
+    const text = value.substring(textMatch.index).trim();
+    const entityId = buildEntityId(this.config.model!, this.config.host!, result.zone);
+    const currentSource = avrStateManager.getSource(entityId);
+
+    // Only process if source is NET
+    if (currentSource !== "net") {
+      return result;
+    }
+
+    // Check if the title contains a known network service name
+    const detectedService = NETWORK_SERVICES.find((service) => text.includes(service));
+    if (detectedService) {
+      const currentSubSource = avrStateManager.getSubSource(entityId);
+      if (currentSubSource !== detectedService.toLowerCase()) {
+        result.command = "NLT";
+        result.argument = detectedService;
+        return result;
+      }
+    }
+
     return result;
   }
 
@@ -648,15 +700,41 @@ export class EiscpDriver extends EventEmitter {
     return this.enqueueSend(data);
   }
 
+  private async handleTIPsend(iscpCommand: string): Promise<void> {
+    // Assumes TuneIn is already the active source.
+    const preset = iscpCommand.slice(3);
+    const presetIndex = String(preset).padStart(5, "0");
+    const menuDelay = this.config.netMenuDelay ?? 2500;
+    const myPresetsPosition = String(this.config.tuneinPresetPosition ?? 1).padStart(5, "0");
+
+    log.info("%s TuneIn preset %d: navigating to My Presets (position %s), selecting index %s", integrationName, preset, myPresetsPosition, presetIndex);
+
+    await this.raw("NTCTOP");                   // Go to TuneIn top menu
+    await delay(menuDelay);
+    await this.raw("NTCSELECT");                // Confirm / enter  
+    await delay(menuDelay*3);
+    await this.raw(`NLSI${myPresetsPosition}`); // Navigate down to My Presets (first position)
+    await delay(menuDelay*2);
+    await this.raw(`NLSI${presetIndex}`);       // Select preset by index
+  }
+
   private async sendIscp(iscpCommand: string): Promise<void> {
-    // Check if command contains a network service selection (NLSLx), this handles both direct NLSL commands and embedded ones like "SLINLSL1"
-    const nlslMatch = iscpCommand.match(/NLSL[0-9A-Fa-f]/);
-    if (nlslMatch) {
-      log.debug("%s Sending SLI2B (NET input) before %s", integrationName, nlslMatch[0]);
+    // Handle TuneIn preset navigation
+    if (iscpCommand.match(/^TIP[0-9A-Fa-f]+$/)) {
+      return this.handleTIPsend(iscpCommand);
+    }
+
+    // Check if command contains a network service selection (NSSxx), this handles both direct NSS commands and embedded ones like "SLINSS01"
+    const nssMatch = iscpCommand.match(/NSS[0-9]{2}/);
+    if (nssMatch) {
+      log.debug("%s Sending SLI2B (NET input) before %s", integrationName, nssMatch[0]);
       await this.raw("SLI2B"); // Select NET input first
       await delay(this.config.netMenuDelay ?? 2500); // Wait for AVR to fully load NET menu
-      log.debug("%s Sending network service command: %s", integrationName, nlslMatch[0]);
-      await this.raw(nlslMatch[0]); // Send just the NLSL command
+      const subsource =  String(nssMatch[0].slice(-2)).padStart(5, "0");
+      log.debug("%s Sending network service command: %s", integrationName, nssMatch[0]);
+      await this.raw(`NLSI${subsource}`);
+      await delay(this.config.netMenuDelay ?? 2500);
+      // avrStateManager.setSubSource(buildEntityId(this.config.model!, this.config.host!, "main"), nssMatch[0]); // Update subSource in state manager
       await this.raw("SLIQSTN"); // Query input-selector to ensure source state updates
       return;
     }

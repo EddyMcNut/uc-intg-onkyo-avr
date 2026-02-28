@@ -28,6 +28,22 @@ export default class ConnectionManager {
     this.physicalConnections.set(physicalAVR, connection);
   }
 
+  updateConnectionConfig(physicalAVR: string, avrConfig: AvrConfig): void {
+    const connection = this.physicalConnections.get(physicalAVR);
+    if (connection) {
+      // Update the stored config
+      connection.avrConfig = avrConfig;
+      // Update the EISCP driver's config for runtime settings like tuneinPresetPosition
+      connection.eiscp["config"] = {
+        ...connection.eiscp["config"],
+        netMenuDelay: avrConfig.netMenuDelay,
+        tuneinPresetPosition: avrConfig.tuneinPresetPosition,
+        send_delay: avrConfig.queueThreshold || 100
+      };
+      log.info(`${integrationName} [${physicalAVR}] Updated connection config (netMenuDelay: ${avrConfig.netMenuDelay}, tuneinPresetPosition: ${avrConfig.tuneinPresetPosition})`);
+    }
+  }
+
   async createAndConnect(physicalAVR: string, avrConfig: AvrConfig, createCommandReceiver: CreateCommandReceiverFn): Promise<PhysicalConnection> {
     log.info(`${integrationName} [${physicalAVR}] Connecting to AVR at ${avrConfig.ip}:${avrConfig.port}`);
 
@@ -36,7 +52,8 @@ export default class ConnectionManager {
       port: avrConfig.port,
       model: avrConfig.model,
       send_delay: avrConfig.queueThreshold || 100,
-      netMenuDelay: avrConfig.netMenuDelay
+      netMenuDelay: avrConfig.netMenuDelay,
+      tuneinPresetPosition: avrConfig.tuneinPresetPosition
     });
 
     const commandReceiver = createCommandReceiver(eiscpInstance);

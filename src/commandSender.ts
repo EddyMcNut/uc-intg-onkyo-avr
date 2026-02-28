@@ -3,6 +3,7 @@ import { EiscpDriver } from "./eiscp.js";
 import { DEFAULT_QUEUE_THRESHOLD, MAX_LENGTHS, PATTERNS, OnkyoConfig } from "./configManager.js";
 import { avrStateManager } from "./avrState.js";
 import log from "./loggers.js";
+import { delay } from "./utils.js";
 
 const integrationName = "commandSender:";
 
@@ -11,11 +12,13 @@ export class CommandSender {
   private config: OnkyoConfig;
   private eiscp: EiscpDriver;
   private lastCommandTime: number = 0;
+  private commandReceiver: any; // CommandReceiver type to avoid circular dependency
 
-  constructor(driver: uc.IntegrationAPI, config: OnkyoConfig, eiscp: EiscpDriver) {
+  constructor(driver: uc.IntegrationAPI, config: OnkyoConfig, eiscp: EiscpDriver, commandReceiver: any) {
     this.driver = driver;
     this.config = config;
     this.eiscp = eiscp;
+    this.commandReceiver = commandReceiver;
   }
 
   async sharedCmdHandler(entity: uc.Entity, cmdId: string, params?: { [key: string]: string | number | boolean }): Promise<uc.StatusCodes> {
@@ -48,7 +51,7 @@ export class CommandSender {
     } catch (err) {
       log.warn("%s [%s] Could not send command, AVR not connected: %s", integrationName, entity.id, err);
       for (let attempt = 1; attempt <= 5; attempt++) {
-        await new Promise((resolve) => setTimeout(resolve, 1000));
+        await delay(1000);
         try {
           await this.eiscp.waitForConnect();
           break;
@@ -209,7 +212,7 @@ export class CommandSender {
         await this.eiscp.command(formatCommand("setup right"));
         break;
       case uc.MediaPlayerCommands.Info:
-        await avrStateManager.refreshAvrState(entity.id, this.eiscp, zone, this.driver, queueThreshold);
+        await avrStateManager.refreshAvrState(entity.id, this.eiscp, zone, this.driver, queueThreshold, this.commandReceiver);
         break;
       default:
         return uc.StatusCodes.NotImplemented;

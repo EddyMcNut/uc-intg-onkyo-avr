@@ -22,6 +22,7 @@ test.serial("createAvrSpecificConfig coerces types correctly", async (t) => {
     adjustVolumeDispl: "false",
     createSensors: "false",
     netMenuDelay: "120",
+    tuneinPresetPosition: "3",
     listeningModeOptions: ["stereo","straight-decode"]
   };
 
@@ -32,6 +33,7 @@ test.serial("createAvrSpecificConfig coerces types correctly", async (t) => {
   t.is(config.avrs[0].adjustVolumeDispl, false);
   t.is(config.avrs[0].createSensors, false);
   t.is(config.avrs[0].netMenuDelay, 120);
+  t.is(config.avrs[0].tuneinPresetPosition, 3);
   t.is(config.avrs[0].port, 60128);
   t.is(config.avrs[0].albumArtURL, "album_art.cgi");
   t.deepEqual(config.avrs[0].listeningModeOptions, ["stereo","straight-decode"]);
@@ -60,12 +62,12 @@ test.serial("CommandSender volume conversion respects adjustVolumeDispl", async 
   const configAdjTrue = { avrs: [{ zone: "main" }], volumeScale: 100, adjustVolumeDispl: true };
   const configAdjFalse = { avrs: [{ zone: "main" }], volumeScale: 100, adjustVolumeDispl: false };
 
-  const senderTrue = new CommandSender(drv as any, configAdjTrue, eiscp as any);
+  const senderTrue = new CommandSender(drv as any, configAdjTrue, eiscp as any, null);
   await senderTrue.sharedCmdHandler(new uc.MediaPlayer("id", { en: "id" }, {}), uc.MediaPlayerCommands.Volume, { volume: 50 });
   t.is(eiscp.lastRaw, "MVL64"); // 50 -> 50 *2 = 100 -> 0x64
 
   const eiscp2 = new MockEiscp();
-  const senderFalse = new CommandSender(drv as any, configAdjFalse, eiscp2 as any);
+  const senderFalse = new CommandSender(drv as any, configAdjFalse, eiscp2 as any, null);
   await senderFalse.sharedCmdHandler(new uc.MediaPlayer("id", { en: "id" }, {}), uc.MediaPlayerCommands.Volume, { volume: 50 });
   t.is(eiscp2.lastRaw, "MVL32"); // 50 -> 50 -> 0x32
 });
