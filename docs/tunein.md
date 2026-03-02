@@ -24,7 +24,7 @@ To set up an Activity for TuneIn, have a look at these screenshots:
 
 - Map the volume up/down physical buttons (do *not* map volume long press, **only map volume short press**). 
 
-- Also map the [Slider](./docs/volume.md#slider) to control the volume
+- Also map the [Slider](./volume.md#slider) to control the volume
 
 - You might also want the map the `Info` function to one of the physical buttons to be able to trigger a refresh of the song data in case you think it did not refresh automatically.
 
