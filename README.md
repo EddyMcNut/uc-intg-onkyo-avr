@@ -78,8 +78,6 @@ Users report it also to work with:
 
 [Volume](./docs/volume.md)
 
-## Slider
-
 [Slider](./docs/volume.md#slider)
 
 ## Sensors
