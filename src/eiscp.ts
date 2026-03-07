@@ -702,12 +702,25 @@ export class EiscpDriver extends EventEmitter {
 
   private async handleTIPsend(iscpCommand: string): Promise<void> {
     // Assumes TuneIn is already the active source.
-    const preset = iscpCommand.slice(3);
+    const presetHex = iscpCommand.slice(3);
+    const preset = parseInt(presetHex, 16);
     const presetIndex = String(preset).padStart(5, "0");
     const menuDelay = this.config.netMenuDelay ?? 2500;
     const myPresetsPosition = String(this.config.tuneinPresetPosition ?? 1).padStart(5, "0");
 
     log.info("%s TuneIn preset %d: navigating to My Presets (position %s), selecting index %s", integrationName, preset, myPresetsPosition, presetIndex);
+
+    this.currentMetadata.artist = "Selecting preset " + preset + "...";
+    this.currentMetadata.album = "please wait";
+    this.emit("data", {
+      command: "metadata",
+      argument: { ...this.currentMetadata },
+      zone: "main",
+      iscpCommand: iscpCommand,
+      host: this.config.host,
+      port: this.config.port,
+      model: this.config.model
+    });
 
     await this.raw("NTCTOP");                   // Go to TuneIn top menu
     await delay(menuDelay);
