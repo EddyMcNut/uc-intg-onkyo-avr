@@ -50,4 +50,4 @@ To set up an Activity for TuneIn, have a look at these screenshots:
 
 _note: after installing a new version of the integration or after a reboot of the remote, it might be needed to close screen on the remote and enter the already active activity again to get the MediaWidget to work_
 
-[back to main README](../README.md#example-activities)
+[back to main README](../README.md#installation-and-usage)

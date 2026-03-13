@@ -29,4 +29,4 @@ To set up an Activity for DAB, have a look at these screenshots:
   - channel up/down
   - mute
 
-[back to main README](../README.md#example-activities)
+[back to main README](../README.md#installation-and-usage)
