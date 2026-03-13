@@ -19,6 +19,16 @@ export const eiscpCommands = {
         QSTN: { name: "query", description: "gets the Audio Muting State" }
       }
     },
+    MZM: {
+      name: "multi-zone-muting",
+      description: "UC integration Multi-Zone Muting Command",
+      values: {
+        "00": { name: "off", description: "sets Audio Muting Off for all configured zones" },
+        "01": { name: "on", description: "sets Audio Muting On for all configured zones" },
+        TG: { name: "toggle", description: "sets Audio Muting Wrap-Around for all configured zones" },
+        QSTN: { name: "query", description: "gets the Audio Muting State for all configured zones" }
+      }
+    },    
     SPA: {
       name: "speaker-a",
       description: "Speaker A Command",

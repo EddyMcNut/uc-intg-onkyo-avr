@@ -2,6 +2,7 @@ export const eiscpMappings = {
   command_mappings: {
     "system-power": "PWR",
     "audio-muting": "AMT",
+    "multi-zone-muting": "MZM",
     "speaker-a": "SPA",
     "speaker-b": "SPB",
     "speaker-layout": "SPL",
