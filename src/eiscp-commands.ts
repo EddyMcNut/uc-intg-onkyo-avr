@@ -76,6 +76,20 @@ export const eiscpCommands = {
         QSTN: { name: "query", description: "gets the Volume Level" }
       }
     },
+    MZV: { 
+      name: "multi-zone-volume",
+      description: "UC integration Multi-Zone Volume Command",
+      values: {
+        ALLUP1: { name: "all-up", description: "sets Volume Level Up for all configured zones 1dB step" },
+        ALLDOWN1: { name: "all-down", description: "sets Volume Level Down for all configured zones 1dB step" },
+        ZM2UP1: { name: "main-zone2-up", description: "sets Volume Level Up for main and zone2 1dB step" },
+        ZM2DOWN1: { name: "main-zone2-down", description: "sets Volume Level Down for main and zone2 1dB step" },
+        ZM3UP1: { name: "main-zone3-up", description: "sets Volume Level Up for main and zone3 1dB step" },
+        ZM3DOWN1: { name: "main-zone3-down", description: "sets Volume Level Down for main and zone3 1dB step" },
+        Z23UP1: { name: "zone2-zone3-up", description: "sets Volume Level Up for zone2 and zone3 1dB step" },
+        Z23DOWN1: { name: "zone2-zone3-down", description: "sets Volume Level Down for zone2 and zone3 1dB step" },
+      }
+    },
     TFR: {
       name: "tone-front",
       description: "Tone(Front) Command",

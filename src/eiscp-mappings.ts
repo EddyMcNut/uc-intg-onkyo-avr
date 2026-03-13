@@ -7,6 +7,7 @@ export const eiscpMappings = {
     "speaker-layout": "SPL",
     "master-volume": "MVL",
     volume: "MVL",
+    "multi-zone-volume": "MZV",
     "tone-front": "TFR",
     "tone-front-wide": "TFW",
     "tone-front-high": "TFH",

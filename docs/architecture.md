@@ -20,7 +20,7 @@ The integration uses **eISCP (Ethernet Integrated Serial Control Protocol)**, wh
 ### 1. Connection Layer
 
 **ConnectionManager** (`src/connectionManager.ts`)
-- Manages TCP socket connections to one or more physical AVRs
+- Manages TCP socket connections (EiscpDriver instances) to one or more physical AVRs
 - Handles connection lifecycle (connect, disconnect, reconnect)
 - Maintains a map of physical connections (one per AVR IP address)
 - Each connection contains an EISCP driver instance and command receiver
@@ -109,7 +109,7 @@ This differs from a synchronous request-response model where you would wait for 
 
 ### Multiple Updates from Single Command
 A single command can trigger multiple event messages:
-- Changing input might trigger: `input-selector`, `audio-information`, `video-information`, `listening-mode`
+- Changing input might trigger: `input-selector`, `audio-information`, `video-information`, `listening-mode`, `volume`
 - Playing a network service triggers: `net-service`, `title`, `artist`, `album`, `artwork`
 
 ### Streaming Data
