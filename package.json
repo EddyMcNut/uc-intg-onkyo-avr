@@ -2,7 +2,7 @@
   "name": "uc-intg-onkyo-avr",
   "type": "module",
   "version": "0.8.3",
-  "description": "Onkyo AVR custom integration for Unfolded Circle Remotes",
+  "description": "Onkyo/Pioneer/Integra AVR custom integration for Unfolded Circle Remotes",
   "main": "dist/src/index.js",
   "scripts": {
     "format": "prettier --write .",
@@ -25,7 +25,9 @@
     "Unfolded",
     "Circle",
     "Remote",
-    "Onkyo"
+    "Onkyo",
+    "Pioneer",
+    "Integra"
   ],
   "author": "Ed Nootebos",
   "license": "GNU GPL-v3",
