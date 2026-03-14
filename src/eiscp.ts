@@ -131,7 +131,8 @@ export class EiscpDriver extends EventEmitter {
       send_delay: config?.send_delay ?? DEFAULT_QUEUE_THRESHOLD,
       receive_delay: config?.receive_delay ?? DEFAULT_QUEUE_THRESHOLD,
       netMenuDelay: config?.netMenuDelay ?? 2500,
-      tuneinPresetPosition: config?.tuneinPresetPosition ?? 1
+      tuneinPresetPosition: config?.tuneinPresetPosition ?? 1,
+      configuredZones: config?.configuredZones
     };
     this.setupErrorHandler();
   }
@@ -671,16 +672,18 @@ export class EiscpDriver extends EventEmitter {
   private enqueueSend(data: string | string[]): Promise<void> {
     const task = this.sendQueue.then(async () => {
       if (this.is_connected && this.eiscp) {
-        // Handle array of commands - send all at once
-        if (Array.isArray(data)) {
+        // Handle single command (most common case)
+        if (typeof data === 'string') {
+          this.eiscp.write(this.eiscp_packet(data));
+        } else {
+          // const shortDelay = Math.round((this.config.send_delay! ?? DEFAULT_QUEUE_THRESHOLD) / data.length / 20) * 10;
+          // console.log("%s ***************", integrationName, data.length, shortDelay);
           for (const cmd of data) {
             this.eiscp.write(this.eiscp_packet(cmd));
+            // await delay(shortDelay);
           }
-        } else {
-          // Handle single command
-          this.eiscp.write(this.eiscp_packet(data));
         }
-        await delay(this.config.send_delay!);
+        await delay(this.config.send_delay! ?? DEFAULT_QUEUE_THRESHOLD);
       } else {
         throw new Error("Send command while not connected");
       }
@@ -693,7 +696,7 @@ export class EiscpDriver extends EventEmitter {
   private enqueueIncoming(data: DataPayload): void {
     this.receiveQueue = this.receiveQueue
       .then(async () => {
-        await delay(this.config.receive_delay!);
+        await delay(this.config.receive_delay! ?? DEFAULT_QUEUE_THRESHOLD);
         this.emit("data", data);
       })
       .catch((err) => {

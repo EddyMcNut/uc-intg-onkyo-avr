@@ -23,10 +23,18 @@ export const eiscpCommands = {
       name: "multi-zone-muting",
       description: "UC integration Multi-Zone Muting Command",
       values: {
-        "00": { name: "off", description: "sets Audio Muting Off for all configured zones" },
-        "01": { name: "on", description: "sets Audio Muting On for all configured zones" },
-        TG: { name: "toggle", description: "sets Audio Muting Wrap-Around for all configured zones" },
-        QSTN: { name: "query", description: "gets the Audio Muting State for all configured zones" }
+        ALLON: { name: "all-on", description: "sets Audio Muting On for all configured zones" },
+        ALLOFF: { name: "all-off", description: "sets Audio Muting Off for all configured zones" },
+        ALLTG: { name: "all-toggle", description: "sets Audio Muting Toggle for all configured zones" },
+        ZM2ON: { name: "main-zone2-on", description: "sets Audio Muting On for main and zone2" },
+        ZM2OFF: { name: "main-zone2-off", description: "sets Audio Muting Off for main and zone2" },
+        ZM2TG: { name: "main-zone2-toggle", description: "sets Audio Muting Toggle for main and zone2" },
+        ZM3ON: { name: "main-zone3-on", description: "sets Audio Muting On for main and zone3" },
+        ZM3OFF: { name: "main-zone3-off", description: "sets Audio Muting Off for main and zone3" },
+        ZM3TG: { name: "main-zone3-toggle", description: "sets Audio Muting Toggle for main and zone3" },
+        Z23ON: { name: "zone2-zone3-on", description: "sets Audio Muting On for zone2 and zone3" },
+        Z23OFF: { name: "zone2-zone3-off", description: "sets Audio Muting Off for zone2 and zone3" },
+        Z23TG: { name: "zone2-zone3-toggle", description: "sets Audio Muting Toggle for zone2 and zone3" }
       }
     },    
     SPA: {

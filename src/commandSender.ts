@@ -75,156 +75,159 @@ export class CommandSender {
     // Determine queue threshold: prefer explicit config, then eISCP driver's send_delay, else default
     const queueThreshold = this.config.queueThreshold ?? (typeof this.eiscp["config"]?.send_delay === "number" ? this.eiscp["config"].send_delay : DEFAULT_QUEUE_THRESHOLD);
 
-    switch (cmdId) {
-      case uc.MediaPlayerCommands.On:
-        await this.eiscp.command(formatCommand("system-power on"));
-        break;
-      case uc.MediaPlayerCommands.Off:
-        await this.eiscp.command(formatCommand("system-power standby"));
-        break;
-      case uc.MediaPlayerCommands.Toggle:
-        entity.attributes?.state === uc.MediaPlayerStates.On ? await this.eiscp.command(formatCommand("system-power standby")) : await this.eiscp.command(formatCommand("system-power on"));
-        break;
-      case uc.MediaPlayerCommands.MuteToggle:
-        await this.eiscp.command(formatCommand("audio-muting toggle"));
-        break;
-      case uc.MediaPlayerCommands.VolumeUp:
-        if (now - this.lastCommandTime > queueThreshold) {
-          this.lastCommandTime = now;
-          await this.eiscp.command(formatCommand("volume level-up-1db-step"));
-        }
-        break;
-      case uc.MediaPlayerCommands.VolumeDown:
-        if (now - this.lastCommandTime > queueThreshold) {
-          this.lastCommandTime = now;
-          await this.eiscp.command(formatCommand("volume level-down-1db-step"));
-        }
-        break;
-      case uc.MediaPlayerCommands.Volume:
-        if (params?.volume !== undefined) {
-          // Remote slider: 0-100, AVR display: 0-volumeScale, EISCP protocol: 0-200 or 0-100 depending on model
-          const sliderValue = Math.max(0, Math.min(100, Number(params.volume)));
-          const volumeScale = this.config.volumeScale || 100;
-          const adjustVolumeDispl = this.config.adjustVolumeDispl ?? true; // Default to true for backward compatibility
+    if (now - this.lastCommandTime > queueThreshold) {
+      switch (cmdId) {
+        case uc.MediaPlayerCommands.On:
+          await this.eiscp.command(formatCommand("system-power on"));
+          break;
+        case uc.MediaPlayerCommands.Off:
+          await this.eiscp.command(formatCommand("system-power standby"));
+          break;
+        case uc.MediaPlayerCommands.Toggle:
+          entity.attributes?.state === uc.MediaPlayerStates.On ? await this.eiscp.command(formatCommand("system-power standby")) : await this.eiscp.command(formatCommand("system-power on"));
+          break;
+        case uc.MediaPlayerCommands.MuteToggle:
+          await this.eiscp.command(formatCommand("audio-muting toggle"));
+          break;
+        case uc.MediaPlayerCommands.VolumeUp:
+          // if (now - this.lastCommandTime > queueThreshold) {
+            this.lastCommandTime = now;
+            await this.eiscp.command(formatCommand("volume level-up-1db-step"));
+          // }
+          break;
+        case uc.MediaPlayerCommands.VolumeDown:
+          // if (now - this.lastCommandTime > queueThreshold) {
+            this.lastCommandTime = now;
+            await this.eiscp.command(formatCommand("volume level-down-1db-step"));
+          // }
+          break;
+        case uc.MediaPlayerCommands.Volume:
+          if (params?.volume !== undefined) {
+            // Remote slider: 0-100, AVR display: 0-volumeScale, EISCP protocol: 0-200 or 0-100 depending on model
+            const sliderValue = Math.max(0, Math.min(100, Number(params.volume)));
+            const volumeScale = this.config.volumeScale || 100;
+            const adjustVolumeDispl = this.config.adjustVolumeDispl ?? true; // Default to true for backward compatibility
 
-          // Convert: slider → AVR display scale
-          const avrDisplayValue = Math.round((sliderValue * volumeScale) / 100);
+            // Convert: slider → AVR display scale
+            const avrDisplayValue = Math.round((sliderValue * volumeScale) / 100);
 
-          // Convert to EISCP: some models use 0.5 dB steps (×2), others show EISCP value directly
-          const eiscpValue = adjustVolumeDispl ? avrDisplayValue * 2 : avrDisplayValue;
-          const hexVolume = eiscpValue.toString(16).toUpperCase().padStart(2, "0");
+            // Convert to EISCP: some models use 0.5 dB steps (×2), others show EISCP value directly
+            const eiscpValue = adjustVolumeDispl ? avrDisplayValue * 2 : avrDisplayValue;
+            const hexVolume = eiscpValue.toString(16).toUpperCase().padStart(2, "0");
 
-          // Debug logging for volume conversion
-          log.info(
-            "%s [%s] volume conversion: slider=%d volumeScale=%d adjustVolumeDispl=%s avrDisplay=%d eiscpValue=%d hex=%s",
-            integrationName,
-            entity.id,
-            sliderValue,
-            volumeScale,
-            String(adjustVolumeDispl),
-            avrDisplayValue,
-            eiscpValue,
-            hexVolume
-          );
+            // Debug logging for volume conversion
+            log.info(
+              "%s [%s] volume conversion: slider=%d volumeScale=%d adjustVolumeDispl=%s avrDisplay=%d eiscpValue=%d hex=%s",
+              integrationName,
+              entity.id,
+              sliderValue,
+              volumeScale,
+              String(adjustVolumeDispl),
+              avrDisplayValue,
+              eiscpValue,
+              hexVolume
+            );
 
-          // Use zone-specific volume command prefix
-          let volumePrefix = "MVL"; // main zone
-          if (zone === "zone2") {
-            volumePrefix = "ZVL";
-          } else if (zone === "zone3") {
-            volumePrefix = "VL3";
+            // Use zone-specific volume command prefix
+            let volumePrefix = "MVL"; // main zone
+            if (zone === "zone2") {
+              volumePrefix = "ZVL";
+            } else if (zone === "zone3") {
+              volumePrefix = "VL3";
+            }
+            await this.eiscp.raw(`${volumePrefix}${hexVolume}`);
           }
-          await this.eiscp.raw(`${volumePrefix}${hexVolume}`);
-        }
-        break;
-      case uc.MediaPlayerCommands.ChannelUp:
-        await this.eiscp.command(formatCommand("preset up"));
-        break;
-      case uc.MediaPlayerCommands.ChannelDown:
-        await this.eiscp.command(formatCommand("preset down"));
-        break;
-      case uc.MediaPlayerCommands.SelectSource:
-        if (params?.source && typeof params.source === "string") {
-          const request = params.source.toLowerCase();
-          
-          if (!request.startsWith("raw")) {
-            const userCmd = params.source.toLowerCase();
+          break;
+        case uc.MediaPlayerCommands.ChannelUp:
+          await this.eiscp.command(formatCommand("preset up"));
+          break;
+        case uc.MediaPlayerCommands.ChannelDown:
+          await this.eiscp.command(formatCommand("preset down"));
+          break;
+        case uc.MediaPlayerCommands.SelectSource:
+          if (params?.source && typeof params.source === "string") {
+            const request = params.source.toLowerCase();
+            
+            if (!request.startsWith("raw")) {
+              const userCmd = params.source.toLowerCase();
 
-            // Security: Validate user command length
-            if (userCmd.length > MAX_LENGTHS.USER_COMMAND) {
-              log.error("%s [%s] Command too long (%d chars), rejecting", integrationName, entity.id, userCmd.length);
-              return uc.StatusCodes.BadRequest;
-            }
-
-            // Security: Validate user command characters
-            if (!PATTERNS.USER_COMMAND.test(userCmd)) {
-              log.error("%s [%s] Command contains invalid characters, rejecting", integrationName, entity.id);
-              return uc.StatusCodes.BadRequest;
-            }
-
-            // Multi-zone-volume commands should not be zone-prefixed
-            if (!request.startsWith("multi-zone")) {
-              await this.eiscp.command(formatCommand(userCmd));
-            } else {
-              if (now - this.lastCommandTime > queueThreshold) {
-                await this.eiscp.command(userCmd);
+              // Security: Validate user command length
+              if (userCmd.length > MAX_LENGTHS.USER_COMMAND) {
+                log.error("%s [%s] Command too long (%d chars), rejecting", integrationName, entity.id, userCmd.length);
+                return uc.StatusCodes.BadRequest;
               }
-            }
-          } else {
-            const rawCmd = (params.source as string).substring(3).trim().toUpperCase();
 
-            // Security: Validate raw command length
-            if (rawCmd.length > MAX_LENGTHS.RAW_COMMAND) {
-              log.error("%s [%s] Raw command too long (%d chars), rejecting", integrationName, entity.id, rawCmd.length);
-              return uc.StatusCodes.BadRequest;
-            }
+              // Security: Validate user command characters
+              if (!PATTERNS.USER_COMMAND.test(userCmd)) {
+                log.error("%s [%s] Command contains invalid characters, rejecting", integrationName, entity.id);
+                return uc.StatusCodes.BadRequest;
+              }
 
-            // Security: Validate raw command characters (alphanumeric only)
-            if (!PATTERNS.RAW_COMMAND.test(rawCmd)) {
-              log.error("%s [%s] Raw command contains invalid characters, rejecting", integrationName, entity.id);
-              return uc.StatusCodes.BadRequest;
-            }
+              // Multi-zone-volume commands should not be zone-prefixed
+              if (!request.startsWith("multi-zone")) {
+                await this.eiscp.command(formatCommand(userCmd));
+              } else {
+                // if (now - this.lastCommandTime > queueThreshold) {
+                  await this.eiscp.command(userCmd);
+                // }
+              }
+            } else {
+              const rawCmd = (params.source as string).substring(3).trim().toUpperCase();
 
-            log.info("%s [%s] sending raw command: %s", integrationName, entity.id, rawCmd);
-            await this.eiscp.raw(rawCmd);
+              // Security: Validate raw command length
+              if (rawCmd.length > MAX_LENGTHS.RAW_COMMAND) {
+                log.error("%s [%s] Raw command too long (%d chars), rejecting", integrationName, entity.id, rawCmd.length);
+                return uc.StatusCodes.BadRequest;
+              }
+
+              // Security: Validate raw command characters (alphanumeric only)
+              if (!PATTERNS.RAW_COMMAND.test(rawCmd)) {
+                log.error("%s [%s] Raw command contains invalid characters, rejecting", integrationName, entity.id);
+                return uc.StatusCodes.BadRequest;
+              }
+
+              log.info("%s [%s] sending raw command: %s", integrationName, entity.id, rawCmd);
+              await this.eiscp.raw(rawCmd);
+            }
           }
-        }
-        break;
-      case uc.MediaPlayerCommands.PlayPause:
-        await this.eiscp.command(formatCommand("network-usb play"));
-        break;
-      case uc.MediaPlayerCommands.Next:
-        await this.eiscp.command(formatCommand("network-usb trup"));
-        break;
-      case uc.MediaPlayerCommands.Previous:
-        await this.eiscp.command(formatCommand("network-usb trdn"));
-        break;
-      case uc.MediaPlayerCommands.Settings:
-        await this.eiscp.command(formatCommand("setup menu"));
-        break;
-      case uc.MediaPlayerCommands.Home:
-        await this.eiscp.command(formatCommand("setup exit"));
-        break;
-      case uc.MediaPlayerCommands.CursorEnter:
-        await this.eiscp.command(formatCommand("setup enter"));
-        break;
-      case uc.MediaPlayerCommands.CursorUp:
-        await this.eiscp.command(formatCommand("setup up"));
-        break;
-      case uc.MediaPlayerCommands.CursorDown:
-        await this.eiscp.command(formatCommand("setup down"));
-        break;
-      case uc.MediaPlayerCommands.CursorLeft:
-        await this.eiscp.command(formatCommand("setup left"));
-        break;
-      case uc.MediaPlayerCommands.CursorRight:
-        await this.eiscp.command(formatCommand("setup right"));
-        break;
-      case uc.MediaPlayerCommands.Info:
-        await avrStateManager.refreshAvrState(entity.id, this.eiscp, zone, this.driver, queueThreshold, this.commandReceiver);
-        break;
-      default:
-        return uc.StatusCodes.NotImplemented;
+          break;
+        case uc.MediaPlayerCommands.PlayPause:
+          await this.eiscp.command(formatCommand("network-usb play"));
+          break;
+        case uc.MediaPlayerCommands.Next:
+          await this.eiscp.command(formatCommand("network-usb trup"));
+          break;
+        case uc.MediaPlayerCommands.Previous:
+          await this.eiscp.command(formatCommand("network-usb trdn"));
+          break;
+        case uc.MediaPlayerCommands.Settings:
+          await this.eiscp.command(formatCommand("setup menu"));
+          break;
+        case uc.MediaPlayerCommands.Home:
+          await this.eiscp.command(formatCommand("setup exit"));
+          break;
+        case uc.MediaPlayerCommands.CursorEnter:
+          await this.eiscp.command(formatCommand("setup enter"));
+          break;
+        case uc.MediaPlayerCommands.CursorUp:
+          await this.eiscp.command(formatCommand("setup up"));
+          break;
+        case uc.MediaPlayerCommands.CursorDown:
+          await this.eiscp.command(formatCommand("setup down"));
+          break;
+        case uc.MediaPlayerCommands.CursorLeft:
+          await this.eiscp.command(formatCommand("setup left"));
+          break;
+        case uc.MediaPlayerCommands.CursorRight:
+          await this.eiscp.command(formatCommand("setup right"));
+          break;
+        case uc.MediaPlayerCommands.Info:
+          await avrStateManager.refreshAvrState(entity.id, this.eiscp, zone, this.driver, queueThreshold, this.commandReceiver);
+          break;
+        default:
+          return uc.StatusCodes.NotImplemented;
+      }
+      // return uc.StatusCodes.Ok;
     }
     return uc.StatusCodes.Ok;
   }
