@@ -19,6 +19,24 @@ export const eiscpCommands = {
         QSTN: { name: "query", description: "gets the Audio Muting State" }
       }
     },
+    MZM: {
+      name: "multi-zone-muting",
+      description: "UC integration Multi-Zone Muting Command",
+      values: {
+        ALLON: { name: "all-on", description: "sets Audio Muting On for all configured zones" },
+        ALLOFF: { name: "all-off", description: "sets Audio Muting Off for all configured zones" },
+        ALLTG: { name: "all-toggle", description: "sets Audio Muting Toggle for all configured zones" },
+        ZM2ON: { name: "main-zone2-on", description: "sets Audio Muting On for main and zone2" },
+        ZM2OFF: { name: "main-zone2-off", description: "sets Audio Muting Off for main and zone2" },
+        ZM2TG: { name: "main-zone2-toggle", description: "sets Audio Muting Toggle for main and zone2" },
+        ZM3ON: { name: "main-zone3-on", description: "sets Audio Muting On for main and zone3" },
+        ZM3OFF: { name: "main-zone3-off", description: "sets Audio Muting Off for main and zone3" },
+        ZM3TG: { name: "main-zone3-toggle", description: "sets Audio Muting Toggle for main and zone3" },
+        Z23ON: { name: "zone2-zone3-on", description: "sets Audio Muting On for zone2 and zone3" },
+        Z23OFF: { name: "zone2-zone3-off", description: "sets Audio Muting Off for zone2 and zone3" },
+        Z23TG: { name: "zone2-zone3-toggle", description: "sets Audio Muting Toggle for zone2 and zone3" }
+      }
+    },    
     SPA: {
       name: "speaker-a",
       description: "Speaker A Command",
@@ -74,6 +92,20 @@ export const eiscpCommands = {
           description: "sets Volume Level Down 1dB Step"
         },
         QSTN: { name: "query", description: "gets the Volume Level" }
+      }
+    },
+    MZV: { 
+      name: "multi-zone-volume",
+      description: "UC integration Multi-Zone Volume Command",
+      values: {
+        ALLUP1: { name: "all-up", description: "sets Volume Level Up for all configured zones 1dB step" },
+        ALLDOWN1: { name: "all-down", description: "sets Volume Level Down for all configured zones 1dB step" },
+        ZM2UP1: { name: "main-zone2-up", description: "sets Volume Level Up for main and zone2 1dB step" },
+        ZM2DOWN1: { name: "main-zone2-down", description: "sets Volume Level Down for main and zone2 1dB step" },
+        ZM3UP1: { name: "main-zone3-up", description: "sets Volume Level Up for main and zone3 1dB step" },
+        ZM3DOWN1: { name: "main-zone3-down", description: "sets Volume Level Down for main and zone3 1dB step" },
+        Z23UP1: { name: "zone2-zone3-up", description: "sets Volume Level Up for zone2 and zone3 1dB step" },
+        Z23DOWN1: { name: "zone2-zone3-down", description: "sets Volume Level Down for zone2 and zone3 1dB step" },
       }
     },
     TFR: {
@@ -1159,6 +1191,505 @@ export const eiscpCommands = {
         QSTN: { name: "query", description: "gets iPod Mode Status" }
       }
     },
+    NBS: {
+      name: "bluetooth-setting",
+      description: "Bluetooth Setting Operation Command",
+      values: {
+        OFF: { name: "off", description: "Bluetooth Status:Off" },
+        ON: { name: "on", description: "Bluetooth Status:On" },
+        QSTN: { name: "query", description: "gets Bluetooth Setting" }
+      }
+    },
+    NBT: {
+      name: "bluetooth-internal",
+      description: "Bluetooth(Internal) Operation Command",
+      values: {
+        PAIRING: { name: "pairing", description: "PAIRING" },
+        CLEAR: { name: "clear", description: "CLEAR PAIRING INFORMATION" }
+      }
+    },
+    NMS: {
+      name: "usb-menu-status",
+      description: "NET/USB Menu Status",
+      values: {
+        "maabbstii": {
+          description: "NET/USB Menu Status (9 letters)\nm -> Track Menu: \"M\": Menu is enable, \"x\": Menu is disable\naa -> F1 button icon (Positive Feed or Mark/Unmark)\nbb -> F2 button icon (Negative Feed)\n aa or bb : \"xx\":disable, \"01\":Like, \"02\":don't like, \"03\":Love, \"04\":Ban,\n                  \"05\":episode, \"06\":ratings, \"07\":Ban(black), \"08\":Ban(white),\n                  \"09\":Favorite(black), \"0A\":Favorite(white), \"0B\":Favorite(yellow)\ns -> Time Seek \"S\": Time Seek is enable \"x\": Time Seek is disable\nt -> Time Display \"1\": Elapsed Time/Total Time, \"2\": Elapsed Time, \"x\": disable\nii-> Service icon\n ii : \"00\":Music Server (DLNA), \"01\":My Favorite, \"02\":vTuner, \n      \"03\":SiriusXM, \"04\":Pandora,\n      \"05\":Rhapsody, \"06\":Last.fm, \"07\":Napster, \"08\":Slacker, \"09\":Mediafly,\n      \"0A\":Spotify, \"0B\":AUPEO!,\n      \"0C\":radiko, \"0D\":e-onkyo, \"0E\":TuneIn, \"0F\":MP3tunes, \"10\":Simfy,\n      \"11\":Home Media, \"12\":Deezer, \"13\":iHeartRadio, \"18\":Airplay,\n      \"1A\": onkyo Music, \"1B\":TIDAL, \"1C\":Amazon Music, \"1D\":PlayQueue,\n      \"40\":Chromecast built-in, \"41\":FireConnect, \"42\":Play-Fi,\n      \"43\":FlareConnect, \"44\":Airplay2, \"45\":Alexa, \"46\":Alexa MRM, \"47\":RoonReady,\n      \"F0\": USB/USB(Front), \"F1: USB(Rear), \n      \"F2\":Internet Radio, \"F3\":NET, \"F4\":Bluetooth"
+        },
+        QSTN: { name: "query", description: "gets the Net/USB Menu Status" }
+      }
+    },
+    NTS: {
+      name: "usb-time-seek",
+      description: "NET/USB Time Seek",
+      values: {
+        "mm:ss": {
+          name: "mm-ss",
+          description: "mm: minutes (00-99)\nss: seconds (00-59)\nThis command is only available when Time Seek is enable."
+        },
+        "hh:mm:ss": {
+          name: "hh-mm-ss",
+          description: "hh: hours(00-99)\nmm: minutes (00-59)\nss: seconds (00-59)\nThis command is only available when Time Seek is enable."
+        }
+      }
+    },
+    NDS: {
+      name: "connection-usb-device-status",
+      description: "NET Connection/USB Device Status",
+      values: {
+        nfr: {
+          name: "nfr",
+          description: "NET Connection/USB Device Status (3 letters)\nn -> NET Connection status: \"-\": no connection, \"E\": Ether, \"W\": Wireless\nf -> Front USB(USB1) Device Status: \"-\": no device, \"i\": iPod/iPhone, \n      \"M\": Memory/NAS, \"W\": Wireless Adaptor, \"B\": Bluetooth Adaptor,\n      \"D\": DAB Dongle, \"x\": disable\nr -> Rear USB(USB2) Device Status: \"-\": no device, \"i\": iPod/iPhone, \n      \"M\": Memory/NAS, \"W\": Wireless Adaptor, \"B\": Bluetooth Adaptor, \n      \"D\": DAB Dongle, \"x\": disable"
+        },
+        QSTN: { name: "query", description: "gets the Net/USB Status" }
+      }
+    },
+    NLA: {
+      name: "usb-list-info-xml",
+      description: "NET/USB List Info(All item, need processing XML data, for Network Control Only)",
+      values: {
+        "tzzzzsurr<.....>": {
+          name: "tzzzzsurr",
+          description: "t -> response type 'X' : XML\nzzzz -> sequence number (0000-FFFF)\ns -> status 'S' : success, 'E' : error\nu -> UI type '0' : List, '1' : Menu, '2' : Playback, '3' : Popup, '4' : Keyboard, \"5\" : Menu List\nrr -> reserved\n<.....> : XML data ( [CR] and [LF] are removed )"
+        },
+        "Lzzzzll{xx}{xx}yyyy": {
+          name: "lzzzzll-xx-xx-yyyy",
+          description: "specify to get the listed data (from Network Control Only)\nzzzz -> sequence number (0000-FFFF)\nll -> number of layer (00-FF)\nxxxx -> index of start item (0000-FFFF : 1st to 65536th Item [4 HEX digits] )\nyyyy -> number of items (0000-FFFF : 1 to 65536 Items [4 HEX digits] )"
+        },
+        "Izzzzll{xx}{xx}----": {
+          name: "izzzzll-xx-xx",
+          description: "select the listed item (from Network Control Only)\nzzzz -> sequence number (0000-FFFF)\nll -> number of layer (00-FF)\nxxxx -> index number (0000-FFFF : 1st to 65536th Item [4 HEX digits] )\n---- -> not used"
+        }
+      }
+    },
+    NLT: {
+      name: "usb-list-title",
+      description: "NET/USB List Title Info",
+      values: {
+        nnnnnnnn: {
+          description: "NET/USB List Title Info (variable-length, 64 Unicode letters [UTF-8 encoded] max , for Network Control only)"
+        },
+        QSTN: { name: "query", description: "gets NET/USB List Title Info" }
+      }
+    },
+    NSB: {
+      name: "usb-select-browse",
+      description: "NET/USB Select Browse",
+      values: {
+        TOP: { name: "top", description: "TOP MENU" },
+        MENU: { name: "menu", description: "MENU" }
+      }
+    },
+    NRI: {
+      name: "internet-radio-info",
+      description: "Internet Radio Info",
+      values: {
+        nnnnnnnn: {
+          description: "Internet Radio Info (variable-length, 64 Unicode letters [UTF-8 encoded] max)"
+        },
+        QSTN: { name: "query", description: "gets Internet Radio Info" }
+      }
+    },
+    NCP: {
+      name: "usb-copy",
+      description: "NET/USB Copy",
+      values: {
+        START: { name: "start", description: "START COPY" },
+        STOP: { name: "stop", description: "STOP COPY" }
+      }
+    },
+    NAC: {
+      name: "account-info",
+      description: "Account Info",
+      values: {
+        "iaaaa...aaaabbbb...bbbb": {
+          description: "i-> Account Info\n 0: No\n 1: Yes\n\"aaaa...aaaa\": User Name ( 128 Unicode letters [UTF-8 encoded] max )\n\"bbbb...bbbb\": Password ( 128 Unicode letters [UTF-8 encoded] max )"
+        }
+      }
+    },
+    NUI: {
+      name: "ui-type",
+      description: "UI Type",
+      values: {
+        "0": { name: "list", description: "List" },
+        "1": { name: "menu", description: "Menu" },
+        "2": { name: "playback", description: "Playback" },
+        "3": { name: "popup", description: "Popup" },
+        "4": { name: "keyboard", description: "Keyboard" },
+        "5": { name: "menu-list", description: "Menu List" }
+      }
+    },
+    NAD: {
+      name: "album-art-display",
+      description: "Album Art Display Mode",
+      values: {
+        "0": { name: "off", description: "OFF" },
+        "1": { name: "on", description: "ON" },
+        QSTN: { name: "query", description: "gets Album Art Display Mode" }
+      }
+    },
+    NLU: {
+      name: "list-url-info",
+      description: "List URL Info",
+      values: {
+        nnnnnnnn: {
+          description: "List URL Info (variable-length, 256 Unicode letters [UTF-8 encoded] max)"
+        }
+      }
+    },
+    NPB: {
+      name: "playback-info",
+      description: "Playback Info",
+      values: {
+        nnnnnnnn: {
+          description: "Playback Info (variable-length, 64 Unicode letters [UTF-8 encoded] max)"
+        },
+        QSTN: { name: "query", description: "gets Playback Info" }
+      }
+    },
+    NAF: {
+      name: "album-art-format",
+      description: "Album Art Format",
+      values: {
+        "0": { name: "bmp", description: "BMP" },
+        "1": { name: "jpeg", description: "JPEG" },
+        "2": { name: "url", description: "URL" },
+        n: { name: "no-image", description: "No Image" }
+      }
+    },
+    NRF: {
+      name: "reference-info",
+      description: "Reference Info",
+      values: {
+        nnnnnnnn: {
+          description: "Reference Info (variable-length, 128 Unicode letters [UTF-8 encoded] max)"
+        }
+      }
+    },
+    NFI: {
+      name: "file-info",
+      description: "File Info",
+      values: {
+        nnnnnnnn: {
+          description: "File Info (variable-length, 256 Unicode letters [UTF-8 encoded] max)"
+        },
+        QSTN: { name: "query", description: "gets File Info" }
+      }
+    },
+    MGS: {
+      name: "multi-gateway-status",
+      description: "Multi Gateway Status",
+      values: {
+        "0": { name: "disabled", description: "Disabled" },
+        "1": { name: "enabled", description: "Enabled" },
+        QSTN: { name: "query", description: "gets Multi Gateway Status" }
+      }
+    },
+    MGV: {
+      name: "multi-gateway-volume",
+      description: "Multi Gateway Volume",
+      values: {
+        "{xx}": {
+          description: "Volume Level 0 - 100 ( In hexadecimal representation)"
+        },
+        UP: { name: "up", description: "sets Volume Level Up" },
+        DOWN: { name: "down", description: "sets Volume Level Down" },
+        QSTN: { name: "query", description: "gets the Volume Level" }
+      }
+    },
+    MDI: {
+      name: "multi-device-info",
+      description: "Multi Device Info",
+      values: {
+        nnnnnnnn: {
+          description: "Multi Device Info (variable-length)"
+        },
+        QSTN: { name: "query", description: "gets Multi Device Info" }
+      }
+    },
+    MRN: {
+      name: "multi-room-name",
+      description: "Multi Room Name",
+      values: {
+        nnnnnnnn: {
+          description: "Multi Room Name (variable-length, 64 Unicode letters [UTF-8 encoded] max)"
+        },
+        QSTN: { name: "query", description: "gets Multi Room Name" }
+      }
+    },
+    MGN: {
+      name: "multi-group-name",
+      description: "Multi Group Name",
+      values: {
+        nnnnnnnn: {
+          description: "Multi Group Name (variable-length, 64 Unicode letters [UTF-8 encoded] max)"
+        },
+        QSTN: { name: "query", description: "gets Multi Group Name" }
+      }
+    },
+    MZI: {
+      name: "multi-zone-info",
+      description: "Multi Zone Info",
+      values: {
+        nnnnnnnn: {
+          description: "Multi Zone Info (variable-length)"
+        },
+        QSTN: { name: "query", description: "gets Multi Zone Info" }
+      }
+    },
+    MSS: {
+      name: "multi-speaker-status",
+      description: "Multi Speaker Status",
+      values: {
+        "0": { name: "off", description: "OFF" },
+        "1": { name: "on", description: "ON" },
+        QSTN: { name: "query", description: "gets Multi Speaker Status" }
+      }
+    },
+    MZC: {
+      name: "multi-zone-control",
+      description: "Multi Zone Control",
+      values: {
+        "0": { name: "main", description: "Main Zone" },
+        "1": { name: "zone2", description: "Zone 2" },
+        "2": { name: "zone3", description: "Zone 3" },
+        "3": { name: "zone4", description: "Zone 4" },
+        QSTN: { name: "query", description: "gets Multi Zone Control" }
+      }
+    },
+    MRM: {
+      name: "multi-room-mode",
+      description: "Multi Room Mode",
+      values: {
+        "0": { name: "off", description: "OFF" },
+        "1": { name: "on", description: "ON" },
+        QSTN: { name: "query", description: "gets Multi Room Mode" }
+      }
+    },
+    MMT: {
+      name: "multi-mute",
+      description: "Multi Mute",
+      values: {
+        "0": { name: "off", description: "Mute OFF" },
+        "1": { name: "on", description: "Mute ON" },
+        TG: { name: "toggle", description: "Mute Toggle" },
+        QSTN: { name: "query", description: "gets Multi Mute Status" }
+      }
+    },
+    MRR: {
+      name: "multi-room-repeat",
+      description: "Multi Room Repeat",
+      values: {
+        "0": { name: "off", description: "Repeat OFF" },
+        "1": { name: "all", description: "Repeat All" },
+        "2": { name: "one", description: "Repeat One" },
+        QSTN: { name: "query", description: "gets Multi Room Repeat" }
+      }
+    },
+    EDV: {
+      name: "editor-version",
+      description: "Editor Version",
+      values: {
+        nnnnnnnn: {
+          description: "Editor Version Info"
+        },
+        QSTN: { name: "query", description: "gets Editor Version" }
+      }
+    },
+    EDA: {
+      name: "editor-application",
+      description: "Editor Application",
+      values: {
+        nnnnnnnn: {
+          description: "Editor Application Info"
+        },
+        QSTN: { name: "query", description: "gets Editor Application" }
+      }
+    },
+    EDC: {
+      name: "editor-command",
+      description: "Editor Command",
+      values: {
+        nnnnnnnn: {
+          description: "Editor Command Info"
+        }
+      }
+    },
+    EDF: {
+      name: "editor-firmware",
+      description: "Editor Firmware",
+      values: {
+        nnnnnnnn: {
+          description: "Editor Firmware Info"
+        },
+        QSTN: { name: "query", description: "gets Editor Firmware" }
+      }
+    },
+    EDE: {
+      name: "editor-extension",
+      description: "Editor Extension",
+      values: {
+        nnnnnnnn: {
+          description: "Editor Extension Info"
+        },
+        QSTN: { name: "query", description: "gets Editor Extension" }
+      }
+    },
+    PQA: {
+      name: "play-queue-add",
+      description: "Play Queue Add",
+      values: {
+        ADD: { name: "add", description: "Add to Play Queue" }
+      }
+    },
+    PQR: {
+      name: "play-queue-remove",
+      description: "Play Queue Remove",
+      values: {
+        REMOVE: { name: "remove", description: "Remove from Play Queue" }
+      }
+    },
+    PQO: {
+      name: "play-queue-operation",
+      description: "Play Queue Operation",
+      values: {
+        UP: { name: "up", description: "Move Up in Queue" },
+        DOWN: { name: "down", description: "Move Down in Queue" },
+        CLEAR: { name: "clear", description: "Clear Queue" }
+      }
+    },
+    AAT: {
+      name: "album-artist-track",
+      description: "Album/Artist/Track Info",
+      values: {
+        nnnnnnnn: {
+          description: "Album/Artist/Track Info (variable-length)"
+        },
+        QSTN: { name: "query", description: "gets Album/Artist/Track Info" }
+      }
+    },
+    AAL: {
+      name: "album-art-link",
+      description: "Album Art Link",
+      values: {
+        nnnnnnnn: {
+          description: "Album Art Link URL (variable-length)"
+        },
+        QSTN: { name: "query", description: "gets Album Art Link" }
+      }
+    },
+    ATI: {
+      name: "audio-track-info",
+      description: "Audio Track Info",
+      values: {
+        nnnnnnnn: {
+          description: "Audio Track Info (variable-length)"
+        },
+        QSTN: { name: "query", description: "gets Audio Track Info" }
+      }
+    },
+    ATM: {
+      name: "audio-track-menu",
+      description: "Audio Track Menu",
+      values: {
+        nnnnnnnn: {
+          description: "Audio Track Menu Info"
+        },
+        QSTN: { name: "query", description: "gets Audio Track Menu" }
+      }
+    },
+    AST: {
+      name: "audio-stream-type",
+      description: "Audio Stream Type",
+      values: {
+        nnnnnnnn: {
+          description: "Audio Stream Type Info"
+        },
+        QSTN: { name: "query", description: "gets Audio Stream Type" }
+      }
+    },
+    PPS: {
+      name: "play-pause-status",
+      description: "Play/Pause Status",
+      values: {
+        PLAY: { name: "play", description: "Playing" },
+        PAUSE: { name: "pause", description: "Paused" },
+        STOP: { name: "stop", description: "Stopped" },
+        QSTN: { name: "query", description: "gets Play/Pause Status" }
+      }
+    },
+    PPD: {
+      name: "play-pause-display",
+      description: "Play/Pause Display",
+      values: {
+        nnnnnnnn: {
+          description: "Play/Pause Display Info"
+        },
+        QSTN: { name: "query", description: "gets Play/Pause Display" }
+      }
+    },
+    NGU: {
+      name: "next-guide-up",
+      description: "Next Guide Up",
+      values: {
+        UP: { name: "up", description: "Guide Up" }
+      }
+    },
+    NGV: {
+      name: "next-guide-view",
+      description: "Next Guide View",
+      values: {
+        nnnnnnnn: {
+          description: "Next Guide View Info"
+        },
+        QSTN: { name: "query", description: "gets Next Guide View" }
+      }
+    },
+    NDN: {
+      name: "next-device-name",
+      description: "Next Device Name",
+      values: {
+        nnnnnnnn: {
+          description: "Next Device Name (variable-length)"
+        },
+        QSTN: { name: "query", description: "gets Next Device Name" }
+      }
+    },
+    NGT: {
+      name: "next-guide-type",
+      description: "Next Guide Type",
+      values: {
+        nnnnnnnn: {
+          description: "Next Guide Type Info"
+        },
+        QSTN: { name: "query", description: "gets Next Guide Type" }
+      }
+    },
+    NFN: {
+      name: "network-friendly-name",
+      description: "Network Friendly Name",
+      values: {
+        nnnnnnnn: {
+          description: "Network Friendly Name (variable-length, 64 Unicode letters [UTF-8 encoded] max)"
+        },
+        QSTN: { name: "query", description: "gets Network Friendly Name" }
+      }
+    },
+    NWP: {
+      name: "network-wifi-password",
+      description: "Network WiFi Password",
+      values: {
+        nnnnnnnn: {
+          description: "Network WiFi Password (variable-length)"
+        }
+      }
+    },
+    NWU: {
+      name: "network-wifi-update",
+      description: "Network WiFi Update",
+      values: {
+        UPDATE: { name: "update", description: "Update WiFi Settings" }
+      }
+    },
     CCD: {
       name: "cd-player",
       description: "CD Player Operation Command",
@@ -1403,6 +1934,60 @@ export const eiscpCommands = {
         FF: { name: "ff", description: "FF" },
         REW: { name: "rew", description: "REW" },
         STBY: { name: "stby", description: "STANDBY" }
+      }
+    },
+    CDS: {
+      name: "docking-station",
+      description: "Docking Station via RI",
+      values: {
+        POWER: { name: "power", description: "POWER ON/OFF" },
+        "SHFL.ON": { name: "shfl-on", description: "SHUFFLE ON" },
+        "SHFL.OFF": { name: "shfl-off", description: "SHUFFLE OFF" },
+        "SEARCF.F": { name: "searcf-f", description: "SEARCH >>|" },
+        "SEARCF.R": { name: "searcf-r", description: "SEARCH |<<" },
+        "SKIP.F": { name: "skip-f", description: ">>I" },
+        "SKIP.R": { name: "skip-r", description: "I<<" },
+        PLAY: { name: "play", description: "PLAY" },
+        STOP: { name: "stop", description: "STOP" },
+        PAUSE: { name: "pause", description: "PAUSE" },
+        "REP.ALL": { name: "rep-all", description: "REPEAT ALL" },
+        "REP.ONE": { name: "rep-one", description: "REPEAT 1" },
+        "REP.OFF": { name: "rep-off", description: "REPEAT OFF" },
+        RANDOM: { name: "random", description: "RANDOM" },
+        "CONT.UP": { name: "cont-up", description: "CONTENT UP" },
+        "CONT.DOWN": { name: "cont-down", description: "CONTENT DOWN" },
+        SELECT: { name: "select", description: "SELECT" },
+        MENU: { name: "menu", description: "MENU" }
+      }
+    },
+    CAP: {
+      name: "amplifier-operation",
+      description: "Amplifier Operation via RI",
+      values: {
+        "VOL.UP": { name: "vol-up", description: "VOLUME UP" },
+        "VOL.DOWN": { name: "vol-down", description: "VOLUME DOWN" },
+        MUTING: { name: "muting", description: "MUTING ON/OFF" },
+        "SL.UP": { name: "sl-up", description: "SELECTOR UP" },
+        "SL.DOWN": { name: "sl-down", description: "SELECTOR DOWN" },
+        "SL.VIDEO1": { name: "sl-video1", description: "SELECTOR VIDEO1" },
+        "SL.VIDEO2": { name: "sl-video2", description: "SELECTOR VIDEO2" },
+        "SL.VIDEO3": { name: "sl-video3", description: "SELECTOR VIDEO3" },
+        "SL.VIDEO4": { name: "sl-video4", description: "SELECTOR VIDEO4" },
+        "SL.VIDEO5": { name: "sl-video5", description: "SELECTOR VIDEO5" },
+        "SL.VIDEO6": { name: "sl-video6", description: "SELECTOR VIDEO6" },
+        "SL.VIDEO7": { name: "sl-video7", description: "SELECTOR VIDEO7" },
+        "SL.DVD": { name: "sl-dvd", description: "SELECTOR DVD" },
+        "SL.TV/CD": { name: "sl-tv-cd", description: "SELECTOR TV/CD" },
+        "SL.PHONO": { name: "sl-phono", description: "SELECTOR PHONO" },
+        "SL.CD": { name: "sl-cd", description: "SELECTOR CD" },
+        "SL.FM": { name: "sl-fm", description: "SELECTOR FM" },
+        "SL.AM": { name: "sl-am", description: "SELECTOR AM" },
+        "SL.TUNER": { name: "sl-tuner", description: "SELECTOR TUNER" },
+        "SL.MULTI": { name: "sl-multi", description: "SELECTOR MULTI" },
+        "SL.USB": { name: "sl-usb", description: "SELECTOR USB" },
+        "SL.NET": { name: "sl-net", description: "SELECTOR NET" },
+        "SL.DOCK": { name: "sl-dock", description: "SELECTOR DOCK" },
+        POWER: { name: "power", description: "POWER ON/OFF" }
       }
     },
     CPT: {

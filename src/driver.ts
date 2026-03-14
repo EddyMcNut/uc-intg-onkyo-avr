@@ -414,16 +414,26 @@ export default class OnkyoDriver {
 
       if (!physicalConnection) {
         // Need to create a new physical connection
+        // Collect all zones configured for this physical AVR
+        const configuredZones = this.config.avrs
+          .filter(avr => buildPhysicalAvrId(avr.model, avr.ip) === physicalAVR)
+          .map(avr => avr.zone);
+        
         const avrSpecificConfig = this.createAvrSpecificConfig(avrConfig);
         const physicalConn = await this.connectionManager.createAndConnect(physicalAVR, avrConfig, (eiscpInstance) => {
           // Create command receiver using Onkyo-specific class and the driver context
           const commandReceiver = new CommandReceiver(this.driver, avrSpecificConfig, eiscpInstance, this.driverVersion);
           return commandReceiver;
-        });
+        }, configuredZones);
         physicalConnection = physicalConn;
       } else {
         // Physical connection exists - update its config in case settings changed
-        this.connectionManager.updateConnectionConfig(physicalAVR, avrConfig);
+        // Collect all zones configured for this physical AVR in case they've changed
+        const configuredZones = this.config.avrs
+          .filter(avr => buildPhysicalAvrId(avr.model, avr.ip) === physicalAVR)
+          .map(avr => avr.zone);
+        
+        this.connectionManager.updateConnectionConfig(physicalAVR, avrConfig, configuredZones);
         
         if (!physicalConnection.eiscp.connected) {
         // Physical connection exists but is disconnected, try to reconnect

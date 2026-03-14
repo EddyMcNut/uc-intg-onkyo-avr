@@ -21,6 +21,7 @@ export interface EiscpConfig {
   receive_delay?: number;
   netMenuDelay?: number;
   tuneinPresetPosition?: number;
+  configuredZones?: string[]; // Zones configured for this physical AVR (e.g., ["main", "zone2"])
 }
 
 const COMMANDS = eiscpCommands.commands;
@@ -130,7 +131,8 @@ export class EiscpDriver extends EventEmitter {
       send_delay: config?.send_delay ?? DEFAULT_QUEUE_THRESHOLD,
       receive_delay: config?.receive_delay ?? DEFAULT_QUEUE_THRESHOLD,
       netMenuDelay: config?.netMenuDelay ?? 2500,
-      tuneinPresetPosition: config?.tuneinPresetPosition ?? 1
+      tuneinPresetPosition: config?.tuneinPresetPosition ?? 1,
+      configuredZones: config?.configuredZones
     };
     this.setupErrorHandler();
   }
@@ -667,11 +669,21 @@ export class EiscpDriver extends EventEmitter {
   }
 
   /** Enqueue a command to be sent with proper delay between commands */
-  private enqueueSend(data: string): Promise<void> {
+  private enqueueSend(data: string | string[]): Promise<void> {
     const task = this.sendQueue.then(async () => {
       if (this.is_connected && this.eiscp) {
-        this.eiscp.write(this.eiscp_packet(data));
-        await delay(this.config.send_delay!);
+        // Handle single command (most common case)
+        if (typeof data === 'string') {
+          this.eiscp.write(this.eiscp_packet(data));
+        } else {
+          // const shortDelay = Math.round((this.config.send_delay! ?? DEFAULT_QUEUE_THRESHOLD) / data.length / 20) * 10;
+          // console.log("%s ***************", integrationName, data.length, shortDelay);
+          for (const cmd of data) {
+            this.eiscp.write(this.eiscp_packet(cmd));
+            // await delay(shortDelay);
+          }
+        }
+        await delay(this.config.send_delay! ?? DEFAULT_QUEUE_THRESHOLD);
       } else {
         throw new Error("Send command while not connected");
       }
@@ -684,7 +696,7 @@ export class EiscpDriver extends EventEmitter {
   private enqueueIncoming(data: DataPayload): void {
     this.receiveQueue = this.receiveQueue
       .then(async () => {
-        await delay(this.config.receive_delay!);
+        await delay(this.config.receive_delay! ?? DEFAULT_QUEUE_THRESHOLD);
         this.emit("data", data);
       })
       .catch((err) => {
@@ -759,6 +771,16 @@ export class EiscpDriver extends EventEmitter {
     let command: string, args: string | number, zone: string;
 
     if (typeof data === "string") {
+      // Check if this is a multi-zone command
+      if (data.toLowerCase().startsWith("multi-zone-volume")) {
+        await this.handleMultiZoneVolume(data);
+        return;
+      }
+      if (data.toLowerCase().startsWith("multi-zone-muting")) {
+        await this.handleMultiZoneMuting(data);
+        return;
+      }
+
       const parts = data
         .toLowerCase()
         .split(/[\s.=:]/)
@@ -784,6 +806,163 @@ export class EiscpDriver extends EventEmitter {
       return;
     }
     await this.sendIscp(this.command_to_iscp(command, args, zone));
+  }
+
+  private async handleMultiZoneVolume(data: string): Promise<void> {
+    const parts = data.toLowerCase().split(/[\s]+/).filter((item) => item !== "");
+    
+    if (parts.length !== 2) {
+      log.warn("%s Invalid multi-zone-volume command format: %s", integrationName, data);
+      return;
+    }
+
+    const action = parts[1]; // e.g., "all-up", "main-zone2-down"
+    
+    // Determine which zones are configured for this AVR
+    const configuredZones = this.config.configuredZones || ["main"]; // default to main if not specified
+    const hasMain = configuredZones.includes("main");
+    const hasZone2 = configuredZones.includes("zone2");
+    const hasZone3 = configuredZones.includes("zone3");
+    
+    // Map action to zone-specific volume commands (conditionally based on configured zones)
+    const volumeCommands: string[] = [];
+    
+    switch (action) {
+      case "all-up":
+        if (hasMain) volumeCommands.push("MVLUP1");   // Main zone volume up
+        if (hasZone2) volumeCommands.push("ZVLUP1");  // Zone 2 volume up
+        if (hasZone3) volumeCommands.push("VL3UP1");  // Zone 3 volume up
+        break;
+      case "all-down":
+        if (hasMain) volumeCommands.push("MVLDOWN1"); // Main zone volume down
+        if (hasZone2) volumeCommands.push("ZVLDOWN1"); // Zone 2 volume down
+        if (hasZone3) volumeCommands.push("VL3DOWN1"); // Zone 3 volume down
+        break;
+      case "main-zone2-up":
+        if (hasMain) volumeCommands.push("MVLUP1");   // Main zone volume up
+        if (hasZone2) volumeCommands.push("ZVLUP1");  // Zone 2 volume up
+        break;
+      case "main-zone2-down":
+        if (hasMain) volumeCommands.push("MVLDOWN1"); // Main zone volume down
+        if (hasZone2) volumeCommands.push("ZVLDOWN1"); // Zone 2 volume down
+        break;
+      case "main-zone3-up":
+        if (hasMain) volumeCommands.push("MVLUP1");   // Main zone volume up
+        if (hasZone3) volumeCommands.push("VL3UP1");  // Zone 3 volume up
+        break;
+      case "main-zone3-down":
+        if (hasMain) volumeCommands.push("MVLDOWN1"); // Main zone volume down
+        if (hasZone3) volumeCommands.push("VL3DOWN1"); // Zone 3 volume down
+        break;
+      case "zone2-zone3-up":
+        if (hasZone2) volumeCommands.push("ZVLUP1");  // Zone 2 volume up
+        if (hasZone3) volumeCommands.push("VL3UP1");  // Zone 3 volume up
+        break;
+      case "zone2-zone3-down":
+        if (hasZone2) volumeCommands.push("ZVLDOWN1"); // Zone 2 volume down
+        if (hasZone3) volumeCommands.push("VL3DOWN1"); // Zone 3 volume down
+        break;
+      default:
+        log.warn("%s Unknown multi-zone-volume action: %s", integrationName, action);
+        return;
+    }
+
+    if (volumeCommands.length === 0) {
+      log.warn("%s No zones configured for multi-zone-volume action: %s (configured zones: %s)", integrationName, action, configuredZones.join(", "));
+      return;
+    }
+
+    log.info("%s Multi-zone volume command: %s -> sending %d zone commands (configured zones: %s)", integrationName, data, volumeCommands.length, configuredZones.join(", "));
+
+    // Send all zone commands at once with a single 100ms delay at the end
+    this.enqueueSend(volumeCommands);
+  }
+
+  private async handleMultiZoneMuting(data: string): Promise<void> {
+    const parts = data.toLowerCase().split(/[\s]+/).filter((item) => item !== "");
+    
+    if (parts.length !== 2) {
+      log.warn("%s Invalid multi-zone-muting command format: %s", integrationName, data);
+      return;
+    }
+
+    const action = parts[1]; // e.g., "all-on", "all-off", "all-toggle", "main-zone2-on"
+    
+    // Determine which zones are configured for this AVR
+    const configuredZones = this.config.configuredZones || ["main"]; // default to main if not specified
+    const hasMain = configuredZones.includes("main");
+    const hasZone2 = configuredZones.includes("zone2");
+    const hasZone3 = configuredZones.includes("zone3");
+    
+    // Map action to zone-specific mute commands (conditionally based on configured zones)
+    const muteCommands: string[] = [];
+    
+    switch (action) {
+      case "all-on":
+        if (hasMain) muteCommands.push("AMT01");   // Main zone mute on
+        if (hasZone2) muteCommands.push("ZMT01");  // Zone 2 mute on
+        if (hasZone3) muteCommands.push("MT301");  // Zone 3 mute on
+        break;
+      case "all-off":
+        if (hasMain) muteCommands.push("AMT00");   // Main zone mute off
+        if (hasZone2) muteCommands.push("ZMT00");  // Zone 2 mute off
+        if (hasZone3) muteCommands.push("MT300");  // Zone 3 mute off
+        break;
+      case "all-toggle":
+        if (hasMain) muteCommands.push("AMTTG");   // Main zone mute toggle
+        if (hasZone2) muteCommands.push("ZMTTG");  // Zone 2 mute toggle
+        if (hasZone3) muteCommands.push("MT3TG");  // Zone 3 mute toggle
+        break;
+      case "main-zone2-on":
+        if (hasMain) muteCommands.push("AMT01");   // Main zone mute on
+        if (hasZone2) muteCommands.push("ZMT01");  // Zone 2 mute on
+        break;
+      case "main-zone2-off":
+        if (hasMain) muteCommands.push("AMT00");   // Main zone mute off
+        if (hasZone2) muteCommands.push("ZMT00");  // Zone 2 mute off
+        break;
+      case "main-zone2-toggle":
+        if (hasMain) muteCommands.push("AMTTG");   // Main zone mute toggle
+        if (hasZone2) muteCommands.push("ZMTTG");  // Zone 2 mute toggle
+        break;
+      case "main-zone3-on":
+        if (hasMain) muteCommands.push("AMT01");   // Main zone mute on
+        if (hasZone3) muteCommands.push("MT301");  // Zone 3 mute on
+        break;
+      case "main-zone3-off":
+        if (hasMain) muteCommands.push("AMT00");   // Main zone mute off
+        if (hasZone3) muteCommands.push("MT300");  // Zone 3 mute off
+        break;
+      case "main-zone3-toggle":
+        if (hasMain) muteCommands.push("AMTTG");   // Main zone mute toggle
+        if (hasZone3) muteCommands.push("MT3TG");  // Zone 3 mute toggle
+        break;
+      case "zone2-zone3-on":
+        if (hasZone2) muteCommands.push("ZMT01");  // Zone 2 mute on
+        if (hasZone3) muteCommands.push("MT301");  // Zone 3 mute on
+        break;
+      case "zone2-zone3-off":
+        if (hasZone2) muteCommands.push("ZMT00");  // Zone 2 mute off
+        if (hasZone3) muteCommands.push("MT300");  // Zone 3 mute off
+        break;
+      case "zone2-zone3-toggle":
+        if (hasZone2) muteCommands.push("ZMTTG");  // Zone 2 mute toggle
+        if (hasZone3) muteCommands.push("MT3TG");  // Zone 3 mute toggle
+        break;
+      default:
+        log.warn("%s Unknown multi-zone-muting action: %s", integrationName, action);
+        return;
+    }
+
+    if (muteCommands.length === 0) {
+      log.warn("%s No zones configured for multi-zone-muting action: %s (configured zones: %s)", integrationName, action, configuredZones.join(", "));
+      return;
+    }
+
+    log.info("%s Multi-zone muting command: %s -> sending %d zone commands (configured zones: %s)", integrationName, data, muteCommands.length, configuredZones.join(", "));
+
+    // Send all zone commands at once with a single 100ms delay at the end
+    this.enqueueSend(muteCommands);
   }
 
   private command_to_iscp(command: string, args: string | number | undefined, zone: string): string {

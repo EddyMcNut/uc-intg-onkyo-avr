@@ -1,8 +1,8 @@
 {
   "driver_id": "onkyo_avr_custom_driver",
-  "version": "0.8.2",
+  "version": "0.8.3",
   "min_core_api": "0.20.0",
-  "name": { "en": "Onkyo AVR" },
+  "name": { "en": "Onkyo/Pioneer/Integra AVR" },
   "icon": "uc:music",
   "description": { "en": "Custom integration for Unfolded Circle remotes to control your Onkyo / Pioneer / Integra AVR." },
   "developer": {

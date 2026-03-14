@@ -44,8 +44,13 @@ export default class ConnectCoordinator {
       let physicalConnection = this.connectionManager.getPhysicalConnection(physicalAVR);
 
       if (!physicalConnection) {
+        // Collect all zones configured for this physical AVR
+        const configuredZones = config.avrs
+          .filter(avr => buildPhysicalAvrId(avr.model, avr.ip) === physicalAVR)
+          .map(avr => avr.zone);
+        
         // Create physical connection using connection manager, which will schedule reconnect on failure
-        physicalConnection = await this.connectionManager.createAndConnect(physicalAVR, avrConfig, createCommandReceiverFactory(avrConfig));
+        physicalConnection = await this.connectionManager.createAndConnect(physicalAVR, avrConfig, createCommandReceiverFactory(avrConfig), configuredZones);
       } else if (!physicalConnection.eiscp.connected) {
         log.info("%s [%s] TCP connection lost, reconnecting to AVR...", integrationName, physicalAVR);
         const result = await this.connectionManager.attemptReconnection(physicalAVR);

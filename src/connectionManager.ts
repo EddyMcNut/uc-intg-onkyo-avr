@@ -28,7 +28,7 @@ export default class ConnectionManager {
     this.physicalConnections.set(physicalAVR, connection);
   }
 
-  updateConnectionConfig(physicalAVR: string, avrConfig: AvrConfig): void {
+  updateConnectionConfig(physicalAVR: string, avrConfig: AvrConfig, configuredZones?: string[]): void {
     const connection = this.physicalConnections.get(physicalAVR);
     if (connection) {
       // Update the stored config
@@ -38,13 +38,14 @@ export default class ConnectionManager {
         ...connection.eiscp["config"],
         netMenuDelay: avrConfig.netMenuDelay,
         tuneinPresetPosition: avrConfig.tuneinPresetPosition,
-        send_delay: avrConfig.queueThreshold || 100
+        send_delay: avrConfig.queueThreshold || 100,
+        configuredZones: configuredZones
       };
-      log.info(`${integrationName} [${physicalAVR}] Updated connection config (netMenuDelay: ${avrConfig.netMenuDelay}, tuneinPresetPosition: ${avrConfig.tuneinPresetPosition})`);
+      log.info(`${integrationName} [${physicalAVR}] Updated connection config (netMenuDelay: ${avrConfig.netMenuDelay}, tuneinPresetPosition: ${avrConfig.tuneinPresetPosition}, zones: ${configuredZones?.join(", ") || "default"})`);
     }
   }
 
-  async createAndConnect(physicalAVR: string, avrConfig: AvrConfig, createCommandReceiver: CreateCommandReceiverFn): Promise<PhysicalConnection> {
+  async createAndConnect(physicalAVR: string, avrConfig: AvrConfig, createCommandReceiver: CreateCommandReceiverFn, configuredZones?: string[]): Promise<PhysicalConnection> {
     log.info(`${integrationName} [${physicalAVR}] Connecting to AVR at ${avrConfig.ip}:${avrConfig.port}`);
 
     const eiscpInstance = new EiscpDriver({
@@ -53,7 +54,8 @@ export default class ConnectionManager {
       model: avrConfig.model,
       send_delay: avrConfig.queueThreshold || 100,
       netMenuDelay: avrConfig.netMenuDelay,
-      tuneinPresetPosition: avrConfig.tuneinPresetPosition
+      tuneinPresetPosition: avrConfig.tuneinPresetPosition,
+      configuredZones: configuredZones
     });
 
     const commandReceiver = createCommandReceiver(eiscpInstance);

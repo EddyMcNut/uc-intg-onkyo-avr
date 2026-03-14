@@ -22,8 +22,8 @@ Read this readme completely, it contains some tips for known issues and it also 
 - Your AVR(s) needs a fixed IP address.
 - Your AVR(s) needs to be connected to the same network as you UC Remote (if AVR IP is 192.168.1.x then UC Remote IP must also start with 192.168.1).
 - Your AVR(s) needs to be ON or STANDBY.
-- Your UC Remote needs to have `New reconnect logic` enabled.
 - A wired network connection is preferred but several users report it's working fine while AVR is connected over WiFi.
+- Your UC Remote needs to have `New reconnect logic` enabled.
 
   ![](./screenshots/new-reconnect-logic.png)
 
@@ -48,13 +48,20 @@ Users report it also to work with:
 - Pioneer VSA-LX805
 - Integra (model unknown)
 
-## Known issues and solutions
-
-[Known issues and solutions](./docs/known-issues.md)
+[Architecture and Operation](./docs/architecture.md)
 
 ## Installation and usage
 
-[Installation and usage](./docs/installation.md)
+[Installation](./docs/installation.md)
+
+Example activities:
+- [Spotify](./docs/spotify.md)
+- [AppleTV](./docs/atv.md)
+- [DAB Radio](./docs/dab.md)
+- [TuneIn Radio](./docs/tunein.md)
+- Make sure that you add your Activities to an [Activity Group](./docs/activitygroup.md).
+- `Home` \ `Customise your remote` Add your new Activity to a page and now you can give it a try on the awesome Unfolded Circle Remote!
+- or, when not created an activity yet: `Home` \ `Customise your remote` and just add your AVR, in that case physical buttons are mapped.
 
 ## Install new version
 
@@ -92,16 +99,6 @@ Users report it also to work with:
 
 [Listening modes](./docs/listening-modes.md)
 
-## Example activities
-
-- [Spotify](./docs/spotify.md)
-- [AppleTV](./docs/atv.md)
-- [DAB Radio](./docs/dab.md)
-- [TuneIn Radio](./docs/tunein.md)
-- Make sure that you add your Activities to an [Activity Group](./docs/activitygroup.md).
-- `Home` \ `Customise your remote` Add your new Activity to a page and now you can give it a try on the awesome Unfolded Circle Remote!
-- or, when not created an activity yet: `Home` \ `Customise your remote` and just add your AVR, in that case physical buttons are mapped.
-
 ## Multiple AVRs
 
 [Multiple AVRs](./docs/multiple-avrs.md)
@@ -121,3 +118,7 @@ Users report it also to work with:
 ## Collect logs
 
 [Collect logs](./docs/collect-logs.md)
+
+## Known issues and solutions
+
+[Known issues and solutions](./docs/known-issues.md)

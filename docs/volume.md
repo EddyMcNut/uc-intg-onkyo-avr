@@ -1,5 +1,10 @@
 ## Volume
 
+### Map the volume button
+With a single zone action, you just map the VolumeUp/Down command of that selected AVR entity to the volume  (assign to **short press** only!):
+
+![](../screenshots/volume-up.png)
+
 ### Steps
 
 Currently the volume level that is shown on the display of the remote can only show integer values (1, 15, 60, ...) and not yet x.5 values (1.5, 15.5, 60.5, ...). When you assign `Volume up` or `Volume down` commands to a button, the volume step will be 1.0, this is done so the volume level that is shown on the display of the remote is the same as the level showing on the AVR.
@@ -40,7 +45,7 @@ When you determine the specific setting for your use-case, consider [Volume Enco
 
 ### Slider
 
-As from v0.6.1, this integration support the use of the Slider to control the AVR volume. Make sure that during the setup step of the integration, you select the correct `Volume scale` to get the best experience. See the manual of your AVR model for detailed information.
+As from v0.6.1, this integration supports the use of the Slider to control the AVR volume. Make sure that during the setup step of the integration, you select the correct `Volume scale` to get the best experience. See the manual of your AVR model for detailed information.
 
 ![](../screenshots/volume-scale.png)
 
@@ -49,5 +54,29 @@ In the Activity, `Button mapping`, click the `Touch slider`, select your Onkyo A
 ![](../screenshots/slider.png)
 
 Now you can control the AVR volume with the Slider.
+
+### Multi Zone Volume
+
+As from v0.8.3 this integration supports controlling the volume for multiple zones with just a single command. Let's assume you have an activity that uses multiple zones:
+
+![](../screenshots/activity-multi-zone.png)
+
+Then in that activity you can use the `multi-zone-volume all-up` command (assign to **short press** only!):
+
+![](../screenshots/volume-multi.png)
+
+Lookup `multi-zone-volume` in the [JSON](../src/eiscp-commands.ts) to the available options, for example `zone2-zone3-up` to adjust zones2 and 3 but not the main zone.
+
+*Note: multi-zone-volume does **not** support the use of the slider.*
+
+### Multi Zone Mute
+
+As from v0.8.3 this integration supports controlling muting for multiple zones with just a single command.
+
+Assign `multi-zone-muting all-toggle` to the muting button to mute all zones in one action:
+
+![](../screenshots/muting-multi.png)
+
+Lookup `multi-zone-muting` in the [JSON](../src/eiscp-commands.ts) to the available options, for example `zone2-zone3-toggle` to toggle zones2 and 3 but not the main zone.
 
 [back to main README](../README.md#volume)

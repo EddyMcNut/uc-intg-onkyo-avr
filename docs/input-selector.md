@@ -118,4 +118,4 @@ _If a service like Spotify is not a selectable input source on your AVR, just us
 
 [more on how to send different commands through `Input source`](./cheats.md)
 
-[activities examples](../README.md#example-activities)
+[activities examples](../README.md#installation-and-usage)

@@ -20,6 +20,7 @@ permissions:
 
 env:
   INTG_NAME: onkyo_avr_custom_driver
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   build:
