@@ -1,14 +1,12 @@
 import * as uc from "@unfoldedcircle/integration-api";
 import { avrStateManager } from "./avrState.js";
-import crypto from "crypto";
 import { OnkyoConfig, buildEntityId } from "./configManager.js";
 import { EiscpDriver } from "./eiscp.js";
 import { SelectAttributes } from "./selectEntity.js";
 import { getCompatibleListeningModes, detectAudioFormatType } from "./listeningModeFilters.js";
 import { eiscpMappings } from "./eiscp-mappings.js";
 import log from "./loggers.js";
-import { delay } from "./utils.js";
-import { ALBUM_ART, SONG_INFO } from "./constants.js";
+import { ZoneAgnosticUpdateProcessor } from "./zoneAgnosticUpdateProcessor.js";
 
 const integrationName = "commandReceiver:";
 
@@ -24,15 +22,27 @@ const SENSOR_SUFFIXES = [
   "_front_panel_display_sensor"
 ];
 
+type AvrUpdateEvent = {
+  command: string;
+  argument: string | number | Record<string, string>;
+  zone: string;
+  iscpCommand: string;
+  host: string;
+  port: number;
+  model: string;
+};
+
+type ZoneAgnosticHandler = (avrUpdates: AvrUpdateEvent, entityId: string, eventZone: string) => Promise<void>;
+
 export class CommandReceiver {
   private driver: uc.IntegrationAPI;
   private config: OnkyoConfig;
   private eiscpInstance: EiscpDriver;
   private avrPreset: string = "unknown";
-  private lastImageHash: string = "";
-  private currentTrackId: string = "";
   private zone: string = "";
   private driverVersion: string;
+  private zoneAgnosticProcessor: ZoneAgnosticUpdateProcessor;
+  private zoneAgnosticHandlers: Record<string, ZoneAgnosticHandler>;
 
   constructor(driver: uc.IntegrationAPI, config: OnkyoConfig, eiscpInstance: EiscpDriver, driverVersion: string = "unknown") {
     this.driver = driver;
@@ -40,55 +50,104 @@ export class CommandReceiver {
     this.eiscpInstance = eiscpInstance;
     this.zone = this.config.avrs && this.config.avrs.length > 0 ? this.config.avrs[0].zone || "main" : "main";
     this.driverVersion = driverVersion;
+    this.zoneAgnosticProcessor = new ZoneAgnosticUpdateProcessor(driver, config, eiscpInstance);
+    this.zoneAgnosticHandlers = {
+      IFA: async (avrUpdates, entityId, eventZone) => {
+        await this.zoneAgnosticProcessor.handleIfa(entityId, eventZone, avrUpdates.argument as Record<string, string> | undefined, async (zoneEntityId, audioInputValue) => {
+          await this.updateListeningModeOptionsForAudioFormat(zoneEntityId, audioInputValue);
+        });
+      },
+      DSN: async (avrUpdates, entityId, eventZone) => {
+        await this.zoneAgnosticProcessor.handleDsn(entityId, avrUpdates.argument.toString(), eventZone);
+      },
+      NLT: async (avrUpdates, entityId, eventZone) => {
+        await this.zoneAgnosticProcessor.handleNlt(entityId, avrUpdates.argument.toString(), eventZone);
+      },
+      FLD: async (avrUpdates, entityId, eventZone) => {
+        await this.zoneAgnosticProcessor.handleFld(entityId, avrUpdates.argument.toString(), eventZone);
+      },
+      NTM: async (avrUpdates, entityId) => {
+        await this.zoneAgnosticProcessor.handleNtm(entityId, avrUpdates.argument.toString());
+      },
+      metadata: async (avrUpdates, entityId) => {
+        const metadata = typeof avrUpdates.argument === "object" && avrUpdates.argument !== null ? (avrUpdates.argument as Record<string, string>) : null;
+        await this.zoneAgnosticProcessor.handleMetadata(entityId, metadata);
+      }
+    };
   }
 
-  private async getImageHash(url: string): Promise<string> {
-    try {
-      const res = await fetch(url);
-      const arrayBuffer = await res.arrayBuffer();
-      const buffer = Buffer.from(arrayBuffer);
-      return crypto.createHash("md5").update(buffer).digest("hex");
-    } catch (err) {
-      log.warn("%s Failed to fetch or hash image: %s", integrationName, err);
-      return "";
+  private async updateListeningModeOptionsForAudioFormat(zoneEntityId: string, audioInputValue: string): Promise<void> {
+    const audioFormatType = detectAudioFormatType(audioInputValue);
+    const formatChanged = avrStateManager.setAudioFormat(zoneEntityId, audioFormatType);
+
+    if (!formatChanged) {
+      return;
     }
+
+    const selectEntityId = `${zoneEntityId}_listening_mode`;
+    const compatibleModes = getCompatibleListeningModes(audioFormatType);
+    if (!compatibleModes) {
+      return;
+    }
+
+    const cfgAvr = this.config.avrs ? this.config.avrs.find((a) => buildEntityId(a.model, a.ip, a.zone) === zoneEntityId) : undefined;
+    if (cfgAvr && Array.isArray(cfgAvr.listeningModeOptions) && cfgAvr.listeningModeOptions.length > 0) {
+      log.info("%s [%s] using user-configured listeningModeOptions (%d entries)", integrationName, zoneEntityId, cfgAvr.listeningModeOptions.length);
+      this.driver.updateEntityAttributes(selectEntityId, {
+        [SelectAttributes.Options]: cfgAvr.listeningModeOptions
+      });
+      return;
+    }
+
+    const lmdMappings = eiscpMappings.value_mappings.LMD;
+    const excludeKeys = ["up", "down", "movie", "music", "game", "query"];
+    const allModes = Object.keys(lmdMappings).filter((key) => !excludeKeys.includes(key));
+    const filteredOptions = allModes.filter((mode) => compatibleModes.includes(mode)).sort();
+
+    log.info("%s [%s] updating listening mode options for format: %s (%d modes)", integrationName, zoneEntityId, audioFormatType, filteredOptions.length);
+    this.driver.updateEntityAttributes(selectEntityId, {
+      [SelectAttributes.Options]: filteredOptions
+    });
+  }
+
+  private async dispatchZoneAgnosticCommand(avrUpdates: AvrUpdateEvent, entityId: string, eventZone: string): Promise<boolean> {
+    const handler = this.zoneAgnosticHandlers[avrUpdates.command];
+    if (handler) {
+      await handler(avrUpdates, entityId, eventZone);
+      return true;
+    }
+
+    if (ZoneAgnosticUpdateProcessor.isZoneAgnosticCommand(avrUpdates.command)) {
+      log.warn("%s [%s] command '%s' is declared zone-agnostic but has no dispatch handler", integrationName, entityId, avrUpdates.command);
+      return true;
+    }
+
+    return false;
+  }
+
+  /** Get config for external access (e.g., from avrState) */
+  public getConfig(): OnkyoConfig {
+    return this.config;
   }
 
   async maybeUpdateImage(entityId: string, force: boolean = false) {
-    if (!this.config.albumArtURL || this.config.albumArtURL === "na") return;
-
-    if (force) {
-      this.lastImageHash = ""; // reset hash to force update on next check
-    }
-
-    let imageUrl = `http://${this.config.ip}/${this.config.albumArtURL}`;
-    let newHash = await this.getImageHash(imageUrl);
-    let attempts = 0;
-    while (newHash === this.lastImageHash && attempts < 3) {
-      attempts++;
-      await delay(500);
-      newHash = await this.getImageHash(imageUrl);
-    }
-    if (newHash !== this.lastImageHash) {
-      this.lastImageHash = newHash;
-      let newURL = `${imageUrl}?hash=${newHash}`; // this dummy quuery param forces refresh in UCR3
-      this.driver.updateEntityAttributes(entityId, {
-        [uc.MediaPlayerAttributes.MediaImageUrl]: newURL
-      });
-    }
+    await this.zoneAgnosticProcessor.maybeUpdateImage(entityId, force);
   }
 
   setupEiscpListener() {
-    const nowPlaying: { station?: string; artist?: string; album?: string; title?: string } = {};
-
     this.eiscpInstance.on("error", (err: Error) => {
       log.error("%s eiscp error: %s", integrationName, err);
     });
     this.eiscpInstance.on(
       "data",
-      async (avrUpdates: { command: string; argument: string | number | Record<string, string>; zone: string; iscpCommand: string; host: string; port: number; model: string }) => {
+      async (avrUpdates: AvrUpdateEvent) => {
         const eventZone = avrUpdates.zone || "main";
         const entityId = buildEntityId(avrUpdates.model, avrUpdates.host, eventZone);
+
+        if (await this.dispatchZoneAgnosticCommand(avrUpdates, entityId, eventZone)) {
+          await this.zoneAgnosticProcessor.renderEntity(entityId, false);
+          return;
+        }
 
         switch (avrUpdates.command) {
           case "system-power": {
@@ -138,7 +197,8 @@ export class CommandReceiver {
             this.driver.updateEntityAttributes(entityId, {
               [uc.MediaPlayerAttributes.Volume]: sliderValue
             });
-            log.info("%s [%s] volume set to: %s", integrationName, entityId, sliderValue);
+            avrStateManager.setVolume(entityId, eiscpValue);
+            // log.info("%s [%s] volume set to: %s", integrationName, entityId, sliderValue);
 
             // Update volume sensor
             const volumeSensorId = `${entityId}_volume_sensor`;
@@ -167,12 +227,9 @@ export class CommandReceiver {
               [SelectAttributes.CurrentOption]: source
             });
 
-            // Reset track info on source change to ensure fresh updates
-            this.currentTrackId = "";
-            nowPlaying.title = undefined;
-            nowPlaying.artist = undefined;
-            nowPlaying.album = undefined;
-            nowPlaying.station = undefined;
+            // Reset zone metadata on source change to avoid stale media details.
+            this.zoneAgnosticProcessor.resetZone(entityId);
+            await this.zoneAgnosticProcessor.renderEntity(entityId, true);
 
             switch (source) {
               case "dab":
@@ -196,75 +253,13 @@ export class CommandReceiver {
             // Handle both string and array (take first element if array)
             const listeningMode = Array.isArray(avrUpdates.argument) ? avrUpdates.argument[0] : (avrUpdates.argument as string);
             if (listeningMode === "undefined" || listeningMode === "unknown") {
-              log.info("%s [%s] listening-mode '%s', re-query...", integrationName, entityId, listeningMode);
-              this.eiscpInstance.command("listening-mode query");
+              log.info("%s [%s] listening-mode '%s', keeping current value (no re-query)", integrationName, entityId, listeningMode);
             } else {
               log.info("%s [%s] listening-mode set to: %s", integrationName, entityId, listeningMode);
               // Update the listening mode select entity
               const selectEntityId = `${entityId}_listening_mode`;
               this.driver.updateEntityAttributes(selectEntityId, {
                 [SelectAttributes.CurrentOption]: listeningMode
-              });
-            }
-            break;
-          }
-          case "IFA": {
-            const arg = avrUpdates.argument as Record<string, string> | undefined;
-            const audioInputValue = arg?.audioInputValue ?? "";
-            const audioOutputValue = arg?.audioOutputValue ?? "";
-
-            const audioInputSensorId = `${entityId}_audio_input_sensor`;
-            const audioOutputSensorId = `${entityId}_audio_output_sensor`;
-
-            if (audioInputValue) {
-              this.driver.updateEntityAttributes(audioInputSensorId, {
-                [uc.SensorAttributes.State]: uc.SensorStates.On,
-                [uc.SensorAttributes.Value]: audioInputValue
-              });
-
-              // Detect and track audio format type
-              const audioFormatType = detectAudioFormatType(audioInputValue);
-              const formatChanged = avrStateManager.setAudioFormat(entityId, audioFormatType);
-
-              // If audio format changed, update listening mode select entity options
-              if (formatChanged) {
-                const selectEntityId = `${entityId}_listening_mode`;
-                const compatibleModes = getCompatibleListeningModes(audioFormatType);
-
-                if (compatibleModes) {
-                  // If user configured a custom listeningModeOptions for this AVR, honor it exactly
-                  const cfgAvr = this.config.avrs ? this.config.avrs.find((a) => buildEntityId(a.model, a.ip, a.zone) === entityId) : undefined;
-                  if (cfgAvr && Array.isArray(cfgAvr.listeningModeOptions) && cfgAvr.listeningModeOptions.length > 0) {
-                    log.info("%s [%s] using user-configured listeningModeOptions (%d entries)", integrationName, entityId, cfgAvr.listeningModeOptions.length);
-                    this.driver.updateEntityAttributes(selectEntityId, {
-                      // options is a simple string array
-                      [SelectAttributes.Options]: cfgAvr.listeningModeOptions
-                    });
-                  } else {
-                    // Get all listening modes from mappings
-                    const lmdMappings = eiscpMappings.value_mappings.LMD;
-                    const excludeKeys = ["up", "down", "movie", "music", "game", "query"];
-                    const allModes = Object.keys(lmdMappings).filter((key) => !excludeKeys.includes(key));
-
-                    // Filter to compatible modes and sort alphabetically
-                    const filteredOptions = allModes.filter((mode) => compatibleModes.includes(mode)).sort();
-
-                    log.info("%s [%s] updating listening mode options for format: %s (%d modes)", integrationName, entityId, audioFormatType, filteredOptions.length);
-
-                    // Update select entity with filtered options
-                    // TypeScript doesn't recognize that options can be an array, but the API supports it
-                    this.driver.updateEntityAttributes(selectEntityId, {
-                      [SelectAttributes.Options]: filteredOptions
-                    });
-                  }
-                }
-              }
-            }
-
-            if (audioOutputValue) {
-              this.driver.updateEntityAttributes(audioOutputSensorId, {
-                [uc.SensorAttributes.State]: uc.SensorStates.On,
-                [uc.SensorAttributes.Value]: audioOutputValue
               });
             }
             break;
@@ -301,140 +296,10 @@ export class CommandReceiver {
             }
             break;
           }
-          case "DSN": {
-            avrStateManager.setSource(entityId, "dab", this.eiscpInstance, eventZone, this.driver);
-            nowPlaying.station = avrUpdates.argument.toString();
-            nowPlaying.artist = "DAB Radio";
-            log.info("%s [%s] DAB station set to: %s", integrationName, entityId, avrUpdates.argument.toString());
-            break;
-          }
-          case "NLT": {
-            // NLT = Net List Title - navigation breadcrumb showing current network service
-            const serviceName = avrUpdates.argument.toString();
-            const currentSource = avrStateManager.getSource(entityId);
-            const frontPanelDisplaySensorId = `${entityId}_front_panel_display_sensor`;
-
-            if (currentSource === "net") {
-              avrStateManager.setSubSource(entityId, serviceName, this.eiscpInstance, eventZone, this.driver);
-              this.driver.updateEntityAttributes(frontPanelDisplaySensorId, {
-                [uc.SensorAttributes.State]: uc.SensorStates.On,
-                [uc.SensorAttributes.Value]: serviceName
-              });
-              // Query metadata when switching to a new network service
-              const hasSongInfo = SONG_INFO.some((name) => serviceName.toLowerCase().includes(name));
-              if (hasSongInfo) {
-                this.eiscpInstance.raw("NATQSTN"); // Query title
-                this.eiscpInstance.raw("NTIQSTN"); // Query artist
-                this.eiscpInstance.raw("NALQSTN"); // Query album
-              }
-            }
-            break;
-          }
-          case "FLD": {
-            const frontPanelText = avrUpdates.argument.toString();
-            const currentSource = avrStateManager.getSource(entityId);
-            const frontPanelDisplaySensorId = `${entityId}_front_panel_display_sensor`;
-
-            // Handle FM-specific metadata
-            if (currentSource === "fm") {
-              nowPlaying.station = frontPanelText;
-              nowPlaying.artist = "FM Radio";
-            }
-
-            // For NET source, only update if subSource changed (prevents scroll updates)
-            if (currentSource === "net") {
-              if (avrStateManager.getSubSource(entityId) !== frontPanelText.toLowerCase()) {
-                avrStateManager.setSubSource(entityId, frontPanelText, this.eiscpInstance, eventZone, this.driver);
-                this.driver.updateEntityAttributes(frontPanelDisplaySensorId, {
-                  [uc.SensorAttributes.State]: uc.SensorStates.On,
-                  [uc.SensorAttributes.Value]: frontPanelText
-                });
-                // Query metadata when switching to a new network service
-                const hasSongInfo = SONG_INFO.some((name) => frontPanelText.toLowerCase().includes(name));
-                if (hasSongInfo) {
-                  this.eiscpInstance.raw("NATQSTN"); // Query title
-                  this.eiscpInstance.raw("NTIQSTN"); // Query artist
-                  this.eiscpInstance.raw("NALQSTN"); // Query album
-                }
-              }
-            } else {
-              // For all other sources, always update the sensor
-              this.driver.updateEntityAttributes(frontPanelDisplaySensorId, {
-                [uc.SensorAttributes.State]: uc.SensorStates.On,
-                [uc.SensorAttributes.Value]: frontPanelText
-              });
-            }
-            break;
-          }
-          case "NTM": {
-            let [position, duration] = avrUpdates.argument.toString().split("/");
-            this.driver.updateEntityAttributes(entityId, {
-              [uc.MediaPlayerAttributes.MediaPosition]: position || 0,
-              [uc.MediaPlayerAttributes.MediaDuration]: duration || 0
-            });
-            break;
-          }
-          case "metadata": {
-            const currentSubSource = avrStateManager.getSubSource(entityId);
-            const hasSongInfo = SONG_INFO.some((name) => currentSubSource.includes(name));
-            if (hasSongInfo) {
-              if (typeof avrUpdates.argument === "object" && avrUpdates.argument !== null) {
-                nowPlaying.title = (avrUpdates.argument as Record<string, string>).title || "unknown";
-                nowPlaying.album = (avrUpdates.argument as Record<string, string>).album || "unknown";
-                nowPlaying.artist = (avrUpdates.argument as Record<string, string>).artist || "unknown";
-              }
-            }
-            break;
-          }
           default:
             break;
         }
-        const entitySource = avrStateManager.getSource(entityId);
-        const entitySubSource = avrStateManager.getSubSource(entityId);
-        switch (entitySource) {
-          case "net":
-            let trackId = `${nowPlaying.title}|${nowPlaying.album}|${nowPlaying.artist}`;
-            if (trackId !== this.currentTrackId) {
-              this.currentTrackId = trackId;
-              this.driver.updateEntityAttributes(entityId, {
-                [uc.MediaPlayerAttributes.MediaArtist]: nowPlaying.artist + " (" + nowPlaying.album + ")" || "unknown",
-                [uc.MediaPlayerAttributes.MediaTitle]: nowPlaying.title || "unknown",
-                [uc.MediaPlayerAttributes.MediaAlbum]: nowPlaying.album || "unknown"
-              });
-              const hasAlbumArt = ALBUM_ART.some((name) => entitySubSource.toLowerCase().includes(name));
-              if (hasAlbumArt) {
-                await this.maybeUpdateImage(entityId, false);
-              } else {
-                // Clear image URL if source does not support album art
-                this.driver.updateEntityAttributes(entityId, {
-                  [uc.MediaPlayerAttributes.MediaImageUrl]: ""
-                });
-              }
-            }
-            break;
-          case "tuner":
-          case "fm":
-          case "dab":
-            this.driver.updateEntityAttributes(entityId, {
-              [uc.MediaPlayerAttributes.MediaArtist]: nowPlaying.artist || "unknown",
-              [uc.MediaPlayerAttributes.MediaTitle]: nowPlaying.station || "unknown",
-              [uc.MediaPlayerAttributes.MediaAlbum]: "",
-              [uc.MediaPlayerAttributes.MediaImageUrl]: "",
-              [uc.MediaPlayerAttributes.MediaPosition]: 0,
-              [uc.MediaPlayerAttributes.MediaDuration]: 0
-            });
-            break;
-          default:
-            this.driver.updateEntityAttributes(entityId, {
-              [uc.MediaPlayerAttributes.MediaArtist]: "",
-              [uc.MediaPlayerAttributes.MediaTitle]: "",
-              [uc.MediaPlayerAttributes.MediaAlbum]: "",
-              [uc.MediaPlayerAttributes.MediaImageUrl]: "",
-              [uc.MediaPlayerAttributes.MediaPosition]: 0,
-              [uc.MediaPlayerAttributes.MediaDuration]: 0
-            });
-            break;
-        }
+        await this.zoneAgnosticProcessor.renderEntity(entityId, false);
       }
     );
   }

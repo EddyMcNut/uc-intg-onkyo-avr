@@ -1,4 +1,5 @@
 import * as uc from "@unfoldedcircle/integration-api";
+import { buildPhysicalAvrId } from "./configManager.js";
 import { EiscpDriver } from "./eiscp.js";
 import log from "./loggers.js";
 import { delay } from "./utils.js";
@@ -13,6 +14,7 @@ interface EntityState {
   subSource: string;
   audioFormat: string;
   powerState: string;
+  volume: number;
 }
 
 /**
@@ -29,7 +31,7 @@ class AvrStateManager {
   private getState(entityId: string): EntityState {
     let state = this.states.get(entityId);
     if (!state) {
-      state = { source: "unknown", subSource: "unknown", audioFormat: "unknown", powerState: "unknown" };
+      state = { source: "unknown", subSource: "unknown", audioFormat: "unknown", powerState: "unknown", volume: 0 };
       this.states.set(entityId, state);
     }
     return state;
@@ -43,6 +45,11 @@ class AvrStateManager {
   /** Get current sub-source for an entity */
   getSubSource(entityId: string): string {
     return this.getState(entityId).subSource;
+  }
+
+  getVolume(entityId: string): number {
+    const avrDisplayValue = this.getState(entityId).volume;
+    return avrDisplayValue;
   }
 
   /** Get current audio format for an entity */
@@ -81,10 +88,68 @@ class AvrStateManager {
     return false;
   }
 
+  setVolume(entityId: string, volume: number): boolean {
+    const state = this.getState(entityId);
+    if (state.volume !== volume) {
+      // log.info("%s [%s] volume changed from '%s' to '%s'", integrationName, entityId, state.volume, volume);
+      state.volume = volume;
+      return true;
+    }
+    return false;
+  }
+
   /** Check if entity is powered on */
   isEntityOn(entityId: string): boolean {
     const powerState = this.getState(entityId).powerState;
     return powerState === "on";
+  }
+
+  //Get all powered-on entities currently using the specified source.
+  getEntitiesBySource(source: string): string[] {
+    const normalizedSource = source.toLowerCase();
+    const entities: string[] = [];
+
+    for (const [entityId, state] of this.states.entries()) {
+      if (state.source === normalizedSource && this.isEntityOn(entityId)) {
+        entities.push(entityId);
+      }
+    }
+
+    return entities;
+  }
+
+  //Get all powered-on entities currently using the specified source and sub-source.
+  getEntitiesBySourceAndSubSource(source: string, subSource: string): string[] {
+    const normalizedSource = source.toLowerCase();
+    const normalizedSubSource = subSource.toLowerCase();
+    const entities: string[] = [];
+
+    for (const [entityId, state] of this.states.entries()) {
+      if (state.source === normalizedSource && state.subSource === normalizedSubSource && this.isEntityOn(entityId)) {
+        entities.push(entityId);
+      }
+    }
+
+    return entities;
+  }
+
+  // Get all powered-on entities for the same physical AVR and source.
+  getEntitiesByPhysicalAvrAndSource(physicalAvrId: string, source: string): string[] {
+    const normalizedSource = source.toLowerCase();
+    const entities: string[] = [];
+
+    for (const [entityId, state] of this.states.entries()) {
+      const [model, host] = entityId.split(" ");
+      if (!model || !host) {
+        continue;
+      }
+
+      if (buildPhysicalAvrId(model, host) === physicalAvrId && state.source === normalizedSource && this.isEntityOn(entityId)) {
+        entities.push(entityId);
+      }
+    }
+
+    return entities;
   }
 
   /** Set source for an entity, returns true if changed */
@@ -95,7 +160,7 @@ class AvrStateManager {
     if (state.source !== normalizedSource) {
       log.info("%s [%s] source changed from '%s' to '%s'", integrationName, entityId, state.source, source);
       state.source = normalizedSource;
-      state.subSource = "unknown"; // Reset sub-source on source change
+      // state.subSource = "unknown"; // Reset sub-source on source change
       this.refreshAvrState(entityId, eiscpInstance, zone, _driver);
       return true;
     }
@@ -168,8 +233,10 @@ class AvrStateManager {
     await eiscpInstance.command({ zone, command: "fp-display", args: "query" });
 
     // Force refresh album art for network services that support it
+    const currentSource = this.getSource(entityId);
     const currentSubSource = this.getSubSource(entityId);
-    const hasAlbumArt = ALBUM_ART.some((name) => currentSubSource.toLowerCase().includes(name));
+    const hasAlbumArt = currentSource === "net";
+    // const hasAlbumArt = ALBUM_ART.some((name) => currentSubSource.toLowerCase().includes(name));
     if (hasAlbumArt && commandReceiver) {
       log.info("%s [%s] forcing album art refresh for subsource '%s'", integrationName, entityId, currentSubSource);
       await commandReceiver.maybeUpdateImage(entityId, true);

@@ -59,15 +59,17 @@ test.serial("CommandSender volume conversion respects adjustVolumeDispl", async 
   const eiscp = new MockEiscp();
   // mock driver only needs updateEntityAttributes; use IntegrationAPI type for clarity
   const drv: Partial<IntegrationAPI> = { updateEntityAttributes: () => true };
-  const configAdjTrue = { avrs: [{ zone: "main" }], volumeScale: 100, adjustVolumeDispl: true };
-  const configAdjFalse = { avrs: [{ zone: "main" }], volumeScale: 100, adjustVolumeDispl: false };
+  const entityId = "M 1.2.3.4 main";
+  const baseAvrConfig = [{ model: "M", ip: "1.2.3.4", zone: "main", port: 60128 }];
+  const configAdjTrue = { avrs: baseAvrConfig, volumeScale: 100, adjustVolumeDispl: true };
+  const configAdjFalse = { avrs: baseAvrConfig, volumeScale: 100, adjustVolumeDispl: false };
 
   const senderTrue = new CommandSender(drv as any, configAdjTrue, eiscp as any, null);
-  await senderTrue.sharedCmdHandler(new uc.MediaPlayer("id", { en: "id" }, {}), uc.MediaPlayerCommands.Volume, { volume: 50 });
+  await senderTrue.sharedCmdHandler(new uc.MediaPlayer(entityId, { en: entityId }, {}), uc.MediaPlayerCommands.Volume, { volume: 50 });
   t.is(eiscp.lastRaw, "MVL64"); // 50 -> 50 *2 = 100 -> 0x64
 
   const eiscp2 = new MockEiscp();
   const senderFalse = new CommandSender(drv as any, configAdjFalse, eiscp2 as any, null);
-  await senderFalse.sharedCmdHandler(new uc.MediaPlayer("id", { en: "id" }, {}), uc.MediaPlayerCommands.Volume, { volume: 50 });
+  await senderFalse.sharedCmdHandler(new uc.MediaPlayer(entityId, { en: entityId }, {}), uc.MediaPlayerCommands.Volume, { volume: 50 });
   t.is(eiscp2.lastRaw, "MVL32"); // 50 -> 50 -> 0x32
 });

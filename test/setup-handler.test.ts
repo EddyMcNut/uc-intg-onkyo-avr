@@ -40,7 +40,7 @@ test.serial("handleRestorePayload: applies valid payload and calls onConfigSaved
     const setup = new SetupHandlerModule.default(host);
 
     const driverJson = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), "driver.json"), "utf-8"));
-    const targetConfig = { avrs: [{ model: "TX-RZ50", ip: "192.168.2.103", port: 60128, zone: "main" }] };
+    const targetConfig = { avrs: [{ model: "TX-RZ50", ip: "192.168.2.103", port: 60128, zone: "main", entityNameStyle: "short" }] };
     const payload = { meta: { driver_id: driverJson.driver_id, version: driverJson.version }, config: targetConfig };
     const payloadString = JSON.stringify(payload);
 
@@ -51,6 +51,7 @@ test.serial("handleRestorePayload: applies valid payload and calls onConfigSaved
     t.truthy(reloaded.avrs);
     t.is(reloaded.avrs[0].model, targetConfig.avrs[0].model);
     t.is(reloaded.avrs[0].ip, targetConfig.avrs[0].ip);
+    t.is(reloaded.avrs[0].entityNameStyle, "short");
     t.true(saved);
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
@@ -161,6 +162,7 @@ test.serial("handleManualConfiguration: valid input creates AVR entries", async 
       albumArtURL: "album_art.cgi",
       volumeScale: "100",
       adjustVolumeDispl: "true",
+      entityNameStyle: "short",
       createSensors: "true",
       netMenuDelay: 500
     };
@@ -173,6 +175,7 @@ test.serial("handleManualConfiguration: valid input creates AVR entries", async 
     t.truthy(reloaded.avrs);
     t.is(reloaded.avrs.length, 2);
     t.is(reloaded.avrs[0].model, "TX-RZ50");
+    t.is(reloaded.avrs[0].entityNameStyle, "short");
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
   }
@@ -278,7 +281,8 @@ test.serial("handleManualConfiguration: autodiscovery should persist listeningMo
     const input = {
       model: "",
       ipAddress: "",
-      listeningModeOptions: "stereo; straight-decode"
+      listeningModeOptions: "stereo; straight-decode",
+      entityNameStyle: "short"
     };
 
     const res = await (setup as any).handleManualConfiguration(input);
@@ -288,6 +292,7 @@ test.serial("handleManualConfiguration: autodiscovery should persist listeningMo
     const reloaded = ConfigManager.load();
     t.truthy(reloaded.avrs && reloaded.avrs[0].listeningModeOptions);
     t.deepEqual(reloaded.avrs![0].listeningModeOptions, ["stereo", "straight-decode"]);
+    t.is(reloaded.avrs![0].entityNameStyle, "short");
 
     // restore stub
     EiscpModule.default.prototype.discover = originalDiscover;

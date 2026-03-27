@@ -48,7 +48,7 @@ export default class SetupHandler {
     if (setupData && Object.prototype.hasOwnProperty.call(setupData, "choice")) {
       const selected = String(setupData.choice ?? "").toLowerCase();
 
-      if (selected === "restore") return this.handleRestorePayload(setupData.backup_data);
+      if (selected === "restore") return this.handleRestorePayload(setupData.restore_data ?? setupData.backup_data);
       if (selected === "backup") return this.handleBackupPayload(setupData.backup_data);
       if (selected === "delete_config") return this.handleDeleteConfigPayload(parseBoolean(setupData.confirm_delete_config, false), true);
     }
@@ -109,9 +109,15 @@ export default class SetupHandler {
   private async handleUserDataResponse(msg: uc.UserDataResponse): Promise<uc.SetupAction | undefined> {
     const input = (msg as uc.UserDataResponse).inputValues || {};
     const action = String(input.action ?? input.choice ?? "").toLowerCase();
+    const restoreRequested = action === "restore" || parseBoolean(input.restore_from_backup, false);
+    const restoreData = typeof input.restore_data === "string" && input.restore_data.trim() ? input.restore_data : input.backup_data;
 
-    if (action === "restore") {
-      if (!input.backup_data) {
+    if (parseBoolean(input.restore_from_backup, false)) {
+      this.host.log.info("%s Detected manager-driven restore request%s", integrationName, restoreData ? " with payload" : " awaiting payload");
+    }
+
+    if (restoreRequested) {
+      if (!restoreData) {
         return new uc.RequestUserInput("Restore data", [
           {
             id: "backup_data",
@@ -120,7 +126,7 @@ export default class SetupHandler {
           }
         ]);
       }
-      return this.handleRestorePayload(input.backup_data);
+      return this.handleRestorePayload(restoreData);
     }
 
     if (action === "backup") {
@@ -164,7 +170,8 @@ export default class SetupHandler {
           input.zoneCount ||
           input.createSensors ||
           input.netMenuDelay ||
-          input.tuneinPresetPosition
+            input.tuneinPresetPosition ||
+            input.entityNameStyle
       );
 
       if (!hasManualFields) {
@@ -181,6 +188,7 @@ export default class SetupHandler {
         const initialTuneinPresetPosition = currentAvr?.tuneinPresetPosition ?? AVR_DEFAULTS.tuneinPresetPosition;
         const initialVolumeScale = currentAvr?.volumeScale ?? AVR_DEFAULTS.volumeScale;
         const initialAdjustVolumeDispl = currentAvr?.adjustVolumeDispl ?? true;
+        const initialEntityNameStyle = currentAvr?.entityNameStyle ?? AVR_DEFAULTS.entityNameStyle;
         // Determine zone count by counting zones for this physical AVR
         const initialZoneCount = currentAvr && cfg.avrs ? 
           cfg.avrs.filter(a => a.model === currentAvr.model && a.ip === currentAvr.ip).length : 1;
@@ -257,6 +265,19 @@ export default class SetupHandler {
                 items: [
                   { id: "true", label: { en: "Yes - eISCP divided by 2" } },
                   { id: "false", label: { en: "No - just eISCP" } }
+                ]
+              }
+            }
+          },
+          {
+            id: "entityNameStyle",
+            label: { en: "Entity name style" },
+            field: {
+              dropdown: {
+                value: String(initialEntityNameStyle),
+                items: [
+                  { id: "long", label: { en: "Long - include IP address" } },
+                  { id: "short", label: { en: "Short - hide IP address" } }
                 ]
               }
             }
@@ -385,6 +406,7 @@ export default class SetupHandler {
 
       const validation = ConfigManager.validateConfigPayload(newConfigObj);
       if (validation.errors && validation.errors.length > 0) {
+        this.host.log.warn("%s Restore payload validation failed with %d error(s)", integrationName, validation.errors.length);
         return new uc.RequestUserInput("Restore data", [
           {
             id: "info",
@@ -401,6 +423,7 @@ export default class SetupHandler {
 
       ConfigManager.save(validation.normalized as Partial<OnkyoConfig>);
       await this.host.onConfigSaved();
+      this.host.log.info("%s Restore payload applied successfully", integrationName);
       return new uc.SetupComplete();
     } catch (err) {
       this.host.log.error("%s Failed to parse or apply restore data (reconfigure):", integrationName, err);
@@ -475,7 +498,8 @@ export default class SetupHandler {
           model: found.model,
           ip: found.host,
           port: Number(found.port) || AVR_DEFAULTS.port,
-          zone: "main"
+          zone: "main",
+          entityNameStyle: String(input.entityNameStyle ?? AVR_DEFAULTS.entityNameStyle).toLowerCase() === "short" ? "short" : "long"
         };
 
         // Use parseSelectOptions which handles the 'none' sentinel (-> null = don't create entity)
@@ -533,6 +557,7 @@ export default class SetupHandler {
       return [80, 100].includes(parsed) ? parsed : AVR_DEFAULTS.volumeScale;
     })(input.volumeScale);
     const adjustVolumeDisplValue = parseBoolean(input.adjustVolumeDispl, true);
+    const entityNameStyleValue = String(input.entityNameStyle ?? AVR_DEFAULTS.entityNameStyle).toLowerCase() === "short" ? "short" : "long";
     const createSensorsValue = parseBoolean(input.createSensors, AVR_DEFAULTS.createSensors);
     const netMenuDelayValue = ((value) => {
       const parsed = parseInt(String(value), 10);
@@ -561,6 +586,7 @@ export default class SetupHandler {
       inputSelectorOptions: input.inputSelectorOptions,
       volumeScale: volumeScaleValue,
       adjustVolumeDispl: adjustVolumeDisplValue,
+      entityNameStyle: entityNameStyleValue,
       createSensors: createSensorsValue,
       netMenuDelay: netMenuDelayValue,
       tuneinPresetPosition: tuneinPresetPositionValue
@@ -665,6 +691,19 @@ export default class SetupHandler {
           }
         },
         {
+          id: "entityNameStyle",
+          label: { en: "Entity name style" },
+          field: {
+            dropdown: {
+              value: String(entityNameStyleValue),
+              items: [
+                { id: "long", label: { en: "Long - include IP address" } },
+                { id: "short", label: { en: "Short - hide IP address" } }
+              ]
+            }
+          }
+        },
+        {
           id: "zoneCount",
           label: { en: "Number of zones to configure" },
           field: {
@@ -696,11 +735,12 @@ export default class SetupHandler {
 
     for (const avrCfg of normalizedAvrs) {
       this.host.log.info(
-        "%s Adding AVR config for zone %s with volumeScale: %d, adjustVolumeDispl: %s, createSensors: %s, netMenuDelay: %d, tuneinPresetPosition: %d",
+        "%s Adding AVR config for zone %s with volumeScale: %d, adjustVolumeDispl: %s, entityNameStyle: %s, createSensors: %s, netMenuDelay: %d, tuneinPresetPosition: %d",
         integrationName,
         avrCfg.zone,
         avrCfg.volumeScale,
         avrCfg.adjustVolumeDispl,
+        avrCfg.entityNameStyle,
         avrCfg.createSensors,
         avrCfg.netMenuDelay,
         avrCfg.tuneinPresetPosition
