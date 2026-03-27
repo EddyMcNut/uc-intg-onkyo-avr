@@ -104,17 +104,6 @@ export default class SetupHandler {
         description: {
           en: "Manual setup opens the configuration form. Integration Manager uses restore mode automatically during update restore."
         }
-      },
-      {
-        id: "info_backup",
-        label: { en: "Create backup" },
-        field: {
-          label: {
-            value: {
-              en: "Backup creation is available from the reconfigure/setup menu after the integration has been configured."
-            }
-          }
-        }
       }
     ]);
   }
@@ -143,10 +132,6 @@ export default class SetupHandler {
       return this.handleRestorePayload(restoreData);
     }
 
-    if (!action && Object.prototype.hasOwnProperty.call(input, "restore_from_backup")) {
-      return this.requestManualConfiguration();
-    }
-
     const hasManualFields = Boolean(
       input.model || input.ipAddress || input.port || input.queueThreshold || input.albumArtURL ||
       input.listeningModeOptions || input.inputSelectorOptions || input.volumeScale ||
@@ -161,6 +146,10 @@ export default class SetupHandler {
         this.host.log.error("%s Failed to save configuration:", integrationName, err);
         return new uc.SetupError("OTHER");
       }
+    }
+
+    if (!action && Object.prototype.hasOwnProperty.call(input, "restore_from_backup")) {
+      return this.requestManualConfiguration();
     }
 
     if (!action) {
