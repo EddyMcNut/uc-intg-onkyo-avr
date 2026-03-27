@@ -168,3 +168,55 @@ test.serial("restore flow applies provided backup_data", async (t) => {
     fs.rmSync(tmp, { recursive: true, force: true });
   }
 });
+
+test.serial("restore flow accepts intg-manager restore_from_backup payload", async (t) => {
+  const tmp = mkTmpDir();
+  try {
+    setConfigDir(tmp);
+
+    ConfigManager.save({ avrs: [{ model: "OLD", ip: "0.0.0.0", port: 60128, zone: "main" }] });
+
+    const { pathToFileURL } = await import("url");
+    const driverModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/driver.js")).href);
+    const OnkyoDriver = driverModule.default as any;
+    const configManagerModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/configManager.js")).href);
+    if (configManagerModule && typeof configManagerModule.setConfigDir === "function") {
+      configManagerModule.setConfigDir(tmp);
+    }
+
+    interface DriverLike {
+      driver?: Partial<IntegrationAPI>;
+      config?: any;
+      handleConnect?: () => Promise<void>;
+      registerAvailableEntities?: () => Promise<void>;
+      handleDriverSetup?: Function;
+    }
+    const drv = Object.create(OnkyoDriver.prototype) as DriverLike;
+    drv.driver = { addAvailableEntity: () => {}, getConfigDirPath: () => tmp, setDeviceState: async () => {}, getConfiguredEntities: () => ({}) } as unknown as Partial<IntegrationAPI>;
+    drv.config = ConfigManager.load();
+    drv.handleConnect = async () => {};
+    drv.registerAvailableEntities = (OnkyoDriver.prototype as any).registerAvailableEntities.bind(drv);
+
+    const driverJson = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), "driver.json"), "utf-8"));
+    const targetConfig = { avrs: [{ model: "TX-RZ50", ip: "192.168.2.103", port: 60128, zone: "main", entityNameStyle: "short" }] } as Partial<import("../src/configManager.js").OnkyoConfig>;
+    const payload = { meta: { driver_id: driverJson.driver_id, version: driverJson.version }, config: targetConfig };
+    const payloadString = JSON.stringify(payload);
+
+    const startResp = await drv.handleDriverSetup?.(new uc.DriverSetupRequest(false, {}));
+    t.true(startResp instanceof uc.RequestUserInput);
+
+    const promptResp = await drv.handleDriverSetup?.(new uc.UserDataResponse({ restore_from_backup: "true" }));
+    t.true(promptResp instanceof uc.RequestUserInput);
+
+    const restoreResp = await drv.handleDriverSetup?.(new uc.UserDataResponse({ restore_from_backup: "true", restore_data: payloadString }));
+    t.true(restoreResp instanceof uc.SetupComplete);
+
+    const reloaded = ConfigManager.load();
+    t.truthy(reloaded.avrs);
+    t.is(reloaded.avrs?.[0].model, targetConfig.avrs![0].model);
+    t.is(reloaded.avrs?.[0].ip, targetConfig.avrs![0].ip);
+    t.is(reloaded.avrs?.[0].entityNameStyle, targetConfig.avrs![0].entityNameStyle);
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});

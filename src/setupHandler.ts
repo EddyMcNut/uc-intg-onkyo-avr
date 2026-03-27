@@ -48,7 +48,7 @@ export default class SetupHandler {
     if (setupData && Object.prototype.hasOwnProperty.call(setupData, "choice")) {
       const selected = String(setupData.choice ?? "").toLowerCase();
 
-      if (selected === "restore") return this.handleRestorePayload(setupData.backup_data);
+      if (selected === "restore") return this.handleRestorePayload(setupData.restore_data ?? setupData.backup_data);
       if (selected === "backup") return this.handleBackupPayload(setupData.backup_data);
       if (selected === "delete_config") return this.handleDeleteConfigPayload(parseBoolean(setupData.confirm_delete_config, false), true);
     }
@@ -109,9 +109,15 @@ export default class SetupHandler {
   private async handleUserDataResponse(msg: uc.UserDataResponse): Promise<uc.SetupAction | undefined> {
     const input = (msg as uc.UserDataResponse).inputValues || {};
     const action = String(input.action ?? input.choice ?? "").toLowerCase();
+    const restoreRequested = action === "restore" || parseBoolean(input.restore_from_backup, false);
+    const restoreData = typeof input.restore_data === "string" && input.restore_data.trim() ? input.restore_data : input.backup_data;
 
-    if (action === "restore") {
-      if (!input.backup_data) {
+    if (parseBoolean(input.restore_from_backup, false)) {
+      this.host.log.info("%s Detected manager-driven restore request%s", integrationName, restoreData ? " with payload" : " awaiting payload");
+    }
+
+    if (restoreRequested) {
+      if (!restoreData) {
         return new uc.RequestUserInput("Restore data", [
           {
             id: "backup_data",
@@ -120,7 +126,7 @@ export default class SetupHandler {
           }
         ]);
       }
-      return this.handleRestorePayload(input.backup_data);
+      return this.handleRestorePayload(restoreData);
     }
 
     if (action === "backup") {
@@ -400,6 +406,7 @@ export default class SetupHandler {
 
       const validation = ConfigManager.validateConfigPayload(newConfigObj);
       if (validation.errors && validation.errors.length > 0) {
+        this.host.log.warn("%s Restore payload validation failed with %d error(s)", integrationName, validation.errors.length);
         return new uc.RequestUserInput("Restore data", [
           {
             id: "info",
@@ -416,6 +423,7 @@ export default class SetupHandler {
 
       ConfigManager.save(validation.normalized as Partial<OnkyoConfig>);
       await this.host.onConfigSaved();
+      this.host.log.info("%s Restore payload applied successfully", integrationName);
       return new uc.SetupComplete();
     } catch (err) {
       this.host.log.error("%s Failed to parse or apply restore data (reconfigure):", integrationName, err);
