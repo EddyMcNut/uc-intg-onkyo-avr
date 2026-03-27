@@ -1,6 +1,6 @@
 import * as uc from "@unfoldedcircle/integration-api";
 import { EiscpDriver } from "./eiscp.js";
-import { DEFAULT_QUEUE_THRESHOLD, MAX_LENGTHS, PATTERNS, OnkyoConfig } from "./configManager.js";
+import { buildEntityId, DEFAULT_QUEUE_THRESHOLD, MAX_LENGTHS, PATTERNS, OnkyoConfig } from "./configManager.js";
 import { avrStateManager } from "./avrState.js";
 import log from "./loggers.js";
 import { delay } from "./utils.js";
@@ -21,8 +21,68 @@ export class CommandSender {
     this.commandReceiver = commandReceiver;
   }
 
+  private async preserveMainAroundZoneSubsource(model: string, host: string, zone: string, action: () => Promise<void>): Promise<void> {
+    if (zone === "main") { // first simple check, as most commands will be for main zone then no need to do any extra processing
+      await action();
+      return;
+    }else{
+      const targetEntityId = buildEntityId(model, host, zone);
+      const mainEntityId = buildEntityId(model, host, "main");
+      const targetSubSource = avrStateManager.getSubSource(targetEntityId);
+      const mainSubSource = avrStateManager.getSubSource(mainEntityId);
+
+      if (targetSubSource === mainSubSource) { // no need to switch main source to a different subsource to cater for a request of zones 2/3
+        log.info("%s [%s] ***************** no need to switch main subsource for zone '%s'.", integrationName, targetEntityId, zone);
+        log.info("%s [%s] ***************** targetEntityId=%s mainEntityId=%s", integrationName, targetEntityId, targetEntityId, mainEntityId);
+        log.info("%s [%s] ***************** targetSubSource=%s mainSubSource=%s", integrationName, targetEntityId, targetSubSource, mainSubSource);
+        await action();
+        return;
+      }
+
+      // we are here because of a command coming from zone2/3 which needs to switch subsource (of NET) for the main zone
+      const mainSourceBefore = avrStateManager.getSource(mainEntityId);
+      const mainPowerBefore = avrStateManager.getPowerState(mainEntityId);
+      const mainVolumeBefore = avrStateManager.getVolume(mainEntityId);
+
+      log.info("%s [%s] ***************** need to switch main subsource because of a command for zone '%s'.", integrationName, targetEntityId, zone);
+      await this.eiscp.command(`main input-selector net`); // main switch to new subsource or is NET good enough?
+      await delay(DEFAULT_QUEUE_THRESHOLD);
+      await this.eiscp.command(`main volume 0`);
+      await delay(DEFAULT_QUEUE_THRESHOLD);
+      await action();
+
+      if (mainPowerBefore === "on") {
+        await delay(DEFAULT_QUEUE_THRESHOLD);
+        await this.eiscp.command(`main input-selector ${mainSourceBefore}`);
+        await delay(DEFAULT_QUEUE_THRESHOLD);
+        await this.eiscp.command(`main volume ${mainVolumeBefore}`);
+        log.info("%s [%s ***************** main zone restored to %s and volume level %s after NET subsource change for %s.", integrationName, targetEntityId,mainSourceBefore, mainVolumeBefore, zone);
+      }else{
+        await delay(DEFAULT_QUEUE_THRESHOLD*3);
+        this.eiscp.command(`main system-power standby`);
+        log.info("%s [%s] ***************** main zone restored to %s after NET subsource change for %s.", integrationName, targetEntityId, mainPowerBefore, zone);
+      }
+    }
+  }
+
   async sharedCmdHandler(entity: uc.Entity, cmdId: string, params?: { [key: string]: string | number | boolean }): Promise<uc.StatusCodes> {
-    const zone = this.config.avrs?.[0]?.zone || "main";
+    const entityParts = entity.id.split(" ");
+    if (entityParts.length < 3) {
+      log.error("%s [%s] Cannot route command: entity id does not contain model, host, and zone", integrationName, entity.id);
+      return uc.StatusCodes.BadRequest;
+    }
+
+    const zone = entityParts[entityParts.length - 1];
+    const host = entityParts[entityParts.length - 2];
+    const model = entityParts.slice(0, -2).join(" ");
+    const targetAvr = this.config.avrs?.find((avr) => buildEntityId(avr.model, avr.ip, avr.zone) === entity.id)
+      ?? this.config.avrs?.find((avr) => avr.model === model && avr.ip === host)
+      ?? null;
+
+    if (!targetAvr) {
+      log.error("%s [%s] Cannot route command: no configured AVR matches model='%s' host='%s' zone='%s'", integrationName, entity.id, model, host, zone);
+      return uc.StatusCodes.BadRequest;
+    }
 
     // Check if connected, and trigger reconnection if needed
     // This handles the case where user sends a command after wake-up from standby
@@ -30,7 +90,7 @@ export class CommandSender {
     if (!this.eiscp.connected) {
       log.info("%s [%s] Command received while disconnected, triggering reconnection...", integrationName, entity.id);
       try {
-        const avrConfig = this.config.avrs?.[0];
+        const avrConfig = targetAvr;
         if (avrConfig) {
           await this.eiscp.connect({
             model: avrConfig.model,
@@ -67,7 +127,7 @@ export class CommandSender {
     log.info("%s [%s] media-player command request: %s", integrationName, entity.id, cmdId, params || "");
 
     // Helper function to format command with zone prefix
-    const formatCommand = (cmd: string): string => {
+    const setZonePrefix = (cmd: string): string => {
       return zone === "main" ? cmd : `${zone}.${cmd}`;
     };
 
@@ -78,27 +138,27 @@ export class CommandSender {
     if (now - this.lastCommandTime > queueThreshold) {
       switch (cmdId) {
         case uc.MediaPlayerCommands.On:
-          await this.eiscp.command(formatCommand("system-power on"));
+          await this.eiscp.command(setZonePrefix("system-power on"));
           break;
         case uc.MediaPlayerCommands.Off:
-          await this.eiscp.command(formatCommand("system-power standby"));
+          await this.eiscp.command(setZonePrefix("system-power standby"));
           break;
         case uc.MediaPlayerCommands.Toggle:
-          entity.attributes?.state === uc.MediaPlayerStates.On ? await this.eiscp.command(formatCommand("system-power standby")) : await this.eiscp.command(formatCommand("system-power on"));
+          entity.attributes?.state === uc.MediaPlayerStates.On ? await this.eiscp.command(setZonePrefix("system-power standby")) : await this.eiscp.command(setZonePrefix("system-power on"));
           break;
         case uc.MediaPlayerCommands.MuteToggle:
-          await this.eiscp.command(formatCommand("audio-muting toggle"));
+          await this.eiscp.command(setZonePrefix("audio-muting toggle"));
           break;
         case uc.MediaPlayerCommands.VolumeUp:
           // if (now - this.lastCommandTime > queueThreshold) {
             this.lastCommandTime = now;
-            await this.eiscp.command(formatCommand("volume level-up-1db-step"));
+            await this.eiscp.command(setZonePrefix("volume level-up-1db-step"));
           // }
           break;
         case uc.MediaPlayerCommands.VolumeDown:
           // if (now - this.lastCommandTime > queueThreshold) {
             this.lastCommandTime = now;
-            await this.eiscp.command(formatCommand("volume level-down-1db-step"));
+            await this.eiscp.command(setZonePrefix("volume level-down-1db-step"));
           // }
           break;
         case uc.MediaPlayerCommands.Volume:
@@ -139,10 +199,10 @@ export class CommandSender {
           }
           break;
         case uc.MediaPlayerCommands.ChannelUp:
-          await this.eiscp.command(formatCommand("preset up"));
+          await this.eiscp.command(setZonePrefix("preset up"));
           break;
         case uc.MediaPlayerCommands.ChannelDown:
-          await this.eiscp.command(formatCommand("preset down"));
+          await this.eiscp.command(setZonePrefix("preset down"));
           break;
         case uc.MediaPlayerCommands.SelectSource:
           if (params?.source && typeof params.source === "string") {
@@ -165,7 +225,7 @@ export class CommandSender {
 
               // Multi-zone-volume commands should not be zone-prefixed
               if (!request.startsWith("multi-zone")) {
-                await this.eiscp.command(formatCommand(userCmd));
+                await this.eiscp.command(setZonePrefix(userCmd));
               } else {
                 // if (now - this.lastCommandTime > queueThreshold) {
                   await this.eiscp.command(userCmd);
@@ -192,34 +252,34 @@ export class CommandSender {
           }
           break;
         case uc.MediaPlayerCommands.PlayPause:
-          await this.eiscp.command(formatCommand("network-usb play"));
+          await this.eiscp.command(setZonePrefix("network-usb play"));
           break;
         case uc.MediaPlayerCommands.Next:
-          await this.eiscp.command(formatCommand("network-usb trup"));
+          await this.eiscp.command(setZonePrefix("network-usb trup"));
           break;
         case uc.MediaPlayerCommands.Previous:
-          await this.eiscp.command(formatCommand("network-usb trdn"));
+          await this.eiscp.command(setZonePrefix("network-usb trdn"));
           break;
         case uc.MediaPlayerCommands.Settings:
-          await this.eiscp.command(formatCommand("setup menu"));
+          await this.eiscp.command(setZonePrefix("setup menu"));
           break;
         case uc.MediaPlayerCommands.Home:
-          await this.eiscp.command(formatCommand("setup exit"));
+          await this.eiscp.command(setZonePrefix("setup exit"));
           break;
         case uc.MediaPlayerCommands.CursorEnter:
-          await this.eiscp.command(formatCommand("setup enter"));
+          await this.eiscp.command(setZonePrefix("setup enter"));
           break;
         case uc.MediaPlayerCommands.CursorUp:
-          await this.eiscp.command(formatCommand("setup up"));
+          await this.eiscp.command(setZonePrefix("setup up"));
           break;
         case uc.MediaPlayerCommands.CursorDown:
-          await this.eiscp.command(formatCommand("setup down"));
+          await this.eiscp.command(setZonePrefix("setup down"));
           break;
         case uc.MediaPlayerCommands.CursorLeft:
-          await this.eiscp.command(formatCommand("setup left"));
+          await this.eiscp.command(setZonePrefix("setup left"));
           break;
         case uc.MediaPlayerCommands.CursorRight:
-          await this.eiscp.command(formatCommand("setup right"));
+          await this.eiscp.command(setZonePrefix("setup right"));
           break;
         case uc.MediaPlayerCommands.Info:
           await avrStateManager.refreshAvrState(entity.id, this.eiscp, zone, this.driver, queueThreshold, this.commandReceiver);

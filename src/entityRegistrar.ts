@@ -10,6 +10,38 @@ export default class EntityRegistrar {
   constructor() {}
 
   /**
+   * Build a user-facing base name from an AVR entry id.
+   * Input format is typically: "MODEL HOST ZONE".
+   * Long style keeps the full entry, short style omits HOST (IP/hostname).
+   */
+  private getDisplayBaseName(avrEntry: string): string {
+    const cfg = ConfigManager.get();
+    const match = cfg?.avrs?.find((a) => buildEntityId(a.model, a.ip, a.zone) === avrEntry);
+    const entityNameStyle = match?.entityNameStyle ?? "long";
+    if (entityNameStyle !== "short") {
+      return avrEntry;
+    }
+
+    const parts = avrEntry.trim().split(/\s+/);
+    if (parts.length < 3) {
+      return avrEntry;
+    }
+
+    const zoneToken = parts[parts.length - 1]?.toLowerCase();
+    const zoneLabel = zoneToken === "main" ? "Main" : zoneToken === "zone2" ? "Zone 2" : zoneToken === "zone3" ? "Zone 3" : undefined;
+    if (!zoneLabel) {
+      return avrEntry;
+    }
+
+    const model = parts.slice(0, -2).join(" ").trim();
+    if (!model) {
+      return avrEntry;
+    }
+
+    return `${model} ${zoneLabel}`;
+  }
+
+  /**
    * Return listening mode options. If an AVR-specific `listeningModeOptions`
    * is configured, return it exactly. Otherwise fall back to dynamic filtering
    * by audio format (or return all available modes).
@@ -45,9 +77,10 @@ export default class EntityRegistrar {
     volumeScale: number,
     cmdHandler?: (entity: uc.Entity, cmdId: string, params?: { [key: string]: string | number | boolean }) => Promise<uc.StatusCodes>
   ): uc.MediaPlayer {
+    const displayBaseName = this.getDisplayBaseName(avrEntry);
     const mediaPlayerEntity = new uc.MediaPlayer(
       avrEntry,
-      { en: avrEntry },
+      { en: displayBaseName },
       {
         features: [
           uc.MediaPlayerFeatures.OnOff,
@@ -90,10 +123,11 @@ export default class EntityRegistrar {
 
   createSensorEntities(avrEntry: string): uc.Sensor[] {
     const sensors: uc.Sensor[] = [];
+    const displayBaseName = this.getDisplayBaseName(avrEntry);
 
     const volumeSensor = new uc.Sensor(
       `${avrEntry}_volume_sensor`,
-      { en: `${avrEntry} Volume` },
+      { en: `${displayBaseName} Volume` },
       {
         attributes: {
           [uc.SensorAttributes.State]: uc.SensorStates.Unknown,
@@ -111,7 +145,7 @@ export default class EntityRegistrar {
 
     const audioInputSensor = new uc.Sensor(
       `${avrEntry}_audio_input_sensor`,
-      { en: `${avrEntry} Audio Input` },
+      { en: `${displayBaseName} Audio Input` },
       {
         attributes: {
           [uc.SensorAttributes.State]: uc.SensorStates.Unknown,
@@ -125,7 +159,7 @@ export default class EntityRegistrar {
 
     const audioOutputSensor = new uc.Sensor(
       `${avrEntry}_audio_output_sensor`,
-      { en: `${avrEntry} Audio Output` },
+      { en: `${displayBaseName} Audio Output` },
       {
         attributes: {
           [uc.SensorAttributes.State]: uc.SensorStates.Unknown,
@@ -139,7 +173,7 @@ export default class EntityRegistrar {
 
     const sourceSensor = new uc.Sensor(
       `${avrEntry}_source_sensor`,
-      { en: `${avrEntry} Source` },
+      { en: `${displayBaseName} Source` },
       {
         attributes: {
           [uc.SensorAttributes.State]: uc.SensorStates.Unknown,
@@ -153,7 +187,7 @@ export default class EntityRegistrar {
 
     const videoInputSensor = new uc.Sensor(
       `${avrEntry}_video_input_sensor`,
-      { en: `${avrEntry} Video Input` },
+      { en: `${displayBaseName} Video Input` },
       {
         attributes: {
           [uc.SensorAttributes.State]: uc.SensorStates.Unknown,
@@ -167,7 +201,7 @@ export default class EntityRegistrar {
 
     const videoOutputSensor = new uc.Sensor(
       `${avrEntry}_video_output_sensor`,
-      { en: `${avrEntry} Video Output` },
+      { en: `${displayBaseName} Video Output` },
       {
         attributes: {
           [uc.SensorAttributes.State]: uc.SensorStates.Unknown,
@@ -181,7 +215,7 @@ export default class EntityRegistrar {
 
     const outputDisplaySensor = new uc.Sensor(
       `${avrEntry}_output_display_sensor`,
-      { en: `${avrEntry} Output Display` },
+      { en: `${displayBaseName} Output Display` },
       {
         attributes: {
           [uc.SensorAttributes.State]: uc.SensorStates.Unknown,
@@ -195,7 +229,7 @@ export default class EntityRegistrar {
 
     const frontPanelDisplaySensor = new uc.Sensor(
       `${avrEntry}_front_panel_display_sensor`,
-      { en: `${avrEntry} Front Panel Display` },
+      { en: `${displayBaseName} Front Panel Display` },
       {
         attributes: {
           [uc.SensorAttributes.State]: uc.SensorStates.Unknown,
@@ -209,7 +243,7 @@ export default class EntityRegistrar {
 
     const muteSensor = new uc.Sensor(
       `${avrEntry}_mute_sensor`,
-      { en: `${avrEntry} Mute` },
+      { en: `${displayBaseName} Mute` },
       {
         attributes: {
           [uc.SensorAttributes.State]: uc.SensorStates.Unknown,
@@ -229,9 +263,10 @@ export default class EntityRegistrar {
     cmdHandler?: (entity: uc.Entity, cmdId: string, params?: { [key: string]: string | number | boolean }) => Promise<uc.StatusCodes>
   ): Select {
     const options = this.getListeningModeOptions(undefined, avrEntry);
+    const displayBaseName = this.getDisplayBaseName(avrEntry);
     const selectEntity = new Select(
       `${avrEntry}_listening_mode`,
-      { en: `${avrEntry} Listening Mode` },
+      { en: `${displayBaseName} Listening Mode` },
       {
         attributes: {
           state: SelectStates.On,
@@ -273,9 +308,10 @@ export default class EntityRegistrar {
     cmdHandler?: (entity: uc.Entity, cmdId: string, params?: { [key: string]: string | number | boolean }) => Promise<uc.StatusCodes>
   ): Select {
     const options = this.getInputSelectorOptions(avrEntry);
+    const displayBaseName = this.getDisplayBaseName(avrEntry);
     const selectEntity = new Select(
       `${avrEntry}_input_selector`,
-      { en: `${avrEntry} Input Selector` },
+      { en: `${displayBaseName} Input Selector` },
       {
         attributes: {
           state: SelectStates.On,

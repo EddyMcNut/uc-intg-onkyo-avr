@@ -164,7 +164,8 @@ export default class SetupHandler {
           input.zoneCount ||
           input.createSensors ||
           input.netMenuDelay ||
-          input.tuneinPresetPosition
+            input.tuneinPresetPosition ||
+            input.entityNameStyle
       );
 
       if (!hasManualFields) {
@@ -181,6 +182,7 @@ export default class SetupHandler {
         const initialTuneinPresetPosition = currentAvr?.tuneinPresetPosition ?? AVR_DEFAULTS.tuneinPresetPosition;
         const initialVolumeScale = currentAvr?.volumeScale ?? AVR_DEFAULTS.volumeScale;
         const initialAdjustVolumeDispl = currentAvr?.adjustVolumeDispl ?? true;
+        const initialEntityNameStyle = currentAvr?.entityNameStyle ?? AVR_DEFAULTS.entityNameStyle;
         // Determine zone count by counting zones for this physical AVR
         const initialZoneCount = currentAvr && cfg.avrs ? 
           cfg.avrs.filter(a => a.model === currentAvr.model && a.ip === currentAvr.ip).length : 1;
@@ -257,6 +259,19 @@ export default class SetupHandler {
                 items: [
                   { id: "true", label: { en: "Yes - eISCP divided by 2" } },
                   { id: "false", label: { en: "No - just eISCP" } }
+                ]
+              }
+            }
+          },
+          {
+            id: "entityNameStyle",
+            label: { en: "Entity name style" },
+            field: {
+              dropdown: {
+                value: String(initialEntityNameStyle),
+                items: [
+                  { id: "long", label: { en: "Long - include IP address" } },
+                  { id: "short", label: { en: "Short - hide IP address" } }
                 ]
               }
             }
@@ -475,7 +490,8 @@ export default class SetupHandler {
           model: found.model,
           ip: found.host,
           port: Number(found.port) || AVR_DEFAULTS.port,
-          zone: "main"
+          zone: "main",
+          entityNameStyle: String(input.entityNameStyle ?? AVR_DEFAULTS.entityNameStyle).toLowerCase() === "short" ? "short" : "long"
         };
 
         // Use parseSelectOptions which handles the 'none' sentinel (-> null = don't create entity)
@@ -533,6 +549,7 @@ export default class SetupHandler {
       return [80, 100].includes(parsed) ? parsed : AVR_DEFAULTS.volumeScale;
     })(input.volumeScale);
     const adjustVolumeDisplValue = parseBoolean(input.adjustVolumeDispl, true);
+    const entityNameStyleValue = String(input.entityNameStyle ?? AVR_DEFAULTS.entityNameStyle).toLowerCase() === "short" ? "short" : "long";
     const createSensorsValue = parseBoolean(input.createSensors, AVR_DEFAULTS.createSensors);
     const netMenuDelayValue = ((value) => {
       const parsed = parseInt(String(value), 10);
@@ -561,6 +578,7 @@ export default class SetupHandler {
       inputSelectorOptions: input.inputSelectorOptions,
       volumeScale: volumeScaleValue,
       adjustVolumeDispl: adjustVolumeDisplValue,
+      entityNameStyle: entityNameStyleValue,
       createSensors: createSensorsValue,
       netMenuDelay: netMenuDelayValue,
       tuneinPresetPosition: tuneinPresetPositionValue
@@ -665,6 +683,19 @@ export default class SetupHandler {
           }
         },
         {
+          id: "entityNameStyle",
+          label: { en: "Entity name style" },
+          field: {
+            dropdown: {
+              value: String(entityNameStyleValue),
+              items: [
+                { id: "long", label: { en: "Long - include IP address" } },
+                { id: "short", label: { en: "Short - hide IP address" } }
+              ]
+            }
+          }
+        },
+        {
           id: "zoneCount",
           label: { en: "Number of zones to configure" },
           field: {
@@ -696,11 +727,12 @@ export default class SetupHandler {
 
     for (const avrCfg of normalizedAvrs) {
       this.host.log.info(
-        "%s Adding AVR config for zone %s with volumeScale: %d, adjustVolumeDispl: %s, createSensors: %s, netMenuDelay: %d, tuneinPresetPosition: %d",
+        "%s Adding AVR config for zone %s with volumeScale: %d, adjustVolumeDispl: %s, entityNameStyle: %s, createSensors: %s, netMenuDelay: %d, tuneinPresetPosition: %d",
         integrationName,
         avrCfg.zone,
         avrCfg.volumeScale,
         avrCfg.adjustVolumeDispl,
+        avrCfg.entityNameStyle,
         avrCfg.createSensors,
         avrCfg.netMenuDelay,
         avrCfg.tuneinPresetPosition

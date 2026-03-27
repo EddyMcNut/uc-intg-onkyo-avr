@@ -52,6 +52,19 @@ const ZONE3_COMMAND_MAP: Record<string, string> = {
 const ZONE2_REVERSE_MAP = Object.fromEntries(Object.entries(ZONE2_COMMAND_MAP).map(([k, v]) => [v, k]));
 const ZONE3_REVERSE_MAP = Object.fromEntries(Object.entries(ZONE3_COMMAND_MAP).map(([k, v]) => [v, k]));
 
+const NSS_TO_SUBSOURCE: Record<string, string> = {
+  NSS01: "tunein",
+  NSS02: "spotify",
+  NSS03: "deezer",
+  NSS04: "tidal",
+  NSS05: "amazonmusic",
+  NSS06: "chromecast",
+  NSS07: "dts-play-fi",
+  NSS08: "airplay",
+  NSS09: "alexa",
+  NSS10: "music-server"
+};
+
 interface Metadata {
   title?: string;
   artist?: string;
@@ -180,6 +193,16 @@ export class EiscpDriver extends EventEmitter {
   /** Build display value, returning "---" if resolution is unknown */
   private buildDisplayValue(resolution: string, ...parts: string[]): string {
     return resolution.toLowerCase() === "unknown" ? "---" : this.joinFiltered(parts);
+  }
+
+  /** Translate main zone command prefix to zone-specific prefix */
+  private getZonePrefix(prefix: string, zone: string): string {
+    if (zone === "zone2") {
+      return ZONE2_COMMAND_MAP[prefix] || prefix;
+    } else if (zone === "zone3") {
+      return ZONE3_COMMAND_MAP[prefix] || prefix;
+    }
+    return prefix;
   }
 
   // ==================== Command Handlers ====================
@@ -743,27 +766,67 @@ export class EiscpDriver extends EventEmitter {
     await this.raw(`NLSI${presetIndex}`);       // Select preset by index
   }
 
-  private async sendIscp(iscpCommand: string): Promise<void> {
-    // Handle TuneIn preset navigation
-    if (iscpCommand.match(/^TIP[0-9A-Fa-f]+$/)) {
+  /** Fast TIP detector with validation only when prefix matches */
+  private isTIPCommand(iscpCommand: string): boolean {
+    if (!iscpCommand.startsWith("TIP")) {
+      return false;
+    }
+    const presetHex = iscpCommand.slice(3);
+    return presetHex.length > 0 && /^[0-9A-Fa-f]+$/.test(presetHex);
+  }
+
+  /** Fast NSS extractor supporting both direct NSSxx and embedded command forms */
+  private extractNSSCode(iscpCommand: string): string | undefined {
+    const nssIndex = iscpCommand.indexOf("NSS");
+    if (nssIndex === -1 || nssIndex + 5 > iscpCommand.length) {
+      return undefined;
+    }
+
+    const d1 = iscpCommand.charCodeAt(nssIndex + 3);
+    const d2 = iscpCommand.charCodeAt(nssIndex + 4);
+    const isDigit1 = d1 >= 48 && d1 <= 57;
+    const isDigit2 = d2 >= 48 && d2 <= 57;
+    if (!isDigit1 || !isDigit2) {
+      return undefined;
+    }
+
+    return iscpCommand.slice(nssIndex, nssIndex + 5);
+  }
+
+  private async handleNSSsend(nssCode: string, zone: string): Promise<void> { //, iscpCommand: string
+    const sliPrefix = this.getZonePrefix("SLI", zone);
+    const netCommand = `${sliPrefix}2B`; // 2B = NET input
+    const queryCommand = `${sliPrefix}QSTN`;
+    const newSubsource =  String(nssCode.slice(-2)).padStart(5, "0");
+
+    log.debug("%s Sending %s (NET input for zone %s) before %s", integrationName, netCommand, zone, nssCode);
+    await this.raw(netCommand); // Select NET input first
+    await delay(this.config.netMenuDelay ?? 2500); // Wait for AVR to fully load NET menu
+    
+    log.debug("%s Sending network service command: %s", integrationName, nssCode);
+    await this.raw(`NLSI${newSubsource}`);
+    await delay(this.config.netMenuDelay ?? 2500);
+    await this.raw(queryCommand); // Query input-selector to ensure source state updates
+  }
+
+  private async sendIscp(iscpCommand: string, zone: string = "main"): Promise<void> {
+    // Hot path: most commands are plain ISCP and do not require TIP/NSS special handling.
+    if (!iscpCommand.startsWith("TIP") && iscpCommand.indexOf("NSS") === -1) {
+      await this.raw(iscpCommand);
+      return;
+    }
+
+    // Handle TuneIn preset navigation.
+    if (this.isTIPCommand(iscpCommand)) {
       return this.handleTIPsend(iscpCommand);
     }
 
-    // Check if command contains a network service selection (NSSxx), this handles both direct NSS commands and embedded ones like "SLINSS01"
-    const nssMatch = iscpCommand.match(/NSS[0-9]{2}/);
-    if (nssMatch) {
-      log.debug("%s Sending SLI2B (NET input) before %s", integrationName, nssMatch[0]);
-      await this.raw("SLI2B"); // Select NET input first
-      await delay(this.config.netMenuDelay ?? 2500); // Wait for AVR to fully load NET menu
-      const subsource =  String(nssMatch[0].slice(-2)).padStart(5, "0");
-      log.debug("%s Sending network service command: %s", integrationName, nssMatch[0]);
-      await this.raw(`NLSI${subsource}`);
-      await delay(this.config.netMenuDelay ?? 2500);
-      // avrStateManager.setSubSource(buildEntityId(this.config.model!, this.config.host!, "main"), nssMatch[0]); // Update subSource in state manager
-      await this.raw("SLIQSTN"); // Query input-selector to ensure source state updates
-      return;
+    // Handle network service selection (NSSxx), including embedded forms like "SLINSS01".
+    const nssCode = this.extractNSSCode(iscpCommand);
+    if (nssCode) {
+      return this.handleNSSsend(nssCode, zone); //, iscpCommand
     }
-    await this.raw(iscpCommand);
+    // await this.raw(iscpCommand);
   }
 
   /** Send a command to the AVR */
@@ -771,20 +834,21 @@ export class EiscpDriver extends EventEmitter {
     let command: string, args: string | number, zone: string;
 
     if (typeof data === "string") {
-      // Check if this is a multi-zone command
-      if (data.toLowerCase().startsWith("multi-zone-volume")) {
-        await this.handleMultiZoneVolume(data);
-        return;
-      }
-      if (data.toLowerCase().startsWith("multi-zone-muting")) {
-        await this.handleMultiZoneMuting(data);
-        return;
+      const normalizedData = data.toLowerCase();
+
+      // Fast path: most commands are not multi-zone, so only check detailed variants when needed.
+      if (normalizedData.startsWith("multi-zone-")) {
+        if (normalizedData.startsWith("multi-zone-volume")) {
+          await this.handleMultiZoneVolume(data);
+          return;
+        }
+        if (normalizedData.startsWith("multi-zone-muting")) {
+          await this.handleMultiZoneMuting(data);
+          return;
+        }
       }
 
-      const parts = data
-        .toLowerCase()
-        .split(/[\s.=:]/)
-        .filter((item) => item !== "");
+      const parts = normalizedData.split(/[\s.=:]/).filter((item) => item !== "");
       if (parts.length === 3) {
         zone = parts[0];
         command = parts[1];
@@ -794,7 +858,7 @@ export class EiscpDriver extends EventEmitter {
         command = parts[0];
         args = parts[1];
       } else {
-        await this.sendIscp(this.command_to_iscp(data, undefined, "main"));
+        await this.sendIscp(this.command_to_iscp(data, undefined, "main"), "main");
         return;
       }
     } else if (typeof data === "object" && data !== null) {
@@ -802,10 +866,10 @@ export class EiscpDriver extends EventEmitter {
       command = data.command;
       args = data.args;
     } else {
-      await this.sendIscp(this.command_to_iscp(String(data), undefined, "main"));
+      await this.sendIscp(this.command_to_iscp(String(data), undefined, "main"), "main");
       return;
     }
-    await this.sendIscp(this.command_to_iscp(command, args, zone));
+    await this.sendIscp(this.command_to_iscp(command, args, zone), zone);
   }
 
   private async handleMultiZoneVolume(data: string): Promise<void> {
@@ -980,12 +1044,7 @@ export class EiscpDriver extends EventEmitter {
     }
 
     // Translate main zone command prefixes to zone-specific prefixes
-    let zonePrefix = prefix;
-    if (zone === "zone2") {
-      zonePrefix = ZONE2_COMMAND_MAP[prefix] || prefix;
-    } else if (zone === "zone3") {
-      zonePrefix = ZONE3_COMMAND_MAP[prefix] || prefix;
-    }
+    const zonePrefix = this.getZonePrefix(prefix, zone);
 
     return zonePrefix + value;
   }

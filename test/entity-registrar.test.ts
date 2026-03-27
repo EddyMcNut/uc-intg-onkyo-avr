@@ -14,6 +14,7 @@ test.serial("EntityRegistrar builds entities correctly", async (t) => {
   const mp = registrar.createMediaPlayerEntity(avrEntry, 80, async () => {});
   t.truthy(mp);
   t.is((mp as any).options?.volume_steps, 80);
+  t.is((mp as any).name?.en, "Model_192.168.1.2_main");
 
   const sensors = registrar.createSensorEntities(avrEntry);
   t.truthy(sensors);
@@ -27,15 +28,57 @@ test.serial("EntityRegistrar builds entities correctly", async (t) => {
   t.true(Array.isArray(attrs.options));
   t.true(attrs.options.length > 0);
   t.true((select as any).id.endsWith("_listening_mode"));
+  t.is((select as any).name?.en, "Model_192.168.1.2_main Listening Mode");
 
   // When user config contains listeningModeOptions, the select entity should use it exactly
   const userList = ["stereo", "straight-decode", "neural-thx", "full-mono"];
   const cfgModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/configManager.js")).href);
-  cfgModule.ConfigManager.save({ avrs: [{ model: "Model", ip: "192.168.1.2", port: 60128, zone: "main", listeningModeOptions: userList }] });
+  cfgModule.ConfigManager.save({ avrs: [{ model: "Model", ip: "192.168.1.2", port: 60128, zone: "main", listeningModeOptions: userList, entityNameStyle: "long" }] });
   const registrar2Module = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/entityRegistrar.js")).href);
   const Registrar2 = registrar2Module.default as any;
   const registrar2 = new Registrar2();
   const select2 = registrar2.createListeningModeSelectEntity("Model 192.168.1.2 main", async () => {});
   const attrs2 = (select2 as any).attributes || {};
   t.deepEqual(attrs2.options, userList);
+});
+
+test.serial("EntityRegistrar sensor names omit host from display name", async (t) => {
+  const cfgModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/configManager.js")).href);
+  cfgModule.ConfigManager.save({ avrs: [{ model: "TX-RZ50", ip: "192.168.1.2", port: 60128, zone: "main", entityNameStyle: "short" }] });
+  const module = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/entityRegistrar.js")).href);
+  const EntityRegistrar = module.default as any;
+  const registrar = new EntityRegistrar();
+
+  const avrEntry = "TX-RZ50 192.168.1.2 main";
+  const sensors = registrar.createSensorEntities(avrEntry);
+
+  t.true(Array.isArray(sensors));
+  t.true(sensors.length > 0);
+  t.is((sensors[0] as any).id, `${avrEntry}_volume_sensor`);
+  t.is((sensors[0] as any).name?.en, "TX-RZ50 Main Volume");
+
+  const mp = registrar.createMediaPlayerEntity(avrEntry, 100, async () => {});
+  t.is((mp as any).name?.en, "TX-RZ50 Main");
+
+  const listeningMode = registrar.createListeningModeSelectEntity(avrEntry, async () => {});
+  t.is((listeningMode as any).name?.en, "TX-RZ50 Main Listening Mode");
+
+  const inputSelector = registrar.createInputSelectorSelectEntity(avrEntry, async () => {});
+  t.is((inputSelector as any).name?.en, "TX-RZ50 Main Input Selector");
+});
+
+test.serial("EntityRegistrar long entity names include host when configured", async (t) => {
+  const cfgModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/configManager.js")).href);
+  cfgModule.ConfigManager.save({ avrs: [{ model: "TX-RZ50", ip: "192.168.1.2", port: 60128, zone: "main", entityNameStyle: "long" }] });
+
+  const module = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/entityRegistrar.js")).href);
+  const EntityRegistrar = module.default as any;
+  const registrar = new EntityRegistrar();
+  const avrEntry = "TX-RZ50 192.168.1.2 main";
+
+  const mp = registrar.createMediaPlayerEntity(avrEntry, 100, async () => {});
+  t.is((mp as any).name?.en, avrEntry);
+
+  const sensor = registrar.createSensorEntities(avrEntry)[0];
+  t.is((sensor as any).name?.en, `${avrEntry} Volume`);
 });

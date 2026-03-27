@@ -21,7 +21,7 @@ test.serial("backup flow returns backup_data JSON", async (t) => {
 
     // Seed a sample config
     const sampleConfig = {
-      avrs: [{ model: "TX-RZ50", ip: "192.168.2.103", port: 60128, zone: "main" }]
+      avrs: [{ model: "TX-RZ50", ip: "192.168.2.103", port: 60128, zone: "main", entityNameStyle: "short" }]
     } as Partial<import("../src/configManager.js").OnkyoConfig>;
     ConfigManager.save(sampleConfig);
     console.log("on-disk-config (after src save):", fs.readFileSync(path.join(tmp, "config.json"), "utf-8"));
@@ -98,10 +98,12 @@ test.serial("backup flow returns backup_data JSON", async (t) => {
     t.is(parsed.config.avrs?.[0].ip, sampleConfig.avrs?.[0].ip);
     t.is(parsed.config.avrs?.[0].port, sampleConfig.avrs?.[0].port);
     t.is(parsed.config.avrs?.[0].zone, sampleConfig.avrs?.[0].zone);
+    t.is(parsed.config.avrs?.[0].entityNameStyle, sampleConfig.avrs?.[0].entityNameStyle);
     t.is(parsedManager.config.avrs?.[0].model, sampleConfig.avrs?.[0].model);
     t.is(parsedManager.config.avrs?.[0].ip, sampleConfig.avrs?.[0].ip);
     t.is(parsedManager.config.avrs?.[0].port, sampleConfig.avrs?.[0].port);
     t.is(parsedManager.config.avrs?.[0].zone, sampleConfig.avrs?.[0].zone);
+    t.is(parsedManager.config.avrs?.[0].entityNameStyle, sampleConfig.avrs?.[0].entityNameStyle);
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
   }
@@ -148,7 +150,7 @@ test.serial("restore flow applies provided backup_data", async (t) => {
 
     // Create a backup payload to restore
     const driverJson = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), "driver.json"), "utf-8"));
-    const targetConfig = { avrs: [{ model: "TX-RZ50", ip: "192.168.2.103", port: 60128, zone: "main" }] } as Partial<import("../src/configManager.js").OnkyoConfig>;
+    const targetConfig = { avrs: [{ model: "TX-RZ50", ip: "192.168.2.103", port: 60128, zone: "main", entityNameStyle: "short" }] } as Partial<import("../src/configManager.js").OnkyoConfig>;
     const payload = { meta: { driver_id: driverJson.driver_id, version: driverJson.version }, config: targetConfig };
     const payloadString = JSON.stringify(payload);
 
@@ -161,6 +163,7 @@ test.serial("restore flow applies provided backup_data", async (t) => {
     t.truthy(reloaded.avrs);
     t.is(reloaded.avrs?.[0].model, targetConfig.avrs![0].model);
     t.is(reloaded.avrs?.[0].ip, targetConfig.avrs![0].ip);
+    t.is(reloaded.avrs?.[0].entityNameStyle, targetConfig.avrs![0].entityNameStyle);
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
   }

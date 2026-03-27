@@ -113,11 +113,14 @@ export const AVR_DEFAULTS = {
   albumArtURL: "album_art.cgi",
   volumeScale: 100,
   adjustVolumeDispl: true,
+  entityNameStyle: "long",
   createSensors: true,
   netMenuDelay: 500,
   tuneinPresetPosition: 1,
   port: 60128
 } as const;
+
+export type EntityNameStyle = "long" | "short";
 
 export interface AvrConfig {
   model: string;
@@ -128,6 +131,7 @@ export interface AvrConfig {
   albumArtURL?: string;
   volumeScale?: number; // 80 or 100
   adjustVolumeDispl?: boolean; // true = use 0.5 dB steps (×2 / ÷2), false = direct EISCP value
+  entityNameStyle?: EntityNameStyle; // long = include host/ip in visible names, short = omit host/ip
   createSensors?: boolean; // true = create sensor entities for this AVR
   netMenuDelay?: number; // delay in ms for NET menu to load (default 2500)
   tuneinPresetPosition?: number; // position of "My Presets" in TuneIn menu (1-9, default 1)
@@ -153,6 +157,7 @@ export interface OnkyoConfig {
   albumArtURL?: string;
   volumeScale?: number; // 80 or 100
   adjustVolumeDispl?: boolean; // true = use 0.5 dB steps (×2 / ÷2), false = direct EISCP value
+  entityNameStyle?: EntityNameStyle;
   createSensors?: boolean; // true = create sensor entities
   // Legacy fields for backward compatibility
   model?: string;
@@ -175,6 +180,7 @@ export class ConfigManager {
       albumArtURL: avr.albumArtURL ?? AVR_DEFAULTS.albumArtURL,
       volumeScale: avr.volumeScale ?? AVR_DEFAULTS.volumeScale,
       adjustVolumeDispl: avr.adjustVolumeDispl ?? AVR_DEFAULTS.adjustVolumeDispl,
+      entityNameStyle: avr.entityNameStyle ?? AVR_DEFAULTS.entityNameStyle,
       createSensors: avr.createSensors ?? AVR_DEFAULTS.createSensors,
       netMenuDelay: avr.netMenuDelay ?? AVR_DEFAULTS.netMenuDelay,
       tuneinPresetPosition: avr.tuneinPresetPosition ?? AVR_DEFAULTS.tuneinPresetPosition,
@@ -212,18 +218,20 @@ export class ConfigManager {
         }
 
         // Migrate global settings to per-AVR settings if needed
-        if (this.config.avrs && (this.config.queueThreshold || this.config.albumArtURL)) {
+        if (this.config.avrs && (this.config.queueThreshold || this.config.albumArtURL || this.config.entityNameStyle)) {
           this.config.avrs = this.config.avrs.map((avr) =>
             this.applyDefaults({
               ...avr,
               zone: this.validateZone(avr.zone),
               queueThreshold: avr.queueThreshold ?? this.config.queueThreshold,
-              albumArtURL: avr.albumArtURL ?? this.config.albumArtURL
+              albumArtURL: avr.albumArtURL ?? this.config.albumArtURL,
+              entityNameStyle: avr.entityNameStyle ?? this.config.entityNameStyle
             })
           );
           // Remove global settings after migration
           delete this.config.queueThreshold;
           delete this.config.albumArtURL;
+          delete this.config.entityNameStyle;
           this.save(this.config);
         }
 
@@ -373,6 +381,14 @@ export class ConfigManager {
       errors.push("adjustVolumeDispl must be boolean");
     }
 
+    // entityNameStyle
+    if (avr.entityNameStyle !== undefined) {
+      const style = String(avr.entityNameStyle).toLowerCase();
+      if (style !== "long" && style !== "short") {
+        errors.push('entityNameStyle must be "long" or "short"');
+      }
+    }
+
     // createSensors
     if (avr.createSensors !== undefined && typeof avr.createSensors !== "boolean" && !(typeof avr.createSensors === "string")) {
       errors.push("createSensors must be boolean");
@@ -433,6 +449,7 @@ export class ConfigManager {
       albumArtURL: avr.albumArtURL,
       volumeScale: typeof avr.volumeScale === "string" ? parseInt(avr.volumeScale, 10) : avr.volumeScale,
       adjustVolumeDispl: parseBoolean(avr.adjustVolumeDispl, AVR_DEFAULTS.adjustVolumeDispl),
+      entityNameStyle: (String(avr.entityNameStyle ?? AVR_DEFAULTS.entityNameStyle).toLowerCase() === "short" ? "short" : "long") as EntityNameStyle,
       createSensors: parseBoolean(avr.createSensors, AVR_DEFAULTS.createSensors),
       netMenuDelay: typeof avr.netMenuDelay === "string" ? parseInt(avr.netMenuDelay, 10) : avr.netMenuDelay,
       tuneinPresetPosition: typeof avr.tuneinPresetPosition === "string" ? parseInt(avr.tuneinPresetPosition, 10) : avr.tuneinPresetPosition,
