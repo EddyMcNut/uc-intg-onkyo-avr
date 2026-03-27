@@ -65,7 +65,7 @@ Then in that activity you can use the `multi-zone-volume all-up` command (assign
 
 ![](../screenshots/volume-multi.png)
 
-Lookup `multi-zone-volume` in the [JSON](../src/eiscp-commands.ts) to see the available options, for example `zone2-zone3-up` to adjust zones2 and 3 but not the main zone.
+Lookup `multi-zone-volume` in the [JSON](../src/eiscp-commands.ts) to see the available options, for example `zone2-zone3-up` to adjust zones2 and 3 but not the main zone. The command `multi-zone-volume all-up`controls the volume on all *configured* zones. 
 
 *Note: multi-zone-volume does **not** support the use of the slider.*
 
@@ -73,7 +73,7 @@ Lookup `multi-zone-volume` in the [JSON](../src/eiscp-commands.ts) to see the av
 
 As from v0.8.3 this integration supports controlling muting for multiple zones with just a single command.
 
-Assign `multi-zone-muting all-toggle` to the muting button to mute all zones in one action:
+Assign `multi-zone-muting all-toggle` to the muting button to mute all comfigured zones in one action:
 
 ![](../screenshots/muting-multi.png)
 
