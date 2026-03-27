@@ -147,6 +147,22 @@ export default class SetupHandler {
       return this.requestManualConfiguration();
     }
 
+    const hasManualFields = Boolean(
+      input.model || input.ipAddress || input.port || input.queueThreshold || input.albumArtURL ||
+      input.listeningModeOptions || input.inputSelectorOptions || input.volumeScale ||
+      input.adjustVolumeDispl || input.zoneCount || input.createSensors || input.netMenuDelay ||
+      input.tuneinPresetPosition || input.entityNameStyle
+    );
+
+    if (!action && hasManualFields) {
+      try {
+        return await this.handleManualConfiguration(input as any);
+      } catch (err) {
+        this.host.log.error("%s Failed to save configuration:", integrationName, err);
+        return new uc.SetupError("OTHER");
+      }
+    }
+
     if (!action) {
       return new uc.RequestUserInput("Configuration", [
         {
