@@ -90,16 +90,19 @@ export default class SetupHandler {
         }
       },
       {
-        id: "choice",
-        label: { en: "Action" },
+        id: "restore_from_backup",
+        label: { en: "Restore from backup" },
+        field: { checkbox: { value: false } },
+        description: { en: "Used by Integration Manager restore flow. Leave unchecked for manual setup." }
+      },
+      {
+        id: "info_manual_setup",
+        label: { en: "Manual setup" },
         field: {
-          dropdown: {
-            value: "configure",
-            items: [
-              { id: "configure", label: { en: "Configure" } },
-              { id: "backup", label: { en: "Create configuration backup" } },
-              { id: "restore", label: { en: "Restore configuration from backup" } }
-            ]
+          label: {
+            value: {
+              en: "For manual setup, submit once, then choose an action on the next step."
+            }
           }
         }
       }
@@ -120,13 +123,33 @@ export default class SetupHandler {
       if (!restoreData) {
         return new uc.RequestUserInput("Restore data", [
           {
-            id: "backup_data",
+            id: "restore_data",
             label: { en: "Configuration Backup Data" },
             field: { textarea: { value: "" } }
           }
         ]);
       }
       return this.handleRestorePayload(restoreData);
+    }
+
+    if (!action) {
+      return new uc.RequestUserInput("Configuration", [
+        {
+          id: "choice",
+          label: { en: "Action" },
+          field: {
+            dropdown: {
+              value: "configure",
+              items: [
+                { id: "configure", label: { en: "Configure" } },
+                { id: "backup", label: { en: "Create configuration backup" } },
+                { id: "restore", label: { en: "Restore configuration from backup" } },
+                { id: "delete_config", label: { en: "Delete config" } }
+              ]
+            }
+          }
+        }
+      ]);
     }
 
     if (action === "backup") {
@@ -392,7 +415,7 @@ export default class SetupHandler {
     if (!rawData) {
       return new uc.RequestUserInput("Restore data", [
         {
-          id: "backup_data",
+          id: "restore_data",
           label: { en: "Configuration Backup Data" },
           field: { textarea: { value: "" } }
         }
@@ -414,7 +437,7 @@ export default class SetupHandler {
             field: { label: { value: { en: `Errors:\n- ${validation.errors.join("\n- ")}` } } }
           },
           {
-            id: "backup_data",
+            id: "restore_data",
             label: { en: "Configuration Backup Data" },
             field: { textarea: { value: raw } }
           }

@@ -84,7 +84,7 @@ test.serial("handleRestorePayload: invalid payload returns RequestUserInput with
     t.true(res instanceof uc.RequestUserInput);
     const settings = (res as uc.RequestUserInput).settings as any[];
     const info = settings.find((s: any) => s.id === "info");
-    const textarea = settings.find((s: any) => s.id === "backup_data");
+    const textarea = settings.find((s: any) => s.id === "restore_data");
     t.truthy(info);
     t.truthy(textarea);
     t.is((textarea.field as any).textarea.value, raw);
