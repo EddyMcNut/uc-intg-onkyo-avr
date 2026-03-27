@@ -220,3 +220,42 @@ test.serial("restore flow accepts intg-manager restore_from_backup payload", asy
     fs.rmSync(tmp, { recursive: true, force: true });
   }
 });
+
+test.serial("initial setup manual mode opens configuration form", async (t) => {
+  const tmp = mkTmpDir();
+  try {
+    setConfigDir(tmp);
+
+    const { pathToFileURL } = await import("url");
+    const driverModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/driver.js")).href);
+    const OnkyoDriver = driverModule.default as any;
+    const configManagerModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/configManager.js")).href);
+    if (configManagerModule && typeof configManagerModule.setConfigDir === "function") {
+      configManagerModule.setConfigDir(tmp);
+    }
+
+    interface DriverLike {
+      driver?: Partial<IntegrationAPI>;
+      config?: any;
+      handleConnect?: () => Promise<void>;
+      registerAvailableEntities?: () => Promise<void>;
+      handleDriverSetup?: Function;
+    }
+    const drv = Object.create(OnkyoDriver.prototype) as DriverLike;
+    drv.driver = { addAvailableEntity: () => {}, getConfigDirPath: () => tmp, setDeviceState: async () => {}, getConfiguredEntities: () => ({}) } as unknown as Partial<IntegrationAPI>;
+    drv.config = ConfigManager.load();
+    drv.handleConnect = async () => {};
+    drv.registerAvailableEntities = (OnkyoDriver.prototype as any).registerAvailableEntities.bind(drv);
+
+    const startResp = await drv.handleDriverSetup?.(new uc.DriverSetupRequest(false, {}));
+    t.true(startResp instanceof uc.RequestUserInput);
+
+    const manualResp = await drv.handleDriverSetup?.(new uc.UserDataResponse({ restore_from_backup: "false" }));
+    t.true(manualResp instanceof uc.RequestUserInput);
+    const settings = (manualResp as uc.RequestUserInput).settings as Array<{ id: string }>;
+    t.truthy(settings.find((s) => s.id === "model"));
+    t.truthy(settings.find((s) => s.id === "ipAddress"));
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});

@@ -91,17 +91,27 @@ export default class SetupHandler {
       },
       {
         id: "restore_from_backup",
-        label: { en: "Restore from backup" },
-        field: { checkbox: { value: false } },
-        description: { en: "Used by Integration Manager restore flow. Leave unchecked for manual setup." }
+        label: { en: "Setup mode" },
+        field: {
+          dropdown: {
+            value: "false",
+            items: [
+              { id: "false", label: { en: "Configure manually" } },
+              { id: "true", label: { en: "Restore from backup" } }
+            ]
+          }
+        },
+        description: {
+          en: "Manual setup opens the configuration form. Integration Manager uses restore mode automatically during update restore."
+        }
       },
       {
-        id: "info_manual_setup",
-        label: { en: "Manual setup" },
+        id: "info_backup",
+        label: { en: "Create backup" },
         field: {
           label: {
             value: {
-              en: "For manual setup, submit once, then choose an action on the next step."
+              en: "Backup creation is available from the reconfigure/setup menu after the integration has been configured."
             }
           }
         }
@@ -112,10 +122,11 @@ export default class SetupHandler {
   private async handleUserDataResponse(msg: uc.UserDataResponse): Promise<uc.SetupAction | undefined> {
     const input = (msg as uc.UserDataResponse).inputValues || {};
     const action = String(input.action ?? input.choice ?? "").toLowerCase();
-    const restoreRequested = action === "restore" || parseBoolean(input.restore_from_backup, false);
+    const restoreModeSelected = parseBoolean(input.restore_from_backup, false);
+    const restoreRequested = action === "restore" || restoreModeSelected;
     const restoreData = typeof input.restore_data === "string" && input.restore_data.trim() ? input.restore_data : input.backup_data;
 
-    if (parseBoolean(input.restore_from_backup, false)) {
+    if (restoreModeSelected) {
       this.host.log.info("%s Detected manager-driven restore request%s", integrationName, restoreData ? " with payload" : " awaiting payload");
     }
 
@@ -130,6 +141,10 @@ export default class SetupHandler {
         ]);
       }
       return this.handleRestorePayload(restoreData);
+    }
+
+    if (!action && Object.prototype.hasOwnProperty.call(input, "restore_from_backup")) {
+      return this.requestManualConfiguration();
     }
 
     if (!action) {
@@ -198,141 +213,7 @@ export default class SetupHandler {
       );
 
       if (!hasManualFields) {
-        const cfg = ConfigManager.load();
-        const currentAvr = cfg.avrs && cfg.avrs.length > 0 ? cfg.avrs[0] : undefined;
-        const initialModel = currentAvr ? currentAvr.model : "";
-        const initialIp = currentAvr ? currentAvr.ip : "";
-        const initialPort = currentAvr ? currentAvr.port : AVR_DEFAULTS.port;
-        const initialListeningModes = currentAvr && Array.isArray(currentAvr.listeningModeOptions) ? currentAvr.listeningModeOptions.join('; ') : currentAvr?.listeningModeOptions === null ? "none" : "";
-        const initialInputSelectorOpts = currentAvr && Array.isArray(currentAvr.inputSelectorOptions) ? currentAvr.inputSelectorOptions.join('; ') : currentAvr?.inputSelectorOptions === null ? "none" : "";
-        const initialAlbumArtURL = currentAvr?.albumArtURL ?? AVR_DEFAULTS.albumArtURL;
-        const initialQueueThreshold = currentAvr?.queueThreshold ?? AVR_DEFAULTS.queueThreshold;
-        const initialNetMenuDelay = currentAvr?.netMenuDelay ?? AVR_DEFAULTS.netMenuDelay;
-        const initialTuneinPresetPosition = currentAvr?.tuneinPresetPosition ?? AVR_DEFAULTS.tuneinPresetPosition;
-        const initialVolumeScale = currentAvr?.volumeScale ?? AVR_DEFAULTS.volumeScale;
-        const initialAdjustVolumeDispl = currentAvr?.adjustVolumeDispl ?? true;
-        const initialEntityNameStyle = currentAvr?.entityNameStyle ?? AVR_DEFAULTS.entityNameStyle;
-        // Determine zone count by counting zones for this physical AVR
-        const initialZoneCount = currentAvr && cfg.avrs ? 
-          cfg.avrs.filter(a => a.model === currentAvr.model && a.ip === currentAvr.ip).length : 1;
-        const initialCreateSensors = currentAvr?.createSensors ?? AVR_DEFAULTS.createSensors;
-
-        return new uc.RequestUserInput("Manual configuration", [
-          {
-            id: "model",
-            label: { en: "AVR Model (or a name you prefer)" },
-            field: { text: { value: initialModel } }
-          },
-          {
-            id: "ipAddress",
-            label: { en: "AVR IP Address (for example `192.168.1.100`)" },
-            field: { text: { value: initialIp } }
-          },
-          {
-            id: "port",
-            label: { en: "AVR Port (default `60128`)" },
-            field: { number: { value: initialPort } }
-          },
-          {
-            id: "albumArtURL",
-            label: { en: "AVR AlbumArt endpoint. Default `album_art.cgi`, if not known set to `na`." },
-            field: { text: { value: initialAlbumArtURL } }
-          },
-          {
-            id: "listeningModeOptions",
-            label: { en: "Listening mode select options (semicolon-separated, 'none' to disable, empty shows all)" },
-            field: { text: { value: initialListeningModes } },
-            description: { en: "Optional — semicolon-separated list (e.g. stereo; straight-decode; neural-thx). Leave empty for dynamic options, enter 'none' to hide this entity." }
-          },
-          {
-            id: "inputSelectorOptions",
-            label: { en: "Input selector options (semicolon-separated, 'none' to disable, empty shows all)" },
-            field: { text: { value: initialInputSelectorOpts } },
-            description: { en: "Optional — semicolon-separated list (e.g. dvd; bd; net; bluetooth). Leave empty to show all inputs, enter 'none' to hide this entity." }
-          },
-          {
-            id: "queueThreshold",
-            label: { en: "Message queue threshold. Default `100`" },
-            field: { number: { value: initialQueueThreshold } }
-          },
-          {
-            id: "netMenuDelay",
-            label: { en: "NET sub-source selection delay. Default `500`" },
-            field: { number: { value: initialNetMenuDelay } }
-          },
-          {
-            id: "tuneinPresetPosition",
-            label: { en: "TuneIn 'My Presets' menu position (1-9). Default `1`" },
-            field: { number: { value: initialTuneinPresetPosition } },
-            description: { en: "Position of 'My Presets' in your AVR's TuneIn menu (1=first, 2=second, etc.)" }
-          },
-          {
-            id: "volumeScale",
-            label: { en: "Volume scale (0-80 or 0-100)" },
-            field: {
-              dropdown: {
-                value: String(initialVolumeScale),
-                items: [
-                  { id: "100", label: { en: "0-100" } },
-                  { id: "80", label: { en: "0-80" } }
-                ]
-              }
-            }
-          },
-          {
-            id: "adjustVolumeDispl",
-            label: { en: "Adjust volume display" },
-            field: {
-              dropdown: {
-                value: String(initialAdjustVolumeDispl),
-                items: [
-                  { id: "true", label: { en: "Yes - eISCP divided by 2" } },
-                  { id: "false", label: { en: "No - just eISCP" } }
-                ]
-              }
-            }
-          },
-          {
-            id: "entityNameStyle",
-            label: { en: "Entity name style" },
-            field: {
-              dropdown: {
-                value: String(initialEntityNameStyle),
-                items: [
-                  { id: "long", label: { en: "Long - include IP address" } },
-                  { id: "short", label: { en: "Short - hide IP address" } }
-                ]
-              }
-            }
-          },
-          {
-            id: "zoneCount",
-            label: { en: "Number of zones to configure" },
-            field: {
-              dropdown: {
-                value: String(initialZoneCount),
-                items: [
-                  { id: "1", label: { en: "1 zone (Main only)" } },
-                  { id: "2", label: { en: "2 zones (Main + Zone 2)" } },
-                  { id: "3", label: { en: "3 zones (Main + Zone 2 + Zone 3)" } }
-                ]
-              }
-            }
-          },
-          {
-            id: "createSensors",
-            label: { en: "Create sensor entities?" },
-            field: {
-              dropdown: {
-                value: String(initialCreateSensors),
-                items: [
-                  { id: "true", label: { en: "Yes" } },
-                  { id: "false", label: { en: "No" } }
-                ]
-              }
-            }
-          }
-        ]);
+        return this.requestManualConfiguration();
       }
 
       // Has manual fields - validate and persist
@@ -345,6 +226,142 @@ export default class SetupHandler {
     }
 
     return undefined;
+  }
+
+  private requestManualConfiguration(): uc.RequestUserInput {
+    const cfg = ConfigManager.load();
+    const currentAvr = cfg.avrs && cfg.avrs.length > 0 ? cfg.avrs[0] : undefined;
+    const initialModel = currentAvr ? currentAvr.model : "";
+    const initialIp = currentAvr ? currentAvr.ip : "";
+    const initialPort = currentAvr ? currentAvr.port : AVR_DEFAULTS.port;
+    const initialListeningModes = currentAvr && Array.isArray(currentAvr.listeningModeOptions) ? currentAvr.listeningModeOptions.join('; ') : currentAvr?.listeningModeOptions === null ? "none" : "";
+    const initialInputSelectorOpts = currentAvr && Array.isArray(currentAvr.inputSelectorOptions) ? currentAvr.inputSelectorOptions.join('; ') : currentAvr?.inputSelectorOptions === null ? "none" : "";
+    const initialAlbumArtURL = currentAvr?.albumArtURL ?? AVR_DEFAULTS.albumArtURL;
+    const initialQueueThreshold = currentAvr?.queueThreshold ?? AVR_DEFAULTS.queueThreshold;
+    const initialNetMenuDelay = currentAvr?.netMenuDelay ?? AVR_DEFAULTS.netMenuDelay;
+    const initialTuneinPresetPosition = currentAvr?.tuneinPresetPosition ?? AVR_DEFAULTS.tuneinPresetPosition;
+    const initialVolumeScale = currentAvr?.volumeScale ?? AVR_DEFAULTS.volumeScale;
+    const initialAdjustVolumeDispl = currentAvr?.adjustVolumeDispl ?? true;
+    const initialEntityNameStyle = currentAvr?.entityNameStyle ?? AVR_DEFAULTS.entityNameStyle;
+    const initialZoneCount = currentAvr && cfg.avrs ? cfg.avrs.filter(a => a.model === currentAvr.model && a.ip === currentAvr.ip).length : 1;
+    const initialCreateSensors = currentAvr?.createSensors ?? AVR_DEFAULTS.createSensors;
+
+    return new uc.RequestUserInput("Manual configuration", [
+      {
+        id: "model",
+        label: { en: "AVR Model (or a name you prefer)" },
+        field: { text: { value: initialModel } }
+      },
+      {
+        id: "ipAddress",
+        label: { en: "AVR IP Address (for example `192.168.1.100`)" },
+        field: { text: { value: initialIp } }
+      },
+      {
+        id: "port",
+        label: { en: "AVR Port (default `60128`)" },
+        field: { number: { value: initialPort } }
+      },
+      {
+        id: "albumArtURL",
+        label: { en: "AVR AlbumArt endpoint. Default `album_art.cgi`, if not known set to `na`." },
+        field: { text: { value: initialAlbumArtURL } }
+      },
+      {
+        id: "listeningModeOptions",
+        label: { en: "Listening mode select options (semicolon-separated, 'none' to disable, empty shows all)" },
+        field: { text: { value: initialListeningModes } },
+        description: { en: "Optional — semicolon-separated list (e.g. stereo; straight-decode; neural-thx). Leave empty for dynamic options, enter 'none' to hide this entity." }
+      },
+      {
+        id: "inputSelectorOptions",
+        label: { en: "Input selector options (semicolon-separated, 'none' to disable, empty shows all)" },
+        field: { text: { value: initialInputSelectorOpts } },
+        description: { en: "Optional — semicolon-separated list (e.g. dvd; bd; net; bluetooth). Leave empty to show all inputs, enter 'none' to hide this entity." }
+      },
+      {
+        id: "queueThreshold",
+        label: { en: "Message queue threshold. Default `100`" },
+        field: { number: { value: initialQueueThreshold } }
+      },
+      {
+        id: "netMenuDelay",
+        label: { en: "NET sub-source selection delay. Default `500`" },
+        field: { number: { value: initialNetMenuDelay } }
+      },
+      {
+        id: "tuneinPresetPosition",
+        label: { en: "TuneIn 'My Presets' menu position (1-9). Default `1`" },
+        field: { number: { value: initialTuneinPresetPosition } },
+        description: { en: "Position of 'My Presets' in your AVR's TuneIn menu (1=first, 2=second, etc.)" }
+      },
+      {
+        id: "volumeScale",
+        label: { en: "Volume scale (0-80 or 0-100)" },
+        field: {
+          dropdown: {
+            value: String(initialVolumeScale),
+            items: [
+              { id: "100", label: { en: "0-100" } },
+              { id: "80", label: { en: "0-80" } }
+            ]
+          }
+        }
+      },
+      {
+        id: "adjustVolumeDispl",
+        label: { en: "Adjust volume display" },
+        field: {
+          dropdown: {
+            value: String(initialAdjustVolumeDispl),
+            items: [
+              { id: "true", label: { en: "Yes - eISCP divided by 2" } },
+              { id: "false", label: { en: "No - just eISCP" } }
+            ]
+          }
+        }
+      },
+      {
+        id: "entityNameStyle",
+        label: { en: "Entity name style" },
+        field: {
+          dropdown: {
+            value: String(initialEntityNameStyle),
+            items: [
+              { id: "long", label: { en: "Long - include IP address" } },
+              { id: "short", label: { en: "Short - hide IP address" } }
+            ]
+          }
+        }
+      },
+      {
+        id: "zoneCount",
+        label: { en: "Number of zones to configure" },
+        field: {
+          dropdown: {
+            value: String(initialZoneCount),
+            items: [
+              { id: "1", label: { en: "1 zone (Main only)" } },
+              { id: "2", label: { en: "2 zones (Main + Zone 2)" } },
+              { id: "3", label: { en: "3 zones (Main + Zone 2 + Zone 3)" } }
+            ]
+          }
+        }
+      },
+      {
+        id: "createSensors",
+        label: { en: "Create sensor entities?" },
+        field: {
+          dropdown: {
+            value: String(initialCreateSensors),
+            items: [
+              { id: "true", label: { en: "Yes" } },
+              { id: "false", label: { en: "No" } }
+            ]
+          }
+        }
+      }
+    ]);
   }
 
   private async handleBackupPayload(backup_data?: string): Promise<uc.SetupAction> {
