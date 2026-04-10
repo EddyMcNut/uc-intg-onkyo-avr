@@ -1,8 +1,8 @@
 import * as uc from "@unfoldedcircle/integration-api";
+import { SelectAttributes } from "@unfoldedcircle/integration-api";
 import { avrStateManager } from "./avrState.js";
 import { OnkyoConfig, buildEntityId } from "./configManager.js";
 import { EiscpDriver } from "./eiscp.js";
-import { SelectAttributes } from "./selectEntity.js";
 import { getCompatibleListeningModes, detectAudioFormatType } from "./listeningModeFilters.js";
 import { eiscpMappings } from "./eiscp-mappings.js";
 import log from "./loggers.js";

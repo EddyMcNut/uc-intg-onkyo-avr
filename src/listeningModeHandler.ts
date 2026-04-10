@@ -5,13 +5,13 @@
  */
 
 import * as uc from "@unfoldedcircle/integration-api";
+import { SelectAttributes, SelectCommands } from "@unfoldedcircle/integration-api";
 import ConnectionManager from "./connectionManager.js";
 import AvrInstanceManager from "./avrInstanceManager.js";
 import EntityRegistrar from "./entityRegistrar.js";
 import { avrStateManager } from "./avrState.js";
 import { buildPhysicalAvrId } from "./configManager.js";
 import log from "./loggers.js";
-import { SelectAttributes, SelectCommands } from "./selectEntity.js";
 
 const integrationName = "listeningModeHandler:";
 

@@ -1,7 +1,7 @@
 /*jslint node:true nomen:true*/
 "use strict";
 import * as uc from "@unfoldedcircle/integration-api";
-import { Select, SelectStates } from "./selectEntity.js";
+import { Select, SelectStates } from "@unfoldedcircle/integration-api";
 import { eiscpMappings } from "./eiscp-mappings.js";
 import { getCompatibleListeningModes } from "./listeningModeFilters.js";
 import { ConfigManager, buildEntityId } from "./configManager.js";
