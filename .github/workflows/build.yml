@@ -30,7 +30,7 @@ jobs:
       version: ${{ steps.pkg.outputs.version }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       - name: Read version from package.json
         id: pkg
@@ -60,7 +60,7 @@ jobs:
 
       - name: Upload test report
         if: always()
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: test-results
           path: test-results.xml
@@ -140,7 +140,7 @@ jobs:
           tar czvf ${{ steps.set-artifact.outputs.artifact-name }}.tar.gz -C ${GITHUB_WORKSPACE}/artifacts .
           ls -lah
 
-      - uses: actions/upload-artifact@v5
+      - uses: actions/upload-artifact@v7
         id: upload_artifact
         with:
           name: ${{ steps.set-artifact.outputs.artifact-name }}
@@ -154,7 +154,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Download build artifact
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v8
         with:
           name: ${{ needs.build.outputs.artifact-name }}
 
