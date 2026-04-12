@@ -102,17 +102,22 @@ export function ingestTuneInListEntry(entityId: string, entry: string): void {
     return;
   }
 
+  const menuIndex = parseInt(match[1], 10);
+  if (isNaN(menuIndex) || menuIndex < 0) {
+    return;
+  }
+
+  // U0 indicates a fresh list; rebuild to avoid stale entries surviving from older captures.
+  if (menuIndex === 0 && state.presetsByMenuIndex.size > 0) {
+    state.presetsByMenuIndex.clear();
+  }
+
   if (!state.captureMyPresets) {
     state.captureMyPresets = true;
     if (!state.contextTitle) {
       state.presetsByMenuIndex.clear();
       log.info("%s [%s] inferring TuneIn preset collection from list entry payload", integrationName, entityId);
     }
-  }
-
-  const menuIndex = parseInt(match[1], 10);
-  if (isNaN(menuIndex) || menuIndex < 0) {
-    return;
   }
 
   const presetIndex = menuIndex + 1;

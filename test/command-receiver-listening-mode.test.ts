@@ -139,6 +139,7 @@ test.serial("CommandReceiver sets media player state to Playing only for ON+NET+
       model: "M"
     });
 
+    await new Promise((resolve) => setTimeout(resolve, 25));
     t.is(statesByEntity.get(entityId), uc.MediaPlayerStates.On);
 
     mockEiscp.emit("data", {
@@ -151,6 +152,8 @@ test.serial("CommandReceiver sets media player state to Playing only for ON+NET+
       model: "M"
     });
 
+    await new Promise((resolve) => setTimeout(resolve, 25));
+
     mockEiscp.emit("data", {
       command: "NLT",
       argument: "Spotify",
@@ -161,7 +164,7 @@ test.serial("CommandReceiver sets media player state to Playing only for ON+NET+
       model: "M"
     });
 
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    await new Promise((resolve) => setTimeout(resolve, 25));
     t.is(statesByEntity.get(entityId), uc.MediaPlayerStates.Playing);
 
     mockEiscp.emit("data", {
@@ -174,6 +177,7 @@ test.serial("CommandReceiver sets media player state to Playing only for ON+NET+
       model: "M"
     });
 
+    await new Promise((resolve) => setTimeout(resolve, 25));
     t.is(statesByEntity.get(entityId), uc.MediaPlayerStates.Standby);
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });

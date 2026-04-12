@@ -11,8 +11,8 @@
     "format": "prettier --write .",
     "code-check": "prettier --check . && eslint .",
     "lint": "eslint --fix",
-    "build": "tsc",
-    "test": "npm run build && ava --tap > test.tap && npx tap-junit < test.tap > test-results.xml",
+    "build": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\" && tsc",
+    "test": "npm run build && ava dist/test/**/*.test.js --tap > test.tap && npx tap-junit < test.tap > test-results.xml",
     "start": "npm run build && node dist/src/index.js"
   },
   "dependencies": {
