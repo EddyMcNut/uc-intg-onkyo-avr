@@ -1,0 +1,20 @@
+TAP version 13
+not ok 1 - command-receiver-listening-mode › CommandReceiver sets media player state to Paused when NST reports pause
+  ---
+    name: AssertionError
+    assertion: t.is()
+    details:
+      'Difference (- actual, + expected):': |-
+        - 'ON'
+        + 'PAUSED'
+    message: ''
+    at: >-
+      ExecutionContext.is
+      (file:///E:/Ed/repos/uc-intg-onkyo-avr/node_modules/ava/lib/assert.js:309:16)
+  ...
+
+1..1
+# tests 1
+# pass 0
+# fail 1
+

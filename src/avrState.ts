@@ -12,6 +12,7 @@ const integrationName = "avrState:";
 interface EntityState {
   source: string;
   subSource: string;
+  playbackStatus: string;
   audioFormat: string;
   powerState: string;
   volume: number;
@@ -31,7 +32,7 @@ class AvrStateManager {
   private getState(entityId: string): EntityState {
     let state = this.states.get(entityId);
     if (!state) {
-      state = { source: "unknown", subSource: "unknown", audioFormat: "unknown", powerState: "unknown", volume: 0 };
+      state = { source: "unknown", subSource: "unknown", playbackStatus: "unknown", audioFormat: "unknown", powerState: "unknown", volume: 0 };
       this.states.set(entityId, state);
     }
     return state;
@@ -76,15 +77,19 @@ class AvrStateManager {
   }
 
   /** Set power state for an entity, returns true if changed */
-  setPowerState(entityId: string, powerState: string): boolean {
+  setPowerState(entityId: string, powerState: string, driver?: uc.IntegrationAPI): boolean {
     const state = this.getState(entityId);
     const normalizedPowerState = powerState.toLowerCase();
 
     if (state.powerState !== normalizedPowerState) {
       log.info("%s [%s] power state changed from '%s' to '%s'", integrationName, entityId, state.powerState, powerState);
       state.powerState = normalizedPowerState;
+      this.applyMediaPlayerState(entityId, driver);
       return true;
     }
+
+    // Keep entity state in sync even if power event is duplicated.
+    this.applyMediaPlayerState(entityId, driver);
     return false;
   }
 
@@ -160,10 +165,14 @@ class AvrStateManager {
     if (state.source !== normalizedSource) {
       log.info("%s [%s] source changed from '%s' to '%s'", integrationName, entityId, state.source, source);
       state.source = normalizedSource;
+      state.playbackStatus = "unknown";
+      this.applyMediaPlayerState(entityId, _driver);
       // state.subSource = "unknown"; // Reset sub-source on source change
       this.refreshAvrState(entityId, eiscpInstance, zone, _driver);
       return true;
     }
+
+    this.applyMediaPlayerState(entityId, _driver);
     return false;
   }
 
@@ -175,10 +184,70 @@ class AvrStateManager {
     if (state.subSource !== normalizedSubSource) {
       log.info("%s [%s] sub-source changed from '%s' to '%s'", integrationName, entityId, state.subSource, subSource);
       state.subSource = normalizedSubSource;
+      state.playbackStatus = "unknown";
+      this.applyMediaPlayerState(entityId, _driver);
       this.refreshAvrState(entityId, eiscpInstance, zone, _driver);
       return true;
     }
+
+    this.applyMediaPlayerState(entityId, _driver);
     return false;
+  }
+
+  setPlaybackStatus(entityId: string, playbackStatus: string, driver?: uc.IntegrationAPI): boolean {
+    const state = this.getState(entityId);
+    const normalizedStatus = playbackStatus.toLowerCase();
+
+    if (state.playbackStatus !== normalizedStatus) {
+      state.playbackStatus = normalizedStatus;
+      this.applyMediaPlayerState(entityId, driver);
+      return true;
+    }
+
+    this.applyMediaPlayerState(entityId, driver);
+    return false;
+  }
+
+  private resolveMediaPlayerState(entityId: string): uc.MediaPlayerStates {
+    const state = this.getState(entityId);
+
+    if (state.powerState !== "on") {
+      if (state.powerState === "standby") {
+        return uc.MediaPlayerStates.Standby;
+      }
+      return uc.MediaPlayerStates.Unknown;
+    }
+
+    if (state.source !== "net") {
+      return uc.MediaPlayerStates.On;
+    }
+
+    // Explicit transport status from NST should override source/sub-source heuristics.
+    if (state.playbackStatus === "paused") {
+      return uc.MediaPlayerStates.Paused;
+    }
+
+    if (state.playbackStatus === "playing" || state.playbackStatus === "ff" || state.playbackStatus === "fr") {
+      return uc.MediaPlayerStates.Playing;
+    }
+
+    const isPlayingService = ALBUM_ART.some((name) => state.subSource.includes(name));
+    if (!isPlayingService) {
+      return uc.MediaPlayerStates.On;
+    }
+
+    // Keep previous behavior for services that do not report explicit play status.
+    return uc.MediaPlayerStates.Playing;
+  }
+
+  public applyMediaPlayerState(entityId: string, driver?: uc.IntegrationAPI): void {
+    if (!driver) {
+      return;
+    }
+
+    driver.updateEntityAttributes(entityId, {
+      [uc.MediaPlayerAttributes.State]: this.resolveMediaPlayerState(entityId)
+    });
   }
 
   /** Clear state for an entity (e.g., on disconnect) */
@@ -249,6 +318,7 @@ class AvrStateManager {
       await eiscpInstance.raw("NATQSTN"); // Query artist
       await eiscpInstance.raw("NTIQSTN"); // Query title
       await eiscpInstance.raw("NALQSTN"); // Query album
+      await eiscpInstance.raw("NSTQSTN"); // Query play/pause status
     }
   }
 

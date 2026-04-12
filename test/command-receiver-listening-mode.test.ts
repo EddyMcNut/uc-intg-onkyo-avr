@@ -1,5 +1,7 @@
+/// <reference types="node" />
 import test from "ava";
 import type { IntegrationAPI } from "@unfoldedcircle/integration-api";
+import * as uc from "@unfoldedcircle/integration-api";
 import fs from "fs";
 import os from "os";
 import { pathToFileURL } from "url";
@@ -75,3 +77,107 @@ test.serial("CommandReceiver preserves user-configured listeningModeOptions acro
     fs.rmSync(tmp, { recursive: true, force: true });
   }
 });
+
+test.serial("CommandReceiver sets media player state to Playing only for ON+NET+album-art subsources", async (t) => {
+  const tmp = mkTmpDir();
+  try {
+    const crModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/commandReceiver.js")).href) as any;
+    const ConfigModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/configManager.js")).href) as any;
+    const { CommandReceiver } = crModule;
+    const { ConfigManager, setConfigDir } = ConfigModule;
+    if (typeof setConfigDir === "function") setConfigDir(tmp);
+
+    ConfigManager.save({ avrs: [{ model: "M", ip: "1.2.3.4", port: 60128, zone: "main" }] });
+
+    const statesByEntity = new Map<string, uc.MediaPlayerStates>();
+    const mockDriver: Partial<IntegrationAPI> = {
+      updateEntityAttributes: (id: string, attrs: { [key: string]: string | number | boolean }) => {
+        const state = attrs[uc.MediaPlayerAttributes.State] as uc.MediaPlayerStates | undefined;
+        if (state) {
+          statesByEntity.set(id, state);
+        }
+        return true;
+      }
+    };
+
+    class MockEiscp {
+      private handlers: { [k: string]: Function[] } = {};
+      on(evt: string, cb: Function) {
+        (this.handlers[evt] ??= []).push(cb);
+      }
+      emit(evt: string, payload: any) {
+        (this.handlers[evt] || []).forEach((h) => h(payload));
+      }
+      async raw() {}
+      async command() {}
+    }
+
+    const mockEiscp = new MockEiscp();
+    const onkyoCfg = ConfigManager.load();
+    const receiver = new CommandReceiver(mockDriver, onkyoCfg, mockEiscp as any, "v-test");
+    receiver.setupEiscpListener();
+
+    const entityId = "M 1.2.3.4 main";
+
+    mockEiscp.emit("data", {
+      command: "system-power",
+      argument: "on",
+      zone: "main",
+      iscpCommand: "PWR",
+      host: "1.2.3.4",
+      port: 60128,
+      model: "M"
+    });
+
+    mockEiscp.emit("data", {
+      command: "input-selector",
+      argument: "cd",
+      zone: "main",
+      iscpCommand: "SLI",
+      host: "1.2.3.4",
+      port: 60128,
+      model: "M"
+    });
+
+    t.is(statesByEntity.get(entityId), uc.MediaPlayerStates.On);
+
+    mockEiscp.emit("data", {
+      command: "input-selector",
+      argument: "net",
+      zone: "main",
+      iscpCommand: "SLI",
+      host: "1.2.3.4",
+      port: 60128,
+      model: "M"
+    });
+
+    mockEiscp.emit("data", {
+      command: "NLT",
+      argument: "Spotify",
+      zone: "main",
+      iscpCommand: "NLT",
+      host: "1.2.3.4",
+      port: 60128,
+      model: "M"
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    t.is(statesByEntity.get(entityId), uc.MediaPlayerStates.Playing);
+
+    mockEiscp.emit("data", {
+      command: "system-power",
+      argument: "standby",
+      zone: "main",
+      iscpCommand: "PWR",
+      host: "1.2.3.4",
+      port: 60128,
+      model: "M"
+    });
+
+    t.is(statesByEntity.get(entityId), uc.MediaPlayerStates.Standby);
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+ 

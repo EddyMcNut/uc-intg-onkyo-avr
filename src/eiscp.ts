@@ -28,7 +28,7 @@ const COMMANDS = eiscpCommands.commands;
 const COMMAND_MAPPINGS = eiscpMappings.command_mappings;
 const VALUE_MAPPINGS = eiscpMappings.value_mappings;
 const integrationName = "eISCP:";
-const IGNORED_COMMANDS = new Set(["NMS", "NPB", "NST"]); // Commands to ignore from AVR (NMS=menu, NPB=playback, NST=net status)
+const IGNORED_COMMANDS = new Set(["NMS", "NPB"]); // Commands to ignore from AVR (NMS=menu, NPB=playback info)
 const THROTTLED_COMMANDS = new Set(["IFA", "IFV", "FLD"]); // Commands to send to incoming queue for throttling
 const FLD_VOLUME_HEX_PREFIX = "566F6C756D65"; // "Volume" in hex - skip these FLD messages
 
@@ -128,8 +128,10 @@ export class EiscpDriver extends EventEmitter {
     NTI: (value, cmd, result) => this.handleMetadata(value, cmd, result),
     NAL: (value, cmd, result) => this.handleMetadata(value, cmd, result),
     DSN: (value, _cmd, result) => this.handleDSN(value, result),
+    NST: (value, _cmd, result) => this.handleNST(value, result),
     FLD: (value, _cmd, result) => this.handleFLD(value, result),
-    NLT: (value, _cmd, result) => this.handleNLT(value, result)
+    NLT: (value, _cmd, result) => this.handleNLT(value, result),
+    NLS: (value, _cmd, result) => this.handleNLS(value, result)
   };
 
   constructor(config?: EiscpConfig) {
@@ -339,6 +341,35 @@ export class EiscpDriver extends EventEmitter {
     return result;
   }
 
+  private handleNST(value: string, result: CommandResult): CommandResult {
+    const status = value.trim().charAt(0);
+    let playback = "unknown";
+
+    switch (status) {
+      case "P":
+        playback = "playing";
+        break;
+      case "p":
+        playback = "paused";
+        break;
+      case "S":
+        playback = "stopped";
+        break;
+      case "F":
+        playback = "ff";
+        break;
+      case "R":
+        playback = "fr";
+        break;
+      default:
+        return result;
+    }
+
+    result.command = "NST";
+    result.argument = playback;
+    return result;
+  }
+
   private handleNLT(value: string, result: CommandResult): CommandResult {
     // NLT format: hex data followed by ASCII text (e.g., "0E01000000090100FF0E00TuneIn Radio")
     // Extract ASCII text portion after hex prefix
@@ -367,6 +398,23 @@ export class EiscpDriver extends EventEmitter {
       }
     }
 
+    if (text.trim().toLowerCase() === "my presets") {
+      result.command = "NLT_CONTEXT";
+      result.argument = "My Presets";
+      return result;
+    }
+
+    return result;
+  }
+
+  private handleNLS(value: string, result: CommandResult): CommandResult {
+    const entry = value.trim();
+    if (!/^U\d+-/.test(entry)) {
+      return result;
+    }
+
+    result.command = "NLS";
+    result.argument = entry;
     return result;
   }
 
@@ -435,6 +483,30 @@ export class EiscpDriver extends EventEmitter {
 
   private eiscp_packet_extract(packet: Buffer): string {
     return packet.toString("ascii", 18, packet.length - 2);
+  }
+
+  private eiscp_packet_extract_all(packet: Buffer): string[] {
+    const messages: string[] = [];
+    let offset = 0;
+
+    while (offset + 16 <= packet.length && packet.toString("ascii", offset, offset + 4) === "ISCP") {
+      const headerSize = packet.readUInt32BE(offset + 4);
+      const dataSize = packet.readUInt32BE(offset + 8);
+      const frameEnd = offset + headerSize + dataSize;
+
+      if (headerSize < 16 || dataSize < 4 || frameEnd > packet.length) {
+        break;
+      }
+
+      messages.push(packet.toString("ascii", offset + headerSize + 2, frameEnd - 2));
+      offset = frameEnd;
+    }
+
+    if (messages.length === 0) {
+      return [this.eiscp_packet_extract(packet)];
+    }
+
+    return messages;
   }
 
   private iscp_to_command(command: string, value: string): CommandResult {
@@ -541,7 +613,7 @@ export class EiscpDriver extends EventEmitter {
           }
         })
         .on("message", (packet: Buffer, rinfo: dgram.RemoteInfo) => {
-          const message = this.eiscp_packet_extract(packet);
+          const message = this.eiscp_packet_extract_all(packet)[0] ?? this.eiscp_packet_extract(packet);
           const command = message.slice(0, 3);
           if (command === "ECN") {
             const data = message.slice(3).split("/");
@@ -632,54 +704,42 @@ export class EiscpDriver extends EventEmitter {
         this.eiscp?.destroy();
       })
       .on("data", (data: Buffer) => {
-        const iscp_message = this.eiscp_packet_extract(data);
-        let command = iscp_message.slice(0, 3);
-        let value = iscp_message.slice(3);
+        for (const iscp_message of this.eiscp_packet_extract_all(data)) {
+          let command = iscp_message.slice(0, 3);
+          let value = iscp_message.slice(3);
 
-        // log.info("%s RAW (0) RECEIVE: [%s] %s %s", integrationName, command, value);
+          // log.info("%s RAW (0) RECEIVE: [%s] %s %s", integrationName, command, value);
 
-        // Ignore messages we don't care about
-        if (IGNORED_COMMANDS.has(command)) {
-          return;
-        }
+          if (IGNORED_COMMANDS.has(command)) {
+            continue;
+          }
 
-        // Skip FLD volume display messages early (before full parsing)
-        if (command === "FLD" && value.slice(0, 12) === FLD_VOLUME_HEX_PREFIX) {
-          return;
-        }
+          if (command === "FLD" && value.slice(0, 12) === FLD_VOLUME_HEX_PREFIX) {
+            continue;
+          }
 
-        value = String(value).replace(/[\x00-\x1F]/g, ""); // remove weird characters like \x1A
+          value = String(value).replace(/[\x00-\x1F]/g, "").trim();
 
-        // Strip trailing ISCP messages for all commands (TCP buffer can combine messages during rapid AVR responses)
-        const iscpIdx = value.indexOf("ISCP");
-        if (iscpIdx !== -1) {
-          value = value.substring(0, iscpIdx);
-        }
-        value = value.trim();
+          const rawResult = this.iscp_to_command(command, value);
+          if (!rawResult || rawResult.command === "undefined") {
+            continue;
+          }
 
-        const rawResult = this.iscp_to_command(command, value);
+          const dataPayload: DataPayload = {
+            command: rawResult.command ?? undefined,
+            argument: rawResult.argument ?? undefined,
+            zone: rawResult.zone ?? undefined,
+            iscpCommand: iscp_message,
+            host: this.config.host,
+            port: this.config.port,
+            model: this.config.model
+          };
 
-        // Only emit if rawResult is defined and has a meaningful command
-        if (!rawResult || rawResult.command === "undefined") {
-          return;
-        }
-
-        const dataPayload: DataPayload = {
-          command: rawResult.command ?? undefined,
-          argument: rawResult.argument ?? undefined,
-          zone: rawResult.zone ?? undefined,
-          iscpCommand: iscp_message,
-          host: this.config.host,
-          port: this.config.port,
-          model: this.config.model
-        };
-
-        // Route less important messages through the incoming queue for throttling
-        if (THROTTLED_COMMANDS.has(command)) {
-          this.enqueueIncoming(dataPayload);
-        } else {
-          // Emit other messages immediately
-          this.emit("data", dataPayload);
+          if (THROTTLED_COMMANDS.has(command)) {
+            this.enqueueIncoming(dataPayload);
+          } else {
+            this.emit("data", dataPayload);
+          }
         }
       });
     return { model: this.config.model!, host: this.config.host!, port: this.config.port! };

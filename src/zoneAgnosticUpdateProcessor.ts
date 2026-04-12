@@ -6,6 +6,7 @@ import { EiscpDriver } from "./eiscp.js";
 import log from "./loggers.js";
 import { delay } from "./utils.js";
 import { ALBUM_ART, SONG_INFO } from "./constants.js";
+import { ingestTuneInListEntry, setTuneInBrowseContext } from "./mediaBrowser.js";
 
 const integrationName = "zoneAgnosticUpdateProcessor:";
 
@@ -26,7 +27,10 @@ export class ZoneAgnosticUpdateProcessor {
   public static readonly ZONE_AGNOSTIC_COMMANDS = new Set<string>([
     "IFA",
     "DSN",
+    "NST",
     "NLT",
+    "NLT_CONTEXT",
+    "NLS",
     "FLD",
     "NTM",
     "metadata"
@@ -191,6 +195,33 @@ export class ZoneAgnosticUpdateProcessor {
       await this.eiscpInstance.raw("NATQSTN");
       await this.eiscpInstance.raw("NTIQSTN");
       await this.eiscpInstance.raw("NALQSTN");
+    }
+  }
+
+  async handleNst(sourceEntityId: string, playbackStatus: string): Promise<void> {
+    const affectedZones = avrStateManager.getEntitiesByPhysicalAvrAndSource(this.getPhysicalAvrId(sourceEntityId), "net");
+    for (const zoneEntityId of affectedZones) {
+      avrStateManager.setPlaybackStatus(zoneEntityId, playbackStatus, this.driver);
+    }
+  }
+
+  async handleNltContext(sourceEntityId: string, title: string): Promise<void> {
+    const affectedZones = avrStateManager.getEntitiesByPhysicalAvrAndSource(this.getPhysicalAvrId(sourceEntityId), "net");
+    for (const zoneEntityId of affectedZones) {
+      const subSource = avrStateManager.getSubSource(zoneEntityId);
+      if (subSource === "tunein") {
+        setTuneInBrowseContext(zoneEntityId, title);
+      }
+    }
+  }
+
+  async handleNls(sourceEntityId: string, entry: string): Promise<void> {
+    const affectedZones = avrStateManager.getEntitiesByPhysicalAvrAndSource(this.getPhysicalAvrId(sourceEntityId), "net");
+    for (const zoneEntityId of affectedZones) {
+      const subSource = avrStateManager.getSubSource(zoneEntityId);
+      if (subSource === "tunein") {
+        ingestTuneInListEntry(zoneEntityId, entry);
+      }
     }
   }
 
