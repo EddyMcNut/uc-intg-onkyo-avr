@@ -2,7 +2,7 @@ import fs from "fs";
 import path from "path";
 import * as uc from "@unfoldedcircle/integration-api";
 import { fileURLToPath } from "url";
-import { MEDIA_BROWSING } from "./constants.js";
+import { MEDIA_BROWSING, NETWORK_SERVICES } from "./constants.js";
 import { avrStateManager } from "./avrState.js";
 import { buildPhysicalAvrId } from "./configManager.js";
 import log from "./loggers.js";
@@ -10,6 +10,7 @@ import log from "./loggers.js";
 const integrationName = "mediaBrowser:";
 const MAX_TUNEIN_THUMBNAIL_LENGTH = 4000;
 const MAX_INLINE_BACKGROUND_DATA_LENGTH = 0;
+const TUNEIN_BROWSER_PAGE_SIZE = 10;
 
 export const TUNEIN_ROOT_ID = "tunein:root";
 export const TUNEIN_ROOT_TYPE = "tunein://presets";
@@ -25,6 +26,7 @@ type TuneInBrowseState = {
   contextTitle: string;
   captureMyPresets: boolean;
   presetsByMenuIndex: Map<number, TuneInPreset>;
+  presetIndexByTitle: Map<string, number>;
   thumbnailByTitle: Map<string, string>;
   backgroundSignature: string;
 };
@@ -184,8 +186,8 @@ function createTuneInBackdrop(backgroundAsset: TuneInBackgroundAsset): string {
 }
 
 function createTuneInThumbnail(title: string, backgroundAsset: TuneInBackgroundAsset): string {
-  const lines = wrapStationTitle(title, 16, 4);
-  const fontSize = lines.length >= 4 ? 28 : lines.length === 3 ? 34 : lines.length === 2 ? 42 : 50;
+  const lines = wrapStationTitle(title, 14, 4);
+  const fontSize = lines.length >= 4 ? 26 : lines.length === 3 ? 32 : lines.length === 2 ? 40 : 48;
   const lineHeight = fontSize + 8;
   const startY = 34 + ((156 - lineHeight * lines.length) / 2) + fontSize;
   const text = lines
@@ -253,6 +255,7 @@ function getTuneInBrowseState(entityId: string): TuneInBrowseState | null {
     contextTitle: "",
     captureMyPresets: false,
     presetsByMenuIndex: new Map<number, TuneInPreset>(),
+    presetIndexByTitle: new Map<string, number>(),
     thumbnailByTitle: new Map<string, string>(),
     backgroundSignature: ""
   };
@@ -268,19 +271,42 @@ function normalizeTuneInLabel(label: string): string {
   return label.substring(pipeIndex + 1).trim();
 }
 
-function looksLikeTuneInDirectory(title: string): boolean {
+function looksLikeTuneInDirectory(title: string, iconId?: string): boolean {
   const normalized = title.trim().toLowerCase();
+  const normalizedIconId = (iconId || "").trim().toUpperCase();
+  const knownServiceNames = NETWORK_SERVICES.map((service) => service.toLowerCase());
+
+  if (["29", "2A", "2B", "2C", "38", "3A", "3B", "3C", "3D", "43", "44"].includes(normalizedIconId)) {
+    return true;
+  }
+
+  if (knownServiceNames.includes(normalized)) {
+    return true;
+  }
+
   return [
+    "login",
     "search",
     "browse",
     "my presets",
     "my favorites",
     "recent",
     "location",
+    "by location",
+    "by language",
+    "by genre",
     "local radio",
     "genre",
     "music",
     "sports",
+    "stations",
+    "shows",
+    "language",
+    "languages",
+    "topics",
+    "categories",
+    "profile",
+    "following",
     "podcast",
     "podcasts",
     "talk",
@@ -297,8 +323,14 @@ export function setTuneInBrowseContext(entityId: string, title: string): void {
   }
 
   const normalized = title.trim().toLowerCase();
+  const enteringMyPresets = normalized === "my presets" && state.contextTitle !== normalized;
   state.contextTitle = normalized;
   state.captureMyPresets = normalized === "my presets";
+
+  if (enteringMyPresets) {
+    state.presetsByMenuIndex.clear();
+    state.presetIndexByTitle.clear();
+  }
 }
 
 export function ingestTuneInListEntry(entityId: string, entry: string): void {
@@ -317,33 +349,75 @@ export function ingestTuneInListEntry(entityId: string, entry: string): void {
     return;
   }
 
-  const presetIndex = menuIndex + 1;
   const rawTitle = match[2].trim();
   const title = normalizeTuneInLabel(rawTitle);
-  if (!title) {
+  if (!title || looksLikeTuneInDirectory(title)) {
     return;
   }
 
-  const shouldInferPresets = !state.contextTitle && !looksLikeTuneInDirectory(title);
-  if (!state.captureMyPresets && !shouldInferPresets) {
+  if (!state.captureMyPresets && state.contextTitle !== "my presets") {
     return;
   }
 
-  if (menuIndex === 0) {
-    state.presetsByMenuIndex.clear();
+  const existingPresetIndex = state.presetIndexByTitle.get(title);
+  const presetIndex = existingPresetIndex ?? state.presetIndexByTitle.size + 1;
+
+  if (existingPresetIndex === undefined) {
+    state.presetIndexByTitle.set(title, presetIndex);
   }
 
-  if (!state.captureMyPresets && shouldInferPresets) {
-    state.captureMyPresets = true;
-    log.info("%s [%s] inferring TuneIn preset collection from list entry payload", integrationName, entityId);
-  }
-
-  state.presetsByMenuIndex.set(menuIndex, {
+  state.presetsByMenuIndex.set(presetIndex, {
     presetIndex,
     title,
     mediaId: `tunein:preset:${presetIndex}`,
     thumbnail: getOrCreateTuneInThumbnail(state, title)
   });
+}
+
+function unescapeXml(value: string): string {
+  return value
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'");
+}
+
+export function ingestTuneInXmlEntries(entityId: string, xmlPayload: string): void {
+  const state = getTuneInBrowseState(entityId);
+  if (!state || !xmlPayload) {
+    return;
+  }
+
+  if (!state.captureMyPresets && state.contextTitle !== "my presets") {
+    return;
+  }
+
+  const itemMatches = [...xmlPayload.matchAll(/<item\b([^>]*)\/?>/gi)];
+  for (const match of itemMatches) {
+    const attributes = match[1] || "";
+    const rawTitle = unescapeXml((attributes.match(/\btitle="([^"]*)"/i)?.[1] || "").trim());
+    const iconId = (attributes.match(/\biconid="([^"]*)"/i)?.[1] || "").trim();
+    const title = normalizeTuneInLabel(rawTitle);
+    if (!title || looksLikeTuneInDirectory(title, iconId)) {
+      continue;
+    }
+
+    const existingPresetIndex = state.presetIndexByTitle.get(title);
+    const presetIndex = existingPresetIndex ?? state.presetIndexByTitle.size + 1;
+
+    if (existingPresetIndex === undefined) {
+      state.presetIndexByTitle.set(title, presetIndex);
+    }
+
+    state.captureMyPresets = true;
+    state.presetsByMenuIndex.set(presetIndex, {
+      presetIndex,
+      title,
+      mediaId: `tunein:preset:${presetIndex}`,
+      thumbnail: getOrCreateTuneInThumbnail(state, title)
+    });
+  }
 }
 
 function getTuneInPresets(entityId: string): TuneInPreset[] {
@@ -352,13 +426,15 @@ function getTuneInPresets(entityId: string): TuneInPreset[] {
     return [];
   }
 
-  return [...state.presetsByMenuIndex.entries()]
-    .sort((a, b) => a[0] - b[0])
-    .map(([, preset]) => preset);
+  return [...state.presetsByMenuIndex.values()].sort((a, b) => a.title.localeCompare(b.title, undefined, { sensitivity: "base" }));
+}
+
+export function getTuneInPresetCount(entityId: string): number {
+  return getTuneInPresets(entityId).length;
 }
 
 export function hasTuneInPresets(entityId: string): boolean {
-  return getTuneInPresets(entityId).length > 0;
+  return getTuneInPresetCount(entityId) > 0;
 }
 
 export function isMediaBrowsingAvailable(entityId: string): boolean {
@@ -404,10 +480,43 @@ function createTuneInPresetItem(preset: TuneInPreset): uc.BrowseMediaItem {
   });
 }
 
+function getTuneInRootItemCount(presetCount: number): number {
+  return presetCount;
+}
+
+function resolveTuneInPage(entityId: string, mediaId?: string): { title: string; items: TuneInPreset[] } | undefined {
+  if (!mediaId) {
+    return undefined;
+  }
+
+  const match = mediaId.match(/^tunein:page:(\d+)$/);
+  if (!match) {
+    return undefined;
+  }
+
+  const page = parseInt(match[1], 10);
+  if (isNaN(page) || page < 1) {
+    return undefined;
+  }
+
+  const presets = getTuneInPresets(entityId);
+  const start = (page - 1) * TUNEIN_BROWSER_PAGE_SIZE;
+  if (start >= presets.length) {
+    return undefined;
+  }
+
+  const items = presets.slice(start, start + TUNEIN_BROWSER_PAGE_SIZE);
+  return {
+    title: `Presets ${start + 1}-${start + items.length}`,
+    items
+  };
+}
+
 function createRootItem(entityId: string, paging: uc.Paging): uc.BrowseMediaItem {
-  const items = getTuneInPresets(entityId)
-    .slice(paging.offset, paging.offset + paging.limit)
-    .map((preset) => createTuneInPresetItem(preset));
+  const presets = getTuneInPresets(entityId);
+  const items = presets
+    .map((preset) => createTuneInPresetItem(preset))
+    .slice(paging.offset, paging.offset + paging.limit);
 
   return new uc.BrowseMediaItem(TUNEIN_ROOT_ID, "TuneIn", {
     can_browse: true,
@@ -434,7 +543,26 @@ export async function browseTuneInMedia(entityId: string, options: uc.BrowseOpti
         ? tuneInPresets.map((preset) => `${preset.presetIndex}:${preset.title}`).join(", ")
         : "none"
     );
-    return uc.BrowseResult.fromPaging(createRootItem(entityId, options.paging), options.paging, tuneInPresets.length);
+    return uc.BrowseResult.fromPaging(
+      createRootItem(entityId, options.paging),
+      options.paging,
+      getTuneInRootItemCount(tuneInPresets.length)
+    );
+  }
+
+  const page = resolveTuneInPage(entityId, options.media_id);
+  if (page) {
+    const items = page.items.map((preset) => createTuneInPresetItem(preset));
+    return new uc.BrowseResult(
+      new uc.BrowseMediaItem(options.media_id, page.title, {
+        can_browse: true,
+        media_class: uc.KnownMediaClass.Directory,
+        media_type: TUNEIN_ROOT_TYPE,
+        thumbnail: createTuneInBackdrop(loadTuneInBackgroundDataUri()),
+        items
+      }),
+      new uc.Pagination(1, items.length, items.length)
+    );
   }
 
   const preset = resolveTuneInPreset(options.media_id, options.media_type);

@@ -35,7 +35,7 @@ test.serial("Media player browse returns TuneIn presets only for NET TuneIn", as
   t.is(browseResult.media?.items?.length, 2);
   t.deepEqual(
     browseResult.media?.items?.map((item) => item.title),
-    ["WTMD (Alternative Rock)", "America's Country (Country)"]
+    ["America's Country (Country)", "Decibel EuroDance (Euro Hits)"]
   );
   t.true((browseResult.media?.items?.[0].thumbnail || "").startsWith("data:image/"));
   t.true((browseResult.media?.items?.[0].thumbnail || "").length < 4000);
@@ -54,30 +54,92 @@ test.serial("Media player browse returns TuneIn presets only for NET TuneIn", as
   t.true((leafResult as uc.BrowseResult).media?.can_play ?? false);
 });
 
-test.serial("Media player browse can infer TuneIn presets from list entries without explicit context", async (t) => {
+test.serial("Media player browse ignores TuneIn menu entries until My Presets is active", async (t) => {
   const registrarModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/entityRegistrar.js")).href);
   const avrStateModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/avrState.js")).href);
   const mediaBrowserModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/mediaBrowser.js")).href);
 
   const EntityRegistrar = registrarModule.default as any;
   const { avrStateManager } = avrStateModule as any;
-  const { ingestTuneInListEntry } = mediaBrowserModule as any;
+  const { ingestTuneInListEntry, setTuneInBrowseContext } = mediaBrowserModule as any;
 
   const registrar = new EntityRegistrar();
-  const entityId = "TX-RZ50 192.168.1.2 main";
+  const entityId = "TX-RZ50 192.168.1.21 main";
   const player = registrar.createMediaPlayerEntity(entityId, 100, async () => uc.StatusCodes.Ok);
 
   avrStateManager.setSource(entityId, "net");
   avrStateManager.setSubSource(entityId, "tunein");
+  ingestTuneInListEntry(entityId, "U0-Login");
+  ingestTuneInListEntry(entityId, "U1-TuneIn");
+  ingestTuneInListEntry(entityId, "U2-Spotify");
+
+  let result = await player.browse({ paging: new uc.Paging(1, 10) });
+
+  t.true(result instanceof uc.BrowseResult);
+  t.deepEqual((result as uc.BrowseResult).media?.items?.map((item) => item.title), []);
+
+  setTuneInBrowseContext(entityId, "My Presets");
   ingestTuneInListEntry(entityId, "U0-89.7 | WTMD (Alternative Rock)");
   ingestTuneInListEntry(entityId, "U1-America's Country (Country)");
+
+  result = await player.browse({ paging: new uc.Paging(1, 10) });
+  t.deepEqual((result as uc.BrowseResult).media?.items?.map((item) => item.title), [
+    "America's Country (Country)",
+    "WTMD (Alternative Rock)"
+  ]);
+});
+
+test.serial("TuneIn browse root exposes all presets when the list is longer than 10", async (t) => {
+  const registrarModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/entityRegistrar.js")).href);
+  const avrStateModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/avrState.js")).href);
+  const mediaBrowserModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/mediaBrowser.js")).href);
+
+  const EntityRegistrar = registrarModule.default as any;
+  const { avrStateManager } = avrStateModule as any;
+  const { setTuneInBrowseContext, ingestTuneInListEntry, ingestTuneInXmlEntries } = mediaBrowserModule as any;
+
+  const registrar = new EntityRegistrar();
+  const entityId = "TX-RZ50 192.168.1.3 main";
+  const player = registrar.createMediaPlayerEntity(entityId, 100, async () => uc.StatusCodes.Ok);
+
+  avrStateManager.setSource(entityId, "net");
+  avrStateManager.setSubSource(entityId, "tunein");
+  setTuneInBrowseContext(entityId, "My Presets");
+
+  for (let index = 0; index < 10; index += 1) {
+    ingestTuneInListEntry(entityId, `U${index}-Station ${String.fromCharCode(65 + index)}`);
+  }
+
+  const pagedWindow = ["Station B", "Station C", "Station D", "Station E", "Station F", "Station G", "Station H", "Station I", "Station J", "Station K"];
+  pagedWindow.forEach((title, index) => ingestTuneInListEntry(entityId, `U${index}-${title}`));
+  const finalWindow = ["Station C", "Station D", "Station E", "Station F", "Station G", "Station H", "Station I", "Station J", "Station K", "Station L"];
+  finalWindow.forEach((title, index) => ingestTuneInListEntry(entityId, `U${index}-${title}`));
+
+  ingestTuneInXmlEntries(entityId, '<?xml version="1.0" encoding="UTF-8"?><response status="ok"><items offset="0000" totalitems="000F"><item iconid="29" title="Browse" url="menu-1"/><item iconid="44" title="Stations" url="menu-2"/><item iconid="2F" title="Station A" url="0"/><item iconid="2F" title="Station B" url="1"/><item iconid="2F" title="Station C" url="2"/><item iconid="2F" title="Station D" url="3"/><item iconid="2F" title="Station E" url="4"/><item iconid="2F" title="Station F" url="5"/><item iconid="2F" title="Station G" url="6"/><item iconid="44" title="By Location" url="menu-3"/><item iconid="2F" title="Station H" url="7"/><item iconid="2F" title="Station I" url="8"/><item iconid="2F" title="Station J" url="9"/><item iconid="2F" title="Station K" url="10"/><item iconid="2F" title="Station L" url="11"/></items></response>');
 
   const result = await player.browse({ paging: new uc.Paging(1, 10) });
 
   t.true(result instanceof uc.BrowseResult);
   t.deepEqual((result as uc.BrowseResult).media?.items?.map((item) => item.title), [
-    "WTMD (Alternative Rock)",
-    "America's Country (Country)"
+    "Station A",
+    "Station B",
+    "Station C",
+    "Station D",
+    "Station E",
+    "Station F",
+    "Station G",
+    "Station H",
+    "Station I",
+    "Station J"
+  ]);
+  t.is((result as uc.BrowseResult).pagination.count, 12);
+
+  const pageResult = await player.browse({ paging: new uc.Paging(2, 10) });
+
+  t.true(pageResult instanceof uc.BrowseResult);
+  t.deepEqual((pageResult as uc.BrowseResult).media?.items?.map((item) => item.title), [
+    "Station K",
+    "Station L"
   ]);
 });
 
@@ -130,7 +192,7 @@ test.serial("TuneIn preset cache survives post-select menu updates", async (t) =
   const { setTuneInBrowseContext, ingestTuneInListEntry } = mediaBrowserModule as any;
 
   const registrar = new EntityRegistrar();
-  const entityId = "TX-RZ50 192.168.1.2 main";
+  const entityId = "TX-RZ50 192.168.1.22 main";
   const player = registrar.createMediaPlayerEntity(entityId, 100, async () => uc.StatusCodes.Ok);
 
   avrStateManager.setSource(entityId, "net");
@@ -149,8 +211,8 @@ test.serial("TuneIn preset cache survives post-select menu updates", async (t) =
   result = await player.browse({ paging: new uc.Paging(1, 10) });
   t.true(result instanceof uc.BrowseResult);
   t.deepEqual((result as uc.BrowseResult).media?.items?.map((item) => item.title), [
-    "WTMD (Alternative Rock)",
-    "America's Country (Country)"
+    "America's Country (Country)",
+    "WTMD (Alternative Rock)"
   ]);
 });
 
@@ -182,6 +244,47 @@ test.serial("TuneIn service selection preloads My Presets for browsing", async (
   t.true(rawCommands.includes("NTCTOP"));
   t.true(rawCommands.includes("NTCSELECT"));
   t.true(rawCommands.includes("NLSI00001"));
+  t.true(rawCommands.some((cmd) => cmd.startsWith("NLAL")));
+  t.true(rawCommands.includes("NTCDOWN"));
+});
+
+test.serial("CommandSender silently absorbs shuffle, repeat, and browse commands", async (t) => {
+  const senderModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/commandSender.js")).href);
+  const avrStateModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/avrState.js")).href);
+
+  const CommandSender = senderModule.CommandSender as any;
+  const { avrStateManager } = avrStateModule as any;
+
+  class MockEiscp {
+    public connected = true;
+    async waitForConnect() {
+      return;
+    }
+    async command() {
+      return;
+    }
+    async raw() {
+      return;
+    }
+  }
+
+  const entityId = "M 1.2.3.4 main";
+  const sender = new CommandSender(
+    { updateEntityAttributes: () => true } as any,
+    { avrs: [{ model: "M", ip: "1.2.3.4", zone: "main", port: 60128, netMenuDelay: 0 }] },
+    new MockEiscp() as any,
+    null
+  );
+
+  avrStateManager.setPowerState(entityId, "on");
+  avrStateManager.setSource(entityId, "net");
+  avrStateManager.setSubSource(entityId, "tunein");
+
+  const entity = new uc.MediaPlayer(entityId, { en: entityId }, {});
+
+  t.is(await sender.sharedCmdHandler(entity, uc.MediaPlayerCommands.Shuffle), uc.StatusCodes.Ok);
+  t.is(await sender.sharedCmdHandler(entity, uc.MediaPlayerCommands.Repeat), uc.StatusCodes.Ok);
+  t.is(await sender.sharedCmdHandler(entity, "browse"), uc.StatusCodes.Ok);
 });
 
 test.serial("CommandSender play_media routes TuneIn preset IDs to tunein-preset", async (t) => {

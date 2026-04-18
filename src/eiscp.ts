@@ -131,7 +131,8 @@ export class EiscpDriver extends EventEmitter {
     NST: (value, _cmd, result) => this.handleNST(value, result),
     FLD: (value, _cmd, result) => this.handleFLD(value, result),
     NLT: (value, _cmd, result) => this.handleNLT(value, result),
-    NLS: (value, _cmd, result) => this.handleNLS(value, result)
+    NLS: (value, _cmd, result) => this.handleNLS(value, result),
+    NLA: (value, _cmd, result) => this.handleNLA(value, result)
   };
 
   constructor(config?: EiscpConfig) {
@@ -415,6 +416,17 @@ export class EiscpDriver extends EventEmitter {
 
     result.command = "NLS";
     result.argument = entry;
+    return result;
+  }
+
+  private handleNLA(value: string, result: CommandResult): CommandResult {
+    const xmlStart = value.indexOf("<");
+    if (xmlStart === -1 || value.charAt(0) !== "X" || value.charAt(5).toUpperCase() !== "S") {
+      return result;
+    }
+
+    result.command = "NLA";
+    result.argument = value.substring(xmlStart).trim();
     return result;
   }
 

@@ -72,6 +72,9 @@ export class CommandReceiver {
       NLS: async (avrUpdates, entityId) => {
         await this.zoneAgnosticProcessor.handleNls(entityId, avrUpdates.argument.toString());
       },
+      NLA: async (avrUpdates, entityId) => {
+        await this.zoneAgnosticProcessor.handleNla(entityId, avrUpdates.argument.toString());
+      },
       FLD: async (avrUpdates, entityId, eventZone) => {
         await this.zoneAgnosticProcessor.handleFld(entityId, avrUpdates.argument.toString(), eventZone);
       },
