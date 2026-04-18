@@ -75,6 +75,28 @@ function normalizeTuneInLabel(label: string): string {
   return label.substring(pipeIndex + 1).trim();
 }
 
+function looksLikeTuneInDirectory(title: string): boolean {
+  const normalized = title.trim().toLowerCase();
+  return [
+    "search",
+    "browse",
+    "my presets",
+    "my favorites",
+    "recent",
+    "location",
+    "local radio",
+    "genre",
+    "music",
+    "sports",
+    "podcast",
+    "podcasts",
+    "talk",
+    "news",
+    "recommended",
+    "trending"
+  ].some((prefix) => normalized.startsWith(prefix));
+}
+
 export function setTuneInBrowseContext(entityId: string, title: string): void {
   const state = getTuneInBrowseState(entityId);
   if (!state) {
@@ -83,12 +105,7 @@ export function setTuneInBrowseContext(entityId: string, title: string): void {
 
   const normalized = title.trim().toLowerCase();
   state.contextTitle = normalized;
-  const isMyPresets = normalized === "my presets";
-
-  if (isMyPresets) {
-    state.presetsByMenuIndex.clear();
-  }
-  state.captureMyPresets = isMyPresets;
+  state.captureMyPresets = normalized === "my presets";
 }
 
 export function ingestTuneInListEntry(entityId: string, entry: string): void {
@@ -107,24 +124,25 @@ export function ingestTuneInListEntry(entityId: string, entry: string): void {
     return;
   }
 
-  // U0 indicates a fresh list; rebuild to avoid stale entries surviving from older captures.
-  if (menuIndex === 0 && state.presetsByMenuIndex.size > 0) {
-    state.presetsByMenuIndex.clear();
-  }
-
-  if (!state.captureMyPresets) {
-    state.captureMyPresets = true;
-    if (!state.contextTitle) {
-      state.presetsByMenuIndex.clear();
-      log.info("%s [%s] inferring TuneIn preset collection from list entry payload", integrationName, entityId);
-    }
-  }
-
   const presetIndex = menuIndex + 1;
   const rawTitle = match[2].trim();
   const title = normalizeTuneInLabel(rawTitle);
   if (!title) {
     return;
+  }
+
+  const shouldInferPresets = !state.contextTitle && !looksLikeTuneInDirectory(title);
+  if (!state.captureMyPresets && !shouldInferPresets) {
+    return;
+  }
+
+  if (menuIndex === 0) {
+    state.presetsByMenuIndex.clear();
+  }
+
+  if (!state.captureMyPresets && shouldInferPresets) {
+    state.captureMyPresets = true;
+    log.info("%s [%s] inferring TuneIn preset collection from list entry payload", integrationName, entityId);
   }
 
   state.presetsByMenuIndex.set(menuIndex, {
@@ -143,6 +161,10 @@ function getTuneInPresets(entityId: string): TuneInPreset[] {
   return [...state.presetsByMenuIndex.entries()]
     .sort((a, b) => a[0] - b[0])
     .map(([, preset]) => preset);
+}
+
+export function hasTuneInPresets(entityId: string): boolean {
+  return getTuneInPresets(entityId).length > 0;
 }
 
 export function isMediaBrowsingAvailable(entityId: string): boolean {

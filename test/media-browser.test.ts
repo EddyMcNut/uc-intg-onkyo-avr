@@ -79,6 +79,109 @@ test.serial("Media player browse can infer TuneIn presets from list entries with
   ]);
 });
 
+test.serial("TuneIn selection keeps subsource and state so browse can be repeated", async (t) => {
+  const avrStateModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/avrState.js")).href);
+  const mediaBrowserModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/mediaBrowser.js")).href);
+  const processorModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/zoneAgnosticUpdateProcessor.js")).href);
+
+  const { avrStateManager } = avrStateModule as any;
+  const { isMediaBrowsingAvailable } = mediaBrowserModule as any;
+  const { ZoneAgnosticUpdateProcessor } = processorModule as any;
+
+  const capturedStates = new Map<string, uc.MediaPlayerStates>();
+  const mockDriver = {
+    updateEntityAttributes: (id: string, attrs: { [key: string]: string | number | boolean }) => {
+      const state = attrs[uc.MediaPlayerAttributes.State] as uc.MediaPlayerStates | undefined;
+      if (state) {
+        capturedStates.set(id, state);
+      }
+      return true;
+    }
+  } as any;
+
+  const mockEiscp = {
+    command: async () => undefined,
+    raw: async () => undefined
+  } as any;
+
+  const entityId = "M 1.2.3.4 main";
+  const processor = new ZoneAgnosticUpdateProcessor(mockDriver, { ip: "1.2.3.4", albumArtURL: "na" } as any, mockEiscp);
+
+  avrStateManager.setPowerState(entityId, "on", mockDriver);
+  avrStateManager.setSource(entityId, "net", undefined, undefined, mockDriver);
+  avrStateManager.setSubSource(entityId, "tunein", undefined, undefined, mockDriver);
+
+  await processor.handleFld(entityId, "WTMD (Alternative Rock)", "main");
+
+  t.is(avrStateManager.getSubSource(entityId), "tunein");
+  t.true(isMediaBrowsingAvailable(entityId));
+  t.is(capturedStates.get(entityId), uc.MediaPlayerStates.Playing);
+});
+
+test.serial("TuneIn preset cache survives post-select menu updates", async (t) => {
+  const registrarModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/entityRegistrar.js")).href);
+  const avrStateModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/avrState.js")).href);
+  const mediaBrowserModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/mediaBrowser.js")).href);
+
+  const EntityRegistrar = registrarModule.default as any;
+  const { avrStateManager } = avrStateModule as any;
+  const { setTuneInBrowseContext, ingestTuneInListEntry } = mediaBrowserModule as any;
+
+  const registrar = new EntityRegistrar();
+  const entityId = "TX-RZ50 192.168.1.2 main";
+  const player = registrar.createMediaPlayerEntity(entityId, 100, async () => uc.StatusCodes.Ok);
+
+  avrStateManager.setSource(entityId, "net");
+  avrStateManager.setSubSource(entityId, "tunein");
+  setTuneInBrowseContext(entityId, "My Presets");
+  ingestTuneInListEntry(entityId, "U0-89.7 | WTMD (Alternative Rock)");
+  ingestTuneInListEntry(entityId, "U1-America's Country (Country)");
+
+  let result = await player.browse({ paging: new uc.Paging(1, 10) });
+  t.true(result instanceof uc.BrowseResult);
+  t.is((result as uc.BrowseResult).media?.items?.length, 2);
+
+  setTuneInBrowseContext(entityId, "Now Playing");
+  ingestTuneInListEntry(entityId, "U0-Search Stations");
+
+  result = await player.browse({ paging: new uc.Paging(1, 10) });
+  t.true(result instanceof uc.BrowseResult);
+  t.deepEqual((result as uc.BrowseResult).media?.items?.map((item) => item.title), [
+    "WTMD (Alternative Rock)",
+    "America's Country (Country)"
+  ]);
+});
+
+test.serial("TuneIn service selection preloads My Presets for browsing", async (t) => {
+  const avrStateModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/avrState.js")).href);
+  const processorModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/zoneAgnosticUpdateProcessor.js")).href);
+
+  const { avrStateManager } = avrStateModule as any;
+  const { ZoneAgnosticUpdateProcessor } = processorModule as any;
+
+  const rawCommands: string[] = [];
+  const mockDriver = { updateEntityAttributes: () => true } as any;
+  const mockEiscp = {
+    config: { netMenuDelay: 0, tuneinPresetPosition: 1 },
+    command: async () => undefined,
+    raw: async (cmd: string) => {
+      rawCommands.push(cmd);
+    }
+  } as any;
+
+  const entityId = "M 1.2.3.4 main";
+  const processor = new ZoneAgnosticUpdateProcessor(mockDriver, { ip: "1.2.3.4", albumArtURL: "na" } as any, mockEiscp);
+
+  avrStateManager.setPowerState(entityId, "on", mockDriver);
+  avrStateManager.setSource(entityId, "net", undefined, undefined, mockDriver);
+
+  await processor.handleNlt(entityId, "TuneIn", "main");
+
+  t.true(rawCommands.includes("NTCTOP"));
+  t.true(rawCommands.includes("NTCSELECT"));
+  t.true(rawCommands.includes("NLSI00001"));
+});
+
 test.serial("CommandSender play_media routes TuneIn preset IDs to tunein-preset", async (t) => {
   const senderModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/commandSender.js")).href);
   const avrStateModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/avrState.js")).href);

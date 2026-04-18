@@ -5,8 +5,8 @@ import { buildPhysicalAvrId, OnkyoConfig } from "./configManager.js";
 import { EiscpDriver } from "./eiscp.js";
 import log from "./loggers.js";
 import { delay } from "./utils.js";
-import { ALBUM_ART, SONG_INFO } from "./constants.js";
-import { ingestTuneInListEntry, setTuneInBrowseContext } from "./mediaBrowser.js";
+import { NETWORK_SERVICES, SONG_INFO } from "./constants.js";
+import { hasTuneInPresets, ingestTuneInListEntry, setTuneInBrowseContext } from "./mediaBrowser.js";
 
 const integrationName = "zoneAgnosticUpdateProcessor:";
 
@@ -38,6 +38,7 @@ export class ZoneAgnosticUpdateProcessor {
 
   private sharedMediaState: Map<string, SharedAvrMediaState> = new Map();
   private currentTrackId: Map<string, string> = new Map();
+  private tuneInPreloadInFlight: Set<string> = new Set();
 
   constructor(
     private readonly driver: uc.IntegrationAPI,
@@ -89,6 +90,30 @@ export class ZoneAgnosticUpdateProcessor {
 
   resetZone(entityId: string): void {
     this.currentTrackId.delete(entityId);
+  }
+
+  private async preloadTuneInPresets(entityId: string): Promise<void> {
+    const physicalAvrId = this.getPhysicalAvrId(entityId);
+    if (this.tuneInPreloadInFlight.has(physicalAvrId) || hasTuneInPresets(entityId)) {
+      return;
+    }
+
+    this.tuneInPreloadInFlight.add(physicalAvrId);
+    const menuDelay = this.eiscpInstance["config"]?.netMenuDelay ?? 2500;
+    const myPresetsPosition = String(this.eiscpInstance["config"]?.tuneinPresetPosition ?? 1).padStart(5, "0");
+
+    try {
+      log.info("%s [%s] preloading TuneIn My Presets for media browsing (position %s)", integrationName, entityId, myPresetsPosition);
+      await this.eiscpInstance.raw("NTCTOP");
+      await delay(menuDelay);
+      await this.eiscpInstance.raw("NTCSELECT");
+      await delay(menuDelay * 3);
+      await this.eiscpInstance.raw(`NLSI${myPresetsPosition}`);
+    } catch (err) {
+      log.warn("%s [%s] failed to preload TuneIn My Presets: %s", integrationName, entityId, err);
+    } finally {
+      this.tuneInPreloadInFlight.delete(physicalAvrId);
+    }
   }
 
   async maybeUpdateImage(entityId: string, force: boolean = false): Promise<void> {
@@ -181,6 +206,8 @@ export class ZoneAgnosticUpdateProcessor {
 
   async handleNlt(sourceEntityId: string, serviceName: string, eventZone: string): Promise<void> {
     const affectedZones = avrStateManager.getEntitiesByPhysicalAvrAndSource(this.getPhysicalAvrId(sourceEntityId), "net");
+    const normalizedService = serviceName.toLowerCase();
+
     for (const zoneEntityId of affectedZones) {
       avrStateManager.setSubSource(zoneEntityId, serviceName, this.eiscpInstance, eventZone, this.driver);
       const frontPanelDisplaySensorId = `${zoneEntityId}_front_panel_display_sensor`;
@@ -190,7 +217,11 @@ export class ZoneAgnosticUpdateProcessor {
       });
     }
 
-    const hasSongInfo = SONG_INFO.some((name) => serviceName.toLowerCase().includes(name));
+    if (normalizedService === "tunein" && affectedZones.some((zoneEntityId) => !hasTuneInPresets(zoneEntityId))) {
+      await this.preloadTuneInPresets(sourceEntityId);
+    }
+
+    const hasSongInfo = SONG_INFO.some((name) => normalizedService.includes(name));
     if (hasSongInfo && affectedZones.length > 0) {
       await this.eiscpInstance.raw("NATQSTN");
       await this.eiscpInstance.raw("NTIQSTN");
@@ -238,25 +269,38 @@ export class ZoneAgnosticUpdateProcessor {
 
     const netZones = avrStateManager.getEntitiesByPhysicalAvrAndSource(physicalAvrId, "net");
     if (netZones.length > 0) {
-      const nextSubSource = frontPanelText.toLowerCase();
-      const needsUpdate = netZones.some((zoneEntityId) => avrStateManager.getSubSource(zoneEntityId) !== nextSubSource);
-      if (needsUpdate) {
-        for (const zoneEntityId of netZones) {
-          avrStateManager.setSubSource(zoneEntityId, frontPanelText, this.eiscpInstance, eventZone, this.driver);
-          const frontPanelDisplaySensorId = `${zoneEntityId}_front_panel_display_sensor`;
-          this.driver.updateEntityAttributes(frontPanelDisplaySensorId, {
-            [uc.SensorAttributes.State]: uc.SensorStates.On,
-            [uc.SensorAttributes.Value]: frontPanelText
-          });
+      const normalizedText = frontPanelText.toLowerCase();
+      const detectedService = NETWORK_SERVICES.find((service) => normalizedText.includes(service.toLowerCase()));
+
+      for (const zoneEntityId of netZones) {
+        const frontPanelDisplaySensorId = `${zoneEntityId}_front_panel_display_sensor`;
+        this.driver.updateEntityAttributes(frontPanelDisplaySensorId, {
+          [uc.SensorAttributes.State]: uc.SensorStates.On,
+          [uc.SensorAttributes.Value]: frontPanelText
+        });
+      }
+
+      if (detectedService) {
+        const nextSubSource = detectedService.toLowerCase();
+        const needsUpdate = netZones.some((zoneEntityId) => avrStateManager.getSubSource(zoneEntityId) !== nextSubSource);
+        if (needsUpdate) {
+          for (const zoneEntityId of netZones) {
+            avrStateManager.setSubSource(zoneEntityId, nextSubSource, this.eiscpInstance, eventZone, this.driver);
+          }
         }
 
-        const hasSongInfo = SONG_INFO.some((name) => frontPanelText.toLowerCase().includes(name));
+        if (nextSubSource === "tunein" && netZones.some((zoneEntityId) => !hasTuneInPresets(zoneEntityId))) {
+          await this.preloadTuneInPresets(sourceEntityId);
+        }
+
+        const hasSongInfo = SONG_INFO.some((name) => nextSubSource.includes(name));
         if (hasSongInfo) {
           await this.eiscpInstance.raw("NATQSTN");
           await this.eiscpInstance.raw("NTIQSTN");
           await this.eiscpInstance.raw("NALQSTN");
         }
       }
+
       return;
     }
 
