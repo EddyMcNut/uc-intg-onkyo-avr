@@ -20,15 +20,10 @@ let cachedTuneInBackgroundAsset: TuneInBackgroundAsset | null = null;
 function loadTuneInBackgroundDataUri(): TuneInBackgroundAsset {
   const currentDir = path.dirname(fileURLToPath(import.meta.url));
   const candidatePaths = [
+    path.resolve(currentDir, "logos/tunein.svg"),
     path.resolve(currentDir, "../logos/tunein.svg"),
     path.resolve(currentDir, "../../logos/tunein.svg"),
-    path.resolve(process.cwd(), "logos/tunein.svg"),
-    path.resolve(currentDir, "../thumbnails/TuneIn.PNG"),
-    path.resolve(currentDir, "../thumbnails/TuneIn.png"),
-    path.resolve(currentDir, "../../thumbnails/TuneIn.PNG"),
-    path.resolve(currentDir, "../../thumbnails/TuneIn.png"),
-    path.resolve(process.cwd(), "thumbnails/TuneIn.PNG"),
-    path.resolve(process.cwd(), "thumbnails/TuneIn.png")
+    path.resolve(process.cwd(), "logos/tunein.svg")
   ];
 
   for (const candidate of candidatePaths) {
@@ -47,9 +42,9 @@ function loadTuneInBackgroundDataUri(): TuneInBackgroundAsset {
         const base64 = fileContents.toString("base64");
         const dataUri = `data:${mimeType};base64,${base64}`;
         const svgContent = extension === ".svg" ? fileContents.toString("utf8") : "";
-        const pathMatch = svgContent.match(/<path[^>]*d="([^"]+)"[^>]*>/s);
+        const pathMatch = svgContent.match(/<path[^>]*d=(['"])([\s\S]*?)\1[^>]*>/i);
         const logoMarkup = pathMatch
-          ? `<g transform="translate(202 228) scale(.38)"><path fill="#17245f" fill-rule="evenodd" clip-rule="evenodd" d="${pathMatch[1]}"/></g>`
+          ? `<g transform="translate(202 228) scale(.38)"><path fill="#17245f" fill-rule="evenodd" clip-rule="evenodd" d="${pathMatch[2]}"/></g>`
           : null;
 
         cachedTuneInBackgroundAsset = {

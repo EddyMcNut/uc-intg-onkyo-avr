@@ -130,8 +130,12 @@ jobs:
           cp driver.json artifacts/
 
           # Include runtime logo assets used by generated media thumbnails.
+          # Copy them both next to the package root and next to the runtime bin
+          # so the integration can resolve them in either installation layout.
           if [ -d logos ]; then
             cp -R logos artifacts/
+            cp -R logos artifacts/bin/
+            echo "Packaged logo assets:" && ls -la artifacts/logos artifacts/bin/logos || true
           fi
 
           ARTIFACT_NAME="uc-intg-${{ env.INTG_NAME }}-${{ steps.pkg.outputs.version }}"
