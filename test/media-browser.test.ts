@@ -37,6 +37,8 @@ test.serial("Media player browse returns TuneIn presets only for NET TuneIn", as
     browseResult.media?.items?.map((item) => item.title),
     ["WTMD (Alternative Rock)", "America's Country (Country)"]
   );
+  t.true((browseResult.media?.items?.[0].thumbnail || "").startsWith("data:image/"));
+  t.true((browseResult.media?.items?.[0].thumbnail || "").length < 4000);
   t.is(browseResult.pagination.page, 1);
   t.is(browseResult.pagination.limit, 2);
   t.is(browseResult.pagination.count, 3);
