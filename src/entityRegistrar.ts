@@ -1,10 +1,11 @@
 /*jslint node:true nomen:true*/
 "use strict";
 import * as uc from "@unfoldedcircle/integration-api";
-import { Select, SelectStates } from "./selectEntity.js";
+import { Select, SelectStates } from "@unfoldedcircle/integration-api";
 import { eiscpMappings } from "./eiscp-mappings.js";
 import { getCompatibleListeningModes } from "./listeningModeFilters.js";
 import { ConfigManager, buildEntityId } from "./configManager.js";
+import { browseTuneInMedia } from "./mediaBrowser.js";
 
 export default class EntityRegistrar {
   constructor() {}
@@ -86,11 +87,13 @@ export default class EntityRegistrar {
           uc.MediaPlayerFeatures.OnOff,
           uc.MediaPlayerFeatures.Toggle,
           uc.MediaPlayerFeatures.PlayPause,
+          uc.MediaPlayerFeatures.PlayMedia,
           uc.MediaPlayerFeatures.MuteToggle,
           uc.MediaPlayerFeatures.Volume,
           uc.MediaPlayerFeatures.VolumeUpDown,
           uc.MediaPlayerFeatures.ChannelSwitcher,
           uc.MediaPlayerFeatures.SelectSource,
+          uc.MediaPlayerFeatures.BrowseMedia,
           uc.MediaPlayerFeatures.MediaTitle,
           uc.MediaPlayerFeatures.MediaArtist,
           uc.MediaPlayerFeatures.MediaAlbum,
@@ -118,6 +121,7 @@ export default class EntityRegistrar {
       }
     );
     if (cmdHandler) mediaPlayerEntity.setCmdHandler(cmdHandler);
+    mediaPlayerEntity.browse = async (options: uc.BrowseOptions) => browseTuneInMedia(avrEntry, options);
     return mediaPlayerEntity;
   }
 

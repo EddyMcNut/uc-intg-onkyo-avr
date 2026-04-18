@@ -23,6 +23,7 @@ Read this readme completely, it contains some tips for known issues and it also 
 - Your AVR(s) needs to be connected to the same network as you UC Remote (if AVR IP is 192.168.1.x then UC Remote IP must also start with 192.168.1).
 - Your AVR(s) needs to be ON or STANDBY.
 - A wired network connection is preferred but several users report it's working fine while AVR is connected over WiFi.
+- Your AVR is configured to allow/enable control over IP/Network
 - Your UC Remote needs to have `New reconnect logic` enabled.
 
   ![](./screenshots/new-reconnect-logic.png)

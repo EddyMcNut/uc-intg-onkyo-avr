@@ -1,128 +1,100 @@
 import * as uc from "@unfoldedcircle/integration-api";
-import crypto from "crypto";
 import { avrStateManager } from "./avrState.js";
-import { buildPhysicalAvrId, OnkyoConfig } from "./configManager.js";
+import { OnkyoConfig } from "./configManager.js";
 import { EiscpDriver } from "./eiscp.js";
 import log from "./loggers.js";
-import { delay } from "./utils.js";
-import { ALBUM_ART, SONG_INFO } from "./constants.js";
+import { NETWORK_SERVICES, SONG_INFO } from "./constants.js";
+import { hasTuneInPresets, ingestTuneInListEntry, ingestTuneInXmlEntries, setTuneInBrowseContext } from "./mediaBrowser.js";
+import { TuneInPreloader } from "./tuneInPreloader.js";
+import { ZoneAgnosticMediaStateStore } from "./zoneAgnosticMediaState.js";
+import { ZoneMediaRenderer } from "./zoneMediaRenderer.js";
 
 const integrationName = "zoneAgnosticUpdateProcessor:";
-
-interface NowPlayingState {
-  station?: string;
-  artist?: string;
-  album?: string;
-  title?: string;
-}
-
-interface SharedAvrMediaState {
-  nowPlayingBySource: Map<string, NowPlayingState>;
-  lastImageHash: string;
-  currentImageUrl: string;
-}
 
 export class ZoneAgnosticUpdateProcessor {
   public static readonly ZONE_AGNOSTIC_COMMANDS = new Set<string>([
     "IFA",
     "DSN",
+    "NST",
     "NLT",
+    "NLT_CONTEXT",
+    "NLS",
+    "NLA",
     "FLD",
     "NTM",
     "metadata"
   ]);
 
-  private sharedMediaState: Map<string, SharedAvrMediaState> = new Map();
-  private currentTrackId: Map<string, string> = new Map();
+  private readonly mediaStateStore = new ZoneAgnosticMediaStateStore();
+  private readonly tuneInPreloader: TuneInPreloader;
+  private readonly mediaRenderer: ZoneMediaRenderer;
 
   constructor(
     private readonly driver: uc.IntegrationAPI,
     private readonly config: OnkyoConfig,
     private readonly eiscpInstance: EiscpDriver
-  ) {}
+  ) {
+    this.tuneInPreloader = new TuneInPreloader(eiscpInstance, (entityId) => this.mediaStateStore.getPhysicalAvrId(entityId));
+    this.mediaRenderer = new ZoneMediaRenderer(driver, config, this.mediaStateStore);
+  }
 
   public static isZoneAgnosticCommand(command: string): boolean {
     return ZoneAgnosticUpdateProcessor.ZONE_AGNOSTIC_COMMANDS.has(command);
   }
 
   private getPhysicalAvrId(entityId: string): string {
-    const [model, host] = entityId.split(" ");
-    return buildPhysicalAvrId(model, host);
+    return this.mediaStateStore.getPhysicalAvrId(entityId);
   }
 
-  private getSharedAvrMediaState(entityId: string): SharedAvrMediaState {
-    const physicalAvrId = this.getPhysicalAvrId(entityId);
-    const existing = this.sharedMediaState.get(physicalAvrId);
-    if (existing) {
-      return existing;
+  private getNetZones(sourceEntityId: string): string[] {
+    return avrStateManager.getEntitiesByPhysicalAvrAndSource(this.getPhysicalAvrId(sourceEntityId), "net");
+  }
+
+  private getTuneInZones(sourceEntityId: string): string[] {
+    return this.getNetZones(sourceEntityId).filter((zoneEntityId) => avrStateManager.getSubSource(zoneEntityId) === "tunein");
+  }
+
+  private updateFrontPanelDisplay(zoneEntityIds: string[], text: string): void {
+    for (const zoneEntityId of zoneEntityIds) {
+      const frontPanelDisplaySensorId = `${zoneEntityId}_front_panel_display_sensor`;
+      this.driver.updateEntityAttributes(frontPanelDisplaySensorId, {
+        [uc.SensorAttributes.State]: uc.SensorStates.On,
+        [uc.SensorAttributes.Value]: text
+      });
     }
-
-    const created: SharedAvrMediaState = {
-      nowPlayingBySource: new Map(),
-      lastImageHash: "",
-      currentImageUrl: ""
-    };
-    this.sharedMediaState.set(physicalAvrId, created);
-    return created;
   }
 
-  private getNowPlaying(entityId: string, source: string): NowPlayingState {
-    const sharedState = this.getSharedAvrMediaState(entityId);
-    const existing = sharedState.nowPlayingBySource.get(source);
-    if (existing) {
-      return existing;
+  private async maybePreloadTuneIn(sourceEntityId: string, zoneEntityIds: string[]): Promise<void> {
+    if (zoneEntityIds.some((zoneEntityId) => !hasTuneInPresets(zoneEntityId))) {
+      await this.preloadTuneInPresets(sourceEntityId);
     }
-
-    const created: NowPlayingState = {};
-    sharedState.nowPlayingBySource.set(source, created);
-    return created;
   }
 
-  private updateNowPlaying(entityId: string, source: string, updates: NowPlayingState): void {
-    const state = this.getNowPlaying(entityId, source);
-    Object.assign(state, updates);
-  }
-
-  resetZone(entityId: string): void {
-    this.currentTrackId.delete(entityId);
-  }
-
-  async maybeUpdateImage(entityId: string, force: boolean = false): Promise<void> {
-    if (!this.config.albumArtURL || this.config.albumArtURL === "na") {
+  private async maybeRequestSongInfo(serviceName: string, zoneCount: number): Promise<void> {
+    if (zoneCount === 0) {
       return;
     }
 
-    const sharedState = this.getSharedAvrMediaState(entityId);
-    const physicalAvrId = this.getPhysicalAvrId(entityId);
-
-    if (force) {
-      sharedState.lastImageHash = "";
+    const hasSongInfo = SONG_INFO.some((name) => serviceName.includes(name));
+    if (!hasSongInfo) {
+      return;
     }
 
-    const imageUrl = `http://${this.config.ip}/${this.config.albumArtURL}`;
-    const previousHash = sharedState.lastImageHash;
+    await this.eiscpInstance.raw("NATQSTN");
+    await this.eiscpInstance.raw("NTIQSTN");
+    await this.eiscpInstance.raw("NALQSTN");
+  }
 
-    let newHash = await this.getImageHash(imageUrl);
-    let attempts = 0;
-    while (newHash === previousHash && attempts < 3) {
-      attempts++;
-      await delay(500);
-      newHash = await this.getImageHash(imageUrl);
-    }
+  resetZone(entityId: string): void {
+    this.mediaStateStore.resetZone(entityId);
+  }
 
-    if (newHash !== previousHash) {
-      sharedState.lastImageHash = newHash;
-      sharedState.currentImageUrl = `${imageUrl}?hash=${newHash}`;
-    }
+  async maybeUpdateImage(entityId: string, force: boolean = false): Promise<void> {
+    await this.mediaRenderer.maybeUpdateImage(entityId, force);
+  }
 
-    if (sharedState.currentImageUrl) {
-      const netZones = avrStateManager.getEntitiesByPhysicalAvrAndSource(physicalAvrId, "net");
-      for (const zoneEntityId of netZones) {
-        this.driver.updateEntityAttributes(zoneEntityId, {
-          [uc.MediaPlayerAttributes.MediaImageUrl]: sharedState.currentImageUrl
-        });
-      }
-    }
+  private async preloadTuneInPresets(entityId: string): Promise<void> {
+    await this.tuneInPreloader.preloadTuneInPresets(entityId);
   }
 
   async handleIfa(
@@ -165,7 +137,7 @@ export class ZoneAgnosticUpdateProcessor {
 
     const affectedZones = avrStateManager.getEntitiesByPhysicalAvrAndSource(this.getPhysicalAvrId(sourceEntityId), "dab");
     for (const zoneEntityId of affectedZones) {
-      this.updateNowPlaying(zoneEntityId, "dab", {
+      this.mediaStateStore.updateNowPlaying(zoneEntityId, "dab", {
         station: stationName,
         artist: "DAB Radio"
       });
@@ -176,21 +148,42 @@ export class ZoneAgnosticUpdateProcessor {
   }
 
   async handleNlt(sourceEntityId: string, serviceName: string, eventZone: string): Promise<void> {
-    const affectedZones = avrStateManager.getEntitiesByPhysicalAvrAndSource(this.getPhysicalAvrId(sourceEntityId), "net");
+    const affectedZones = this.getNetZones(sourceEntityId);
+    const normalizedService = serviceName.toLowerCase();
+
     for (const zoneEntityId of affectedZones) {
       avrStateManager.setSubSource(zoneEntityId, serviceName, this.eiscpInstance, eventZone, this.driver);
-      const frontPanelDisplaySensorId = `${zoneEntityId}_front_panel_display_sensor`;
-      this.driver.updateEntityAttributes(frontPanelDisplaySensorId, {
-        [uc.SensorAttributes.State]: uc.SensorStates.On,
-        [uc.SensorAttributes.Value]: serviceName
-      });
+    }
+    this.updateFrontPanelDisplay(affectedZones, serviceName);
+
+    if (normalizedService === "tunein") {
+      await this.maybePreloadTuneIn(sourceEntityId, affectedZones);
     }
 
-    const hasSongInfo = SONG_INFO.some((name) => serviceName.toLowerCase().includes(name));
-    if (hasSongInfo && affectedZones.length > 0) {
-      await this.eiscpInstance.raw("NATQSTN");
-      await this.eiscpInstance.raw("NTIQSTN");
-      await this.eiscpInstance.raw("NALQSTN");
+    await this.maybeRequestSongInfo(normalizedService, affectedZones.length);
+  }
+
+  async handleNst(sourceEntityId: string, playbackStatus: string): Promise<void> {
+    for (const zoneEntityId of this.getNetZones(sourceEntityId)) {
+      avrStateManager.setPlaybackStatus(zoneEntityId, playbackStatus, this.driver);
+    }
+  }
+
+  async handleNltContext(sourceEntityId: string, title: string): Promise<void> {
+    for (const zoneEntityId of this.getTuneInZones(sourceEntityId)) {
+      setTuneInBrowseContext(zoneEntityId, title);
+    }
+  }
+
+  async handleNls(sourceEntityId: string, entry: string): Promise<void> {
+    for (const zoneEntityId of this.getTuneInZones(sourceEntityId)) {
+      ingestTuneInListEntry(zoneEntityId, entry);
+    }
+  }
+
+  async handleNla(sourceEntityId: string, xmlPayload: string): Promise<void> {
+    for (const zoneEntityId of this.getTuneInZones(sourceEntityId)) {
+      ingestTuneInXmlEntries(zoneEntityId, xmlPayload);
     }
   }
 
@@ -198,49 +191,47 @@ export class ZoneAgnosticUpdateProcessor {
     const physicalAvrId = this.getPhysicalAvrId(sourceEntityId);
     const fmZones = avrStateManager.getEntitiesByPhysicalAvrAndSource(physicalAvrId, "fm");
     for (const zoneEntityId of fmZones) {
-      this.updateNowPlaying(zoneEntityId, "fm", {
+      this.mediaStateStore.updateNowPlaying(zoneEntityId, "fm", {
         station: frontPanelText,
         artist: "FM Radio"
       });
       await this.renderZoneMedia(zoneEntityId, true);
     }
 
-    const netZones = avrStateManager.getEntitiesByPhysicalAvrAndSource(physicalAvrId, "net");
+    const netZones = this.getNetZones(sourceEntityId);
     if (netZones.length > 0) {
-      const nextSubSource = frontPanelText.toLowerCase();
-      const needsUpdate = netZones.some((zoneEntityId) => avrStateManager.getSubSource(zoneEntityId) !== nextSubSource);
-      if (needsUpdate) {
-        for (const zoneEntityId of netZones) {
-          avrStateManager.setSubSource(zoneEntityId, frontPanelText, this.eiscpInstance, eventZone, this.driver);
-          const frontPanelDisplaySensorId = `${zoneEntityId}_front_panel_display_sensor`;
-          this.driver.updateEntityAttributes(frontPanelDisplaySensorId, {
-            [uc.SensorAttributes.State]: uc.SensorStates.On,
-            [uc.SensorAttributes.Value]: frontPanelText
-          });
+      const normalizedText = frontPanelText.toLowerCase();
+      const detectedService = NETWORK_SERVICES.find((service) => normalizedText.includes(service.toLowerCase()));
+
+      this.updateFrontPanelDisplay(netZones, frontPanelText);
+
+      if (detectedService) {
+        const nextSubSource = detectedService.toLowerCase();
+        const needsUpdate = netZones.some((zoneEntityId) => avrStateManager.getSubSource(zoneEntityId) !== nextSubSource);
+        if (needsUpdate) {
+          for (const zoneEntityId of netZones) {
+            avrStateManager.setSubSource(zoneEntityId, nextSubSource, this.eiscpInstance, eventZone, this.driver);
+          }
         }
 
-        const hasSongInfo = SONG_INFO.some((name) => frontPanelText.toLowerCase().includes(name));
-        if (hasSongInfo) {
-          await this.eiscpInstance.raw("NATQSTN");
-          await this.eiscpInstance.raw("NTIQSTN");
-          await this.eiscpInstance.raw("NALQSTN");
+        if (nextSubSource === "tunein") {
+          await this.maybePreloadTuneIn(sourceEntityId, netZones);
         }
+
+        await this.maybeRequestSongInfo(nextSubSource, netZones.length);
       }
+
       return;
     }
 
     if (fmZones.length === 0) {
-      const frontPanelDisplaySensorId = `${sourceEntityId}_front_panel_display_sensor`;
-      this.driver.updateEntityAttributes(frontPanelDisplaySensorId, {
-        [uc.SensorAttributes.State]: uc.SensorStates.On,
-        [uc.SensorAttributes.Value]: frontPanelText
-      });
+      this.updateFrontPanelDisplay([sourceEntityId], frontPanelText);
     }
   }
 
   async handleNtm(sourceEntityId: string, argument: string): Promise<void> {
     const [position, duration] = argument.split("/");
-    const affectedZones = avrStateManager.getEntitiesByPhysicalAvrAndSource(this.getPhysicalAvrId(sourceEntityId), "net");
+    const affectedZones = this.getNetZones(sourceEntityId);
 
     for (const zoneEntityId of affectedZones) {
       this.driver.updateEntityAttributes(zoneEntityId, {
@@ -259,9 +250,9 @@ export class ZoneAgnosticUpdateProcessor {
     const album = argument.album || "unknown";
     const artist = argument.artist || "unknown";
 
-    const affectedZones = avrStateManager.getEntitiesByPhysicalAvrAndSource(this.getPhysicalAvrId(sourceEntityId), "net");
+    const affectedZones = this.getNetZones(sourceEntityId);
     for (const zoneEntityId of affectedZones) {
-      this.updateNowPlaying(zoneEntityId, "net", { title, album, artist });
+      this.mediaStateStore.updateNowPlaying(zoneEntityId, "net", { title, album, artist });
       await this.renderZoneMedia(zoneEntityId, true);
     }
 
@@ -275,72 +266,6 @@ export class ZoneAgnosticUpdateProcessor {
   }
 
   private async renderZoneMedia(entityId: string, forceUpdate: boolean): Promise<void> {
-    const entitySource = avrStateManager.getSource(entityId);
-    const entitySubSource = avrStateManager.getSubSource(entityId);
-    const zoneNowPlaying = this.getNowPlaying(entityId, entitySource);
-    const sharedState = this.getSharedAvrMediaState(entityId);
-
-    switch (entitySource) {
-      case "net": {
-        const trackId = `${zoneNowPlaying.title}|${zoneNowPlaying.album}|${zoneNowPlaying.artist}`;
-        const previousTrackId = this.currentTrackId.get(entityId) || "";
-        const trackChanged = trackId !== previousTrackId;
-
-        if (trackChanged || forceUpdate) {
-          this.currentTrackId.set(entityId, trackId);
-          this.driver.updateEntityAttributes(entityId, {
-            [uc.MediaPlayerAttributes.MediaArtist]: `${zoneNowPlaying.artist || "unknown"} (${zoneNowPlaying.album || "unknown"})`,
-            [uc.MediaPlayerAttributes.MediaTitle]: zoneNowPlaying.title || "unknown",
-            [uc.MediaPlayerAttributes.MediaAlbum]: zoneNowPlaying.album || "unknown"
-          });
-
-          if (sharedState.currentImageUrl) {
-            this.driver.updateEntityAttributes(entityId, {
-              [uc.MediaPlayerAttributes.MediaImageUrl]: sharedState.currentImageUrl
-            });
-          }
-
-          if (forceUpdate || !sharedState.currentImageUrl) {
-            await this.maybeUpdateImage(entityId, forceUpdate);
-          }
-        }
-        break;
-      }
-      case "tuner":
-      case "fm":
-      case "dab": {
-        this.driver.updateEntityAttributes(entityId, {
-          [uc.MediaPlayerAttributes.MediaArtist]: zoneNowPlaying.artist || "unknown",
-          [uc.MediaPlayerAttributes.MediaTitle]: zoneNowPlaying.station || "unknown",
-          [uc.MediaPlayerAttributes.MediaAlbum]: "",
-          [uc.MediaPlayerAttributes.MediaImageUrl]: "",
-          [uc.MediaPlayerAttributes.MediaPosition]: 0,
-          [uc.MediaPlayerAttributes.MediaDuration]: 0
-        });
-        break;
-      }
-      default: {
-        this.driver.updateEntityAttributes(entityId, {
-          [uc.MediaPlayerAttributes.MediaArtist]: "",
-          [uc.MediaPlayerAttributes.MediaTitle]: "",
-          [uc.MediaPlayerAttributes.MediaAlbum]: "",
-          [uc.MediaPlayerAttributes.MediaImageUrl]: "",
-          [uc.MediaPlayerAttributes.MediaPosition]: 0,
-          [uc.MediaPlayerAttributes.MediaDuration]: 0
-        });
-      }
-    }
-  }
-
-  private async getImageHash(url: string): Promise<string> {
-    try {
-      const response = await fetch(url);
-      const arrayBuffer = await response.arrayBuffer();
-      const buffer = Buffer.from(arrayBuffer);
-      return crypto.createHash("md5").update(buffer).digest("hex");
-    } catch (err) {
-      log.warn("%s failed to fetch/hash image: %s", integrationName, err);
-      return "";
-    }
+    await this.mediaRenderer.renderZoneMedia(entityId, forceUpdate);
   }
 }

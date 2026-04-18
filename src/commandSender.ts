@@ -4,6 +4,7 @@ import { buildEntityId, DEFAULT_QUEUE_THRESHOLD, MAX_LENGTHS, PATTERNS, OnkyoCon
 import { avrStateManager } from "./avrState.js";
 import log from "./loggers.js";
 import { delay } from "./utils.js";
+import { browseTuneInMedia, isMediaBrowsingAvailable, resolveTuneInPreset } from "./mediaBrowser.js";
 
 const integrationName = "commandSender:";
 
@@ -254,6 +255,36 @@ export class CommandSender {
         case uc.MediaPlayerCommands.PlayPause:
           await this.eiscp.command(setZonePrefix("network-usb play"));
           break;
+        case uc.MediaPlayerCommands.Shuffle:
+        case uc.MediaPlayerCommands.Repeat:
+          log.debug("%s [%s] ignoring unsupported media-player command '%s' to avoid user-facing errors", integrationName, entity.id, cmdId);
+          break;
+        case "browse":
+          if (isMediaBrowsingAvailable(entity.id)) {
+            await browseTuneInMedia(entity.id, { paging: new uc.Paging(1, 50) } as uc.BrowseOptions);
+          } else {
+            log.debug("%s [%s] ignoring browse request outside NET TuneIn", integrationName, entity.id);
+          }
+          break;
+        case uc.MediaPlayerCommands.PlayMedia: {
+          const mediaId = typeof params?.media_id === "string" ? params.media_id : undefined;
+          const mediaType = typeof params?.media_type === "string" ? params.media_type : undefined;
+          const preset = resolveTuneInPreset(mediaId, mediaType);
+
+          if (!preset) {
+            return uc.StatusCodes.NotFound;
+          }
+
+          const currentSource = avrStateManager.getSource(entity.id);
+          const currentSubSource = avrStateManager.getSubSource(entity.id);
+          if (currentSource !== "net" || currentSubSource !== "tunein") {
+            await this.eiscp.command(setZonePrefix("input-selector tunein"));
+            await delay(targetAvr.netMenuDelay ?? DEFAULT_QUEUE_THRESHOLD);
+          }
+
+          await this.eiscp.command(setZonePrefix(`tunein-preset ${preset.presetIndex}`));
+          break;
+        }
         case uc.MediaPlayerCommands.Next:
           await this.eiscp.command(setZonePrefix("network-usb trup"));
           break;

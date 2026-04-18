@@ -1,8 +1,8 @@
 import * as uc from "@unfoldedcircle/integration-api";
+import { SelectAttributes } from "@unfoldedcircle/integration-api";
 import { avrStateManager } from "./avrState.js";
 import { OnkyoConfig, buildEntityId } from "./configManager.js";
 import { EiscpDriver } from "./eiscp.js";
-import { SelectAttributes } from "./selectEntity.js";
 import { getCompatibleListeningModes, detectAudioFormatType } from "./listeningModeFilters.js";
 import { eiscpMappings } from "./eiscp-mappings.js";
 import log from "./loggers.js";
@@ -62,6 +62,18 @@ export class CommandReceiver {
       },
       NLT: async (avrUpdates, entityId, eventZone) => {
         await this.zoneAgnosticProcessor.handleNlt(entityId, avrUpdates.argument.toString(), eventZone);
+      },
+      NST: async (avrUpdates, entityId) => {
+        await this.zoneAgnosticProcessor.handleNst(entityId, avrUpdates.argument.toString());
+      },
+      NLT_CONTEXT: async (avrUpdates, entityId) => {
+        await this.zoneAgnosticProcessor.handleNltContext(entityId, avrUpdates.argument.toString());
+      },
+      NLS: async (avrUpdates, entityId) => {
+        await this.zoneAgnosticProcessor.handleNls(entityId, avrUpdates.argument.toString());
+      },
+      NLA: async (avrUpdates, entityId) => {
+        await this.zoneAgnosticProcessor.handleNla(entityId, avrUpdates.argument.toString());
       },
       FLD: async (avrUpdates, entityId, eventZone) => {
         await this.zoneAgnosticProcessor.handleFld(entityId, avrUpdates.argument.toString(), eventZone);
@@ -152,14 +164,11 @@ export class CommandReceiver {
         switch (avrUpdates.command) {
           case "system-power": {
             const powerState = avrUpdates.argument === "on" ? uc.MediaPlayerStates.On : uc.MediaPlayerStates.Standby;
-            this.driver.updateEntityAttributes(entityId, {
-              [uc.MediaPlayerAttributes.State]: powerState
-            });
             log.info("** Onkyo AVR custom integration version %s **", this.driverVersion);
             log.info("%s [%s] power set to: %s", integrationName, entityId, powerState);
 
             // Track power state in state manager
-            avrStateManager.setPowerState(entityId, avrUpdates.argument as string);
+            avrStateManager.setPowerState(entityId, avrUpdates.argument as string, this.driver);
 
             // When AVR is off, set all sensor states to standby
             if (avrUpdates.argument !== "on") {

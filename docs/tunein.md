@@ -42,11 +42,17 @@ To set up an Activity for TuneIn, have a look at these screenshots:
 
   ![](../screenshots/tunein-ui-pic.jpg)
 
-- Preset switch can fail when TuneIn itself is broadcasting a commercial.
-
 - If selecting preset is not always working, consider running setup again and set `NET sub source selection delay` to a higher value.
 
   ![](/screenshots/net-subsource-delay.png)
+
+### Media Browser
+If your UC Remote is running firmware v2.9.1 or higher, the mediawidget supports media browsing! This integration (v0.8.5+) offers browsing of the 'My Presets' list to easily select a different TuneIn station:
+
+  ![](/screenshots/tunein-browse1.jpg)
+
+  ![](/screenshots/tunein-browse2.jpg)
+
 
 _note: after installing a new version of the integration or after a reboot of the remote, it might be needed to close screen on the remote and enter the already active activity again to get the MediaWidget to work_
 

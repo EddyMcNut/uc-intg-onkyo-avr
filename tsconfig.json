@@ -8,7 +8,6 @@
     "forceConsistentCasingInFileNames": true,
     "skipLibCheck": false,
     "esModuleInterop": true,
-    "baseUrl": ".",
     "resolveJsonModule": true
   },
   "include": ["src/**/*", "test/**/*", "types/**/*"],

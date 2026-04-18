@@ -7,6 +7,7 @@ on:
     paths:
       - "**/*.js"
       - "**/*.ts"
+      - "logos/**"
       - ".github/**/*.yml"
       - "package-lock.json"
     tags:
@@ -30,7 +31,7 @@ jobs:
       version: ${{ steps.pkg.outputs.version }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Read version from package.json
         id: pkg
@@ -44,7 +45,7 @@ jobs:
           jq --arg ver "$VERSION" '.version = $ver' driver.json > driver.json.tmp && mv driver.json.tmp driver.json
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version-file: ".nvmrc"
 
@@ -60,7 +61,7 @@ jobs:
 
       - name: Upload test report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: test-results
           path: test-results.xml
@@ -78,7 +79,7 @@ jobs:
         run: |
           mkdir -p artifacts
           cd artifacts
-          echo ${{ env.VERSION }} > version.txt
+          echo "$VERSION" > version.txt
 
       - name: Create custom intg archive
         id: set-artifact
@@ -127,7 +128,17 @@ jobs:
           cp package.json artifacts/bin/
           mv node_modules artifacts/bin/
           cp driver.json artifacts/
-          ARTIFACT_NAME="uc-intg-${{ env.INTG_NAME }}-${{ env.VERSION }}"
+
+          # Include runtime logo assets used by generated media thumbnails.
+          # Copy them both next to the package root and next to the runtime bin
+          # so the integration can resolve them in either installation layout.
+          if [ -d logos ]; then
+            cp -R logos artifacts/
+            cp -R logos artifacts/bin/
+            echo "Packaged logo assets:" && ls -la artifacts/logos artifacts/bin/logos || true
+          fi
+
+          ARTIFACT_NAME="uc-intg-${{ env.INTG_NAME }}-${{ steps.pkg.outputs.version }}"
           echo "ARTIFACT_NAME=$ARTIFACT_NAME" >> $GITHUB_ENV
           echo "artifact-name=$ARTIFACT_NAME" >> $GITHUB_OUTPUT
 
@@ -137,14 +148,14 @@ jobs:
       - name: Create upload artifact
         shell: bash
         run: |
-          tar czvf ${{ env.ARTIFACT_NAME }}.tar.gz -C ${GITHUB_WORKSPACE}/artifacts .
+          tar czvf ${{ steps.set-artifact.outputs.artifact-name }}.tar.gz -C ${GITHUB_WORKSPACE}/artifacts .
           ls -lah
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         id: upload_artifact
         with:
-          name: ${{ env.ARTIFACT_NAME }}
-          path: ${{ env.ARTIFACT_NAME }}.tar.gz
+          name: ${{ steps.set-artifact.outputs.artifact-name }}
+          path: ${{ steps.set-artifact.outputs.artifact-name }}.tar.gz
           if-no-files-found: error
           retention-days: 3
 
@@ -154,7 +165,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Download build artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: ${{ needs.build.outputs.artifact-name }}
 

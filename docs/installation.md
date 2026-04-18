@@ -23,6 +23,7 @@
   - Populate `AVR Model` and `AVR IP Address`.
 - Check if the endpoint for Album Art corresponds with your AVR model, if it does not have an Album Art endpoint, set it to `na` to prevent errors.
 - Configure also the other settings for your AVR.
+- Example of the entity names long or short configuration: `TX-RZ50 192.168.2.103 main` or `TX-RZ50 main`
 - Click `Next`.
 - Click `Add all`, click `Done`.
 

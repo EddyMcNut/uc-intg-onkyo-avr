@@ -1,12 +1,12 @@
 /*jslint node:true nomen:true*/
 "use strict";
 import * as uc from "@unfoldedcircle/integration-api";
+import { SelectAttributes } from "@unfoldedcircle/integration-api";
 import EiscpDriver from "./eiscp.js";
 import { ConfigManager, setConfigDir, OnkyoConfig, AvrConfig, AVR_DEFAULTS, buildEntityId, buildPhysicalAvrId, DEFAULT_QUEUE_THRESHOLD, parseBoolean } from "./configManager.js";
 import { CommandSender } from "./commandSender.js";
 import { CommandReceiver } from "./commandReceiver.js";
 import { ReconnectionManager } from "./reconnectionManager.js";
-import { SelectAttributes } from "./selectEntity.js";
 import { avrStateManager } from "./avrState.js";
 import log from "./loggers.js";
 import SetupHandler from "./setupHandler.js";

@@ -1,19 +1,22 @@
 {
   "name": "uc-intg-onkyo-avr",
   "type": "module",
-  "version": "0.8.4",
+  "version": "0.8.5",
   "description": "Onkyo/Pioneer/Integra AVR custom integration for Unfolded Circle Remotes",
   "main": "dist/src/index.js",
+  "engines": {
+    "node": ">=22.13.0"
+  },
   "scripts": {
     "format": "prettier --write .",
     "code-check": "prettier --check . && eslint .",
     "lint": "eslint --fix",
-    "build": "tsc",
-    "test": "npm run build && ava --tap > test.tap && npx tap-junit < test.tap > test-results.xml",
+    "build": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\" && tsc",
+    "test": "npm run build && ava dist/test/**/*.test.js --tap > test.tap && npx tap-junit < test.tap > test-results.xml",
     "start": "npm run build && node dist/src/index.js"
   },
   "dependencies": {
-    "@unfoldedcircle/integration-api": "^0.3.0",
+    "@unfoldedcircle/integration-api": "^0.5.0",
     "async": "^3.2.6",
     "debug": "^4.4.0"
   },
@@ -39,7 +42,7 @@
     "@ava/typescript": "^5.0.0",
     "@types/async": "^3.2.25",
     "@types/debug": "^4.1.12",
-    "@types/node": "^22.5.5",
+    "@types/node": "^22.19.17",
     "@types/node-fetch": "^2.6.13",
     "@types/ws": "^8.5.12",
     "@typescript-eslint/eslint-plugin": "^8.8.1",
