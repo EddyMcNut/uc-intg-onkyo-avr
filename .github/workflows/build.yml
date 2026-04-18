@@ -7,6 +7,7 @@ on:
     paths:
       - "**/*.js"
       - "**/*.ts"
+      - "logos/**"
       - ".github/**/*.yml"
       - "package-lock.json"
     tags:
@@ -127,6 +128,12 @@ jobs:
           cp package.json artifacts/bin/
           mv node_modules artifacts/bin/
           cp driver.json artifacts/
+
+          # Include runtime logo assets used by generated media thumbnails.
+          if [ -d logos ]; then
+            cp -R logos artifacts/
+          fi
+
           ARTIFACT_NAME="uc-intg-${{ env.INTG_NAME }}-${{ steps.pkg.outputs.version }}"
           echo "ARTIFACT_NAME=$ARTIFACT_NAME" >> $GITHUB_ENV
           echo "artifact-name=$ARTIFACT_NAME" >> $GITHUB_OUTPUT
