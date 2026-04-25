@@ -3,7 +3,6 @@
  * make the behaviour easier to test in isolation.
  */
 
-import * as uc from "@unfoldedcircle/integration-api";
 import AvrInstanceManager from "./avrInstanceManager.js";
 import ConnectionManager from "./connectionManager.js";
 import { avrStateManager } from "./avrState.js";
@@ -35,7 +34,6 @@ export default class SubscriptionHandler {
       log.debug("%s [%s] Subscription received shortly after recent query, skipping", integrationName, baseEntityId);
       return;
     }
-
 
     const physicalAVR = buildPhysicalAvrId(instance.config.model, instance.config.ip);
     const physicalConnection = this.connectionManager.getPhysicalConnection(physicalAVR);

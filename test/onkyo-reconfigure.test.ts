@@ -17,7 +17,7 @@ test.serial("registerAvailableEntities refreshes listening_mode options on recon
     setConfigDir(tmp);
 
     // Initial config with user list A
-    ConfigManager.save({ avrs: [{ model: "M", ip: "1.2.3.4", port: 60128, zone: "main", listeningModeOptions: ["old-a","old-b"] }] });
+    ConfigManager.save({ avrs: [{ model: "M", ip: "1.2.3.4", port: 60128, zone: "main", listeningModeOptions: ["old-a", "old-b"] }] });
 
     const driverModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/driver.js")).href);
     const OnkyoDriver = driverModule.default as any;
@@ -33,13 +33,13 @@ test.serial("registerAvailableEntities refreshes listening_mode options on recon
     const drv = Object.create(OnkyoDriver.prototype) as DriverLike;
 
     // record attribute updates with correct typing
-    const updates: Array<{ id: string; attrs: { [key: string]: string|number|boolean } }> = [];
+    const updates: Array<{ id: string; attrs: { [key: string]: string | number | boolean } }> = [];
     drv.driver = {
       addAvailableEntity: () => {},
       getConfigDirPath: () => tmp,
       setDeviceState: async () => {},
       getConfiguredEntities: () => ({}),
-      updateEntityAttributes: (id: string, attrs: { [key: string]: string|number|boolean }) => {
+      updateEntityAttributes: (id: string, attrs: { [key: string]: string | number | boolean }) => {
         updates.push({ id, attrs });
         return true;
       }
@@ -56,7 +56,7 @@ test.serial("registerAvailableEntities refreshes listening_mode options on recon
     t.deepEqual(first!.attrs.options, ["old-a", "old-b"]);
 
     // Now simulate reconfigure: update config to new list B and re-register
-    ConfigManager.save({ avrs: [{ model: "M", ip: "1.2.3.4", port: 60128, zone: "main", listeningModeOptions: ["new-x","new-y"] }] });
+    ConfigManager.save({ avrs: [{ model: "M", ip: "1.2.3.4", port: 60128, zone: "main", listeningModeOptions: ["new-x", "new-y"] }] });
     drv.config = ConfigManager.load();
 
     await drv.registerAvailableEntities?.();

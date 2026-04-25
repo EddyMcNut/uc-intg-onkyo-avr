@@ -19,7 +19,7 @@ interface EntityState {
 }
 
 /**
- * Manages per-entity state for AVR sources. 
+ * Manages per-entity state for AVR sources.
  * Each entity (AVR zone) has its own independent source tracking.
  */
 class AvrStateManager {
@@ -261,14 +261,7 @@ class AvrStateManager {
   }
 
   /** Query AVR state and clear media attributes on source change */
-  async refreshAvrState(
-    entityId: string,
-    eiscpInstance?: EiscpDriver,
-    zone?: string,
-    driver?: uc.IntegrationAPI,
-    queueThreshold?: number,
-    commandReceiver?: CommandReceiver
-  ): Promise<void> {
+  async refreshAvrState(entityId: string, eiscpInstance?: EiscpDriver, zone?: string, driver?: uc.IntegrationAPI, queueThreshold?: number, commandReceiver?: CommandReceiver): Promise<void> {
     if (!eiscpInstance || !zone || !driver || !entityId) {
       return;
     }

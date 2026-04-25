@@ -119,9 +119,7 @@ function getTuneInRootItemCount(presetCount: number): number {
 
 function createRootItem(entityId: string, paging: uc.Paging): uc.BrowseMediaItem {
   const presets = getTuneInPresets(entityId);
-  const items = presets
-    .map((preset) => createTuneInPresetItem(preset))
-    .slice(paging.offset, paging.offset + paging.limit);
+  const items = presets.map((preset) => createTuneInPresetItem(preset)).slice(paging.offset, paging.offset + paging.limit);
 
   return new uc.BrowseMediaItem(TUNEIN_ROOT_ID, "TuneIn", {
     can_browse: true,
@@ -144,15 +142,9 @@ export async function browseTuneInMedia(entityId: string, options: uc.BrowseOpti
       integrationName,
       entityId,
       tuneInPresets.length,
-      tuneInPresets.length > 0
-        ? tuneInPresets.map((preset) => `${preset.presetIndex}:${preset.title}`).join(", ")
-        : "none"
+      tuneInPresets.length > 0 ? tuneInPresets.map((preset) => `${preset.presetIndex}:${preset.title}`).join(", ") : "none"
     );
-    return uc.BrowseResult.fromPaging(
-      createRootItem(entityId, options.paging),
-      options.paging,
-      getTuneInRootItemCount(tuneInPresets.length)
-    );
+    return uc.BrowseResult.fromPaging(createRootItem(entityId, options.paging), options.paging, getTuneInRootItemCount(tuneInPresets.length));
   }
 
   const preset = resolveTuneInPreset(options.media_id, options.media_type);

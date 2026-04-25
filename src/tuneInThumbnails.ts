@@ -43,9 +43,7 @@ function loadTuneInBackgroundDataUri(): TuneInBackgroundAsset {
         const dataUri = `data:${mimeType};base64,${base64}`;
         const svgContent = extension === ".svg" ? fileContents.toString("utf8") : "";
         const pathMatch = svgContent.match(/<path[^>]*d=(['"])([\s\S]*?)\1[^>]*>/i);
-        const logoMarkup = pathMatch
-          ? `<g transform="translate(202 228) scale(.38)"><path fill="#17245f" fill-rule="evenodd" clip-rule="evenodd" d="${pathMatch[2]}"/></g>`
-          : null;
+        const logoMarkup = pathMatch ? `<g transform="translate(202 228) scale(.38)"><path fill="#17245f" fill-rule="evenodd" clip-rule="evenodd" d="${pathMatch[2]}"/></g>` : null;
 
         cachedTuneInBackgroundAsset = {
           dataUri,
@@ -69,12 +67,7 @@ function loadTuneInBackgroundDataUri(): TuneInBackgroundAsset {
 }
 
 function escapeXml(value: string): string {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&apos;");
+  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&apos;");
 }
 
 function wrapStationTitle(title: string, maxCharsPerLine = 16, maxLines = 3): string[] {
@@ -111,7 +104,7 @@ function wrapStationTitle(title: string, maxCharsPerLine = 16, maxLines = 3): st
   }
 
   return lines.slice(0, maxLines).map((line, index, arr) => {
-    if (index === arr.length - 1 && (words.join(" ").length > arr.join(" ").length)) {
+    if (index === arr.length - 1 && words.join(" ").length > arr.join(" ").length) {
       return line.length > maxCharsPerLine - 1 ? `${line.slice(0, maxCharsPerLine - 1)}…` : `${line}…`;
     }
     return line;
@@ -138,10 +131,7 @@ function svgToDataUri(svg: string): string {
     .replace(/"/g, "'")
     .trim();
 
-  return `data:image/svg+xml;utf8,${compact}`
-    .replace(/%/g, "%25")
-    .replace(/#/g, "%23")
-    .replace(/\n/g, "");
+  return `data:image/svg+xml;utf8,${compact}`.replace(/%/g, "%25").replace(/#/g, "%23").replace(/\n/g, "");
 }
 
 function finalizeTuneInThumbnail(svg: string): string {
@@ -171,10 +161,8 @@ export function getOrCreateTuneInThumbnail(state: TuneInBrowseState, title: stri
   const lines = wrapStationTitle(title, 14, 4);
   const fontSize = lines.length >= 4 ? 26 : lines.length === 3 ? 32 : lines.length === 2 ? 40 : 48;
   const lineHeight = fontSize + 8;
-  const startY = 34 + ((156 - lineHeight * lines.length) / 2) + fontSize;
-  const text = lines
-    .map((line, index) => `<text x="320" y="${startY + index * lineHeight}">${escapeXml(line)}</text>`)
-    .join("");
+  const startY = 34 + (156 - lineHeight * lines.length) / 2 + fontSize;
+  const text = lines.map((line, index) => `<text x="320" y="${startY + index * lineHeight}">${escapeXml(line)}</text>`).join("");
 
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360" viewBox="0 0 640 360">${buildTuneInBackgroundMarkup(backgroundAsset)}<g fill="#17245f" font-family="Arial,Helvetica,sans-serif" font-size="${fontSize}" font-weight="700" text-anchor="middle">${text}</g></svg>`;
   const generated = finalizeTuneInThumbnail(svg);

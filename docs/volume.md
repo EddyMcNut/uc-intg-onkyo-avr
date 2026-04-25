@@ -1,7 +1,8 @@
 ## Volume
 
 ### Map the volume button
-With a single zone action, you just map the VolumeUp/Down command of that selected AVR entity to the volume  (assign to **short press** only!):
+
+With a single zone action, you just map the VolumeUp/Down command of that selected AVR entity to the volume (assign to **short press** only!):
 
 ![](../screenshots/volume-up.png)
 
@@ -65,9 +66,9 @@ Then in that activity you can use the `multi-zone-volume all-up` command (assign
 
 ![](../screenshots/volume-multi.png)
 
-Lookup `multi-zone-volume` in the [JSON](../src/eiscp-commands.ts) to see the available options, for example `zone2-zone3-up` to adjust zones2 and 3 but not the main zone. The command `multi-zone-volume all-up`controls the volume on all *configured* zones. 
+Lookup `multi-zone-volume` in the [JSON](../src/eiscp-commands.ts) to see the available options, for example `zone2-zone3-up` to adjust zones2 and 3 but not the main zone. The command `multi-zone-volume all-up`controls the volume on all _configured_ zones.
 
-*Note: multi-zone-volume does **not** support the use of the slider.*
+_Note: multi-zone-volume does **not** support the use of the slider._
 
 ### Multi Zone Mute
 

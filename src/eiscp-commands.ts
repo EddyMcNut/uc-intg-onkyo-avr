@@ -36,7 +36,7 @@ export const eiscpCommands = {
         Z23OFF: { name: "zone2-zone3-off", description: "sets Audio Muting Off for zone2 and zone3" },
         Z23TG: { name: "zone2-zone3-toggle", description: "sets Audio Muting Toggle for zone2 and zone3" }
       }
-    },    
+    },
     SPA: {
       name: "speaker-a",
       description: "Speaker A Command",
@@ -94,7 +94,7 @@ export const eiscpCommands = {
         QSTN: { name: "query", description: "gets the Volume Level" }
       }
     },
-    MZV: { 
+    MZV: {
       name: "multi-zone-volume",
       description: "UC integration Multi-Zone Volume Command",
       values: {
@@ -105,7 +105,7 @@ export const eiscpCommands = {
         ZM3UP1: { name: "main-zone3-up", description: "sets Volume Level Up for main and zone3 1dB step" },
         ZM3DOWN1: { name: "main-zone3-down", description: "sets Volume Level Down for main and zone3 1dB step" },
         Z23UP1: { name: "zone2-zone3-up", description: "sets Volume Level Up for zone2 and zone3 1dB step" },
-        Z23DOWN1: { name: "zone2-zone3-down", description: "sets Volume Level Down for zone2 and zone3 1dB step" },
+        Z23DOWN1: { name: "zone2-zone3-down", description: "sets Volume Level Down for zone2 and zone3 1dB step" }
       }
     },
     TFR: {
@@ -1212,8 +1212,9 @@ export const eiscpCommands = {
       name: "usb-menu-status",
       description: "NET/USB Menu Status",
       values: {
-        "maabbstii": {
-          description: "NET/USB Menu Status (9 letters)\nm -> Track Menu: \"M\": Menu is enable, \"x\": Menu is disable\naa -> F1 button icon (Positive Feed or Mark/Unmark)\nbb -> F2 button icon (Negative Feed)\n aa or bb : \"xx\":disable, \"01\":Like, \"02\":don't like, \"03\":Love, \"04\":Ban,\n                  \"05\":episode, \"06\":ratings, \"07\":Ban(black), \"08\":Ban(white),\n                  \"09\":Favorite(black), \"0A\":Favorite(white), \"0B\":Favorite(yellow)\ns -> Time Seek \"S\": Time Seek is enable \"x\": Time Seek is disable\nt -> Time Display \"1\": Elapsed Time/Total Time, \"2\": Elapsed Time, \"x\": disable\nii-> Service icon\n ii : \"00\":Music Server (DLNA), \"01\":My Favorite, \"02\":vTuner, \n      \"03\":SiriusXM, \"04\":Pandora,\n      \"05\":Rhapsody, \"06\":Last.fm, \"07\":Napster, \"08\":Slacker, \"09\":Mediafly,\n      \"0A\":Spotify, \"0B\":AUPEO!,\n      \"0C\":radiko, \"0D\":e-onkyo, \"0E\":TuneIn, \"0F\":MP3tunes, \"10\":Simfy,\n      \"11\":Home Media, \"12\":Deezer, \"13\":iHeartRadio, \"18\":Airplay,\n      \"1A\": onkyo Music, \"1B\":TIDAL, \"1C\":Amazon Music, \"1D\":PlayQueue,\n      \"40\":Chromecast built-in, \"41\":FireConnect, \"42\":Play-Fi,\n      \"43\":FlareConnect, \"44\":Airplay2, \"45\":Alexa, \"46\":Alexa MRM, \"47\":RoonReady,\n      \"F0\": USB/USB(Front), \"F1: USB(Rear), \n      \"F2\":Internet Radio, \"F3\":NET, \"F4\":Bluetooth"
+        maabbstii: {
+          description:
+            'NET/USB Menu Status (9 letters)\nm -> Track Menu: "M": Menu is enable, "x": Menu is disable\naa -> F1 button icon (Positive Feed or Mark/Unmark)\nbb -> F2 button icon (Negative Feed)\n aa or bb : "xx":disable, "01":Like, "02":don\'t like, "03":Love, "04":Ban,\n                  "05":episode, "06":ratings, "07":Ban(black), "08":Ban(white),\n                  "09":Favorite(black), "0A":Favorite(white), "0B":Favorite(yellow)\ns -> Time Seek "S": Time Seek is enable "x": Time Seek is disable\nt -> Time Display "1": Elapsed Time/Total Time, "2": Elapsed Time, "x": disable\nii-> Service icon\n ii : "00":Music Server (DLNA), "01":My Favorite, "02":vTuner, \n      "03":SiriusXM, "04":Pandora,\n      "05":Rhapsody, "06":Last.fm, "07":Napster, "08":Slacker, "09":Mediafly,\n      "0A":Spotify, "0B":AUPEO!,\n      "0C":radiko, "0D":e-onkyo, "0E":TuneIn, "0F":MP3tunes, "10":Simfy,\n      "11":Home Media, "12":Deezer, "13":iHeartRadio, "18":Airplay,\n      "1A": onkyo Music, "1B":TIDAL, "1C":Amazon Music, "1D":PlayQueue,\n      "40":Chromecast built-in, "41":FireConnect, "42":Play-Fi,\n      "43":FlareConnect, "44":Airplay2, "45":Alexa, "46":Alexa MRM, "47":RoonReady,\n      "F0": USB/USB(Front), "F1: USB(Rear), \n      "F2":Internet Radio, "F3":NET, "F4":Bluetooth'
         },
         QSTN: { name: "query", description: "gets the Net/USB Menu Status" }
       }
@@ -1238,7 +1239,8 @@ export const eiscpCommands = {
       values: {
         nfr: {
           name: "nfr",
-          description: "NET Connection/USB Device Status (3 letters)\nn -> NET Connection status: \"-\": no connection, \"E\": Ether, \"W\": Wireless\nf -> Front USB(USB1) Device Status: \"-\": no device, \"i\": iPod/iPhone, \n      \"M\": Memory/NAS, \"W\": Wireless Adaptor, \"B\": Bluetooth Adaptor,\n      \"D\": DAB Dongle, \"x\": disable\nr -> Rear USB(USB2) Device Status: \"-\": no device, \"i\": iPod/iPhone, \n      \"M\": Memory/NAS, \"W\": Wireless Adaptor, \"B\": Bluetooth Adaptor, \n      \"D\": DAB Dongle, \"x\": disable"
+          description:
+            'NET Connection/USB Device Status (3 letters)\nn -> NET Connection status: "-": no connection, "E": Ether, "W": Wireless\nf -> Front USB(USB1) Device Status: "-": no device, "i": iPod/iPhone, \n      "M": Memory/NAS, "W": Wireless Adaptor, "B": Bluetooth Adaptor,\n      "D": DAB Dongle, "x": disable\nr -> Rear USB(USB2) Device Status: "-": no device, "i": iPod/iPhone, \n      "M": Memory/NAS, "W": Wireless Adaptor, "B": Bluetooth Adaptor, \n      "D": DAB Dongle, "x": disable'
         },
         QSTN: { name: "query", description: "gets the Net/USB Status" }
       }
@@ -1249,15 +1251,18 @@ export const eiscpCommands = {
       values: {
         "tzzzzsurr<.....>": {
           name: "tzzzzsurr",
-          description: "t -> response type 'X' : XML\nzzzz -> sequence number (0000-FFFF)\ns -> status 'S' : success, 'E' : error\nu -> UI type '0' : List, '1' : Menu, '2' : Playback, '3' : Popup, '4' : Keyboard, \"5\" : Menu List\nrr -> reserved\n<.....> : XML data ( [CR] and [LF] are removed )"
+          description:
+            "t -> response type 'X' : XML\nzzzz -> sequence number (0000-FFFF)\ns -> status 'S' : success, 'E' : error\nu -> UI type '0' : List, '1' : Menu, '2' : Playback, '3' : Popup, '4' : Keyboard, \"5\" : Menu List\nrr -> reserved\n<.....> : XML data ( [CR] and [LF] are removed )"
         },
         "Lzzzzll{xx}{xx}yyyy": {
           name: "lzzzzll-xx-xx-yyyy",
-          description: "specify to get the listed data (from Network Control Only)\nzzzz -> sequence number (0000-FFFF)\nll -> number of layer (00-FF)\nxxxx -> index of start item (0000-FFFF : 1st to 65536th Item [4 HEX digits] )\nyyyy -> number of items (0000-FFFF : 1 to 65536 Items [4 HEX digits] )"
+          description:
+            "specify to get the listed data (from Network Control Only)\nzzzz -> sequence number (0000-FFFF)\nll -> number of layer (00-FF)\nxxxx -> index of start item (0000-FFFF : 1st to 65536th Item [4 HEX digits] )\nyyyy -> number of items (0000-FFFF : 1 to 65536 Items [4 HEX digits] )"
         },
         "Izzzzll{xx}{xx}----": {
           name: "izzzzll-xx-xx",
-          description: "select the listed item (from Network Control Only)\nzzzz -> sequence number (0000-FFFF)\nll -> number of layer (00-FF)\nxxxx -> index number (0000-FFFF : 1st to 65536th Item [4 HEX digits] )\n---- -> not used"
+          description:
+            "select the listed item (from Network Control Only)\nzzzz -> sequence number (0000-FFFF)\nll -> number of layer (00-FF)\nxxxx -> index number (0000-FFFF : 1st to 65536th Item [4 HEX digits] )\n---- -> not used"
         }
       }
     },
@@ -1302,7 +1307,7 @@ export const eiscpCommands = {
       description: "Account Info",
       values: {
         "iaaaa...aaaabbbb...bbbb": {
-          description: "i-> Account Info\n 0: No\n 1: Yes\n\"aaaa...aaaa\": User Name ( 128 Unicode letters [UTF-8 encoded] max )\n\"bbbb...bbbb\": Password ( 128 Unicode letters [UTF-8 encoded] max )"
+          description: 'i-> Account Info\n 0: No\n 1: Yes\n"aaaa...aaaa": User Name ( 128 Unicode letters [UTF-8 encoded] max )\n"bbbb...bbbb": Password ( 128 Unicode letters [UTF-8 encoded] max )'
         }
       }
     },

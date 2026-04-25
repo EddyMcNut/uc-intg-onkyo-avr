@@ -76,17 +76,20 @@ test.serial("Media player browse ignores TuneIn menu entries until My Presets is
   let result = await player.browse({ paging: new uc.Paging(1, 10) });
 
   t.true(result instanceof uc.BrowseResult);
-  t.deepEqual((result as uc.BrowseResult).media?.items?.map((item) => item.title), []);
+  t.deepEqual(
+    (result as uc.BrowseResult).media?.items?.map((item) => item.title),
+    []
+  );
 
   setTuneInBrowseContext(entityId, "My Presets");
   ingestTuneInListEntry(entityId, "U0-89.7 | WTMD (Alternative Rock)");
   ingestTuneInListEntry(entityId, "U1-America's Country (Country)");
 
   result = await player.browse({ paging: new uc.Paging(1, 10) });
-  t.deepEqual((result as uc.BrowseResult).media?.items?.map((item) => item.title), [
-    "America's Country (Country)",
-    "WTMD (Alternative Rock)"
-  ]);
+  t.deepEqual(
+    (result as uc.BrowseResult).media?.items?.map((item) => item.title),
+    ["America's Country (Country)", "WTMD (Alternative Rock)"]
+  );
 });
 
 test.serial("TuneIn browse root exposes all presets when the list is longer than 10", async (t) => {
@@ -115,32 +118,27 @@ test.serial("TuneIn browse root exposes all presets when the list is longer than
   const finalWindow = ["Station C", "Station D", "Station E", "Station F", "Station G", "Station H", "Station I", "Station J", "Station K", "Station L"];
   finalWindow.forEach((title, index) => ingestTuneInListEntry(entityId, `U${index}-${title}`));
 
-  ingestTuneInXmlEntries(entityId, '<?xml version="1.0" encoding="UTF-8"?><response status="ok"><items offset="0000" totalitems="000F"><item iconid="29" title="Browse" url="menu-1"/><item iconid="44" title="Stations" url="menu-2"/><item iconid="2F" title="Station A" url="0"/><item iconid="2F" title="Station B" url="1"/><item iconid="2F" title="Station C" url="2"/><item iconid="2F" title="Station D" url="3"/><item iconid="2F" title="Station E" url="4"/><item iconid="2F" title="Station F" url="5"/><item iconid="2F" title="Station G" url="6"/><item iconid="44" title="By Location" url="menu-3"/><item iconid="2F" title="Station H" url="7"/><item iconid="2F" title="Station I" url="8"/><item iconid="2F" title="Station J" url="9"/><item iconid="2F" title="Station K" url="10"/><item iconid="2F" title="Station L" url="11"/></items></response>');
+  ingestTuneInXmlEntries(
+    entityId,
+    '<?xml version="1.0" encoding="UTF-8"?><response status="ok"><items offset="0000" totalitems="000F"><item iconid="29" title="Browse" url="menu-1"/><item iconid="44" title="Stations" url="menu-2"/><item iconid="2F" title="Station A" url="0"/><item iconid="2F" title="Station B" url="1"/><item iconid="2F" title="Station C" url="2"/><item iconid="2F" title="Station D" url="3"/><item iconid="2F" title="Station E" url="4"/><item iconid="2F" title="Station F" url="5"/><item iconid="2F" title="Station G" url="6"/><item iconid="44" title="By Location" url="menu-3"/><item iconid="2F" title="Station H" url="7"/><item iconid="2F" title="Station I" url="8"/><item iconid="2F" title="Station J" url="9"/><item iconid="2F" title="Station K" url="10"/><item iconid="2F" title="Station L" url="11"/></items></response>'
+  );
 
   const result = await player.browse({ paging: new uc.Paging(1, 10) });
 
   t.true(result instanceof uc.BrowseResult);
-  t.deepEqual((result as uc.BrowseResult).media?.items?.map((item) => item.title), [
-    "Station A",
-    "Station B",
-    "Station C",
-    "Station D",
-    "Station E",
-    "Station F",
-    "Station G",
-    "Station H",
-    "Station I",
-    "Station J"
-  ]);
+  t.deepEqual(
+    (result as uc.BrowseResult).media?.items?.map((item) => item.title),
+    ["Station A", "Station B", "Station C", "Station D", "Station E", "Station F", "Station G", "Station H", "Station I", "Station J"]
+  );
   t.is((result as uc.BrowseResult).pagination.count, 12);
 
   const pageResult = await player.browse({ paging: new uc.Paging(2, 10) });
 
   t.true(pageResult instanceof uc.BrowseResult);
-  t.deepEqual((pageResult as uc.BrowseResult).media?.items?.map((item) => item.title), [
-    "Station K",
-    "Station L"
-  ]);
+  t.deepEqual(
+    (pageResult as uc.BrowseResult).media?.items?.map((item) => item.title),
+    ["Station K", "Station L"]
+  );
 });
 
 test.serial("TuneIn selection keeps subsource and state so browse can be repeated", async (t) => {
@@ -210,10 +208,10 @@ test.serial("TuneIn preset cache survives post-select menu updates", async (t) =
 
   result = await player.browse({ paging: new uc.Paging(1, 10) });
   t.true(result instanceof uc.BrowseResult);
-  t.deepEqual((result as uc.BrowseResult).media?.items?.map((item) => item.title), [
-    "America's Country (Country)",
-    "WTMD (Alternative Rock)"
-  ]);
+  t.deepEqual(
+    (result as uc.BrowseResult).media?.items?.map((item) => item.title),
+    ["America's Country (Country)", "WTMD (Alternative Rock)"]
+  );
 });
 
 test.serial("TuneIn service selection preloads My Presets for browsing", async (t) => {
@@ -269,12 +267,7 @@ test.serial("CommandSender silently absorbs shuffle, repeat, and browse commands
   }
 
   const entityId = "M 1.2.3.4 main";
-  const sender = new CommandSender(
-    { updateEntityAttributes: () => true } as any,
-    { avrs: [{ model: "M", ip: "1.2.3.4", zone: "main", port: 60128, netMenuDelay: 0 }] },
-    new MockEiscp() as any,
-    null
-  );
+  const sender = new CommandSender({ updateEntityAttributes: () => true } as any, { avrs: [{ model: "M", ip: "1.2.3.4", zone: "main", port: 60128, netMenuDelay: 0 }] }, new MockEiscp() as any, null);
 
   avrStateManager.setPowerState(entityId, "on");
   avrStateManager.setSource(entityId, "net");
@@ -309,21 +302,15 @@ test.serial("CommandSender play_media routes TuneIn preset IDs to tunein-preset"
 
   const entityId = "M 1.2.3.4 main";
   const eiscp = new MockEiscp();
-  const sender = new CommandSender(
-    { updateEntityAttributes: () => true } as any,
-    { avrs: [{ model: "M", ip: "1.2.3.4", zone: "main", port: 60128, netMenuDelay: 0 }] },
-    eiscp as any,
-    null
-  );
+  const sender = new CommandSender({ updateEntityAttributes: () => true } as any, { avrs: [{ model: "M", ip: "1.2.3.4", zone: "main", port: 60128, netMenuDelay: 0 }] }, eiscp as any, null);
 
   avrStateManager.setSource(entityId, "cd");
   avrStateManager.setSubSource(entityId, "unknown");
 
-  const status = await sender.sharedCmdHandler(
-    new uc.MediaPlayer(entityId, { en: entityId }, {}),
-    uc.MediaPlayerCommands.PlayMedia,
-    { media_id: "tunein:preset:2", media_type: uc.KnownMediaContentType.Radio } as any
-  );
+  const status = await sender.sharedCmdHandler(new uc.MediaPlayer(entityId, { en: entityId }, {}), uc.MediaPlayerCommands.PlayMedia, {
+    media_id: "tunein:preset:2",
+    media_type: uc.KnownMediaContentType.Radio
+  } as any);
 
   t.is(status, uc.StatusCodes.Ok);
   t.deepEqual(eiscp.commands, ["input-selector tunein", "tunein-preset 2"]);

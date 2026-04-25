@@ -18,7 +18,7 @@ As the list of all known options is very long, you can configure which options y
   ![](./../screenshots/input-selector-config.png)
 
 - Behavior:
-  - If you provide a list, the `input-selector` select-entity will show *only* those options for that AVR.
+  - If you provide a list, the `input-selector` select-entity will show _only_ those options for that AVR.
   - If you leave the field empty the driver continues to use the complete list with all possible options for all AVR models.
   - If you enter `none` the select-entity will not be created.
   - The configured list is saved, included in backups, and persists across reboots.

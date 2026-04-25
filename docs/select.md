@@ -3,6 +3,7 @@
 This integration offers `select entities`.
 
 Current available `Select` entities (v0.8.1):
+
 - [Listening Mode](select-listening-mode.md)
 - [Input Selector](select-input-selector.md)
 

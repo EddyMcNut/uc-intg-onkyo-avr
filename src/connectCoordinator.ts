@@ -45,10 +45,8 @@ export default class ConnectCoordinator {
 
       if (!physicalConnection) {
         // Collect all zones configured for this physical AVR
-        const configuredZones = config.avrs
-          .filter(avr => buildPhysicalAvrId(avr.model, avr.ip) === physicalAVR)
-          .map(avr => avr.zone);
-        
+        const configuredZones = config.avrs.filter((avr) => buildPhysicalAvrId(avr.model, avr.ip) === physicalAVR).map((avr) => avr.zone);
+
         // Create physical connection using connection manager, which will schedule reconnect on failure
         physicalConnection = await this.connectionManager.createAndConnect(physicalAVR, avrConfig, createCommandReceiverFactory(avrConfig), configuredZones);
       } else if (!physicalConnection.eiscp.connected) {

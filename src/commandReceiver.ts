@@ -150,166 +150,163 @@ export class CommandReceiver {
     this.eiscpInstance.on("error", (err: Error) => {
       log.error("%s eiscp error: %s", integrationName, err);
     });
-    this.eiscpInstance.on(
-      "data",
-      async (avrUpdates: AvrUpdateEvent) => {
-        const eventZone = avrUpdates.zone || "main";
-        const entityId = buildEntityId(avrUpdates.model, avrUpdates.host, eventZone);
+    this.eiscpInstance.on("data", async (avrUpdates: AvrUpdateEvent) => {
+      const eventZone = avrUpdates.zone || "main";
+      const entityId = buildEntityId(avrUpdates.model, avrUpdates.host, eventZone);
 
-        if (await this.dispatchZoneAgnosticCommand(avrUpdates, entityId, eventZone)) {
-          await this.zoneAgnosticProcessor.renderEntity(entityId, false);
-          return;
-        }
-
-        switch (avrUpdates.command) {
-          case "system-power": {
-            const powerState = avrUpdates.argument === "on" ? uc.MediaPlayerStates.On : uc.MediaPlayerStates.Standby;
-            log.info("** Onkyo AVR custom integration version %s **", this.driverVersion);
-            log.info("%s [%s] power set to: %s", integrationName, entityId, powerState);
-
-            // Track power state in state manager
-            avrStateManager.setPowerState(entityId, avrUpdates.argument as string, this.driver);
-
-            // When AVR is off, set all sensor states to standby
-            if (avrUpdates.argument !== "on") {
-              for (const suffix of SENSOR_SUFFIXES) {
-                this.driver.updateEntityAttributes(`${entityId}${suffix}`, {
-                  [uc.SensorAttributes.Value]: "no data"
-                });
-              }
-            }
-            break;
-          }
-          case "audio-muting": {
-            this.driver.updateEntityAttributes(entityId, {
-              [uc.MediaPlayerAttributes.Muted]: avrUpdates.argument === "on" ? true : false
-            });
-            const muteSensorId = `${entityId}_mute_sensor`;
-            const muteState = avrUpdates.argument === "on" ? "ON" : "OFF";
-            this.driver.updateEntityAttributes(muteSensorId, {
-              [uc.SensorAttributes.State]: uc.SensorStates.On,
-              [uc.SensorAttributes.Value]: muteState
-            });
-            log.info("%s [%s] audio-muting set to: %s", integrationName, entityId, muteState);
-            break;
-          }
-          case "volume": {
-            // EISCP protocol: 0-200 or 0-100 depending on model, AVR display: 0-volumeScale, Remote slider: 0-100
-            const eiscpValue = Number(avrUpdates.argument);
-            const volumeScale = this.config.volumeScale || 100;
-            const adjustVolumeDispl = this.config.adjustVolumeDispl ?? true;
-
-            // Convert: EISCP → AVR display scale (÷2 for 0.5 dB steps if enabled) → slider
-            const avrDisplayValue = adjustVolumeDispl ? Math.round(eiscpValue / 2) : eiscpValue;
-            const sliderValue = Math.round((avrDisplayValue * 100) / volumeScale);
-
-            this.driver.updateEntityAttributes(entityId, {
-              [uc.MediaPlayerAttributes.Volume]: sliderValue
-            });
-            avrStateManager.setVolume(entityId, eiscpValue);
-            // log.info("%s [%s] volume set to: %s", integrationName, entityId, sliderValue);
-
-            // Update volume sensor
-            const volumeSensorId = `${entityId}_volume_sensor`;
-            this.driver.updateEntityAttributes(volumeSensorId, {
-              [uc.SensorAttributes.State]: uc.SensorStates.On,
-              [uc.SensorAttributes.Value]: sliderValue
-            });
-            break;
-          }
-          case "preset": {
-            this.avrPreset = avrUpdates.argument.toString();
-            log.info("%s [%s] preset set to: %s", integrationName, entityId, this.avrPreset);
-            // this.eiscpInstance.command("input-selector query");
-            break;
-          }
-          case "input-selector": {
-            let source = avrUpdates.argument.toString().split(",")[0];
-            avrStateManager.setSource(entityId, source, this.eiscpInstance, eventZone, this.driver);
-            this.driver.updateEntityAttributes(entityId, {
-              [uc.MediaPlayerAttributes.Source]: source
-            });
-            log.info("%s [%s] input-selector (source) set to: %s", integrationName, entityId, source);
-            // Mirror the current value into the input-selector select entity
-            const inputSelectorEntityId = `${entityId}_input_selector`;
-            this.driver.updateEntityAttributes(inputSelectorEntityId, {
-              [SelectAttributes.CurrentOption]: source
-            });
-
-            // Reset zone metadata on source change to avoid stale media details.
-            this.zoneAgnosticProcessor.resetZone(entityId);
-            await this.zoneAgnosticProcessor.renderEntity(entityId, true);
-
-            switch (source) {
-              case "dab":
-                this.eiscpInstance.raw("DSNQSTN");
-                break;
-              case "fm":
-                this.eiscpInstance.raw("RDS01");
-                break;
-              default:
-                break;
-            }
-            // Update source sensor
-            const sourceSensorId = `${entityId}_source_sensor`;
-            this.driver.updateEntityAttributes(sourceSensorId, {
-              [uc.SensorAttributes.State]: uc.SensorStates.On,
-              [uc.SensorAttributes.Value]: source.toUpperCase()
-            });
-            break;
-          }
-          case "listening-mode": {
-            // Handle both string and array (take first element if array)
-            const listeningMode = Array.isArray(avrUpdates.argument) ? avrUpdates.argument[0] : (avrUpdates.argument as string);
-            if (listeningMode === "undefined" || listeningMode === "unknown") {
-              log.info("%s [%s] listening-mode '%s', keeping current value (no re-query)", integrationName, entityId, listeningMode);
-            } else {
-              log.info("%s [%s] listening-mode set to: %s", integrationName, entityId, listeningMode);
-              // Update the listening mode select entity
-              const selectEntityId = `${entityId}_listening_mode`;
-              this.driver.updateEntityAttributes(selectEntityId, {
-                [SelectAttributes.CurrentOption]: listeningMode
-              });
-            }
-            break;
-          }
-          case "IFV": {
-            const arg = avrUpdates.argument as Record<string, string> | undefined;
-            const videoInputValue = arg?.videoInputValue ?? "";
-            const videoOutputValue = arg?.videoOutputValue ?? "";
-            const videoOutputDisplay = arg?.outputDisplay ?? "";
-
-            const videoInputSensorId = `${entityId}_video_input_sensor`;
-            const videoOutputSensorId = `${entityId}_video_output_sensor`;
-            const videoOutputDisplaySensorId = `${entityId}_output_display_sensor`;
-
-            if (videoInputValue) {
-              this.driver.updateEntityAttributes(videoInputSensorId, {
-                [uc.SensorAttributes.State]: uc.SensorStates.On,
-                [uc.SensorAttributes.Value]: videoInputValue
-              });
-            }
-
-            if (videoOutputValue) {
-              this.driver.updateEntityAttributes(videoOutputSensorId, {
-                [uc.SensorAttributes.State]: uc.SensorStates.On,
-                [uc.SensorAttributes.Value]: videoOutputValue
-              });
-            }
-
-            if (videoOutputDisplay) {
-              this.driver.updateEntityAttributes(videoOutputDisplaySensorId, {
-                [uc.SensorAttributes.State]: uc.SensorStates.On,
-                [uc.SensorAttributes.Value]: videoOutputDisplay
-              });
-            }
-            break;
-          }
-          default:
-            break;
-        }
+      if (await this.dispatchZoneAgnosticCommand(avrUpdates, entityId, eventZone)) {
         await this.zoneAgnosticProcessor.renderEntity(entityId, false);
+        return;
       }
-    );
+
+      switch (avrUpdates.command) {
+        case "system-power": {
+          const powerState = avrUpdates.argument === "on" ? uc.MediaPlayerStates.On : uc.MediaPlayerStates.Standby;
+          log.info("** Onkyo AVR custom integration version %s **", this.driverVersion);
+          log.info("%s [%s] power set to: %s", integrationName, entityId, powerState);
+
+          // Track power state in state manager
+          avrStateManager.setPowerState(entityId, avrUpdates.argument as string, this.driver);
+
+          // When AVR is off, set all sensor states to standby
+          if (avrUpdates.argument !== "on") {
+            for (const suffix of SENSOR_SUFFIXES) {
+              this.driver.updateEntityAttributes(`${entityId}${suffix}`, {
+                [uc.SensorAttributes.Value]: "no data"
+              });
+            }
+          }
+          break;
+        }
+        case "audio-muting": {
+          this.driver.updateEntityAttributes(entityId, {
+            [uc.MediaPlayerAttributes.Muted]: avrUpdates.argument === "on" ? true : false
+          });
+          const muteSensorId = `${entityId}_mute_sensor`;
+          const muteState = avrUpdates.argument === "on" ? "ON" : "OFF";
+          this.driver.updateEntityAttributes(muteSensorId, {
+            [uc.SensorAttributes.State]: uc.SensorStates.On,
+            [uc.SensorAttributes.Value]: muteState
+          });
+          log.info("%s [%s] audio-muting set to: %s", integrationName, entityId, muteState);
+          break;
+        }
+        case "volume": {
+          // EISCP protocol: 0-200 or 0-100 depending on model, AVR display: 0-volumeScale, Remote slider: 0-100
+          const eiscpValue = Number(avrUpdates.argument);
+          const volumeScale = this.config.volumeScale || 100;
+          const adjustVolumeDispl = this.config.adjustVolumeDispl ?? true;
+
+          // Convert: EISCP → AVR display scale (÷2 for 0.5 dB steps if enabled) → slider
+          const avrDisplayValue = adjustVolumeDispl ? Math.round(eiscpValue / 2) : eiscpValue;
+          const sliderValue = Math.round((avrDisplayValue * 100) / volumeScale);
+
+          this.driver.updateEntityAttributes(entityId, {
+            [uc.MediaPlayerAttributes.Volume]: sliderValue
+          });
+          avrStateManager.setVolume(entityId, eiscpValue);
+          // log.info("%s [%s] volume set to: %s", integrationName, entityId, sliderValue);
+
+          // Update volume sensor
+          const volumeSensorId = `${entityId}_volume_sensor`;
+          this.driver.updateEntityAttributes(volumeSensorId, {
+            [uc.SensorAttributes.State]: uc.SensorStates.On,
+            [uc.SensorAttributes.Value]: sliderValue
+          });
+          break;
+        }
+        case "preset": {
+          this.avrPreset = avrUpdates.argument.toString();
+          log.info("%s [%s] preset set to: %s", integrationName, entityId, this.avrPreset);
+          // this.eiscpInstance.command("input-selector query");
+          break;
+        }
+        case "input-selector": {
+          let source = avrUpdates.argument.toString().split(",")[0];
+          avrStateManager.setSource(entityId, source, this.eiscpInstance, eventZone, this.driver);
+          this.driver.updateEntityAttributes(entityId, {
+            [uc.MediaPlayerAttributes.Source]: source
+          });
+          log.info("%s [%s] input-selector (source) set to: %s", integrationName, entityId, source);
+          // Mirror the current value into the input-selector select entity
+          const inputSelectorEntityId = `${entityId}_input_selector`;
+          this.driver.updateEntityAttributes(inputSelectorEntityId, {
+            [SelectAttributes.CurrentOption]: source
+          });
+
+          // Reset zone metadata on source change to avoid stale media details.
+          this.zoneAgnosticProcessor.resetZone(entityId);
+          await this.zoneAgnosticProcessor.renderEntity(entityId, true);
+
+          switch (source) {
+            case "dab":
+              this.eiscpInstance.raw("DSNQSTN");
+              break;
+            case "fm":
+              this.eiscpInstance.raw("RDS01");
+              break;
+            default:
+              break;
+          }
+          // Update source sensor
+          const sourceSensorId = `${entityId}_source_sensor`;
+          this.driver.updateEntityAttributes(sourceSensorId, {
+            [uc.SensorAttributes.State]: uc.SensorStates.On,
+            [uc.SensorAttributes.Value]: source.toUpperCase()
+          });
+          break;
+        }
+        case "listening-mode": {
+          // Handle both string and array (take first element if array)
+          const listeningMode = Array.isArray(avrUpdates.argument) ? avrUpdates.argument[0] : (avrUpdates.argument as string);
+          if (listeningMode === "undefined" || listeningMode === "unknown") {
+            log.info("%s [%s] listening-mode '%s', keeping current value (no re-query)", integrationName, entityId, listeningMode);
+          } else {
+            log.info("%s [%s] listening-mode set to: %s", integrationName, entityId, listeningMode);
+            // Update the listening mode select entity
+            const selectEntityId = `${entityId}_listening_mode`;
+            this.driver.updateEntityAttributes(selectEntityId, {
+              [SelectAttributes.CurrentOption]: listeningMode
+            });
+          }
+          break;
+        }
+        case "IFV": {
+          const arg = avrUpdates.argument as Record<string, string> | undefined;
+          const videoInputValue = arg?.videoInputValue ?? "";
+          const videoOutputValue = arg?.videoOutputValue ?? "";
+          const videoOutputDisplay = arg?.outputDisplay ?? "";
+
+          const videoInputSensorId = `${entityId}_video_input_sensor`;
+          const videoOutputSensorId = `${entityId}_video_output_sensor`;
+          const videoOutputDisplaySensorId = `${entityId}_output_display_sensor`;
+
+          if (videoInputValue) {
+            this.driver.updateEntityAttributes(videoInputSensorId, {
+              [uc.SensorAttributes.State]: uc.SensorStates.On,
+              [uc.SensorAttributes.Value]: videoInputValue
+            });
+          }
+
+          if (videoOutputValue) {
+            this.driver.updateEntityAttributes(videoOutputSensorId, {
+              [uc.SensorAttributes.State]: uc.SensorStates.On,
+              [uc.SensorAttributes.Value]: videoOutputValue
+            });
+          }
+
+          if (videoOutputDisplay) {
+            this.driver.updateEntityAttributes(videoOutputDisplaySensorId, {
+              [uc.SensorAttributes.State]: uc.SensorStates.On,
+              [uc.SensorAttributes.Value]: videoOutputDisplay
+            });
+          }
+          break;
+        }
+        default:
+          break;
+      }
+      await this.zoneAgnosticProcessor.renderEntity(entityId, false);
+    });
   }
 }

@@ -11,8 +11,8 @@ function mkTmpDir(prefix = "onkyo-test-") {
 test.serial("EntityRegistrar returns user-configured listeningModeOptions from config", async (t) => {
   const tmp = mkTmpDir();
   try {
-    const module = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/entityRegistrar.js")).href) as any;
-    const cfgModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/configManager.js")).href) as any;
+    const module = (await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/entityRegistrar.js")).href)) as any;
+    const cfgModule = (await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/configManager.js")).href)) as any;
 
     const { ConfigManager, setConfigDir } = cfgModule;
     if (typeof setConfigDir === "function") setConfigDir(tmp);

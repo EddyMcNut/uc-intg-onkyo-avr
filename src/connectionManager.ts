@@ -41,7 +41,9 @@ export default class ConnectionManager {
         send_delay: avrConfig.queueThreshold || 100,
         configuredZones: configuredZones
       };
-      log.info(`${integrationName} [${physicalAVR}] Updated connection config (netMenuDelay: ${avrConfig.netMenuDelay}, tuneinPresetPosition: ${avrConfig.tuneinPresetPosition}, zones: ${configuredZones?.join(", ") || "default"})`);
+      log.info(
+        `${integrationName} [${physicalAVR}] Updated connection config (netMenuDelay: ${avrConfig.netMenuDelay}, tuneinPresetPosition: ${avrConfig.tuneinPresetPosition}, zones: ${configuredZones?.join(", ") || "default"})`
+      );
     }
   }
 

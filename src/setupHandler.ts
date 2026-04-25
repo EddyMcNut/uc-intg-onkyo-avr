@@ -133,10 +133,20 @@ export default class SetupHandler {
     }
 
     const hasManualFields = Boolean(
-      input.model || input.ipAddress || input.port || input.queueThreshold || input.albumArtURL ||
-      input.listeningModeOptions || input.inputSelectorOptions || input.volumeScale ||
-      input.adjustVolumeDispl || input.zoneCount || input.createSensors || input.netMenuDelay ||
-      input.tuneinPresetPosition || input.entityNameStyle
+      input.model ||
+      input.ipAddress ||
+      input.port ||
+      input.queueThreshold ||
+      input.albumArtURL ||
+      input.listeningModeOptions ||
+      input.inputSelectorOptions ||
+      input.volumeScale ||
+      input.adjustVolumeDispl ||
+      input.zoneCount ||
+      input.createSensors ||
+      input.netMenuDelay ||
+      input.tuneinPresetPosition ||
+      input.entityNameStyle
     );
 
     if (!action && hasManualFields) {
@@ -202,19 +212,19 @@ export default class SetupHandler {
     if (action === "configure") {
       const hasManualFields = Boolean(
         input.model ||
-          input.ipAddress ||
-          input.port ||
-          input.queueThreshold ||
-          input.albumArtURL ||
-          input.listeningModeOptions ||
-          input.inputSelectorOptions ||
-          input.volumeScale ||
-          input.adjustVolumeDispl ||
-          input.zoneCount ||
-          input.createSensors ||
-          input.netMenuDelay ||
-            input.tuneinPresetPosition ||
-            input.entityNameStyle
+        input.ipAddress ||
+        input.port ||
+        input.queueThreshold ||
+        input.albumArtURL ||
+        input.listeningModeOptions ||
+        input.inputSelectorOptions ||
+        input.volumeScale ||
+        input.adjustVolumeDispl ||
+        input.zoneCount ||
+        input.createSensors ||
+        input.netMenuDelay ||
+        input.tuneinPresetPosition ||
+        input.entityNameStyle
       );
 
       if (!hasManualFields) {
@@ -239,8 +249,9 @@ export default class SetupHandler {
     const initialModel = currentAvr ? currentAvr.model : "";
     const initialIp = currentAvr ? currentAvr.ip : "";
     const initialPort = currentAvr ? currentAvr.port : AVR_DEFAULTS.port;
-    const initialListeningModes = currentAvr && Array.isArray(currentAvr.listeningModeOptions) ? currentAvr.listeningModeOptions.join('; ') : currentAvr?.listeningModeOptions === null ? "none" : "";
-    const initialInputSelectorOpts = currentAvr && Array.isArray(currentAvr.inputSelectorOptions) ? currentAvr.inputSelectorOptions.join('; ') : currentAvr?.inputSelectorOptions === null ? "none" : "";
+    const initialListeningModes = currentAvr && Array.isArray(currentAvr.listeningModeOptions) ? currentAvr.listeningModeOptions.join("; ") : currentAvr?.listeningModeOptions === null ? "none" : "";
+    const initialInputSelectorOpts =
+      currentAvr && Array.isArray(currentAvr.inputSelectorOptions) ? currentAvr.inputSelectorOptions.join("; ") : currentAvr?.inputSelectorOptions === null ? "none" : "";
     const initialAlbumArtURL = currentAvr?.albumArtURL ?? AVR_DEFAULTS.albumArtURL;
     const initialQueueThreshold = currentAvr?.queueThreshold ?? AVR_DEFAULTS.queueThreshold;
     const initialNetMenuDelay = currentAvr?.netMenuDelay ?? AVR_DEFAULTS.netMenuDelay;
@@ -248,7 +259,7 @@ export default class SetupHandler {
     const initialVolumeScale = currentAvr?.volumeScale ?? AVR_DEFAULTS.volumeScale;
     const initialAdjustVolumeDispl = currentAvr?.adjustVolumeDispl ?? true;
     const initialEntityNameStyle = currentAvr?.entityNameStyle ?? AVR_DEFAULTS.entityNameStyle;
-    const initialZoneCount = currentAvr && cfg.avrs ? cfg.avrs.filter(a => a.model === currentAvr.model && a.ip === currentAvr.ip).length : 1;
+    const initialZoneCount = currentAvr && cfg.avrs ? cfg.avrs.filter((a) => a.model === currentAvr.model && a.ip === currentAvr.ip).length : 1;
     const initialCreateSensors = currentAvr?.createSensors ?? AVR_DEFAULTS.createSensors;
 
     return new uc.RequestUserInput("Manual configuration", [

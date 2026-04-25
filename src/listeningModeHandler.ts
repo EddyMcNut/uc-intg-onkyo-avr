@@ -23,11 +23,7 @@ export default class ListeningModeHandler {
     private entityRegistrar: EntityRegistrar
   ) {}
 
-  public async handle(
-    entity: uc.Entity,
-    cmdId: string,
-    params?: { [key: string]: string | number | boolean }
-  ): Promise<uc.StatusCodes> {
+  public async handle(entity: uc.Entity, cmdId: string, params?: { [key: string]: string | number | boolean }): Promise<uc.StatusCodes> {
     log.info("%s [%s] Listening Mode command: %s", integrationName, entity.id, cmdId, params);
 
     // Extract avrEntry from entity ID (format: "model_ip_zone_listening_mode")
@@ -83,10 +79,7 @@ export default class ListeningModeHandler {
 
     try {
       const audioFormat = avrStateManager.getAudioFormat(avrEntry);
-      const options = this.entityRegistrar.getListeningModeOptions(
-        audioFormat !== "unknown" ? audioFormat : undefined,
-        avrEntry
-      );
+      const options = this.entityRegistrar.getListeningModeOptions(audioFormat !== "unknown" ? audioFormat : undefined, avrEntry);
       const currentAttrs = entity.attributes || {};
       const currentOption = (currentAttrs[SelectAttributes.CurrentOption] as string) || "";
 
