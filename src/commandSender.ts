@@ -22,6 +22,10 @@ export class CommandSender {
     this.commandReceiver = commandReceiver;
   }
 
+  public updateConfig(config: OnkyoConfig): void {
+    this.config = config;
+  }
+
   private async preserveMainAroundZoneSubsource(model: string, host: string, zone: string, action: () => Promise<void>): Promise<void> {
     if (zone === "main") {
       // first simple check, as most commands will be for main zone then no need to do any extra processing
@@ -176,18 +180,18 @@ export class CommandSender {
             const eiscpValue = adjustVolumeDispl ? avrDisplayValue * 2 : avrDisplayValue;
             const hexVolume = eiscpValue.toString(16).toUpperCase().padStart(2, "0");
 
-            // Debug logging for volume conversion
-            log.info(
-              "%s [%s] volume conversion: slider=%d volumeScale=%d adjustVolumeDispl=%s avrDisplay=%d eiscpValue=%d hex=%s",
-              integrationName,
-              entity.id,
-              sliderValue,
-              volumeScale,
-              String(adjustVolumeDispl),
-              avrDisplayValue,
-              eiscpValue,
-              hexVolume
-            );
+            // // Debug logging for volume conversion
+            // log.info(
+            //   "%s [%s] volume conversion: slider=%d volumeScale=%d adjustVolumeDispl=%s avrDisplay=%d eiscpValue=%d hex=%s",
+            //   integrationName,
+            //   entity.id,
+            //   sliderValue,
+            //   volumeScale,
+            //   String(adjustVolumeDispl),
+            //   avrDisplayValue,
+            //   eiscpValue,
+            //   hexVolume
+            // );
 
             // Use zone-specific volume command prefix
             let volumePrefix = "MVL"; // main zone

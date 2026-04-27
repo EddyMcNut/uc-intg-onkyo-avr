@@ -141,6 +141,7 @@ export default class SetupHandler {
       input.listeningModeOptions ||
       input.inputSelectorOptions ||
       input.volumeScale ||
+      input.volumeDisplay ||
       input.adjustVolumeDispl ||
       input.zoneCount ||
       input.createSensors ||
@@ -219,6 +220,7 @@ export default class SetupHandler {
         input.listeningModeOptions ||
         input.inputSelectorOptions ||
         input.volumeScale ||
+        input.volumeDisplay ||
         input.adjustVolumeDispl ||
         input.zoneCount ||
         input.createSensors ||
@@ -257,6 +259,7 @@ export default class SetupHandler {
     const initialNetMenuDelay = currentAvr?.netMenuDelay ?? AVR_DEFAULTS.netMenuDelay;
     const initialTuneinPresetPosition = currentAvr?.tuneinPresetPosition ?? AVR_DEFAULTS.tuneinPresetPosition;
     const initialVolumeScale = currentAvr?.volumeScale ?? AVR_DEFAULTS.volumeScale;
+    const initialVolumeDisplay = currentAvr?.volumeDisplay ?? AVR_DEFAULTS.volumeDisplay;
     const initialAdjustVolumeDispl = currentAvr?.adjustVolumeDispl ?? true;
     const initialEntityNameStyle = currentAvr?.entityNameStyle ?? AVR_DEFAULTS.entityNameStyle;
     const initialZoneCount = currentAvr && cfg.avrs ? cfg.avrs.filter((a) => a.model === currentAvr.model && a.ip === currentAvr.ip).length : 1;
@@ -320,6 +323,19 @@ export default class SetupHandler {
             items: [
               { id: "100", label: { en: "0-100" } },
               { id: "80", label: { en: "0-80" } }
+            ]
+          }
+        }
+      },
+      {
+        id: "volumeDisplay",
+        label: { en: "Volume display" },
+        field: {
+          dropdown: {
+            value: String(initialVolumeDisplay),
+            items: [
+              { id: "absolute", label: { en: "Absolute (1-100)" } },
+              { id: "relative", label: { en: "Relative (dB)" } }
             ]
           }
         }
@@ -555,6 +571,7 @@ export default class SetupHandler {
           ip: found.host,
           port: Number(found.port) || AVR_DEFAULTS.port,
           zone: "main",
+          volumeDisplay: String(input.volumeDisplay ?? AVR_DEFAULTS.volumeDisplay).toLowerCase() === "relative" ? "relative" : "absolute",
           entityNameStyle: String(input.entityNameStyle ?? AVR_DEFAULTS.entityNameStyle).toLowerCase() === "short" ? "short" : "long"
         };
 
@@ -612,6 +629,7 @@ export default class SetupHandler {
       if (isNaN(parsed)) return AVR_DEFAULTS.volumeScale;
       return [80, 100].includes(parsed) ? parsed : AVR_DEFAULTS.volumeScale;
     })(input.volumeScale);
+    const volumeDisplayValue = String(input.volumeDisplay ?? AVR_DEFAULTS.volumeDisplay).toLowerCase() === "relative" ? "relative" : "absolute";
     const adjustVolumeDisplValue = parseBoolean(input.adjustVolumeDispl, true);
     const entityNameStyleValue = String(input.entityNameStyle ?? AVR_DEFAULTS.entityNameStyle).toLowerCase() === "short" ? "short" : "long";
     const createSensorsValue = parseBoolean(input.createSensors, AVR_DEFAULTS.createSensors);
@@ -641,6 +659,7 @@ export default class SetupHandler {
       listeningModeOptions: input.listeningModeOptions,
       inputSelectorOptions: input.inputSelectorOptions,
       volumeScale: volumeScaleValue,
+      volumeDisplay: volumeDisplayValue,
       adjustVolumeDispl: adjustVolumeDisplValue,
       entityNameStyle: entityNameStyleValue,
       createSensors: createSensorsValue,
@@ -734,6 +753,19 @@ export default class SetupHandler {
           }
         },
         {
+          id: "volumeDisplay",
+          label: { en: "Volume display" },
+          field: {
+            dropdown: {
+              value: String(volumeDisplayValue),
+              items: [
+                { id: "absolute", label: { en: "Absolute (1-100)" } },
+                { id: "relative", label: { en: "Relative (dB)" } }
+              ]
+            }
+          }
+        },
+        {
           id: "adjustVolumeDispl",
           label: { en: "Adjust volume display" },
           field: {
@@ -791,10 +823,11 @@ export default class SetupHandler {
 
     for (const avrCfg of normalizedAvrs) {
       this.host.log.info(
-        "%s Adding AVR config for zone %s with volumeScale: %d, adjustVolumeDispl: %s, entityNameStyle: %s, createSensors: %s, netMenuDelay: %d, tuneinPresetPosition: %d",
+        "%s Adding AVR config for zone %s with volumeScale: %d, volumeDisplay: %s, adjustVolumeDispl: %s, entityNameStyle: %s, createSensors: %s, netMenuDelay: %d, tuneinPresetPosition: %d",
         integrationName,
         avrCfg.zone,
         avrCfg.volumeScale,
+        avrCfg.volumeDisplay,
         avrCfg.adjustVolumeDispl,
         avrCfg.entityNameStyle,
         avrCfg.createSensors,

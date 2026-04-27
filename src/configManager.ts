@@ -112,6 +112,7 @@ export const AVR_DEFAULTS = {
   queueThreshold: DEFAULT_QUEUE_THRESHOLD,
   albumArtURL: "album_art.cgi",
   volumeScale: 100,
+  volumeDisplay: "absolute",
   adjustVolumeDispl: true,
   entityNameStyle: "long",
   createSensors: true,
@@ -121,6 +122,7 @@ export const AVR_DEFAULTS = {
 } as const;
 
 export type EntityNameStyle = "long" | "short";
+export type VolumeDisplay = "absolute" | "relative";
 
 export interface AvrConfig {
   model: string;
@@ -130,6 +132,7 @@ export interface AvrConfig {
   queueThreshold?: number;
   albumArtURL?: string;
   volumeScale?: number; // 80 or 100
+  volumeDisplay?: VolumeDisplay; // absolute = 1-100 style, relative = dB style
   adjustVolumeDispl?: boolean; // true = use 0.5 dB steps (×2 / ÷2), false = direct EISCP value
   entityNameStyle?: EntityNameStyle; // long = include host/ip in visible names, short = omit host/ip
   createSensors?: boolean; // true = create sensor entities for this AVR
@@ -156,6 +159,7 @@ export interface OnkyoConfig {
   queueThreshold?: number;
   albumArtURL?: string;
   volumeScale?: number; // 80 or 100
+  volumeDisplay?: VolumeDisplay;
   adjustVolumeDispl?: boolean; // true = use 0.5 dB steps (×2 / ÷2), false = direct EISCP value
   entityNameStyle?: EntityNameStyle;
   createSensors?: boolean; // true = create sensor entities
@@ -179,6 +183,7 @@ export class ConfigManager {
       queueThreshold: avr.queueThreshold ?? AVR_DEFAULTS.queueThreshold,
       albumArtURL: avr.albumArtURL ?? AVR_DEFAULTS.albumArtURL,
       volumeScale: avr.volumeScale ?? AVR_DEFAULTS.volumeScale,
+      volumeDisplay: avr.volumeDisplay ?? AVR_DEFAULTS.volumeDisplay,
       adjustVolumeDispl: avr.adjustVolumeDispl ?? AVR_DEFAULTS.adjustVolumeDispl,
       entityNameStyle: avr.entityNameStyle ?? AVR_DEFAULTS.entityNameStyle,
       createSensors: avr.createSensors ?? AVR_DEFAULTS.createSensors,
@@ -218,20 +223,22 @@ export class ConfigManager {
         }
 
         // Migrate global settings to per-AVR settings if needed
-        if (this.config.avrs && (this.config.queueThreshold || this.config.albumArtURL || this.config.entityNameStyle)) {
+        if (this.config.avrs && (this.config.queueThreshold || this.config.albumArtURL || this.config.entityNameStyle || this.config.volumeDisplay)) {
           this.config.avrs = this.config.avrs.map((avr) =>
             this.applyDefaults({
               ...avr,
               zone: this.validateZone(avr.zone),
               queueThreshold: avr.queueThreshold ?? this.config.queueThreshold,
               albumArtURL: avr.albumArtURL ?? this.config.albumArtURL,
-              entityNameStyle: avr.entityNameStyle ?? this.config.entityNameStyle
+              entityNameStyle: avr.entityNameStyle ?? this.config.entityNameStyle,
+              volumeDisplay: avr.volumeDisplay ?? this.config.volumeDisplay
             })
           );
           // Remove global settings after migration
           delete this.config.queueThreshold;
           delete this.config.albumArtURL;
           delete this.config.entityNameStyle;
+          delete this.config.volumeDisplay;
           this.save(this.config);
         }
 
@@ -376,6 +383,14 @@ export class ConfigManager {
       }
     }
 
+    // volumeDisplay
+    if (avr.volumeDisplay !== undefined) {
+      const vd = String(avr.volumeDisplay).toLowerCase();
+      if (vd !== "absolute" && vd !== "relative") {
+        errors.push('volumeDisplay must be "absolute" or "relative"');
+      }
+    }
+
     // adjustVolumeDispl
     if (avr.adjustVolumeDispl !== undefined && typeof avr.adjustVolumeDispl !== "boolean" && !(typeof avr.adjustVolumeDispl === "string")) {
       errors.push("adjustVolumeDispl must be boolean");
@@ -448,6 +463,7 @@ export class ConfigManager {
       queueThreshold: avr.queueThreshold,
       albumArtURL: avr.albumArtURL,
       volumeScale: typeof avr.volumeScale === "string" ? parseInt(avr.volumeScale, 10) : avr.volumeScale,
+      volumeDisplay: String(avr.volumeDisplay ?? AVR_DEFAULTS.volumeDisplay).toLowerCase() === "relative" ? "relative" : "absolute",
       adjustVolumeDispl: parseBoolean(avr.adjustVolumeDispl, AVR_DEFAULTS.adjustVolumeDispl),
       entityNameStyle: (String(avr.entityNameStyle ?? AVR_DEFAULTS.entityNameStyle).toLowerCase() === "short" ? "short" : "long") as EntityNameStyle,
       createSensors: parseBoolean(avr.createSensors, AVR_DEFAULTS.createSensors),

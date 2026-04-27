@@ -88,6 +88,12 @@ export class CommandReceiver {
     };
   }
 
+  public updateConfig(config: OnkyoConfig): void {
+    this.config = config;
+    this.zone = this.config.avrs && this.config.avrs.length > 0 ? this.config.avrs[0].zone || "main" : "main";
+    this.zoneAgnosticProcessor.updateConfig(config);
+  }
+
   private async updateListeningModeOptionsForAudioFormat(zoneEntityId: string, audioInputValue: string): Promise<void> {
     const audioFormatType = detectAudioFormatType(audioInputValue);
     const formatChanged = avrStateManager.setAudioFormat(zoneEntityId, audioFormatType);
@@ -196,22 +202,24 @@ export class CommandReceiver {
           const eiscpValue = Number(avrUpdates.argument);
           const volumeScale = this.config.volumeScale || 100;
           const adjustVolumeDispl = this.config.adjustVolumeDispl ?? true;
+          const volumeDisplay = String(this.config.volumeDisplay ?? "absolute").toLowerCase() === "relative" ? "relative" : "absolute";
 
           // Convert: EISCP → AVR display scale (÷2 for 0.5 dB steps if enabled) → slider
           const avrDisplayValue = adjustVolumeDispl ? Math.round(eiscpValue / 2) : eiscpValue;
           const sliderValue = Math.round((avrDisplayValue * 100) / volumeScale);
+          const volumeSensorValue = volumeDisplay === "relative" ? avrDisplayValue - 82 : avrDisplayValue;
 
           this.driver.updateEntityAttributes(entityId, {
-            [uc.MediaPlayerAttributes.Volume]: sliderValue
+            [uc.MediaPlayerAttributes.Volume]: volumeSensorValue// sliderValue //volumeDisplay === "relative" ? volumeSensorValue : sliderValue
           });
-          avrStateManager.setVolume(entityId, eiscpValue);
+          avrStateManager.setVolume(entityId, eiscpValue); //eiscpValue
           // log.info("%s [%s] volume set to: %s", integrationName, entityId, sliderValue);
 
           // Update volume sensor
           const volumeSensorId = `${entityId}_volume_sensor`;
           this.driver.updateEntityAttributes(volumeSensorId, {
             [uc.SensorAttributes.State]: uc.SensorStates.On,
-            [uc.SensorAttributes.Value]: sliderValue
+            [uc.SensorAttributes.Value]: volumeDisplay === "relative" ? (avrDisplayValue <= 0 ? "-oo dB" : `${volumeSensorValue} dB`) : volumeSensorValue
           });
           break;
         }

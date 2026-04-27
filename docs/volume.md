@@ -18,6 +18,13 @@ When the remote itself can show 0.5 steps in the future, I will add something li
 
 The AVR itself may display the volume as dB (relative) or as an absolute number, depending on its settings, but the eISCP protocol only accepts and returns the absolute value. There is no command to set the volume directly in dB via eISCP.
 
+In setup you can now choose `Volume display`:
+
+- `Absolute (1-100)` (default): volume sensor values are shown as absolute numbers.
+- `Relative (dB)`: volume sensor values are shown as dB values computed from the absolute value (`relative = absolute - 82`, with absolute `0` shown as `-oo dB`).
+
+This setting only changes how volume is displayed; volume control commands still use eISCP absolute values.
+
 ### Volume Encoding in eISCP:
 
 The volume command uses a range of 0-200 to represent volume levels from 0.0 to 100.0 in 0.5 steps. Why This Design?

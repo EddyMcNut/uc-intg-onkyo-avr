@@ -328,6 +328,8 @@ export default class OnkyoDriver {
       return v === 80 || v === 100 ? v : AVR_DEFAULTS.volumeScale;
     })();
 
+    const volumeDisplay = String(avrConfig.volumeDisplay ?? AVR_DEFAULTS.volumeDisplay).toLowerCase() === "relative" ? "relative" : "absolute";
+
     const adjustVolumeDispl = parseBoolean(avrConfig.adjustVolumeDispl, AVR_DEFAULTS.adjustVolumeDispl);
     const createSensors = parseBoolean(avrConfig.createSensors, AVR_DEFAULTS.createSensors);
 
@@ -357,6 +359,7 @@ export default class OnkyoDriver {
           queueThreshold,
           albumArtURL,
           volumeScale,
+          volumeDisplay,
           adjustVolumeDispl,
           createSensors,
           netMenuDelay,
@@ -369,6 +372,7 @@ export default class OnkyoDriver {
       queueThreshold,
       albumArtURL,
       volumeScale,
+      volumeDisplay,
       adjustVolumeDispl,
       // Backward compatibility fields for existing code
       model: avrConfig.model,
@@ -425,8 +429,9 @@ export default class OnkyoDriver {
         // Physical connection exists - update its config in case settings changed
         // Collect all zones configured for this physical AVR in case they've changed
         const configuredZones = this.config.avrs.filter((avr) => buildPhysicalAvrId(avr.model, avr.ip) === physicalAVR).map((avr) => avr.zone);
+        const avrSpecificConfig = this.createAvrSpecificConfig(avrConfig);
 
-        this.connectionManager.updateConnectionConfig(physicalAVR, avrConfig, configuredZones);
+        this.connectionManager.updateConnectionConfig(physicalAVR, avrConfig, configuredZones, avrSpecificConfig);
 
         if (!physicalConnection.eiscp.connected) {
           // Physical connection exists but is disconnected, try to reconnect

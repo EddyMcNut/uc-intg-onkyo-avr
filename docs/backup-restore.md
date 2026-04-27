@@ -36,6 +36,7 @@ In the driver setup flow choose the `Create configuration backup` and `Restore c
 ## Notes
 
 - The backup contains only driver configuration and driver metadata — it does not include runtime state or logs.
+- All setup settings are included in the backup payload, including per-AVR volume settings such as `volumeScale`, `adjustVolumeDispl`, and `volumeDisplay`.
 - Restoring replaces the existing configuration; be careful and keep a backup of the current config if you might need to revert.
 - The driver validates restored data against the same rules used during manual setup — invalid fields produce a clear validation error list.
 

@@ -11,9 +11,13 @@ const integrationName = "zoneAgnosticUpdateProcessor:";
 export class ZoneMediaRenderer {
   constructor(
     private readonly driver: uc.IntegrationAPI,
-    private readonly config: OnkyoConfig,
+    private config: OnkyoConfig,
     private readonly mediaStateStore: ZoneAgnosticMediaStateStore
   ) {}
+
+  public updateConfig(config: OnkyoConfig): void {
+    this.config = config;
+  }
 
   async maybeUpdateImage(entityId: string, force: boolean = false): Promise<void> {
     if (!this.config.albumArtURL || this.config.albumArtURL === "na") {
