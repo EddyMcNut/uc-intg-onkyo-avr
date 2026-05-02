@@ -458,19 +458,11 @@ export default class OnkyoDriver {
       const physicalAVR = buildPhysicalAvrId(avrConfig.model, avrConfig.ip);
       const avrEntry = buildEntityId(avrConfig.model, avrConfig.ip, avrConfig.zone);
 
-      // Skip if zone instance already exists
-      if (this.avrInstanceManager.hasInstance(avrEntry)) {
-        log.info("%s [%s] Zone instance already exists", integrationName, avrEntry);
-        continue;
-      }
-
-      // Get the physical connection (it should exist from Phase 1, even if connection failed)
+      // Always run through ensureZoneInstances so existing zone instances get runtime config refreshes
+      // (for example volumeDisplay absolute/relative changes) and missing instances are created.
       const physicalConnection = this.connectionManager.getPhysicalConnection(physicalAVR);
-
       if (!physicalConnection) {
-        // This shouldn't happen since Phase 1 creates physicalConnection objects even on failure
-        // But if it does, we can't create zone instance without the shared eiscp
-        log.warn("%s [%s] Cannot create zone instance - no physical connection object exists", integrationName, avrEntry);
+        log.warn("%s [%s] Cannot create or refresh zone instance - no physical connection object exists", integrationName, avrEntry);
         continue;
       }
 

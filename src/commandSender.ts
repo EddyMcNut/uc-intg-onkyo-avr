@@ -168,8 +168,10 @@ export class CommandSender {
           break;
         case uc.MediaPlayerCommands.Volume:
           if (params?.volume !== undefined) {
+            log.debug("************* %s", params.volume);
             const volumeDisplay = String(this.config.volumeDisplay ?? "absolute").toLowerCase() === "relative" ? "relative" : "absolute";
-            if (volumeDisplay === "relative") {
+            if (volumeDisplay !== "absolute") {
+              log.debug("%s [%s] volume set to relative so slider is ignored.", integrationName, entity.id);
               break;
             }
 
