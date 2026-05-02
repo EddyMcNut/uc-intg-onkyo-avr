@@ -206,8 +206,9 @@ export class CommandReceiver {
 
           // Convert: EISCP → AVR display scale (÷2 for 0.5 dB steps if enabled) → slider
           const avrDisplayValue = adjustVolumeDispl ? Math.round(eiscpValue / 2) : eiscpValue;
-          const sliderValue = Math.round((avrDisplayValue * 100) / volumeScale);
-          const volumeSensorValue = volumeDisplay === "relative" ? avrDisplayValue - 82 : avrDisplayValue;
+          // const sliderValue = Math.round((avrDisplayValue * 100) / volumeScale);
+          const scaledValue = Math.round((avrDisplayValue * 100) / volumeScale);
+          const volumeSensorValue = volumeDisplay === "relative" ? scaledValue - 82 : scaledValue;
 
           this.driver.updateEntityAttributes(entityId, {
             [uc.MediaPlayerAttributes.Volume]: volumeSensorValue// sliderValue //volumeDisplay === "relative" ? volumeSensorValue : sliderValue

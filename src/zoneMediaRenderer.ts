@@ -24,12 +24,12 @@ export class ZoneMediaRenderer {
       return;
     }
 
+    if(force) {
+      log.info("%s forcing image update obsolete?", entityId);
+    }
+
     const sharedState = this.mediaStateStore.getSharedAvrMediaState(entityId);
     const physicalAvrId = this.mediaStateStore.getPhysicalAvrId(entityId);
-
-    if (force) {
-      sharedState.lastImageHash = "";
-    }
 
     const imageUrl = `http://${this.config.ip}/${this.config.albumArtURL}`;
     const previousHash = sharedState.lastImageHash;

@@ -168,6 +168,11 @@ export class CommandSender {
           break;
         case uc.MediaPlayerCommands.Volume:
           if (params?.volume !== undefined) {
+            const volumeDisplay = String(this.config.volumeDisplay ?? "absolute").toLowerCase() === "relative" ? "relative" : "absolute";
+            if (volumeDisplay === "relative") {
+              break;
+            }
+
             // Remote slider: 0-100, AVR display: 0-volumeScale, EISCP protocol: 0-200 or 0-100 depending on model
             const sliderValue = Math.max(0, Math.min(100, Number(params.volume)));
             const volumeScale = this.config.volumeScale || 100;
