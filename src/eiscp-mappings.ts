@@ -167,8 +167,112 @@ export const eiscpMappings = {
     "ipod-play-status": "IST",
     "ipod-list-info": "ILS",
     "dab-preset": "UPR",
-    "dab-sation-name": "UDS",
-    "dab-display-info": "UDD"
+    "dab-station-name": "UDS",
+    "dab-display-info": "UDD",
+    "all-channel-eq": "ACE",
+    "av-direct-mode-operation": "ADM",
+    "accueq": "AEQ",
+    "auto-power-down": "APD",
+    "air-play-setting": "APS",
+    "audio-return-channel": "ARC",
+    "audio-scalar": "ASC",
+    "a-v-sync": "AVS",
+    "battery-charge-status-command-battery-model-only": "BCS",
+    "zone3-balance": "BL3",
+    "hdmi-cec-control-monitor": "CCM",
+    "hdmi-cec": "CEC",
+    "current-folder-status-no": "CFS",
+    "audio-muting-by-channel": "CMT",
+    "cd-play-status": "CST",
+    "center-image-for-neo-6-music": "CTI",
+    "cd-time-info": "CTM",
+    "center-spread-for-dolby-surround": "CTS",
+    "tv-operation-command-via-rihd": "CTV",
+    "center-width-for-plii-music": "CTW",
+    "dab-bit-rate-and-stereo-mono-info": "DBR",
+    "dialog-control-enabled": "DCE",
+    "dab-bit-error-rate-info": "DER",
+    "digital-filter": "DGF",
+    "direct": "DIR",
+    "dialog-control": "DLC",
+    "dab-multiplex-name-info": "DMN",
+    "dimension-for-plii-music": "DMS",
+    "dab-program-type-info": "DPT",
+    "dab-station-name-dsn": "DSN",
+    "dirac-slot-selection": "DSS",
+    "current-disc-status-notice": "DST",
+    "device-ui-status": "DUS",
+    "for-smart-grid": "ECO",
+    "equalizer-select-o-i-equalizer-p-manual-eq-select": "EQS",
+    "usb-firmware-status": "FWU",
+    "firmware-version": "FWV",
+    "pcm-fixed-mode-fixed-pcm-mode": "FXP",
+    "hi-bit": "HBT",
+    "hdmi-out-information": "HOI",
+    "hdmi-4k-8k-signal-format": "HSF",
+    "hdmi-standby-through": "HST",
+    "network-information": "IFN",
+    "input-selector-rename-input-function-rename": "IRN",
+    "intellivolume-input-volume-absorber": "ITV",
+    "loudness-management": "LDM",
+    "lfe-level-lfe-mute-level": "LFE",
+    "zone2-listening-mode": "LMZ",
+    "lip-sync-auto-delay": "LPS",
+    "lock-range-adjust": "LRA",
+    "zone2-late-night": "LTZ",
+    "mcacc-calibration": "MCC",
+    "mcacc-eq": "MCM",
+    "fullband-mcacc-calibration": "MFB",
+    "zone3-muting": "MT3",
+    "zone4-muting": "MT4",
+    "internet-radio-preset-my-favorites-command-network-model-only": "NP3",
+    "internet-radio-preset-command-network-model-only": "NP4",
+    "internet-radio-preset-my-favorites-command-network-model-only-npz": "NPZ",
+    "net-tune-network-operation-command-network-model-only": "NT3",
+    "net-tune-network-operation-command-network-model-only-nt4": "NT4",
+    "net-tune-network-operation-command-network-model-only-ntz": "NTZ",
+    "pre-amp-mode-amp-mode": "PAM",
+    "p-bass": "PBS",
+    "phase-control-plus": "PCP",
+    "phase-control": "PCT",
+    "phase-matching-bass": "PMB",
+    "panorama-for-plii-music": "PNR",
+    "popup-message": "POP",
+    "personal-preset-command-my-input-command": "PPT",
+    "pqls": "PQL",
+    "zone3-preset": "PR3",
+    "zone4-preset": "PR4",
+    "zone2-preset": "PRZ",
+    "zone3-power": "PW3",
+    "zone4-power": "PW4",
+    "re-eq-academy-filter": "RAZ",
+    "reset": "RST",
+    "s-bass": "SBS",
+    "screen-centered-dialog-dialog-enhancement": "SCD",
+    "set-cd-elapsed-time": "SCE",
+    "zone3-selector": "SL3",
+    "zone4-selector": "SL4",
+    "zone2-selector": "SLZ",
+    "speaker-information": "SPI",
+    "super-resolution": "SPR",
+    "eq-for-standing-wave-standing-wave": "STW",
+    "subwoofer-2-temporary-level": "SW2",
+    "zone3-tone": "TN3",
+    "temperature-data": "TPD",
+    "zone3-tuning": "TU3",
+    "tuning-tu4": "TU4",
+    "tuning-tuz": "TUZ",
+    "update": "UPD",
+    "upsampling": "UPS",
+    "zone3-volume": "VL3",
+    "zone4-volume": "VL4",
+    "vocal-dialog": "VOC",
+    "zone2-balance": "ZBL",
+    "zone2-hdmi-out": "ZHO",
+    "zone2-muting": "ZMT",
+    "zone2-power": "ZPW",
+    "zone2-tone": "ZTN",
+    "zone2-volume": "ZVL",
   },
   value_mappings: {
     PWR: {
@@ -1072,6 +1176,724 @@ export const eiscpMappings = {
       mn: { value: "MN" },
       mf: { value: "MF" },
       up: { value: "UP" }
-    }
+    },
+    ACE: {
+      query: { value: "QSTN" }
+    },
+    ADM: {
+      off: { value: "00" },
+      on: { value: "01" },
+      tg: { value: "TG" },
+      query: { value: "QSTN" }
+    },
+    AEQ: {
+      "accueq-off": { value: "00" },
+      "accueq-on-on-all-ch": { value: "01" },
+      "accueq-on-ex-front-l-r": { value: "02" },
+      "accueq-on-front-matching-eq": { value: "03" },
+      up: { value: "UP" },
+      query: { value: "QSTN" }
+    },
+    APD: {
+      "auto-power-down-off": { value: "00" },
+      "auto-power-down-on": { value: "01" },
+      up: { value: "UP" },
+      query: { value: "QSTN" }
+    },
+    APS: {
+      off: { value: "00" },
+      on: { value: "01" },
+      up: { value: "UP" },
+      query: { value: "QSTN" }
+    },
+    ARC: {
+      "audio-return-channel-off": { value: "00" },
+      "audio-return-channel-auto": { value: "01" },
+      up: { value: "UP" },
+      query: { value: "QSTN" }
+    },
+    ASC: {
+      "audio-scalar-auto": { value: "00" },
+      "audio-scalar-manual": { value: "01" },
+      up: { value: "UP" },
+      query: { value: "QSTN" }
+    },
+    AVS: {
+      "a-v-sync-is-increased-step-is-depend-on-model": { value: "UP" },
+      "a-v-sync-is-decreased-step-is-depend-on-model": { value: "DOWN" },
+      query: { value: "QSTN" }
+    },
+    BCS: {
+      "00": { value: "00" },
+      "01": { value: "01" },
+      "10": { value: "10" },
+      "11": { value: "11" },
+      "12": { value: "12" },
+      query: { value: "QSTN" }
+    },
+    BL3: {
+      "balance-up-to-r-2-step": { value: "UP" },
+      "balance-down-to-l-2-step": { value: "DOWN" },
+      query: { value: "QSTN" }
+    },
+    CCM: {
+      main: { value: "01" },
+      zone2: { value: "02" },
+      sub: { value: "10" },
+      up: { value: "UP" },
+      query: { value: "QSTN" }
+    },
+    CEC: {
+      off: { value: "00" },
+      on: { value: "01" },
+      up: { value: "UP" },
+      query: { value: "QSTN" }
+    },
+    CFS: {
+      query: { value: "QSTN" }
+    },
+    CMT: {
+      query: { value: "QSTN" },
+      "speaker-off": { value: "00" },
+      "speaker-on": { value: "01" },
+      up: { value: "UP" }
+    },
+    CST: {
+      query: { value: "QSTN" }
+    },
+    CTI: {
+      "center-image-up": { value: "UP" },
+      "center-image-down": { value: "DOWN" },
+      query: { value: "QSTN" }
+    },
+    CTM: {
+      query: { value: "QSTN" }
+    },
+    CTS: {
+      "center-spread-off": { value: "00" },
+      "center-spread-on": { value: "01" },
+      tg: { value: "TG" },
+      query: { value: "QSTN" }
+    },
+    CTV: {
+      power: { value: "POWER" },
+      pwron: { value: "PWRON" },
+      pwroff: { value: "PWROFF" },
+      chup: { value: "CHUP" },
+      chdn: { value: "CHDN" },
+      vlup: { value: "VLUP" },
+      vldn: { value: "VLDN" },
+      mute: { value: "MUTE" },
+      disp: { value: "DISP" },
+      input: { value: "INPUT" },
+      clear: { value: "CLEAR" },
+      setup: { value: "SETUP" },
+      guide: { value: "GUIDE" },
+      prev: { value: "PREV" },
+      up: { value: "UP" },
+      down: { value: "DOWN" },
+      left: { value: "LEFT" },
+      right: { value: "RIGHT" },
+      enter: { value: "ENTER" },
+      return: { value: "RETURN" }
+    },
+    CTW: {
+      "center-width-up": { value: "UP" },
+      "center-width-down": { value: "DOWN" },
+      query: { value: "QSTN" }
+    },
+    DBR: {
+      query: { value: "QSTN" }
+    },
+    DCE: {
+      "00": { value: "00" },
+      "01": { value: "01" },
+      query: { value: "QSTN" }
+    },
+    DER: {
+      query: { value: "QSTN" }
+    },
+    DGF: {
+      "digital-filter-slow": { value: "00" },
+      "digital-filter-sharp": { value: "01" },
+      "digital-filter-short": { value: "02" },
+      "digital-filter-auto": { value: "03" },
+      up: { value: "UP" },
+      query: { value: "QSTN" }
+    },
+    DIR: {
+      off: { value: "00" },
+      on: { value: "01" },
+      tg: { value: "TG" },
+      query: { value: "QSTN" }
+    },
+    DLC: {
+      "dialog-control-up": { value: "UP" },
+      "dialog-control-down": { value: "DOWN" },
+      query: { value: "QSTN" }
+    },
+    DMN: {
+      query: { value: "QSTN" }
+    },
+    DMS: {
+      "dimension-up": { value: "UP" },
+      "dimension-down": { value: "DOWN" },
+      query: { value: "QSTN" }
+    },
+    DPT: {
+      query: { value: "QSTN" }
+    },
+    DSN: {
+      "xx-xx": { value: "xx...xx" },
+      query: { value: "QSTN" }
+    },
+    DSS: {
+      "C00": { value: "C00" },
+      "C01": { value: "C01" },
+      "C02": { value: "C02" },
+      "C03": { value: "C03" },
+      query: { value: "QSTN" }
+    },
+    DST: {
+      "00": { value: "00" },
+      "04": { value: "04" },
+      "07": { value: "07" },
+      ff: { value: "FF" },
+      query: { value: "QSTN" }
+    },
+    DUS: {
+      query: { value: "QSTN" }
+    },
+    ECO: {
+      "volume-1db-down-and-dimmer-level-dark": { value: "01" },
+      "volume-3db-down-and-dimmer-level-dark": { value: "03" },
+      "volume-6db-down-and-dimmer-level-dark": { value: "06" }
+    },
+    EQS: {
+      "equalizer-off": { value: "00" },
+      "equalizer-preset-1": { value: "01" },
+      "equalizer-preset-2": { value: "02" },
+      "equalizer-preset-3": { value: "03" },
+      up: { value: "UP" },
+      down: { value: "DOWN" },
+      query: { value: "QSTN" }
+    },
+    FWU: {
+      query: { value: "QSTN" }
+    },
+    FWV: {
+      query: { value: "QSTN" }
+    },
+    FXP: {
+      "pcm-fixed-mode-off": { value: "00" },
+      "pcm-fixed-mode-on": { value: "01" },
+      up: { value: "UP" },
+      query: { value: "QSTN" }
+    },
+    HBT: {
+      "hi-bit-off": { value: "00" },
+      "hi-bit-on": { value: "01" },
+      up: { value: "UP" },
+      query: { value: "QSTN" }
+    },
+    HOI: {
+      query: { value: "QSTN" }
+    },
+    HSF: {
+      "4k-standard": { value: "00" },
+      "4k-enhanced": { value: "01" },
+      "8k-standard": { value: "02" },
+      "8k-enhanced": { value: "03" },
+      up: { value: "UP" },
+      query: { value: "QSTN" }
+    },
+    HST: {
+      "hdmi-standby-through-off": { value: "OFF" },
+      "hdmi-standby-through-last": { value: "LAST" },
+      "hdmi-standby-through-auto": { value: "AT" },
+      "hdmi-standby-through-auto-eco": { value: "ATE" },
+      up: { value: "UP" },
+      query: { value: "QSTN" }
+    },
+    IFN: {
+      info: { value: "INFO" },
+      query: { value: "QSTN" }
+    },
+    IRN: {
+      query: { value: "QSTN" }
+    },
+    ITV: {
+      "intellivolume-up": { value: "UP" },
+      "intellivolume-down": { value: "DOWN" },
+      query: { value: "QSTN" }
+    },
+    LDM: {
+      "loudness-management-off": { value: "00" },
+      "loudness-management-on": { value: "01" },
+      up: { value: "UP" },
+      query: { value: "QSTN" }
+    },
+    LFE: {
+      "lfe-mute-level-up": { value: "UP" },
+      "lfe-mute-level-down": { value: "DOWN" },
+      query: { value: "QSTN" }
+    },
+    LMZ: {
+      stereo: { value: "00" },
+      direct: { value: "01" },
+      mono: { value: "0F" },
+      multiplex: { value: "12" },
+      "dvs-pl2": { value: "87" },
+      "dvs-neo6": { value: "88" }
+    },
+    LPS: {
+      "lip-sync-off": { value: "00" },
+      "lip-sync-on": { value: "01" },
+      up: { value: "UP" },
+      query: { value: "QSTN" }
+    },
+    LRA: {
+      query: { value: "QSTN" }
+    },
+    LTZ: {
+      "late-night-off": { value: "00" },
+      "late-night-low": { value: "01" },
+      "late-night-high": { value: "02" },
+      up: { value: "UP" },
+      query: { value: "QSTN" }
+    },
+    MCC: {
+      "00": { value: "00" },
+      "01": { value: "01" },
+      query: { value: "QSTN" }
+    },
+    MCM: {
+      "mcacc-memory-1": { value: "01" },
+      "mcacc-memory-2": { value: "02" },
+      "mcacc-memory-3": { value: "03" },
+      "mcacc-memory-4": { value: "04" },
+      "mcacc-memory-5": { value: "05" },
+      "mcacc-memory-6": { value: "06" },
+      up: { value: "UP" },
+      down: { value: "DOWN" },
+      query: { value: "QSTN" }
+    },
+    MFB: {
+      "00": { value: "00" },
+      "01": { value: "01" },
+      query: { value: "QSTN" }
+    },
+    MT3: {
+      "zone3-muting-off": { value: "00" },
+      "zone3-muting-on": { value: "01" },
+      tg: { value: "TG" },
+      query: { value: "QSTN" }
+    },
+    MT4: {
+      "zone4-muting-off": { value: "00" },
+      "zone4-muting-on": { value: "01" },
+      tg: { value: "TG" },
+      query: { value: "QSTN" }
+    },
+    NP3: {
+      query: { value: "QSTN" }
+    },
+    NP4: {
+      "cccc/tttt": { value: "cccc/tttt" },
+      query: { value: "QSTN" }
+    },
+    NPZ: {
+      query: { value: "QSTN" }
+    },
+    NT3: {
+      play: { value: "PLAY" },
+      stop: { value: "STOP" },
+      pause: { value: "PAUSE" },
+      trup: { value: "TRUP" },
+      trdn: { value: "TRDN" },
+      chup: { value: "CHUP" },
+      chdn: { value: "CHDN" },
+      ff: { value: "FF" },
+      rew: { value: "REW" },
+      repeat: { value: "REPEAT" },
+      random: { value: "RANDOM" },
+      display: { value: "DISPLAY" },
+      memory: { value: "MEMORY" },
+      right: { value: "RIGHT" },
+      left: { value: "LEFT" },
+      up: { value: "UP" },
+      down: { value: "DOWN" },
+      select: { value: "SELECT" },
+      return: { value: "RETURN" }
+    },
+    NT4: {
+      play: { value: "PLAY" },
+      stop: { value: "STOP" },
+      pause: { value: "PAUSE" },
+      trup: { value: "TRUP" },
+      trdn: { value: "TRDN" },
+      ff: { value: "FF" },
+      rew: { value: "REW" },
+      repeat: { value: "REPEAT" },
+      random: { value: "RANDOM" },
+      display: { value: "DISPLAY" },
+      right: { value: "RIGHT" },
+      left: { value: "LEFT" },
+      up: { value: "UP" },
+      down: { value: "DOWN" },
+      select: { value: "SELECT" },
+      return: { value: "RETURN" }
+    },
+    NTZ: {
+      play: { value: "PLAY" },
+      stop: { value: "STOP" },
+      pause: { value: "PAUSE" },
+      trup: { value: "TRUP" },
+      trdn: { value: "TRDN" },
+      chup: { value: "CHUP" },
+      chdn: { value: "CHDN" },
+      ff: { value: "FF" },
+      rew: { value: "REW" },
+      repeat: { value: "REPEAT" },
+      random: { value: "RANDOM" },
+      display: { value: "DISPLAY" },
+      memory: { value: "MEMORY" },
+      mode: { value: "MODE" },
+      right: { value: "RIGHT" },
+      left: { value: "LEFT" },
+      up: { value: "UP" },
+      down: { value: "DOWN" },
+      select: { value: "SELECT" },
+      return: { value: "RETURN" }
+    },
+    PAM: {
+      "pre-amp-mode-off": { value: "00" },
+      "pre-amp-mode-front": { value: "01" },
+      "pre-amp-mode-front-center": { value: "03" },
+      "pre-amp-mode-all": { value: "07" },
+      up: { value: "UP" },
+      query: { value: "QSTN" }
+    },
+    PBS: {
+      "p-bass-off": { value: "00" },
+      "p-bass-on": { value: "01" },
+      up: { value: "UP" },
+      query: { value: "QSTN" }
+    },
+    PCP: {
+      query: { value: "QSTN" }
+    },
+    PCT: {
+      "phase-control-off": { value: "00" },
+      "phase-control-on": { value: "01" },
+      "full-band-phase-control-on": { value: "02" },
+      up: { value: "UP" },
+      query: { value: "QSTN" }
+    },
+    PMB: {
+      off: { value: "00" },
+      on: { value: "01" },
+      tg: { value: "TG" },
+      query: { value: "QSTN" }
+    },
+    PNR: {
+      "panorama-off": { value: "00" },
+      "panorama-on": { value: "01" },
+      tg: { value: "TG" },
+      query: { value: "QSTN" }
+    },
+    POP: {
+      "accueq-off": { value: "xxuycccciiiillsraabbssnnn...nnn" }
+    },
+    PPT: {
+      query: { value: "QSTN" }
+    },
+    PQL: {
+      "pqls-off": { value: "00" },
+      "pqls-on": { value: "01" },
+      up: { value: "UP" },
+      query: { value: "QSTN" }
+    },
+    PR3: {
+      "no-1-40": { value: "1,40" },
+      "no-1-30": { value: "1,30" },
+      up: { value: "UP" },
+      down: { value: "DOWN" },
+      query: { value: "QSTN" }
+    },
+    PR4: {
+      "no-1-40": { value: "1,40" },
+      "no-1-30": { value: "1,30" },
+      up: { value: "UP" },
+      down: { value: "DOWN" },
+      query: { value: "QSTN" }
+    },
+    PRZ: {
+      "no-1-40": { value: "1,40" },
+      "no-1-30": { value: "1,30" },
+      up: { value: "UP" },
+      down: { value: "DOWN" },
+      query: { value: "QSTN" }
+    },
+    PW3: {
+      "zone3-standby": { value: "00" },
+      "zone3-on": { value: "01" },
+      query: { value: "QSTN" }
+    },
+    PW4: {
+      "zone4-standby": { value: "00" },
+      "zone4-on": { value: "01" },
+      query: { value: "QSTN" }
+    },
+    RAZ: {
+      "both-off": { value: "00" },
+      "re-eq-on": { value: "01" },
+      "academy-on": { value: "02" },
+      up: { value: "UP" },
+      query: { value: "QSTN" }
+    },
+    RST: {
+      all: { value: "ALL" }
+    },
+    SBS: {
+      "s-bass-off": { value: "00" },
+      "s-bass-on": { value: "01" },
+      up: { value: "UP" },
+      query: { value: "QSTN" }
+    },
+    SCD: {
+      "dialog-enhancement-off": { value: "00" },
+      "dialog-enhancement-on": { value: "01" }
+    },
+    SCE: {
+      query: { value: "QSTN" }
+    },
+    SL3: {
+      "video1-vcr-dvr-stb-dvr": { value: "00" },
+      "video2-cbl-sat": { value: "01" },
+      "video3-game-tv-game-game1": { value: "02" },
+      "video4-aux1-aux": { value: "03" },
+      "video5-aux2-game2": { value: "04" },
+      "video6-pc": { value: "05" },
+      video7: { value: "06" },
+      "hidden1-extra1": { value: "07" },
+      "hidden2-extra2": { value: "08" },
+      "hidden3-extra3": { value: "09" },
+      dvd: { value: "10" },
+      "strm-box": { value: "11" },
+      tv: { value: "12" },
+      "tape-1": { value: "20" },
+      tape2: { value: "21" },
+      phono: { value: "22" },
+      "cd-tv-cd": { value: "23" },
+      fm: { value: "24" },
+      am: { value: "25" },
+      tuner: { value: "26" },
+      "music-server-p4s-dlna-2": { value: "27" },
+      "internet-radio-iradio-favorite-3": { value: "28" },
+      "usb-usb-front": { value: "29" },
+      "usb-rear": { value: "2A" },
+      "network-net": { value: "2B" },
+      "usb-toggle": { value: "2C" },
+      airplay: { value: "2D" },
+      bluetooth: { value: "2E" },
+      "universal-port": { value: "40" },
+      "multi-ch": { value: "30" },
+      "xm-1": { value: "31" },
+      "sirius-1": { value: "32" },
+      "dab-5": { value: "33" },
+      source: { value: "80" },
+      up: { value: "UP" },
+      down: { value: "DOWN" },
+      query: { value: "QSTN" }
+    },
+    SL4: {
+      "video1-vcr-dvr-stb-dvr": { value: "00" },
+      "video2-cbl-sat": { value: "01" },
+      "video3-game-tv-game-game1": { value: "02" },
+      "video4-aux1-aux": { value: "03" },
+      "video5-aux2-game2": { value: "04" },
+      "video6-pc": { value: "05" },
+      video7: { value: "06" },
+      "hidden1-extra1": { value: "07" },
+      "hidden2-extra2": { value: "08" },
+      "hidden3-extra3": { value: "09" },
+      "dvd-bd-dvd": { value: "10" },
+      "tape-1-tv-tape": { value: "20" },
+      tape2: { value: "21" },
+      phono: { value: "22" },
+      "cd-tv-cd": { value: "23" },
+      fm: { value: "24" },
+      am: { value: "25" },
+      tuner: { value: "26" },
+      "music-server-p4s-dlna-2": { value: "27" },
+      "internet-radio-iradio-favorite-3": { value: "28" },
+      "usb-usb-front": { value: "29" },
+      "usb-rear": { value: "2A" },
+      "network-net": { value: "2B" },
+      "usb-toggle": { value: "2C" },
+      "2d": { value: "2D" },
+      bluetooth: { value: "2E" },
+      "universal-port": { value: "40" },
+      "multi-ch": { value: "30" },
+      "xm-1": { value: "31" },
+      "sirius-1": { value: "32" },
+      "dab-5": { value: "33" },
+      source: { value: "80" },
+      up: { value: "UP" },
+      down: { value: "DOWN" },
+      query: { value: "QSTN" }
+    },
+    SLZ: {
+      "video1-vcr-dvr-stb-dvr": { value: "00" },
+      "video2-cbl-sat": { value: "01" },
+      "video3-game-tv-game-game1": { value: "02" },
+      "video4-aux1-aux": { value: "03" },
+      "video5-aux2-game2": { value: "04" },
+      "video6-pc": { value: "05" },
+      video7: { value: "06" },
+      "hidden1-extra1": { value: "07" },
+      "hidden2-extra2": { value: "08" },
+      "hidden3-extra3": { value: "09" },
+      "dvd-bd-dvd": { value: "10" },
+      "strm-box": { value: "11" },
+      tv: { value: "12" },
+      "tape-1-tv-tape": { value: "20" },
+      tape2: { value: "21" },
+      phono: { value: "22" },
+      "cd-tv-cd": { value: "23" },
+      fm: { value: "24" },
+      am: { value: "25" },
+      tuner: { value: "26" },
+      "music-server-p4s-dlna-4": { value: "27" },
+      "internet-radio-iradio-favorite-5": { value: "28" },
+      "usb-usb-front": { value: "29" },
+      "usb-rear": { value: "2A" },
+      "network-net": { value: "2B" },
+      "usb-toggle": { value: "2C" },
+      airplay: { value: "2D" },
+      bluetooth: { value: "2E" },
+      "universal-port": { value: "40" },
+      "multi-ch": { value: "30" },
+      "xm-3": { value: "31" },
+      "sirius-3": { value: "32" },
+      "dab-5": { value: "33" },
+      "hdmi-5": { value: "55" },
+      "hdmi-6": { value: "56" },
+      "hdmi-7": { value: "57" },
+      off: { value: "7F" },
+      source: { value: "80" },
+      up: { value: "UP" },
+      down: { value: "DOWN" },
+      query: { value: "QSTN" }
+    },
+    SPI: {
+      query: { value: "QSTN" }
+    },
+    SPR: {
+      query: { value: "QSTN" }
+    },
+    STW: {
+      "standing-wave-off": { value: "00" },
+      "standing-wave-on": { value: "01" },
+      up: { value: "UP" },
+      query: { value: "QSTN" }
+    },
+    SW2: {
+      up: { value: "UP" },
+      down: { value: "DOWN" },
+      query: { value: "QSTN" }
+    },
+    TN3: {
+      "bass-up-2-step": { value: "BUP" },
+      "bass-down-2-step": { value: "BDOWN" },
+      "treble-up-2-step": { value: "TUP" },
+      "treble-down-2-step": { value: "TDOWN" },
+      query: { value: "QSTN" }
+    },
+    TPD: {
+      query: { value: "QSTN" }
+    },
+    TU3: {
+      band: { value: "BAND" },
+      direct: { value: "DIRECT" },
+      up: { value: "UP" },
+      down: { value: "DOWN" },
+      query: { value: "QSTN" }
+    },
+    TU4: {
+      direct: { value: "DIRECT" },
+      up: { value: "UP" },
+      down: { value: "DOWN" },
+      query: { value: "QSTN" }
+    },
+    TUZ: {
+      direct: { value: "DIRECT" },
+      band: { value: "BAND" },
+      up: { value: "UP" },
+      down: { value: "DOWN" },
+      query: { value: "QSTN" }
+    },
+    UPD: {
+      net: { value: "NET" },
+      usb: { value: "USB" },
+      cmp: { value: "CMP" },
+      ff: { value: "FF" },
+      "00": { value: "00" },
+      "01": { value: "01" },
+      "02": { value: "02" },
+      query: { value: "QSTN" }
+    },
+    UPS: {
+      "upsampling-x1": { value: "00" },
+      "upsampling-x2": { value: "01" },
+      "upsampling-x4": { value: "02" },
+      "upsampling-x8": { value: "03" },
+      up: { value: "UP" },
+      query: { value: "QSTN" }
+    },
+    VL3: {
+      "upsampling-x8": { value: "UP1" },
+      down1: { value: "DOWN1" },
+      query: { value: "QSTN" }
+    },
+    VL4: {
+      query: { value: "QSTN" }
+    },
+    VOC: {
+      query: { value: "QSTN" }
+    },
+    ZBL: {
+      "balance-up-to-r-2-step": { value: "UP" },
+      "balance-down-to-l-2-step": { value: "DOWN" },
+      query: { value: "QSTN" }
+    },
+    ZHO: {
+      "00": { value: "00" },
+      "01": { value: "01" },
+      up: { value: "UP" },
+      query: { value: "QSTN" }
+    },
+    ZMT: {
+      "zone2-muting-off": { value: "00" },
+      "zone2-muting-on": { value: "01" },
+      tg: { value: "TG" },
+      query: { value: "QSTN" }
+    },
+    ZPW: {
+      "zone2-standby": { value: "00" },
+      "zone2-on": { value: "01" },
+      query: { value: "QSTN" }
+    },
+    ZTN: {
+      "bass-up-2-step": { value: "BUP" },
+      "bass-down-2-step": { value: "BDOWN" },
+      "treble-up-2-step": { value: "TUP" },
+      "treble-down-2-step": { value: "TDOWN" },
+      query: { value: "QSTN" }
+    },
+    ZVL: {
+      query: { value: "QSTN" }
+    },
   }
 };
