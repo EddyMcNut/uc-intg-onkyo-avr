@@ -6,7 +6,7 @@ With a single zone action, you just map the VolumeUp/Down command of that select
 
 ![](../screenshots/volume-up.png)
 
-### Steps
+### Volume Steps
 
 Currently the volume level that is shown on the display of the remote can only show integer values (1, 15, 60, ...) and not yet x.5 values (1.5, 15.5, 60.5, ...). When you assign `Volume up` or `Volume down` commands to a button, the volume step will be 1.0, this is done so the volume level that is shown on the display of the remote is the same as the level showing on the AVR.
 
@@ -18,12 +18,16 @@ When the remote itself can show 0.5 steps in the future, I will add something li
 
 The AVR itself may display the volume as dB (relative) or as an absolute number, depending on its settings, but the eISCP protocol only accepts and returns the absolute value. There is no command to set the volume directly in dB via eISCP.
 
-In setup you can now choose `Volume display`:
+This integration can calculate the dB value based on the absolute value, you can configure this during setup:
+
+![](../screenshots/volume-relative.png)
 
 - `Absolute (1-100)` (default): volume sensor values are shown as absolute numbers.
-- `Relative (dB)`: volume sensor values are shown as dB values computed from the absolute value (`relative = absolute - 82`, with absolute `0` shown as `-oo dB`).
+- `Relative (dB)`: volume sensor values are shown as dB values computed from the absolute value 
 
-This setting only changes how volume is displayed; volume control commands still use eISCP absolute values.
+This setting only changes how volume is displayed; volume control commands still use eISCP absolute values. 
+
+There is a trade off: *when you configure the integration to work with dB, you cannot use the slider yet*.
 
 ### Volume Encoding in eISCP:
 
@@ -52,6 +56,10 @@ Most models allow to set a standard volume level per input source. For example w
 When you determine the specific setting for your use-case, consider [Volume Encoding in eISCP](#volume-encoding-in-eiscp): if you want to set the level to 30 (AVR display) then you probably need to set a value of 60.
 
 ### Slider
+
+Note: **currently you can only use the slider to control the volume when you have configured the integration to work with absolute values instead of relative**.
+
+![](../screenshots/volume-absolute.png)
 
 As from v0.6.1, this integration supports the use of the Slider to control the AVR volume. Make sure that during the setup step of the integration, you select the correct `Volume scale` to get the best experience. See the manual of your AVR model for detailed information.
 

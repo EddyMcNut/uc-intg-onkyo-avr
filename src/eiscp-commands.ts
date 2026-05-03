@@ -2236,13 +2236,6 @@ export const eiscpCommands = {
         UP: { name: "up", description: "gets & display DAB Information Wrap-Around Up" }
       }
     },
-    ACE: {
-      name: "all-channel-eq",
-      description: "All Channel EQ for Temporary Value",
-      values: {
-        QSTN: { name: "query", description: "gets The Phase Control" }
-      }
-    },
     ADM: {
       name: "av-direct-mode-operation",
       description: "AV Direct Mode Operation Command",
@@ -2257,10 +2250,10 @@ export const eiscpCommands = {
       name: "accueq",
       description: "AccuEQ",
       values: {
-        "00": { name: "accueq-off", description: "sets AccuEQ Off" },
-        "01": { name: "accueq-on-on-all-ch", description: "sets AccuEQ On         On(All Ch)" },
-        "02": { name: "accueq-on-ex-front-l-r", description: "sets AccuEQ               On(ex. Front L/R)" },
-        "03": { name: "accueq-on-front-matching-eq", description: "sets AccuEQ               On( Front Matching EQ)" },
+        "00": { name: "off", description: "sets AccuEQ Off" },
+        "01": { name: "on-on-all-ch", description: "sets AccuEQ On (All Ch)" },
+        "02": { name: "on-ex-front-l-r", description: "sets AccuEQ On (ex. Front L/R)" },
+        "03": { name: "on-front-matching-eq", description: "sets AccuEQ On (Front Matching EQ)" },
         UP: { name: "up", description: "sets AccuEQ State Wrap-Around Up" },
         QSTN: { name: "query", description: "gets The AccuEQ State" }
       }
@@ -2269,8 +2262,8 @@ export const eiscpCommands = {
       name: "auto-power-down",
       description: "Auto Power Down",
       values: {
-        "00": { name: "auto-power-down-off", description: "sets Auto Power Down Off" },
-        "01": { name: "auto-power-down-on", description: "sets Auto Power Down On" },
+        "00": { name: "off", description: "sets Auto Power Down Off" },
+        "01": { name: "on", description: "sets Auto Power Down On" },
         UP: { name: "up", description: "sets Auto Power Down Wrap-Around" },
         QSTN: { name: "query", description: "gets The Auto Power Down State" }
       }
@@ -2289,8 +2282,8 @@ export const eiscpCommands = {
       name: "audio-return-channel",
       description: "Audio Return Channel",
       values: {
-        "00": { name: "audio-return-channel-off", description: "sets Audio Return Channel Off" },
-        "01": { name: "audio-return-channel-auto", description: "sets Audio Return Channel Auto" },
+        "00": { name: "off", description: "sets Audio Return Channel Off" },
+        "01": { name: "auto", description: "sets Audio Return Channel Auto" },
         UP: { name: "up", description: "sets Audio Return Channel Wrap-Around" },
         QSTN: { name: "query", description: "gets The Audio Return Channel State" }
       }
@@ -2299,40 +2292,31 @@ export const eiscpCommands = {
       name: "audio-scalar",
       description: "Audio Scalar",
       values: {
-        "00": { name: "audio-scalar-auto", description: "sets Audio Scalar Auto" },
-        "01": { name: "audio-scalar-manual", description: "sets Audio Scalar Manual" },
+        "00": { name: "auto", description: "sets Audio Scalar Auto" },
+        "01": { name: "manual", description: "sets Audio Scalar Manual" },
         UP: { name: "up", description: "sets Audio Scalar Wrap-Around" },
         QSTN: { name: "query", description: "gets The Audio Scalar State" }
       }
     },
     AVS: {
-      name: "a-v-sync",
+      name: "av-sync",
       description: "A/V Sync",
       values: {
-        UP: { name: "a-v-sync-is-increased-step-is-depend-on-model", description: "sets A/V Sync is increased (step is depend on model)" },
-        DOWN: { name: "a-v-sync-is-decreased-step-is-depend-on-model", description: "sets A/V Sync is decreased (step is depend on model)" },
+        UP: { name: "up", description: "sets A/V Sync is increased (step is depend on model)" },
+        DOWN: { name: "down", description: "sets A/V Sync is decreased (step is depend on model)" },
         QSTN: { name: "query", description: "gets A/V Sync Value" }
       }
     },
     BCS: {
-      name: "battery-charge-status-command-battery-model-only",
+      name: "battery-charge",
       description: "Battery Charge Status Command (Battery Model Only)",
       values: {
-        "00": { name: "00", description: "charging" },
-        "01": { name: "01", description: "charge completed" },
-        "10": { name: "10", description: "battery level Low" },
-        "11": { name: "11", description: "battery level Middle" },
-        "12": { name: "12", description: "battery level High" },
+        "00": { name: "charging", description: "charging" },
+        "01": { name: "completed", description: "charge completed" },
+        "10": { name: "low", description: "battery level Low" },
+        "11": { name: "middle", description: "battery level Middle" },
+        "12": { name: "high", description: "battery level High" },
         QSTN: { name: "query", description: "gets battery charge status" }
-      }
-    },
-    BL3: {
-      name: "zone3-balance",
-      description: "Zone3 Balance Command",
-      values: {
-        UP: { name: "balance-up-to-r-2-step", description: "sets Balance Up (to R 2 Step)" },
-        DOWN: { name: "balance-down-to-l-2-step", description: "sets Balance Down (to L 2 Step)" },
-        QSTN: { name: "query", description: "gets Zone3 Balance" }
       }
     },
     CCM: {
@@ -2356,247 +2340,23 @@ export const eiscpCommands = {
         QSTN: { name: "query", description: "gets HDMI CEC" }
       }
     },
-    CFS: {
-      name: "current-folder-status-no",
-      description: "Current Folder Status（No.）",
-      values: {
-        QSTN: { name: "query", description: "gets command status" }
-      }
-    },
-    CMT: {
-      name: "audio-muting-by-channel",
-      description: "Audio Muting by Channel Command",
-      values: {
-        QSTN: { name: "query", description: "gets the Audio Muting State" },
-        "00": { name: "speaker-off", description: "sets Speaker Off" },
-        "01": { name: "speaker-on", description: "sets Speaker On" },
-        UP: { name: "up", description: "sets Speaker Switch Wrap-Around" },
-      }
-    },
-    CST: {
-      name: "cd-play-status",
-      description: "CD Play Status",
-      values: {
-        QSTN: { name: "query", description: "gets CD Play Status" }
-      }
-    },
-    CTI: {
-      name: "center-image-for-neo-6-music",
-      description: "Center Image for Neo:6 Music",
-      values: {
-        UP: { name: "center-image-up", description: "sets Center Image Up" },
-        DOWN: { name: "center-image-down", description: "sets Center Image Down" },
-        QSTN: { name: "query", description: "gets The Center Image State" }
-      }
-    },
-    CTM: {
-      name: "cd-time-info",
-      description: "CD Time Info",
-      values: {
-        QSTN: { name: "query", description: "gets CDTime Info" }
-      }
-    },
-    CTS: {
-      name: "center-spread-for-dolby-surround",
-      description: "Center Spread for Dolby Surround",
-      values: {
-        "00": { name: "center-spread-off", description: "sets Center Spread Off" },
-        "01": { name: "center-spread-on", description: "sets Center Spread On" },
-        TG: { name: "tg", description: "sets Center Spread Wrap-Around" },
-        QSTN: { name: "query", description: "gets The Center Spread State" }
-      }
-    },
-    CTV: {
-      name: "tv-operation-command-via-rihd",
-      description: "TV Operation Command (via RIHD)",
-      values: {
-        POWER: { name: "power", description: "Power" },
-        PWRON: { name: "pwron", description: "PowerOn" },
-        PWROFF: { name: "pwroff", description: "Standby" },
-        CHUP: { name: "chup", description: "CH Up" },
-        CHDN: { name: "chdn", description: "CH Down" },
-        VLUP: { name: "vlup", description: "Volume Up" },
-        VLDN: { name: "vldn", description: "Volume Down" },
-        MUTE: { name: "mute", description: "Muting" },
-        DISP: { name: "disp", description: "Display" },
-        INPUT: { name: "input", description: "Input" },
-        CLEAR: { name: "clear", description: "Clear" },
-        SETUP: { name: "setup", description: "Setup" },
-        GUIDE: { name: "guide", description: "Guide / Top Menu" },
-        PREV: { name: "prev", description: "Previous" },
-        UP: { name: "up", description: "Cursor Up" },
-        DOWN: { name: "down", description: "Cursor Down" },
-        LEFT: { name: "left", description: "Cursor Left" },
-        RIGHT: { name: "right", description: "Cursor Right" },
-        ENTER: { name: "enter", description: "Enter" },
-        RETURN: { name: "return", description: "Return" }
-      }
-    },
-    CTW: {
-      name: "center-width-for-plii-music",
-      description: "Center Width for PLII Music",
-      values: {
-        UP: { name: "center-width-up", description: "sets Center Width Up" },
-        DOWN: { name: "center-width-down", description: "sets Center Width Down" },
-        QSTN: { name: "query", description: "gets The Center Width State" }
-      }
-    },
-    DBR: {
-      name: "dab-bit-rate-and-stereo-mono-info",
-      description: "DAB Bit Rate and Stereo/Mono Info",
-      values: {
-        QSTN: { name: "query", description: "gets DAB Bit Rate and Stereo/Mono Status" }
-      }
-    },
-    DCE: {
-      name: "dialog-control-enabled",
-      description: "Dialog Control Enabled",
-      values: {
-        "00": { name: "00", description: "Dialog Control is disabled" },
-        "01": { name: "01", description: "Dialog Control is enabled" },
-        QSTN: { name: "query", description: "gets The Dialog Control Enabled State" }
-      }
-    },
-    DER: {
-      name: "dab-bit-error-rate-info",
-      description: "DAB Bit Error Rate Info",
-      values: {
-        QSTN: { name: "query", description: "gets DAB Bit Error Rate" }
-      }
-    },
-    DGF: {
-      name: "digital-filter",
-      description: "Digital Filter",
-      values: {
-        "00": { name: "digital-filter-slow", description: "sets Digital Filter Slow" },
-        "01": { name: "digital-filter-sharp", description: "sets Digital Filter Sharp" },
-        "02": { name: "digital-filter-short", description: "sets Digital Filter Short" },
-        "03": { name: "digital-filter-auto", description: "sets Digital Filter Auto" },
-        UP: { name: "up", description: "sets Digital Filter Wrap-Around" },
-        QSTN: { name: "query", description: "gets The Digital Filter State" }
-      }
-    },
-    DIR: {
-      name: "direct",
-      description: "Direct Command",
-      values: {
-        "00": { name: "off", description: "sets Off" },
-        "01": { name: "on", description: "sets On" },
-        TG: { name: "tg", description: "sets Direct Wrap-Around Up" },
-        QSTN: { name: "query", description: "gets Direct Status" }
-      }
-    },
-    DLC: {
-      name: "dialog-control",
-      description: "Dialog Control",
-      values: {
-        UP: { name: "dialog-control-up", description: "sets Dialog Control Up" },
-        DOWN: { name: "dialog-control-down", description: "sets Dialog Control Down" },
-        QSTN: { name: "query", description: "gets The Dialog Control State" }
-      }
-    },
-    DMN: {
-      name: "dab-multiplex-name-info",
-      description: "DAB Multiplex Name Info",
-      values: {
-        QSTN: { name: "query", description: "gets DAB Multiplex Name" }
-      }
-    },
-    DMS: {
-      name: "dimension-for-plii-music",
-      description: "Dimension for PLII Music",
-      values: {
-        UP: { name: "dimension-up", description: "sets Dimension Up" },
-        DOWN: { name: "dimension-down", description: "sets Dimension Down" },
-        QSTN: { name: "query", description: "gets The Dimension State" }
-      }
-    },
-    DPT: {
-      name: "dab-program-type-info",
-      description: "DAB Program Type Info",
-      values: {
-        QSTN: { name: "query", description: "gets DAB Program Type" }
-      }
-    },
-    DSN: {
-      name: "dab-station-name-dsn",
-      description: "DAB Station Name",
-      values: {
-        "xx...xx": { name: "xx-xx", description: "DAB Station Name" },
-        QSTN: { name: "query", description: "gets Station Name" }
-      }
-    },
     DSS: {
-      name: "dirac-slot-selection",
+      name: "dirac",
       description: "Dirac Slot Selection",
       values: {
-        "C00": { name: "C00", description: "Dirac off" },
-        "C01": { name: "C01", description: "Dirac on and select slot1" },
-        "C02": { name: "C02", description: "Dirac on and select slot2" },
-        "C03": { name: "C03", description: "Dirac on and select slot3" },
+        "C00": { name: "off", description: "Dirac off" },
+        "C01": { name: "slot1", description: "Dirac on and select slot1" },
+        "C02": { name: "slot2", description: "Dirac on and select slot2" },
+        "C03": { name: "slot3", description: "Dirac on and select slot3" },
         QSTN: { name: "query", description: "get the Dirac slot selection" }
       }
     },
-    DST: {
-      name: "current-disc-status-notice",
-      description: "Current disc status notice",
-      values: {
-        "00": { name: "00", description: "No disc" },
-        "04": { name: "04", description: "Audio CD" },
-        "07": { name: "07", description: "MP3 CD" },
-        FF: { name: "ff", description: "Unknown" },
-        QSTN: { name: "query", description: "gets Disc Status" }
-      }
-    },
-    DUS: {
-      name: "device-ui-status",
-      description: "Device UI Status Command",
-      values: {
-        QSTN: { name: "query", description: "gets the Device UI Status" }
-      }
-    },
-    ECO: {
-      name: "for-smart-grid",
-      description: "for Smart Grid Command",
-      values: {
-        "01": { name: "volume-1db-down-and-dimmer-level-dark", description: "sets Volume 1dB down and Dimmer Level \"Dark\"" },
-        "03": { name: "volume-3db-down-and-dimmer-level-dark", description: "sets Volume 3dB down and Dimmer Level \"Dark\"" },
-        "06": { name: "volume-6db-down-and-dimmer-level-dark", description: "sets Volume 6dB down and Dimmer Level \"Dark\"" }
-      }
-    },
-    EQS: {
-      name: "equalizer-select-o-i-equalizer-p-manual-eq-select",
-      description: "Equalizer Select(O/I:Equalizer, P:Manual EQ Select)",
-      values: {
-        "00": { name: "equalizer-off", description: "sets Equalizer Off" },
-        "01": { name: "equalizer-preset-1", description: "sets Equalizer Preset 1" },
-        "02": { name: "equalizer-preset-2", description: "sets Equalizer Preset 2" },
-        "03": { name: "equalizer-preset-3", description: "sets Equalizer Preset 3" },
-        UP: { name: "up", description: "sets Equalizer Preset Wrap-Around Up" },
-        DOWN: { name: "down", description: "sets Equalizer Preset Wrap-Around Down" },
-        QSTN: { name: "query", description: "gets The Equalizer Preset" }
-      }
-    },
-    FWU: {
-      name: "usb-firmware-status",
-      description: "USB Firmware Status",
-      values: {
-        QSTN: { name: "query", description: "gets The USB Firmware Status" }
-      }
-    },
-    FWV: {
-      name: "firmware-version",
-      description: "Firmware Version",
-      values: {
-        QSTN: { name: "query", description: "gets The Firmware Version State" }
-      }
-    },
     FXP: {
-      name: "pcm-fixed-mode-fixed-pcm-mode",
+      name: "pcm-fixed-mode",
       description: "PCM Fixed Mode / Fixed PCM Mode",
       values: {
-        "00": { name: "pcm-fixed-mode-off", description: "sets PCM Fixed Mode Off" },
-        "01": { name: "pcm-fixed-mode-on", description: "sets PCM Fixed Mode On" },
+        "00": { name: "off", description: "sets PCM Fixed Mode Off" },
+        "01": { name: "on", description: "sets PCM Fixed Mode On" },
         UP: { name: "up", description: "sets PCM Fixed Mode Wrap-Around" },
         QSTN: { name: "query", description: "gets The PCM Fixed Mode State" }
       }
@@ -2605,21 +2365,14 @@ export const eiscpCommands = {
       name: "hi-bit",
       description: "Hi-Bit",
       values: {
-        "00": { name: "hi-bit-off", description: "sets Hi-Bit Off" },
-        "01": { name: "hi-bit-on", description: "sets Hi-Bit On" },
+        "00": { name: "off", description: "sets Hi-Bit Off" },
+        "01": { name: "on", description: "sets Hi-Bit On" },
         UP: { name: "up", description: "sets Hi-Bit Wrap-Around Up" },
         QSTN: { name: "query", description: "gets The Hi-Bit State" }
       }
     },
-    HOI: {
-      name: "hdmi-out-information",
-      description: "HDMI Out Information",
-      values: {
-        QSTN: { name: "query", description: "gets The HDMI Out Information State" }
-      }
-    },
     HSF: {
-      name: "hdmi-4k-8k-signal-format",
+      name: "hdmi-signal-format",
       description: "HDMI 4K/8K Signal Format Command",
       values: {
         "00": { name: "4k-standard", description: "sets HDMI 4K/8K Signal Format:4K Standard" },
@@ -2630,762 +2383,43 @@ export const eiscpCommands = {
         QSTN: { name: "query", description: "gets HDMI 4K/8K Signal Format Status" }
       }
     },
-    HST: {
-      name: "hdmi-standby-through",
-      description: "HDMI Standby Through",
-      values: {
-        OFF: { name: "hdmi-standby-through-off", description: "sets HDMI Standby Through Off" },
-        LAST: { name: "hdmi-standby-through-last", description: "sets HDMI Standby Through Last" },
-        AT: { name: "hdmi-standby-through-auto", description: "sets HDMI Standby Through Auto" },
-        ATE: { name: "hdmi-standby-through-auto-eco", description: "sets HDMI Standby Through Auto(Eco)" },
-        UP: { name: "up", description: "sets HDMI Standby Through Wrap-Around" },
-        QSTN: { name: "query", description: "gets The HDMI Standby Through State" }
-      }
-    },
-    IFN: {
-      name: "network-information",
-      description: "Network Information Command",
-      values: {
-        INFO: { name: "info", description: "display Information of Network" },
-        QSTN: { name: "query", description: "gets Information of Network" }
-      }
-    },
-    IRN: {
-      name: "input-selector-rename-input-function-rename",
-      description: "Input Selector Rename / Input Function Rename",
-      values: {
-        QSTN: { name: "query", description: "gets command status" }
-      }
-    },
-    ITV: {
-      name: "intellivolume-input-volume-absorber",
-      description: "IntelliVolume / Input Volume Absorber",
-      values: {
-        UP: { name: "intellivolume-up", description: "sets IntelliVolume Up" },
-        DOWN: { name: "intellivolume-down", description: "sets IntelliVolume Down" },
-        QSTN: { name: "query", description: "gets The IntelliVolume State" }
-      }
-    },
     LDM: {
       name: "loudness-management",
       description: "Loudness Management",
       values: {
-        "00": { name: "loudness-management-off", description: "sets Loudness Management Off" },
-        "01": { name: "loudness-management-on", description: "sets Loudness management On" },
+        "00": { name: "off", description: "sets Loudness Management Off" },
+        "01": { name: "on", description: "sets Loudness management On" },
         UP: { name: "up", description: "sets Panorama Wrap-Around" },
         QSTN: { name: "query", description: "gets The Panorama State" }
       }
     },
     LFE: {
-      name: "lfe-level-lfe-mute-level",
+      name: "lfe-level",
       description: "LFE Level / LFE Mute Level",
       values: {
-        UP: { name: "lfe-mute-level-up", description: "sets LFE Mute Level Up" },
-        DOWN: { name: "lfe-mute-level-down", description: "sets LFE Mute Level Down" },
+        "00": {name: "0dB", description: "sets 0dB" },
+        "01": {name: "-1dB", description: "sets -1dB" },
+        "02": {name: "-2dB", description: "sets -2dB" },
+        "03": {name: "-3dB", description: "sets -3dB" },
+        "04": {name: "-4dB", description: "sets -4dB" },
+        "05": {name: "-5dB", description: "sets -5dB" },
+        "0A": {name: "-10dB", description: "sets -10dB" },
+        "0F": {name: "-15dB", description: "sets -15dB" },
+        "14": {name: "-20dB", description: "sets -20dB" },
+        "FF": {name: "-oodB", description: "sets -oodB" },
+        UP: { name: "up", description: "sets LFE Mute Level Up" },
+        DOWN: { name: "down", description: "sets LFE Mute Level Down" },
         QSTN: { name: "query", description: "gets The LFE Mute Level" }
       }
     },
-    LMZ: {
-      name: "zone2-listening-mode",
-      description: "Listening Mode Command",
-      values: {
-        "00": { name: "stereo", description: "sets STEREO" },
-        "01": { name: "direct", description: "sets DIRECT" },
-        "0F": { name: "mono", description: "sets MONO" },
-        "12": { name: "multiplex", description: "sets MULTIPLEX" },
-        "87": { name: "dvs-pl2", description: "sets DVS(Pl2)" },
-        "88": { name: "dvs-neo6", description: "sets DVS(NEO6)" }
-      }
-    },
     LPS: {
-      name: "lip-sync-auto-delay",
+      name: "lip-sync",
       description: "Lip Sync / Auto Delay",
       values: {
-        "00": { name: "lip-sync-off", description: "sets Lip Sync Off" },
-        "01": { name: "lip-sync-on", description: "sets Lip Sync On" },
+        "00": { name: "off", description: "sets Lip Sync Off" },
+        "01": { name: "on", description: "sets Lip Sync On" },
         UP: { name: "up", description: "sets Lip Sync Wrap-Around" },
         QSTN: { name: "query", description: "gets The Lip Sync State" }
-      }
-    },
-    LRA: {
-      name: "lock-range-adjust",
-      description: "Lock Range Adjust",
-      values: {
-        QSTN: { name: "query", description: "gets command status" }
-      }
-    },
-    LTZ: {
-      name: "zone2-late-night",
-      description: "Late Night Command",
-      values: {
-        "00": { name: "late-night-off", description: "sets Late Night Off" },
-        "01": { name: "late-night-low", description: "sets Late Night Low" },
-        "02": { name: "late-night-high", description: "sets Late Night High" },
-        UP: { name: "up", description: "sets Late Night State Wrap-Around Up" },
-        QSTN: { name: "query", description: "gets The Late Night Level" }
-      }
-    },
-    MCC: {
-      name: "mcacc-calibration",
-      description: "MCACC Calibration",
-      values: {
-        "00": { name: "00", description: "not complete MCACC calibration" },
-        "01": { name: "01", description: "complete MCACC calibration" },
-        QSTN: { name: "query", description: "gets The MCACC calibration" }
-      }
-    },
-    MCM: {
-      name: "mcacc-eq",
-      description: "MCACC EQ",
-      values: {
-        "01": { name: "mcacc-memory-1", description: "sets MCACC MEMORY 1" },
-        "02": { name: "mcacc-memory-2", description: "sets MCACC MEMORY 2" },
-        "03": { name: "mcacc-memory-3", description: "sets MCACC MEMORY 3" },
-        "04": { name: "mcacc-memory-4", description: "sets MCACC MEMORY 4" },
-        "05": { name: "mcacc-memory-5", description: "sets MCACC MEMORY 5" },
-        "06": { name: "mcacc-memory-6", description: "sets MCACC MEMORY 6" },
-        UP: { name: "up", description: "sets MCACC MEMORY Wrap-Around Up" },
-        DOWN: { name: "down", description: "sets MCACC MEMORY Wrap-Around Down" },
-        QSTN: { name: "query", description: "gets The MCACC MEMORY" }
-      }
-    },
-    MFB: {
-      name: "fullband-mcacc-calibration",
-      description: "Fullband MCACC Calibration",
-      values: {
-        "00": { name: "00", description: "not complete Fullband MCACC calibration or not have Fullband MCACC function" },
-        "01": { name: "01", description: "complete Fullband MCACC calibration" },
-        QSTN: { name: "query", description: "gets The Fullband MCACC calibration" }
-      }
-    },
-    MT3: {
-      name: "zone3-muting",
-      description: "Zone3 Muting Command",
-      values: {
-        "00": { name: "zone3-muting-off", description: "sets Zone3 Muting Off" },
-        "01": { name: "zone3-muting-on", description: "sets Zone3 Muting On" },
-        TG: { name: "tg", description: "sets Zone3 Muting Wrap-Around" },
-        QSTN: { name: "query", description: "gets the Zone3 Muting Status" }
-      }
-    },
-    MT4: {
-      name: "zone4-muting",
-      description: "Zone4 Muting Command",
-      values: {
-        "00": { name: "zone4-muting-off", description: "sets Zone4 Muting Off" },
-        "01": { name: "zone4-muting-on", description: "sets Zone4 Muting On" },
-        TG: { name: "tg", description: "sets Zone4 Muting Wrap-Around" },
-        QSTN: { name: "query", description: "gets the Zone4 Muting Status" }
-      }
-    },
-    NP3: {
-      name: "internet-radio-preset-my-favorites-command-network-model-only",
-      description: "Internet Radio Preset / My Favorites Command (Network Model Only)",
-      values: {
-        QSTN: { name: "query", description: "gets command status" }
-      }
-    },
-    NP4: {
-      name: "internet-radio-preset-command-network-model-only",
-      description: "Internet Radio Preset Command (Network Model Only)",
-      values: {
-        "cccc/tttt": { name: "cccc/tttt", description: "gets the Net/USB Status" },
-        QSTN: { name: "query", description: "gets the Net/USB Status" }
-      }
-    },
-    NPZ: {
-      name: "internet-radio-preset-my-favorites-command-network-model-only-npz",
-      description: "Internet Radio Preset / My Favorites Command (Network Model Only)",
-      values: {
-        QSTN: { name: "query", description: "gets command status" }
-      }
-    },
-    NT3: {
-      name: "net-tune-network-operation-command-network-model-only",
-      description: "Net-Tune/Network Operation Command(Network Model Only)",
-      values: {
-        PLAY: { name: "play", description: "PLAY KEY" },
-        STOP: { name: "stop", description: "STOP KEY" },
-        PAUSE: { name: "pause", description: "PAUSE KEY" },
-        TRUP: { name: "trup", description: "TRACK UP KEY" },
-        TRDN: { name: "trdn", description: "TRACK DOWN KEY" },
-        CHUP: { name: "chup", description: "CH UP(for iRadio)" },
-        CHDN: { name: "chdn", description: "CH DOWNP(for iRadio)" },
-        FF: { name: "ff", description: "FF KEY (CONTINUOUS*) (for iPod 1wire)" },
-        REW: { name: "rew", description: "REW KEY (CONTINUOUS*) (for iPod 1wire)" },
-        REPEAT: { name: "repeat", description: "REPEAT KEY(for iPod 1wire)" },
-        RANDOM: { name: "random", description: "RANDOM KEY(for iPod 1wire)" },
-        DISPLAY: { name: "display", description: "DISPLAY KEY(for iPod 1wire)" },
-        MEMORY: { name: "memory", description: "MEMORY KEY" },
-        RIGHT: { name: "right", description: "RIGHT KEY(for iPod 1wire)" },
-        LEFT: { name: "left", description: "LEFT KEY(for iPod 1wire)" },
-        UP: { name: "up", description: "UP KEY(for iPod 1wire)" },
-        DOWN: { name: "down", description: "DOWN KEY(for iPod 1wire)" },
-        SELECT: { name: "select", description: "SELECT KEY(for iPod 1wire)" },
-        RETURN: { name: "return", description: "RETURN KEY(for iPod 1wire)" }
-      }
-    },
-    NT4: {
-      name: "net-tune-network-operation-command-network-model-only-nt4",
-      description: "Net-Tune/Network Operation Command(Network Model Only)",
-      values: {
-        PLAY: { name: "play", description: "PLAY KEY" },
-        STOP: { name: "stop", description: "STOP KEY" },
-        PAUSE: { name: "pause", description: "PAUSE KEY" },
-        TRUP: { name: "trup", description: "TRACK UP KEY" },
-        TRDN: { name: "trdn", description: "TRACK DOWN KEY" },
-        FF: { name: "ff", description: "FF KEY (CONTINUOUS*) (for iPod 1wire)" },
-        REW: { name: "rew", description: "REW KEY (CONTINUOUS*) (for iPod 1wire)" },
-        REPEAT: { name: "repeat", description: "REPEAT KEY(for iPod 1wire)" },
-        RANDOM: { name: "random", description: "RANDOM KEY(for iPod 1wire)" },
-        DISPLAY: { name: "display", description: "DISPLAY KEY(for iPod 1wire)" },
-        RIGHT: { name: "right", description: "RIGHT KEY(for iPod 1wire)" },
-        LEFT: { name: "left", description: "LEFT KEY(for iPod 1wire)" },
-        UP: { name: "up", description: "UP KEY(for iPod 1wire)" },
-        DOWN: { name: "down", description: "DOWN KEY(for iPod 1wire)" },
-        SELECT: { name: "select", description: "SELECT KEY(for iPod 1wire)" },
-        RETURN: { name: "return", description: "RETURN KEY(for iPod 1wire)" }
-      }
-    },
-    NTZ: {
-      name: "net-tune-network-operation-command-network-model-only-ntz",
-      description: "Net-Tune/Network Operation Command(Network Model Only)",
-      values: {
-        PLAY: { name: "play", description: "PLAY KEY" },
-        STOP: { name: "stop", description: "STOP KEY" },
-        PAUSE: { name: "pause", description: "PAUSE KEY" },
-        TRUP: { name: "trup", description: "TRACK UP KEY" },
-        TRDN: { name: "trdn", description: "TRACK DOWN KEY" },
-        CHUP: { name: "chup", description: "CH UP(for iRadio)" },
-        CHDN: { name: "chdn", description: "CH DOWN(for iRadio)" },
-        FF: { name: "ff", description: "FF KEY (CONTINUOUS*) (for iPod 1wire)" },
-        REW: { name: "rew", description: "REW KEY (CONTINUOUS*) (for iPod 1wire)" },
-        REPEAT: { name: "repeat", description: "REPEAT KEY(for iPod 1wire)" },
-        RANDOM: { name: "random", description: "RANDOM KEY(for iPod 1wire)" },
-        DISPLAY: { name: "display", description: "DISPLAY KEY(for iPod 1wire)" },
-        MEMORY: { name: "memory", description: "MEMORY KEY" },
-        MODE: { name: "mode", description: "MODE KEY" },
-        RIGHT: { name: "right", description: "RIGHT KEY(for iPod 1wire)" },
-        LEFT: { name: "left", description: "LEFT KEY(for iPod 1wire)" },
-        UP: { name: "up", description: "UP KEY(for iPod 1wire)" },
-        DOWN: { name: "down", description: "DOWN KEY(for iPod 1wire)" },
-        SELECT: { name: "select", description: "SELECT KEY(for iPod 1wire)" },
-        RETURN: { name: "return", description: "RETURN KEY(for iPod 1wire)" }
-      }
-    },
-    PAM: {
-      name: "pre-amp-mode-amp-mode",
-      description: "Pre Amp Mode / AMP Mode",
-      values: {
-        "00": { name: "pre-amp-mode-off", description: "sets Pre Amp Mode Off" },
-        "01": { name: "pre-amp-mode-front", description: "sets Pre Amp Mode Front" },
-        "03": { name: "pre-amp-mode-front-center", description: "sets Pre Amp Mode Front+Center" },
-        "07": { name: "pre-amp-mode-all", description: "sets Pre Amp Mode All" },
-        UP: { name: "up", description: "sets Auto Power Down Wrap-Around" },
-        QSTN: { name: "query", description: "gets The Auto Power Down State" }
-      }
-    },
-    PBS: {
-      name: "p-bass",
-      description: "P.BASS",
-      values: {
-        "00": { name: "p-bass-off", description: "sets P.BASS Off" },
-        "01": { name: "p-bass-on", description: "sets P.BASS On" },
-        UP: { name: "up", description: "sets P.BASS Wrap-Around Up" },
-        QSTN: { name: "query", description: "gets The P.BASS State" }
-      }
-    },
-    PCP: {
-      name: "phase-control-plus",
-      description: "Phase Control Plus",
-      values: {
-        QSTN: { name: "query", description: "gets command status" }
-      }
-    },
-    PCT: {
-      name: "phase-control",
-      description: "Phase Control",
-      values: {
-        "00": { name: "phase-control-off", description: "sets Phase Control Off" },
-        "01": { name: "phase-control-on", description: "sets Phase Control On" },
-        "02": { name: "full-band-phase-control-on", description: "sets Full Band Phase Control On" },
-        UP: { name: "up", description: "sets Phase Control Wrap-Around Up" },
-        QSTN: { name: "query", description: "gets The Phase Control" }
-      }
-    },
-    PMB: {
-      name: "phase-matching-bass",
-      description: "Phase Matching Bass Command",
-      values: {
-        "00": { name: "off", description: "sets Off" },
-        "01": { name: "on", description: "sets On" },
-        TG: { name: "tg", description: "sets Phase Matching Bass Wrap-Around Up" },
-        QSTN: { name: "query", description: "gets Phase Matching Bass" }
-      }
-    },
-    PNR: {
-      name: "panorama-for-plii-music",
-      description: "Panorama for PLII Music",
-      values: {
-        "00": { name: "panorama-off", description: "sets Panorama Off" },
-        "01": { name: "panorama-on", description: "sets Panorama On" },
-        TG: { name: "tg", description: "sets Panorama Wrap-Around" },
-        QSTN: { name: "query", description: "gets The Panorama State" }
-      }
-    },
-    POP: {
-      name: "popup-message",
-      description: "Popup Message",
-      values: {
-        "xxuycccciiiillsraabbssnnn...nnn": { name: "accueq-off", description: "sets AccuEQ Off" }
-      }
-    },
-    PPT: {
-      name: "personal-preset-command-my-input-command",
-      description: "Personal Preset Command (My Input Command)",
-      values: {
-        QSTN: { name: "query", description: "gets the Personal Preset Setting" }
-      }
-    },
-    PQL: {
-      name: "pqls",
-      description: "PQLS",
-      values: {
-        "00": { name: "pqls-off", description: "sets PQLS Off" },
-        "01": { name: "pqls-on", description: "sets PQLS On" },
-        UP: { name: "up", description: "sets PQLS Wrap-Around" },
-        QSTN: { name: "query", description: "gets The PQLS State" }
-      }
-    },
-    PR3: {
-      name: "zone3-preset",
-      description: "Zone3 Preset Command",
-      values: {
-        "1,40": {
-          name: "no-1-40",
-          description: "sets Preset No. 1 - 40 ( In hexadecimal representation)"
-        },
-        "1,30": {
-          name: "no-1-30",
-          description: "sets Preset No. 1 - 30 ( In hexadecimal representation)"
-        },
-        UP: { name: "up", description: "sets Preset No. Wrap-Around Up" },
-        DOWN: { name: "down", description: "sets Preset No. Wrap-Around Down" },
-        QSTN: { name: "query", description: "gets The Preset No." }
-      }
-    },
-    PR4: {
-      name: "zone4-preset",
-      description: "Zone4 Preset Command",
-      values: {
-        "1,40": {
-          name: "no-1-40",
-          description: "sets Preset No. 1 - 40 ( In hexadecimal representation)"
-        },
-        "1,30": {
-          name: "no-1-30",
-          description: "sets Preset No. 1 - 30 ( In hexadecimal representation)"
-        },
-        UP: { name: "up", description: "sets Preset No. Wrap-Around Up" },
-        DOWN: { name: "down", description: "sets Preset No. Wrap-Around Down" },
-        QSTN: { name: "query", description: "gets The Preset No." }
-      }
-    },
-    PRZ: {
-      name: "zone2-preset",
-      description: "Zone2 Preset Command",
-      values: {
-        "1,40": {
-          name: "no-1-40",
-          description: "sets Preset No. 1 - 40 ( In hexadecimal representation)"
-        },
-        "1,30": {
-          name: "no-1-30",
-          description: "sets Preset No. 1 - 30 ( In hexadecimal representation)"
-        },
-        UP: { name: "up", description: "sets Preset No. Wrap-Around Up" },
-        DOWN: { name: "down", description: "sets Preset No. Wrap-Around Down" },
-        QSTN: { name: "query", description: "gets The Preset No." }
-      }
-    },
-    PW3: {
-      name: "zone3-power",
-      description: "Zone3 Power Command",
-      values: {
-        "00": { name: "zone3-standby", description: "sets Zone3 Standby" },
-        "01": { name: "zone3-on", description: "sets Zone3 On" },
-        QSTN: { name: "query", description: "gets the Zone3 Power Status" }
-      }
-    },
-    PW4: {
-      name: "zone4-power",
-      description: "Zone4 Power Command",
-      values: {
-        "00": { name: "zone4-standby", description: "sets Zone4 Standby" },
-        "01": { name: "zone4-on", description: "sets Zone4 On" },
-        QSTN: { name: "query", description: "gets the Zone4 Power Status" }
-      }
-    },
-    RAZ: {
-      name: "re-eq-academy-filter",
-      description: "Re-EQ/Academy Filter Command",
-      values: {
-        "00": { name: "both-off", description: "sets Both Off" },
-        "01": { name: "re-eq-on", description: "sets Re-EQ On" },
-        "02": { name: "academy-on", description: "sets Academy On" },
-        UP: { name: "up", description: "sets Re-EQ/Academy State Wrap-Around Up" },
-        QSTN: { name: "query", description: "gets The Re-EQ/Academy State" }
-      }
-    },
-    RST: {
-      name: "reset",
-      description: "Reset Command",
-      values: {
-        ALL: { name: "all", description: "Reset All" }
-      }
-    },
-    SBS: {
-      name: "s-bass",
-      description: "S.BASS",
-      values: {
-        "00": { name: "s-bass-off", description: "sets S.BASS Off" },
-        "01": { name: "s-bass-on", description: "sets S.BASS On" },
-        UP: { name: "up", description: "sets S.BASS Wrap-Around Up" },
-        QSTN: { name: "query", description: "gets The S.BASS State" }
-      }
-    },
-    SCD: {
-      name: "screen-centered-dialog-dialog-enhancement",
-      description: "Screen Centered Dialog / Dialog Enhancement",
-      values: {
-        "00": { name: "dialog-enhancement-off", description: "sets Dialog Enhancement Off" },
-        "01": { name: "dialog-enhancement-on", description: "sets Dialog Enhancement On" }
-      }
-    },
-    SCE: {
-      name: "set-cd-elapsed-time",
-      description: "Set　CD Elapsed　Time",
-      values: {
-        QSTN: { name: "query", description: "gets Station Name" }
-      }
-    },
-    SL3: {
-      name: "zone3-selector",
-      description: "ZONE3 Selector Command",
-      values: {
-        "00": { name: "video1-vcr-dvr-stb-dvr", description: "sets VIDEO1    VCR/DVR    STB/DVR" },
-        "01": { name: "video2-cbl-sat", description: "sets VIDEO2    CBL/SAT" },
-        "02": { name: "video3-game-tv-game-game1", description: "sets VIDEO3    GAME/TV    GAME     GAME1" },
-        "03": { name: "video4-aux1-aux", description: "sets VIDEO4    AUX1(AUX)" },
-        "04": { name: "video5-aux2-game2", description: "sets VIDEO5    AUX2                          GAME2" },
-        "05": { name: "video6-pc", description: "sets VIDEO6    PC" },
-        "06": { name: "video7", description: "sets VIDEO7" },
-        "07": { name: "hidden1-extra1", description: "sets Hidden1     EXTRA1" },
-        "08": { name: "hidden2-extra2", description: "sets Hidden2     EXTRA2" },
-        "09": { name: "hidden3-extra3", description: "sets Hidden3     EXTRA3" },
-        "10": { name: "dvd", description: "sets DVD" },
-        "11": { name: "strm-box", description: "sets STRM BOX" },
-        "12": { name: "tv", description: "sets TV" },
-        "20": { name: "tape-1", description: "sets TAPE(1)" },
-        "21": { name: "tape2", description: "sets TAPE2" },
-        "22": { name: "phono", description: "sets PHONO" },
-        "23": { name: "cd-tv-cd", description: "sets CD    TV/CD" },
-        "24": { name: "fm", description: "sets FM" },
-        "25": { name: "am", description: "sets AM" },
-        "26": { name: "tuner", description: "sets TUNER" },
-        "27": { name: "music-server-p4s-dlna-2", description: "sets MUSIC SERVER    P4S   DLNA*2" },
-        "28": { name: "internet-radio-iradio-favorite-3", description: "sets INTERNET RADIO           iRadio Favorite*3" },
-        "29": { name: "usb-usb-front", description: "sets USB/USB(Front)" },
-        "2A": { name: "usb-rear", description: "sets USB(Rear)" },
-        "2B": { name: "network-net", description: "sets NETWORK                      NET" },
-        "2C": { name: "usb-toggle", description: "sets USB(toggle)" },
-        "2D": { name: "airplay", description: "sets Airplay" },
-        "2E": { name: "bluetooth", description: "sets Bluetooth" },
-        "40": { name: "universal-port", description: "sets Universal PORT" },
-        "30": { name: "multi-ch", description: "sets MULTI CH" },
-        "31": { name: "xm-1", description: "sets XM*1" },
-        "32": { name: "sirius-1", description: "sets SIRIUS*1" },
-        "33": { name: "dab-5", description: "sets DAB *5" },
-        "80": { name: "source", description: "sets SOURCE" },
-        UP: { name: "up", description: "sets Selector Position Wrap-Around Up" },
-        DOWN: { name: "down", description: "sets Selector Position Wrap-Around Down" },
-        QSTN: { name: "query", description: "gets The Selector Position" }
-      }
-    },
-    SL4: {
-      name: "zone4-selector",
-      description: "ZONE4 Selector Command",
-      values: {
-        "00": { name: "video1-vcr-dvr-stb-dvr", description: "sets VIDEO1    VCR/DVR    STB/DVR" },
-        "01": { name: "video2-cbl-sat", description: "sets VIDEO2    CBL/SAT" },
-        "02": { name: "video3-game-tv-game-game1", description: "sets VIDEO3    GAME/TV    GAME     GAME1" },
-        "03": { name: "video4-aux1-aux", description: "sets VIDEO4    AUX1(AUX)" },
-        "04": { name: "video5-aux2-game2", description: "sets VIDEO5    AUX2                          GAME2" },
-        "05": { name: "video6-pc", description: "sets VIDEO6    PC" },
-        "06": { name: "video7", description: "sets VIDEO7" },
-        "07": { name: "hidden1-extra1", description: "sets Hidden1     EXTRA1" },
-        "08": { name: "hidden2-extra2", description: "sets Hidden2     EXTRA2" },
-        "09": { name: "hidden3-extra3", description: "sets Hidden3     EXTRA3" },
-        "10": { name: "dvd-bd-dvd", description: "sets DVD          BD/DVD" },
-        "20": { name: "tape-1-tv-tape", description: "sets TAPE(1)    TV/TAPE" },
-        "21": { name: "tape2", description: "sets TAPE2" },
-        "22": { name: "phono", description: "sets PHONO" },
-        "23": { name: "cd-tv-cd", description: "sets CD    TV/CD" },
-        "24": { name: "fm", description: "sets FM" },
-        "25": { name: "am", description: "sets AM" },
-        "26": { name: "tuner", description: "sets TUNER" },
-        "27": { name: "music-server-p4s-dlna-2", description: "sets MUSIC SERVER    P4S   DLNA*2" },
-        "28": { name: "internet-radio-iradio-favorite-3", description: "sets INTERNET RADIO           iRadio Favorite*3" },
-        "29": { name: "usb-usb-front", description: "sets USB/USB(Front)" },
-        "2A": { name: "usb-rear", description: "sets USB(Rear)" },
-        "2B": { name: "network-net", description: "sets NETWORK                      NET" },
-        "2C": { name: "usb-toggle", description: "sets USB(toggle)" },
-        "2D": { name: "2d", description: "Airplay" },
-        "2E": { name: "bluetooth", description: "sets Bluetooth" },
-        "40": { name: "universal-port", description: "sets Universal PORT" },
-        "30": { name: "multi-ch", description: "sets MULTI CH" },
-        "31": { name: "xm-1", description: "sets XM*1" },
-        "32": { name: "sirius-1", description: "sets SIRIUS*1" },
-        "33": { name: "dab-5", description: "sets DAB *5" },
-        "80": { name: "source", description: "sets SOURCE" },
-        UP: { name: "up", description: "sets Selector Position Wrap-Around Up" },
-        DOWN: { name: "down", description: "sets Selector Position Wrap-Around Down" },
-        QSTN: { name: "query", description: "gets The Selector Position" }
-      }
-    },
-    SLZ: {
-      name: "zone2-selector",
-      description: "ZONE2 Selector Command",
-      values: {
-        "00": { name: "video1-vcr-dvr-stb-dvr", description: "sets VIDEO1    VCR/DVR    STB/DVR" },
-        "01": { name: "video2-cbl-sat", description: "sets VIDEO2    CBL/SAT" },
-        "02": { name: "video3-game-tv-game-game1", description: "sets VIDEO3    GAME/TV    GAME     GAME1" },
-        "03": { name: "video4-aux1-aux", description: "sets VIDEO4    AUX1(AUX)" },
-        "04": { name: "video5-aux2-game2", description: "sets VIDEO5    AUX2                          GAME2" },
-        "05": { name: "video6-pc", description: "sets VIDEO6    PC" },
-        "06": { name: "video7", description: "sets VIDEO7" },
-        "07": { name: "hidden1-extra1", description: "sets Hidden1     EXTRA1" },
-        "08": { name: "hidden2-extra2", description: "sets Hidden2     EXTRA2" },
-        "09": { name: "hidden3-extra3", description: "sets Hidden3     EXTRA3" },
-        "10": { name: "dvd-bd-dvd", description: "sets DVD          BD/DVD" },
-        "11": { name: "strm-box", description: "sets STRM BOX" },
-        "12": { name: "tv", description: "sets TV" },
-        "20": { name: "tape-1-tv-tape", description: "sets TAPE(1) TV/TAPE" },
-        "21": { name: "tape2", description: "sets TAPE2" },
-        "22": { name: "phono", description: "sets PHONO" },
-        "23": { name: "cd-tv-cd", description: "sets CD    TV/CD" },
-        "24": { name: "fm", description: "sets FM" },
-        "25": { name: "am", description: "sets AM" },
-        "26": { name: "tuner", description: "sets TUNER" },
-        "27": { name: "music-server-p4s-dlna-4", description: "sets MUSIC SERVER    P4S   DLNA*4" },
-        "28": { name: "internet-radio-iradio-favorite-5", description: "sets INTERNET RADIO           iRadio Favorite*5" },
-        "29": { name: "usb-usb-front", description: "sets USB/USB(Front)" },
-        "2A": { name: "usb-rear", description: "sets USB(Rear)" },
-        "2B": { name: "network-net", description: "sets NETWORK                      NET" },
-        "2C": { name: "usb-toggle", description: "sets USB(toggle)" },
-        "2D": { name: "airplay", description: "sets Airplay" },
-        "2E": { name: "bluetooth", description: "sets Bluetooth" },
-        "40": { name: "universal-port", description: "sets Universal PORT" },
-        "30": { name: "multi-ch", description: "sets MULTI CH" },
-        "31": { name: "xm-3", description: "sets XM*3" },
-        "32": { name: "sirius-3", description: "sets SIRIUS*3" },
-        "33": { name: "dab-5", description: "sets DAB *5" },
-        "55": { name: "hdmi-5", description: "sets HDMI 5" },
-        "56": { name: "hdmi-6", description: "sets HDMI 6" },
-        "57": { name: "hdmi-7", description: "sets HDMI 7" },
-        "7F": { name: "off", description: "sets OFF" },
-        "80": { name: "source", description: "sets SOURCE" },
-        UP: { name: "up", description: "sets Selector Position Wrap-Around Up" },
-        DOWN: { name: "down", description: "sets Selector Position Wrap-Around Down" },
-        QSTN: { name: "query", description: "gets The Selector Position" }
-      }
-    },
-    SPI: {
-      name: "speaker-information",
-      description: "Speaker Information",
-      values: {
-        QSTN: { name: "query", description: "gets The Speaker Information" }
-      }
-    },
-    SPR: {
-      name: "super-resolution",
-      description: "Super Resolution",
-      values: {
-        QSTN: { name: "query", description: "gets command status" }
-      }
-    },
-    STW: {
-      name: "eq-for-standing-wave-standing-wave",
-      description: "EQ for Standing Wave / Standing Wave",
-      values: {
-        "00": { name: "standing-wave-off", description: "sets Standing Wave Off" },
-        "01": { name: "standing-wave-on", description: "sets Standing Wave On" },
-        UP: { name: "up", description: "sets Standing Wave Wrap-Around Up" },
-        QSTN: { name: "query", description: "gets The Standing Wave" }
-      }
-    },
-    SW2: {
-      name: "subwoofer-2-temporary-level",
-      description: "Subwoofer 2 (temporary) Level Command",
-      values: {
-        UP: { name: "up", description: "LEVEL + Key" },
-        DOWN: { name: "down", description: "LEVEL – KEY" },
-        QSTN: { name: "query", description: "gets the Subwoofer Level" }
-      }
-    },
-    TN3: {
-      name: "zone3-tone",
-      description: "Zone3 Tone Command",
-      values: {
-        BUP: { name: "bass-up-2-step", description: "sets Bass Up (2 Step)" },
-        BDOWN: { name: "bass-down-2-step", description: "sets Bass Down (2 Step)" },
-        TUP: { name: "treble-up-2-step", description: "sets Treble Up (2 Step)" },
-        TDOWN: { name: "treble-down-2-step", description: "sets Treble Down (2 Step)" },
-        QSTN: { name: "query", description: "gets Zone3 Tone (\"BxxTxx\")" }
-      }
-    },
-    TPD: {
-      name: "temperature-data",
-      description: "Temperature Data",
-      values: {
-        QSTN: { name: "query", description: "gets the Temperature Data" }
-      }
-    },
-    TU3: {
-      name: "zone3-tuning",
-      description: "Tuning Command",
-      values: {
-        BAND: { name: "band", description: "Change BAND" },
-        DIRECT: { name: "direct", description: "starts/restarts Direct Tuning Mode" },
-        UP: { name: "up", description: "sets Tuning Frequency Wrap-Around Up" },
-        DOWN: { name: "down", description: "sets Tuning Frequency Wrap-Around Down" },
-        QSTN: { name: "query", description: "gets The Tuning Frequency" }
-      }
-    },
-    TU4: {
-      name: "tuning-tu4",
-      description: "Tuning Command",
-      values: {
-        DIRECT: { name: "direct", description: "starts/restarts Direct Tuning Mode" },
-        UP: { name: "up", description: "sets Tuning Frequency Wrap-Around Up" },
-        DOWN: { name: "down", description: "sets Tuning Frequency Wrap-Around Down" },
-        QSTN: { name: "query", description: "gets The Tuning Frequency" }
-      }
-    },
-    TUZ: {
-      name: "tuning-tuz",
-      description: "Tuning Command",
-      values: {
-        DIRECT: { name: "direct", description: "starts/restarts Direct Tuning Mode" },
-        BAND: { name: "band", description: "Change BAND" },
-        UP: { name: "up", description: "sets Tuning Frequency Wrap-Around Up" },
-        DOWN: { name: "down", description: "sets Tuning Frequency Wrap-Around Down" },
-        QSTN: { name: "query", description: "gets The Tuning Frequency" }
-      }
-    },
-    UPD: {
-      name: "update",
-      description: "Update",
-      values: {
-        NET: { name: "net", description: "start Device Update via Network" },
-        USB: { name: "usb", description: "start Device Update via USB" },
-        CMP: { name: "cmp", description: "Device Update is completed" },
-        FF: { name: "ff", description: "not exist new firmware" },
-        "00": { name: "00", description: "exist new firmware" },
-        "01": { name: "01", description: "exist new firmware(Update Notice Normal)" },
-        "02": { name: "02", description: "exist new firmware(Update Notice Force)" },
-        QSTN: { name: "query", description: "gets exist new firmware" }
-      }
-    },
-    UPS: {
-      name: "upsampling",
-      description: "Upsampling",
-      values: {
-        "00": { name: "upsampling-x1", description: "sets Upsampling x1" },
-        "01": { name: "upsampling-x2", description: "sets Upsampling x2" },
-        "02": { name: "upsampling-x4", description: "sets Upsampling x4" },
-        "03": { name: "upsampling-x8", description: "sets Upsampling x8" },
-        UP: { name: "up", description: "sets Upsampling Wrap-Around" },
-        QSTN: { name: "query", description: "gets The Upsampling State" }
-      }
-    },
-    VL3: {
-      name: "zone3-volume",
-      description: "Zone3 Volume Command",
-      values: {
-        UP1: { name: "upsampling-x8", description: "sets Upsampling x8" },
-        DOWN1: { name: "down1", description: "gets The Upsampling State" },
-        QSTN: { name: "query", description: "gets The Upsampling State" }
-      }
-    },
-    VL4: {
-      name: "zone4-volume",
-      description: "Zone4 Volume Command",
-      values: {
-        QSTN: { name: "query", description: "gets command status" }
-      }
-    },
-    VOC: {
-      name: "vocal-dialog",
-      description: "Vocal/Dialog Command",
-      values: {
-        QSTN: { name: "query", description: "gets Vocal/Dialogs Level" }
-      }
-    },
-    ZBL: {
-      name: "zone2-balance",
-      description: "Zone2 Balance Command",
-      values: {
-        UP: { name: "balance-up-to-r-2-step", description: "sets Balance Up (to R 2 Step)" },
-        DOWN: { name: "balance-down-to-l-2-step", description: "sets Balance Down (to L 2 Step)" },
-        QSTN: { name: "query", description: "gets Zone2 Balance" }
-      }
-    },
-    ZHO: {
-      name: "zone2-hdmi-out",
-      description: "Zone2 HDMI Out Command",
-      values: {
-        "00": { name: "00", description: "Z2 HDMI Out:Not Use" },
-        "01": { name: "01", description: "Z2 HDMI Out:Use" },
-        UP: { name: "up", description: "sets Zone2 HDMI Out Wrap-Around Up" },
-        QSTN: { name: "query", description: "gets Zone2 HDMI Out Selector" }
-      }
-    },
-    ZMT: {
-      name: "zone2-muting",
-      description: "Zone2 Muting Command",
-      values: {
-        "00": { name: "zone2-muting-off", description: "sets Zone2 Muting Off" },
-        "01": { name: "zone2-muting-on", description: "sets Zone2 Muting On" },
-        TG: { name: "tg", description: "sets Zone2 Muting Wrap-Around" },
-        QSTN: { name: "query", description: "gets the Zone2 Muting Status" }
-      }
-    },
-    ZPW: {
-      name: "zone2-power",
-      description: "Zone2 Power Command",
-      values: {
-        "00": { name: "zone2-standby", description: "sets Zone2 Standby" },
-        "01": { name: "zone2-on", description: "sets Zone2 On" },
-        QSTN: { name: "query", description: "gets the Zone2 Power Status" },
-      }
-    },
-    ZTN: {
-      name: "zone2-tone",
-      description: "Zone2 Tone Command",
-      values: {
-        BUP: { name: "bass-up-2-step", description: "sets Bass Up (2 Step)" },
-        BDOWN: { name: "bass-down-2-step", description: "sets Bass Down (2 Step)" },
-        TUP: { name: "treble-up-2-step", description: "sets Treble Up (2 Step)" },
-        TDOWN: { name: "treble-down-2-step", description: "sets Treble Down (2 Step)" },
-        QSTN: { name: "query", description: "gets Zone2 Tone (\"BxxTxx\")" }
-      }
-    },
-    ZVL: {
-      name: "zone2-volume",
-      description: "Zone2 Volume Command",
-      values: {
-        QSTN: { name: "query", description: "gets command status" }
       }
     }
   }
