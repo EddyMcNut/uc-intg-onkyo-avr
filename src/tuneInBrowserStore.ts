@@ -82,11 +82,7 @@ export function setTuneInBrowseContextState(entityId: string, title: string): vo
   }
 }
 
-export function addTuneInPreset(
-  entityId: string,
-  title: string,
-  thumbnailResolver: (state: TuneInBrowseState, title: string) => string
-): void {
+export function addTuneInPreset(entityId: string, title: string, thumbnailResolver: (state: TuneInBrowseState, title: string) => string): void {
   const state = getTuneInBrowseState(entityId);
   if (!state) {
     return;

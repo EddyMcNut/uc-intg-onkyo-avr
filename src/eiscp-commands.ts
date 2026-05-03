@@ -36,7 +36,7 @@ export const eiscpCommands = {
         Z23OFF: { name: "zone2-zone3-off", description: "sets Audio Muting Off for zone2 and zone3" },
         Z23TG: { name: "zone2-zone3-toggle", description: "sets Audio Muting Toggle for zone2 and zone3" }
       }
-    },    
+    },
     SPA: {
       name: "speaker-a",
       description: "Speaker A Command",
@@ -94,7 +94,7 @@ export const eiscpCommands = {
         QSTN: { name: "query", description: "gets the Volume Level" }
       }
     },
-    MZV: { 
+    MZV: {
       name: "multi-zone-volume",
       description: "UC integration Multi-Zone Volume Command",
       values: {
@@ -105,7 +105,7 @@ export const eiscpCommands = {
         ZM3UP1: { name: "main-zone3-up", description: "sets Volume Level Up for main and zone3 1dB step" },
         ZM3DOWN1: { name: "main-zone3-down", description: "sets Volume Level Down for main and zone3 1dB step" },
         Z23UP1: { name: "zone2-zone3-up", description: "sets Volume Level Up for zone2 and zone3 1dB step" },
-        Z23DOWN1: { name: "zone2-zone3-down", description: "sets Volume Level Down for zone2 and zone3 1dB step" },
+        Z23DOWN1: { name: "zone2-zone3-down", description: "sets Volume Level Down for zone2 and zone3 1dB step" }
       }
     },
     TFR: {
@@ -1212,8 +1212,9 @@ export const eiscpCommands = {
       name: "usb-menu-status",
       description: "NET/USB Menu Status",
       values: {
-        "maabbstii": {
-          description: "NET/USB Menu Status (9 letters)\nm -> Track Menu: \"M\": Menu is enable, \"x\": Menu is disable\naa -> F1 button icon (Positive Feed or Mark/Unmark)\nbb -> F2 button icon (Negative Feed)\n aa or bb : \"xx\":disable, \"01\":Like, \"02\":don't like, \"03\":Love, \"04\":Ban,\n                  \"05\":episode, \"06\":ratings, \"07\":Ban(black), \"08\":Ban(white),\n                  \"09\":Favorite(black), \"0A\":Favorite(white), \"0B\":Favorite(yellow)\ns -> Time Seek \"S\": Time Seek is enable \"x\": Time Seek is disable\nt -> Time Display \"1\": Elapsed Time/Total Time, \"2\": Elapsed Time, \"x\": disable\nii-> Service icon\n ii : \"00\":Music Server (DLNA), \"01\":My Favorite, \"02\":vTuner, \n      \"03\":SiriusXM, \"04\":Pandora,\n      \"05\":Rhapsody, \"06\":Last.fm, \"07\":Napster, \"08\":Slacker, \"09\":Mediafly,\n      \"0A\":Spotify, \"0B\":AUPEO!,\n      \"0C\":radiko, \"0D\":e-onkyo, \"0E\":TuneIn, \"0F\":MP3tunes, \"10\":Simfy,\n      \"11\":Home Media, \"12\":Deezer, \"13\":iHeartRadio, \"18\":Airplay,\n      \"1A\": onkyo Music, \"1B\":TIDAL, \"1C\":Amazon Music, \"1D\":PlayQueue,\n      \"40\":Chromecast built-in, \"41\":FireConnect, \"42\":Play-Fi,\n      \"43\":FlareConnect, \"44\":Airplay2, \"45\":Alexa, \"46\":Alexa MRM, \"47\":RoonReady,\n      \"F0\": USB/USB(Front), \"F1: USB(Rear), \n      \"F2\":Internet Radio, \"F3\":NET, \"F4\":Bluetooth"
+        maabbstii: {
+          description:
+            'NET/USB Menu Status (9 letters)\nm -> Track Menu: "M": Menu is enable, "x": Menu is disable\naa -> F1 button icon (Positive Feed or Mark/Unmark)\nbb -> F2 button icon (Negative Feed)\n aa or bb : "xx":disable, "01":Like, "02":don\'t like, "03":Love, "04":Ban,\n                  "05":episode, "06":ratings, "07":Ban(black), "08":Ban(white),\n                  "09":Favorite(black), "0A":Favorite(white), "0B":Favorite(yellow)\ns -> Time Seek "S": Time Seek is enable "x": Time Seek is disable\nt -> Time Display "1": Elapsed Time/Total Time, "2": Elapsed Time, "x": disable\nii-> Service icon\n ii : "00":Music Server (DLNA), "01":My Favorite, "02":vTuner, \n      "03":SiriusXM, "04":Pandora,\n      "05":Rhapsody, "06":Last.fm, "07":Napster, "08":Slacker, "09":Mediafly,\n      "0A":Spotify, "0B":AUPEO!,\n      "0C":radiko, "0D":e-onkyo, "0E":TuneIn, "0F":MP3tunes, "10":Simfy,\n      "11":Home Media, "12":Deezer, "13":iHeartRadio, "18":Airplay,\n      "1A": onkyo Music, "1B":TIDAL, "1C":Amazon Music, "1D":PlayQueue,\n      "40":Chromecast built-in, "41":FireConnect, "42":Play-Fi,\n      "43":FlareConnect, "44":Airplay2, "45":Alexa, "46":Alexa MRM, "47":RoonReady,\n      "F0": USB/USB(Front), "F1: USB(Rear), \n      "F2":Internet Radio, "F3":NET, "F4":Bluetooth'
         },
         QSTN: { name: "query", description: "gets the Net/USB Menu Status" }
       }
@@ -1238,7 +1239,8 @@ export const eiscpCommands = {
       values: {
         nfr: {
           name: "nfr",
-          description: "NET Connection/USB Device Status (3 letters)\nn -> NET Connection status: \"-\": no connection, \"E\": Ether, \"W\": Wireless\nf -> Front USB(USB1) Device Status: \"-\": no device, \"i\": iPod/iPhone, \n      \"M\": Memory/NAS, \"W\": Wireless Adaptor, \"B\": Bluetooth Adaptor,\n      \"D\": DAB Dongle, \"x\": disable\nr -> Rear USB(USB2) Device Status: \"-\": no device, \"i\": iPod/iPhone, \n      \"M\": Memory/NAS, \"W\": Wireless Adaptor, \"B\": Bluetooth Adaptor, \n      \"D\": DAB Dongle, \"x\": disable"
+          description:
+            'NET Connection/USB Device Status (3 letters)\nn -> NET Connection status: "-": no connection, "E": Ether, "W": Wireless\nf -> Front USB(USB1) Device Status: "-": no device, "i": iPod/iPhone, \n      "M": Memory/NAS, "W": Wireless Adaptor, "B": Bluetooth Adaptor,\n      "D": DAB Dongle, "x": disable\nr -> Rear USB(USB2) Device Status: "-": no device, "i": iPod/iPhone, \n      "M": Memory/NAS, "W": Wireless Adaptor, "B": Bluetooth Adaptor, \n      "D": DAB Dongle, "x": disable'
         },
         QSTN: { name: "query", description: "gets the Net/USB Status" }
       }
@@ -1249,15 +1251,18 @@ export const eiscpCommands = {
       values: {
         "tzzzzsurr<.....>": {
           name: "tzzzzsurr",
-          description: "t -> response type 'X' : XML\nzzzz -> sequence number (0000-FFFF)\ns -> status 'S' : success, 'E' : error\nu -> UI type '0' : List, '1' : Menu, '2' : Playback, '3' : Popup, '4' : Keyboard, \"5\" : Menu List\nrr -> reserved\n<.....> : XML data ( [CR] and [LF] are removed )"
+          description:
+            "t -> response type 'X' : XML\nzzzz -> sequence number (0000-FFFF)\ns -> status 'S' : success, 'E' : error\nu -> UI type '0' : List, '1' : Menu, '2' : Playback, '3' : Popup, '4' : Keyboard, \"5\" : Menu List\nrr -> reserved\n<.....> : XML data ( [CR] and [LF] are removed )"
         },
         "Lzzzzll{xx}{xx}yyyy": {
           name: "lzzzzll-xx-xx-yyyy",
-          description: "specify to get the listed data (from Network Control Only)\nzzzz -> sequence number (0000-FFFF)\nll -> number of layer (00-FF)\nxxxx -> index of start item (0000-FFFF : 1st to 65536th Item [4 HEX digits] )\nyyyy -> number of items (0000-FFFF : 1 to 65536 Items [4 HEX digits] )"
+          description:
+            "specify to get the listed data (from Network Control Only)\nzzzz -> sequence number (0000-FFFF)\nll -> number of layer (00-FF)\nxxxx -> index of start item (0000-FFFF : 1st to 65536th Item [4 HEX digits] )\nyyyy -> number of items (0000-FFFF : 1 to 65536 Items [4 HEX digits] )"
         },
         "Izzzzll{xx}{xx}----": {
           name: "izzzzll-xx-xx",
-          description: "select the listed item (from Network Control Only)\nzzzz -> sequence number (0000-FFFF)\nll -> number of layer (00-FF)\nxxxx -> index number (0000-FFFF : 1st to 65536th Item [4 HEX digits] )\n---- -> not used"
+          description:
+            "select the listed item (from Network Control Only)\nzzzz -> sequence number (0000-FFFF)\nll -> number of layer (00-FF)\nxxxx -> index number (0000-FFFF : 1st to 65536th Item [4 HEX digits] )\n---- -> not used"
         }
       }
     },
@@ -1302,7 +1307,7 @@ export const eiscpCommands = {
       description: "Account Info",
       values: {
         "iaaaa...aaaabbbb...bbbb": {
-          description: "i-> Account Info\n 0: No\n 1: Yes\n\"aaaa...aaaa\": User Name ( 128 Unicode letters [UTF-8 encoded] max )\n\"bbbb...bbbb\": Password ( 128 Unicode letters [UTF-8 encoded] max )"
+          description: 'i-> Account Info\n 0: No\n 1: Yes\n"aaaa...aaaa": User Name ( 128 Unicode letters [UTF-8 encoded] max )\n"bbbb...bbbb": Password ( 128 Unicode letters [UTF-8 encoded] max )'
         }
       }
     },
@@ -2229,6 +2234,192 @@ export const eiscpCommands = {
         MN: { name: "mn", description: "gets & display DAB Multicast Name" },
         MF: { name: "mf", description: "gets & display DAB Multicast Band & Freq Info" },
         UP: { name: "up", description: "gets & display DAB Information Wrap-Around Up" }
+      }
+    },
+    ADM: {
+      name: "av-direct-mode-operation",
+      description: "AV Direct Mode Operation Command",
+      values: {
+        "00": { name: "off", description: "sets AV Direct Mode:Off" },
+        "01": { name: "on", description: "sets AV Direct Mode:On" },
+        TG: { name: "tg", description: "sets AV Direct Mode Wrap-Around Up" },
+        QSTN: { name: "query", description: "gets AV Direct Mode Status" }
+      }
+    },
+    AEQ: {
+      name: "accueq",
+      description: "AccuEQ",
+      values: {
+        "00": { name: "off", description: "sets AccuEQ Off" },
+        "01": { name: "on-on-all-ch", description: "sets AccuEQ On (All Ch)" },
+        "02": { name: "on-ex-front-l-r", description: "sets AccuEQ On (ex. Front L/R)" },
+        "03": { name: "on-front-matching-eq", description: "sets AccuEQ On (Front Matching EQ)" },
+        UP: { name: "up", description: "sets AccuEQ State Wrap-Around Up" },
+        QSTN: { name: "query", description: "gets The AccuEQ State" }
+      }
+    },
+    APD: {
+      name: "auto-power-down",
+      description: "Auto Power Down",
+      values: {
+        "00": { name: "off", description: "sets Auto Power Down Off" },
+        "01": { name: "on", description: "sets Auto Power Down On" },
+        UP: { name: "up", description: "sets Auto Power Down Wrap-Around" },
+        QSTN: { name: "query", description: "gets The Auto Power Down State" }
+      }
+    },
+    APS: {
+      name: "air-play-setting",
+      description: "Air Play Setting",
+      values: {
+        "00": { name: "off", description: "sets Off" },
+        "01": { name: "on", description: "sets On" },
+        UP: { name: "up", description: "sets Air Play Setting Wrap-Around Up" },
+        QSTN: { name: "query", description: "gets Air Play Setting" }
+      }
+    },
+    ARC: {
+      name: "audio-return-channel",
+      description: "Audio Return Channel",
+      values: {
+        "00": { name: "off", description: "sets Audio Return Channel Off" },
+        "01": { name: "auto", description: "sets Audio Return Channel Auto" },
+        UP: { name: "up", description: "sets Audio Return Channel Wrap-Around" },
+        QSTN: { name: "query", description: "gets The Audio Return Channel State" }
+      }
+    },
+    ASC: {
+      name: "audio-scalar",
+      description: "Audio Scalar",
+      values: {
+        "00": { name: "auto", description: "sets Audio Scalar Auto" },
+        "01": { name: "manual", description: "sets Audio Scalar Manual" },
+        UP: { name: "up", description: "sets Audio Scalar Wrap-Around" },
+        QSTN: { name: "query", description: "gets The Audio Scalar State" }
+      }
+    },
+    AVS: {
+      name: "av-sync",
+      description: "A/V Sync",
+      values: {
+        UP: { name: "up", description: "sets A/V Sync is increased (step is depend on model)" },
+        DOWN: { name: "down", description: "sets A/V Sync is decreased (step is depend on model)" },
+        QSTN: { name: "query", description: "gets A/V Sync Value" }
+      }
+    },
+    BCS: {
+      name: "battery-charge",
+      description: "Battery Charge Status Command (Battery Model Only)",
+      values: {
+        "00": { name: "charging", description: "charging" },
+        "01": { name: "completed", description: "charge completed" },
+        "10": { name: "low", description: "battery level Low" },
+        "11": { name: "middle", description: "battery level Middle" },
+        "12": { name: "high", description: "battery level High" },
+        QSTN: { name: "query", description: "gets battery charge status" }
+      }
+    },
+    CCM: {
+      name: "hdmi-cec-control-monitor",
+      description: "HDMI CEC Control Monitor",
+      values: {
+        "01": { name: "main", description: "sets Main" },
+        "02": { name: "zone2", description: "sets Zone2" },
+        "10": { name: "sub", description: "sets Sub" },
+        UP: { name: "up", description: "sets Control Monitor Wrap-Around Up" },
+        QSTN: { name: "query", description: "gets Control Monitor" }
+      }
+    },
+    CEC: {
+      name: "hdmi-cec",
+      description: "HDMI CEC",
+      values: {
+        "00": { name: "off", description: "sets Off" },
+        "01": { name: "on", description: "sets On" },
+        UP: { name: "up", description: "sets HDMI CEC Wrap-Around Up" },
+        QSTN: { name: "query", description: "gets HDMI CEC" }
+      }
+    },
+    DSS: {
+      name: "dirac",
+      description: "Dirac Slot Selection",
+      values: {
+        "C00": { name: "off", description: "Dirac off" },
+        "C01": { name: "slot1", description: "Dirac on and select slot1" },
+        "C02": { name: "slot2", description: "Dirac on and select slot2" },
+        "C03": { name: "slot3", description: "Dirac on and select slot3" },
+        QSTN: { name: "query", description: "get the Dirac slot selection" }
+      }
+    },
+    FXP: {
+      name: "pcm-fixed-mode",
+      description: "PCM Fixed Mode / Fixed PCM Mode",
+      values: {
+        "00": { name: "off", description: "sets PCM Fixed Mode Off" },
+        "01": { name: "on", description: "sets PCM Fixed Mode On" },
+        UP: { name: "up", description: "sets PCM Fixed Mode Wrap-Around" },
+        QSTN: { name: "query", description: "gets The PCM Fixed Mode State" }
+      }
+    },
+    HBT: {
+      name: "hi-bit",
+      description: "Hi-Bit",
+      values: {
+        "00": { name: "off", description: "sets Hi-Bit Off" },
+        "01": { name: "on", description: "sets Hi-Bit On" },
+        UP: { name: "up", description: "sets Hi-Bit Wrap-Around Up" },
+        QSTN: { name: "query", description: "gets The Hi-Bit State" }
+      }
+    },
+    HSF: {
+      name: "hdmi-signal-format",
+      description: "HDMI 4K/8K Signal Format Command",
+      values: {
+        "00": { name: "4k-standard", description: "sets HDMI 4K/8K Signal Format:4K Standard" },
+        "01": { name: "4k-enhanced", description: "sets HDMI 4K/8K Signal Format:4K Enhanced" },
+        "02": { name: "8k-standard", description: "sets HDMI 4K/8K Signal Format:8K Standard" },
+        "03": { name: "8k-enhanced", description: "sets HDMI 4K/8K Signal Format:8K Enhanced" },
+        UP: { name: "up", description: "sets HDMI 4K/8K Signal Format Wrap-Around Up" },
+        QSTN: { name: "query", description: "gets HDMI 4K/8K Signal Format Status" }
+      }
+    },
+    LDM: {
+      name: "loudness-management",
+      description: "Loudness Management",
+      values: {
+        "00": { name: "off", description: "sets Loudness Management Off" },
+        "01": { name: "on", description: "sets Loudness management On" },
+        UP: { name: "up", description: "sets Panorama Wrap-Around" },
+        QSTN: { name: "query", description: "gets The Panorama State" }
+      }
+    },
+    LFE: {
+      name: "lfe-level",
+      description: "LFE Level / LFE Mute Level",
+      values: {
+        "00": {name: "0dB", description: "sets 0dB" },
+        "01": {name: "-1dB", description: "sets -1dB" },
+        "02": {name: "-2dB", description: "sets -2dB" },
+        "03": {name: "-3dB", description: "sets -3dB" },
+        "04": {name: "-4dB", description: "sets -4dB" },
+        "05": {name: "-5dB", description: "sets -5dB" },
+        "0A": {name: "-10dB", description: "sets -10dB" },
+        "0F": {name: "-15dB", description: "sets -15dB" },
+        "14": {name: "-20dB", description: "sets -20dB" },
+        "FF": {name: "-oodB", description: "sets -oodB" },
+        UP: { name: "up", description: "sets LFE Mute Level Up" },
+        DOWN: { name: "down", description: "sets LFE Mute Level Down" },
+        QSTN: { name: "query", description: "gets The LFE Mute Level" }
+      }
+    },
+    LPS: {
+      name: "lip-sync",
+      description: "Lip Sync / Auto Delay",
+      values: {
+        "00": { name: "off", description: "sets Lip Sync Off" },
+        "01": { name: "on", description: "sets Lip Sync On" },
+        UP: { name: "up", description: "sets Lip Sync Wrap-Around" },
+        QSTN: { name: "query", description: "gets The Lip Sync State" }
       }
     }
   }

@@ -167,8 +167,25 @@ export const eiscpMappings = {
     "ipod-play-status": "IST",
     "ipod-list-info": "ILS",
     "dab-preset": "UPR",
-    "dab-sation-name": "UDS",
-    "dab-display-info": "UDD"
+    "dab-station-name": "UDS",
+    "dab-display-info": "UDD",
+    "av-direct-mode-operation": "ADM",
+    "accueq": "AEQ",
+    "auto-power-down": "APD",
+    "air-play-setting": "APS",
+    "audio-return-channel": "ARC",
+    "audio-scalar": "ASC",
+    "av-sync": "AVS",
+    "battery-charge": "BCS",
+    "hdmi-cec-control-monitor": "CCM",
+    "hdmi-cec": "CEC",
+    "dirac": "DSS",
+    "pcm-fixed-mode": "FXP",
+    "hi-bit": "HBT",
+    "hdmi-signal-format": "HSF",
+    "loudness-management": "LDM",
+    "lfe-level": "LFE",
+    "lip-sync": "LPS",
   },
   value_mappings: {
     PWR: {
@@ -1072,6 +1089,124 @@ export const eiscpMappings = {
       mn: { value: "MN" },
       mf: { value: "MF" },
       up: { value: "UP" }
+    },
+    ADM: {
+      off: { value: "00" },
+      on: { value: "01" },
+      tg: { value: "TG" },
+      query: { value: "QSTN" }
+    },
+    AEQ: {
+      "off": { value: "00" },
+      "on-on-all-ch": { value: "01" },
+      "on-ex-front-l-r": { value: "02" },
+      "on-front-matching-eq": { value: "03" },
+      up: { value: "UP" },
+      query: { value: "QSTN" }
+    },
+    APD: {
+      "off": { value: "00" },
+      "on": { value: "01" },
+      up: { value: "UP" },
+      query: { value: "QSTN" }
+    },
+    APS: {
+      off: { value: "00" },
+      on: { value: "01" },
+      up: { value: "UP" },
+      query: { value: "QSTN" }
+    },
+    ARC: {
+      "off": { value: "00" },
+      "auto": { value: "01" },
+      up: { value: "UP" },
+      query: { value: "QSTN" }
+    },
+    ASC: {
+      "auto": { value: "00" },
+      "manual": { value: "01" },
+      up: { value: "UP" },
+      query: { value: "QSTN" }
+    },
+    AVS: {
+      "up": { value: "UP" },
+      "down": { value: "DOWN" },
+      query: { value: "QSTN" }
+    },
+    BCS: {
+      "charging": { value: "00" },
+      "completed": { value: "01" },
+      "low": { value: "10" },
+      "middle": { value: "11" },
+      "high": { value: "12" },
+      query: { value: "QSTN" }
+    },
+    CCM: {
+      main: { value: "01" },
+      zone2: { value: "02" },
+      sub: { value: "10" },
+      up: { value: "UP" },
+      query: { value: "QSTN" }
+    },
+    CEC: {
+      off: { value: "00" },
+      on: { value: "01" },
+      up: { value: "UP" },
+      query: { value: "QSTN" }
+    },
+    DSS: {
+      "off": { value: "C00" },
+      "slot1": { value: "C01" },
+      "slot2": { value: "C02" },
+      "slot3": { value: "C03" },
+      query: { value: "QSTN" }
+    },
+    FXP: {
+      "off": { value: "00" },
+      "on": { value: "01" },
+      up: { value: "UP" },
+      query: { value: "QSTN" }
+    },
+    HBT: {
+      "off": { value: "00" },
+      "on": { value: "01" },
+      up: { value: "UP" },
+      query: { value: "QSTN" }
+    },
+    HSF: {
+      "4k-standard": { value: "00" },
+      "4k-enhanced": { value: "01" },
+      "8k-standard": { value: "02" },
+      "8k-enhanced": { value: "03" },
+      up: { value: "UP" },
+      query: { value: "QSTN" }
+    },
+    LDM: {
+      "off": { value: "00" },
+      "on": { value: "01" },
+      up: { value: "UP" },
+      query: { value: "QSTN" }
+    },
+    LFE: {
+      "0dB": { value: "00" },
+      "-1dB": { value: "01" },
+      "-2dB": { value: "02" },
+      "-3dB": { value: "03" },
+      "-4dB": { value: "04" },
+      "-5dB": { value: "05" },
+      "-10dB": { value: "0A" },
+      "-15dB": { value: "0F" },
+      "-20dB": { value: "14" },
+      "-oodB": { value: "FF" },
+      "up": { value: "UP" },
+      "down": { value: "DOWN" },
+      query: { value: "QSTN" }
+    },
+    LPS: {
+      "off": { value: "00" },
+      "on": { value: "01" },
+      up: { value: "UP" },
+      query: { value: "QSTN" }
     }
   }
 };

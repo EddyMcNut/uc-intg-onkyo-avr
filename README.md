@@ -56,6 +56,7 @@ Users report it also to work with:
 [Installation](./docs/installation.md)
 
 Example activities:
+
 - [Spotify](./docs/spotify.md)
 - [AppleTV](./docs/atv.md)
 - [DAB Radio](./docs/dab.md)

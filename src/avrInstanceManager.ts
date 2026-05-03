@@ -58,9 +58,17 @@ export default class AvrInstanceManager {
     for (const avrConfig of avrs) {
       const physicalAVR = buildPhysicalAvrId(avrConfig.model, avrConfig.ip);
       const avrEntry = buildEntityId(avrConfig.model, avrConfig.ip, avrConfig.zone);
+      const avrSpecificConfig = createAvrSpecificConfig(avrConfig);
 
       if (this.hasInstance(avrEntry)) {
-        log.info("%s [%s] Zone instance already exists", integrationName, avrEntry);
+        const existing = this.getInstance(avrEntry);
+        if (existing) {
+          existing.config = avrConfig;
+          if (typeof (existing.commandSender as any).updateConfig === "function") {
+            (existing.commandSender as any).updateConfig(avrSpecificConfig);
+          }
+        }
+        log.info("%s [%s] Zone instance already exists (runtime config refreshed)", integrationName, avrEntry);
         continue;
       }
 
@@ -69,9 +77,6 @@ export default class AvrInstanceManager {
         log.warn("%s [%s] Cannot create zone instance - no physical connection object exists", integrationName, avrEntry);
         continue;
       }
-
-      // Create per-zone config for command sender
-      const avrSpecificConfig = createAvrSpecificConfig(avrConfig);
 
       // Create command sender for this zone (uses shared eiscp from physical connection)
       const commandSender = createCommandSender(avrSpecificConfig, physicalConnection.eiscp, physicalConnection.commandReceiver);

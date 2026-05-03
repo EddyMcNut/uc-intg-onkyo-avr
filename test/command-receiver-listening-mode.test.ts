@@ -14,8 +14,8 @@ function mkTmpDir(prefix = "onkyo-test-") {
 test.serial("CommandReceiver preserves user-configured listeningModeOptions across IFA/source events", async (t) => {
   const tmp = mkTmpDir();
   try {
-    const crModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/commandReceiver.js")).href) as any;
-    const ConfigModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/configManager.js")).href) as any;
+    const crModule = (await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/commandReceiver.js")).href)) as any;
+    const ConfigModule = (await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/configManager.js")).href)) as any;
     const { CommandReceiver } = crModule;
     const { ConfigManager, setConfigDir } = ConfigModule;
     if (typeof setConfigDir === "function") setConfigDir(tmp);
@@ -81,8 +81,8 @@ test.serial("CommandReceiver preserves user-configured listeningModeOptions acro
 test.serial("CommandReceiver sets media player state to Playing only for ON+NET+album-art subsources", async (t) => {
   const tmp = mkTmpDir();
   try {
-    const crModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/commandReceiver.js")).href) as any;
-    const ConfigModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/configManager.js")).href) as any;
+    const crModule = (await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/commandReceiver.js")).href)) as any;
+    const ConfigModule = (await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/configManager.js")).href)) as any;
     const { CommandReceiver } = crModule;
     const { ConfigManager, setConfigDir } = ConfigModule;
     if (typeof setConfigDir === "function") setConfigDir(tmp);
@@ -183,5 +183,3 @@ test.serial("CommandReceiver sets media player state to Playing only for ON+NET+
     fs.rmSync(tmp, { recursive: true, force: true });
   }
 });
-
- 

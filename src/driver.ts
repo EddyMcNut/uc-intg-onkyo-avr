@@ -16,8 +16,8 @@ import AvrInstanceManager from "./avrInstanceManager.js";
 import ListeningModeHandler from "./listeningModeHandler.js";
 import InputSelectorHandler from "./inputSelectorHandler.js";
 import SubscriptionHandler from "./subscriptionHandler.js";
-import fs from "fs";
-import path from "path";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 const integrationName = "driver:";
 import { delay } from "./utils.js";
 
@@ -63,10 +63,8 @@ export default class OnkyoDriver {
 
     // Read driver version early so it's available when creating command receivers
     try {
-      const fs = require("fs");
-      const path = require("path");
-      const driverJsonPath = path.resolve(process.cwd(), "driver.json");
-      const driverJsonRaw = fs.readFileSync(driverJsonPath, "utf-8");
+      const driverJsonPath = resolve(process.cwd(), "driver.json");
+      const driverJsonRaw = readFileSync(driverJsonPath, "utf-8");
       const driverJson = JSON.parse(driverJsonRaw);
       this.driverVersion = driverJson.version || "unknown";
     } catch (err) {
@@ -161,9 +159,7 @@ export default class OnkyoDriver {
       // handler, so fall back gracefully to a no-op to avoid exceptions.
       // Skip if user configured 'none' for this entity.
       if (avrConfig.listeningModeOptions !== null) {
-        const lmHandler =
-          this.listeningModeHandler?.handle.bind(this.listeningModeHandler) ||
-          (async () => uc.StatusCodes.Ok);
+        const lmHandler = this.listeningModeHandler?.handle.bind(this.listeningModeHandler) || (async () => uc.StatusCodes.Ok);
         const listeningModeEntity = this.entityRegistrar.createListeningModeSelectEntity(avrEntry, lmHandler);
         this.driver.addAvailableEntity(listeningModeEntity);
         log.info("%s [%s] Listening Mode select entity registered", integrationName, avrEntry);
@@ -196,9 +192,7 @@ export default class OnkyoDriver {
 
       // Register Input Selector select entity. Skip if user configured 'none'.
       if (avrConfig.inputSelectorOptions !== null) {
-        const isHandler =
-          this.inputSelectorHandler?.handle.bind(this.inputSelectorHandler) ||
-          (async () => uc.StatusCodes.Ok);
+        const isHandler = this.inputSelectorHandler?.handle.bind(this.inputSelectorHandler) || (async () => uc.StatusCodes.Ok);
         const inputSelectorEntity = this.entityRegistrar.createInputSelectorSelectEntity(avrEntry, isHandler);
         this.driver.addAvailableEntity(inputSelectorEntity);
         log.info("%s [%s] Input Selector select entity registered", integrationName, avrEntry);
@@ -334,6 +328,8 @@ export default class OnkyoDriver {
       return v === 80 || v === 100 ? v : AVR_DEFAULTS.volumeScale;
     })();
 
+    const volumeDisplay = String(avrConfig.volumeDisplay ?? AVR_DEFAULTS.volumeDisplay).toLowerCase() === "relative" ? "relative" : "absolute";
+
     const adjustVolumeDispl = parseBoolean(avrConfig.adjustVolumeDispl, AVR_DEFAULTS.adjustVolumeDispl);
     const createSensors = parseBoolean(avrConfig.createSensors, AVR_DEFAULTS.createSensors);
 
@@ -363,20 +359,20 @@ export default class OnkyoDriver {
           queueThreshold,
           albumArtURL,
           volumeScale,
+          volumeDisplay,
           adjustVolumeDispl,
           createSensors,
           netMenuDelay,
           tuneinPresetPosition,
           // Preserve user-configured listening mode options so command receivers
           // and runtime logic can honour them after restart.
-          listeningModeOptions: Array.isArray((avrConfig as any).listeningModeOptions)
-            ? (avrConfig as any).listeningModeOptions.map((s: string) => s.trim())
-            : undefined
+          listeningModeOptions: Array.isArray((avrConfig as any).listeningModeOptions) ? (avrConfig as any).listeningModeOptions.map((s: string) => s.trim()) : undefined
         }
       ],
       queueThreshold,
       albumArtURL,
       volumeScale,
+      volumeDisplay,
       adjustVolumeDispl,
       // Backward compatibility fields for existing code
       model: avrConfig.model,
@@ -415,31 +411,33 @@ export default class OnkyoDriver {
       if (!physicalConnection) {
         // Need to create a new physical connection
         // Collect all zones configured for this physical AVR
-        const configuredZones = this.config.avrs
-          .filter(avr => buildPhysicalAvrId(avr.model, avr.ip) === physicalAVR)
-          .map(avr => avr.zone);
-        
+        const configuredZones = this.config.avrs.filter((avr) => buildPhysicalAvrId(avr.model, avr.ip) === physicalAVR).map((avr) => avr.zone);
+
         const avrSpecificConfig = this.createAvrSpecificConfig(avrConfig);
-        const physicalConn = await this.connectionManager.createAndConnect(physicalAVR, avrConfig, (eiscpInstance) => {
-          // Create command receiver using Onkyo-specific class and the driver context
-          const commandReceiver = new CommandReceiver(this.driver, avrSpecificConfig, eiscpInstance, this.driverVersion);
-          return commandReceiver;
-        }, configuredZones);
+        const physicalConn = await this.connectionManager.createAndConnect(
+          physicalAVR,
+          avrConfig,
+          (eiscpInstance) => {
+            // Create command receiver using Onkyo-specific class and the driver context
+            const commandReceiver = new CommandReceiver(this.driver, avrSpecificConfig, eiscpInstance, this.driverVersion);
+            return commandReceiver;
+          },
+          configuredZones
+        );
         physicalConnection = physicalConn;
       } else {
         // Physical connection exists - update its config in case settings changed
         // Collect all zones configured for this physical AVR in case they've changed
-        const configuredZones = this.config.avrs
-          .filter(avr => buildPhysicalAvrId(avr.model, avr.ip) === physicalAVR)
-          .map(avr => avr.zone);
-        
-        this.connectionManager.updateConnectionConfig(physicalAVR, avrConfig, configuredZones);
-        
-        if (!physicalConnection.eiscp.connected) {
-        // Physical connection exists but is disconnected, try to reconnect
-        log.info("%s [%s] TCP connection lost, reconnecting to AVR...", integrationName, physicalAVR);
+        const configuredZones = this.config.avrs.filter((avr) => buildPhysicalAvrId(avr.model, avr.ip) === physicalAVR).map((avr) => avr.zone);
+        const avrSpecificConfig = this.createAvrSpecificConfig(avrConfig);
 
-        const result = await this.connectionManager.attemptReconnection(physicalAVR);
+        this.connectionManager.updateConnectionConfig(physicalAVR, avrConfig, configuredZones, avrSpecificConfig);
+
+        if (!physicalConnection.eiscp.connected) {
+          // Physical connection exists but is disconnected, try to reconnect
+          log.info("%s [%s] TCP connection lost, reconnecting to AVR...", integrationName, physicalAVR);
+
+          const result = await this.connectionManager.attemptReconnection(physicalAVR);
 
           if (result.success) {
             // Cancel any scheduled reconnection since we're now connected
@@ -460,19 +458,11 @@ export default class OnkyoDriver {
       const physicalAVR = buildPhysicalAvrId(avrConfig.model, avrConfig.ip);
       const avrEntry = buildEntityId(avrConfig.model, avrConfig.ip, avrConfig.zone);
 
-      // Skip if zone instance already exists
-      if (this.avrInstanceManager.hasInstance(avrEntry)) {
-        log.info("%s [%s] Zone instance already exists", integrationName, avrEntry);
-        continue;
-      }
-
-      // Get the physical connection (it should exist from Phase 1, even if connection failed)
+      // Always run through ensureZoneInstances so existing zone instances get runtime config refreshes
+      // (for example volumeDisplay absolute/relative changes) and missing instances are created.
       const physicalConnection = this.connectionManager.getPhysicalConnection(physicalAVR);
-
       if (!physicalConnection) {
-        // This shouldn't happen since Phase 1 creates physicalConnection objects even on failure
-        // But if it does, we can't create zone instance without the shared eiscp
-        log.warn("%s [%s] Cannot create zone instance - no physical connection object exists", integrationName, avrEntry);
+        log.warn("%s [%s] Cannot create or refresh zone instance - no physical connection object exists", integrationName, avrEntry);
         continue;
       }
 

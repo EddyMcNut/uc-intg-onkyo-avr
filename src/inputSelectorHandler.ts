@@ -22,11 +22,7 @@ export default class InputSelectorHandler {
     private entityRegistrar: EntityRegistrar
   ) {}
 
-  public async handle(
-    entity: uc.Entity,
-    cmdId: string,
-    params?: { [key: string]: string | number | boolean }
-  ): Promise<uc.StatusCodes> {
+  public async handle(entity: uc.Entity, cmdId: string, params?: { [key: string]: string | number | boolean }): Promise<uc.StatusCodes> {
     log.info("%s [%s] Input Selector command: %s", integrationName, entity.id, cmdId, params);
 
     // Extract avrEntry from entity ID (format: "model_ip_zone_input_selector")

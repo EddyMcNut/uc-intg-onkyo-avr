@@ -58,7 +58,7 @@ export default class EntityRegistrar {
             return match.listeningModeOptions.map((s) => s.trim());
           }
         }
-      } catch (err) {
+      } catch {
         // ignore and fall back to defaults
       }
     }
@@ -262,10 +262,7 @@ export default class EntityRegistrar {
     return sensors;
   }
 
-  createListeningModeSelectEntity(
-    avrEntry: string,
-    cmdHandler?: (entity: uc.Entity, cmdId: string, params?: { [key: string]: string | number | boolean }) => Promise<uc.StatusCodes>
-  ): Select {
+  createListeningModeSelectEntity(avrEntry: string, cmdHandler?: (entity: uc.Entity, cmdId: string, params?: { [key: string]: string | number | boolean }) => Promise<uc.StatusCodes>): Select {
     const options = this.getListeningModeOptions(undefined, avrEntry);
     const displayBaseName = this.getDisplayBaseName(avrEntry);
     const selectEntity = new Select(
@@ -298,19 +295,18 @@ export default class EntityRegistrar {
             return match.inputSelectorOptions.map((s) => s.trim());
           }
         }
-      } catch (err) {
+      } catch {
         // ignore and fall back to defaults
       }
     }
     const sliMappings = eiscpMappings.value_mappings.SLI;
     const excludeKeys = ["up", "down", "query"];
-    return Object.keys(sliMappings).filter((key) => !excludeKeys.includes(key)).sort();
+    return Object.keys(sliMappings)
+      .filter((key) => !excludeKeys.includes(key))
+      .sort();
   }
 
-  createInputSelectorSelectEntity(
-    avrEntry: string,
-    cmdHandler?: (entity: uc.Entity, cmdId: string, params?: { [key: string]: string | number | boolean }) => Promise<uc.StatusCodes>
-  ): Select {
+  createInputSelectorSelectEntity(avrEntry: string, cmdHandler?: (entity: uc.Entity, cmdId: string, params?: { [key: string]: string | number | boolean }) => Promise<uc.StatusCodes>): Select {
     const options = this.getInputSelectorOptions(avrEntry);
     const displayBaseName = this.getDisplayBaseName(avrEntry);
     const selectEntity = new Select(

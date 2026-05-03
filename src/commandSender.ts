@@ -22,17 +22,23 @@ export class CommandSender {
     this.commandReceiver = commandReceiver;
   }
 
+  public updateConfig(config: OnkyoConfig): void {
+    this.config = config;
+  }
+
   private async preserveMainAroundZoneSubsource(model: string, host: string, zone: string, action: () => Promise<void>): Promise<void> {
-    if (zone === "main") { // first simple check, as most commands will be for main zone then no need to do any extra processing
+    if (zone === "main") {
+      // first simple check, as most commands will be for main zone then no need to do any extra processing
       await action();
       return;
-    }else{
+    } else {
       const targetEntityId = buildEntityId(model, host, zone);
       const mainEntityId = buildEntityId(model, host, "main");
       const targetSubSource = avrStateManager.getSubSource(targetEntityId);
       const mainSubSource = avrStateManager.getSubSource(mainEntityId);
 
-      if (targetSubSource === mainSubSource) { // no need to switch main source to a different subsource to cater for a request of zones 2/3
+      if (targetSubSource === mainSubSource) {
+        // no need to switch main source to a different subsource to cater for a request of zones 2/3
         log.info("%s [%s] ***************** no need to switch main subsource for zone '%s'.", integrationName, targetEntityId, zone);
         log.info("%s [%s] ***************** targetEntityId=%s mainEntityId=%s", integrationName, targetEntityId, targetEntityId, mainEntityId);
         log.info("%s [%s] ***************** targetSubSource=%s mainSubSource=%s", integrationName, targetEntityId, targetSubSource, mainSubSource);
@@ -57,9 +63,9 @@ export class CommandSender {
         await this.eiscp.command(`main input-selector ${mainSourceBefore}`);
         await delay(DEFAULT_QUEUE_THRESHOLD);
         await this.eiscp.command(`main volume ${mainVolumeBefore}`);
-        log.info("%s [%s ***************** main zone restored to %s and volume level %s after NET subsource change for %s.", integrationName, targetEntityId,mainSourceBefore, mainVolumeBefore, zone);
-      }else{
-        await delay(DEFAULT_QUEUE_THRESHOLD*3);
+        log.info("%s [%s ***************** main zone restored to %s and volume level %s after NET subsource change for %s.", integrationName, targetEntityId, mainSourceBefore, mainVolumeBefore, zone);
+      } else {
+        await delay(DEFAULT_QUEUE_THRESHOLD * 3);
         this.eiscp.command(`main system-power standby`);
         log.info("%s [%s] ***************** main zone restored to %s after NET subsource change for %s.", integrationName, targetEntityId, mainPowerBefore, zone);
       }
@@ -76,9 +82,7 @@ export class CommandSender {
     const zone = entityParts[entityParts.length - 1];
     const host = entityParts[entityParts.length - 2];
     const model = entityParts.slice(0, -2).join(" ");
-    const targetAvr = this.config.avrs?.find((avr) => buildEntityId(avr.model, avr.ip, avr.zone) === entity.id)
-      ?? this.config.avrs?.find((avr) => avr.model === model && avr.ip === host)
-      ?? null;
+    const targetAvr = this.config.avrs?.find((avr) => buildEntityId(avr.model, avr.ip, avr.zone) === entity.id) ?? this.config.avrs?.find((avr) => avr.model === model && avr.ip === host) ?? null;
 
     if (!targetAvr) {
       log.error("%s [%s] Cannot route command: no configured AVR matches model='%s' host='%s' zone='%s'", integrationName, entity.id, model, host, zone);
@@ -152,18 +156,25 @@ export class CommandSender {
           break;
         case uc.MediaPlayerCommands.VolumeUp:
           // if (now - this.lastCommandTime > queueThreshold) {
-            this.lastCommandTime = now;
-            await this.eiscp.command(setZonePrefix("volume level-up-1db-step"));
+          this.lastCommandTime = now;
+          await this.eiscp.command(setZonePrefix("volume level-up-1db-step"));
           // }
           break;
         case uc.MediaPlayerCommands.VolumeDown:
           // if (now - this.lastCommandTime > queueThreshold) {
-            this.lastCommandTime = now;
-            await this.eiscp.command(setZonePrefix("volume level-down-1db-step"));
+          this.lastCommandTime = now;
+          await this.eiscp.command(setZonePrefix("volume level-down-1db-step"));
           // }
           break;
         case uc.MediaPlayerCommands.Volume:
           if (params?.volume !== undefined) {
+            log.debug("************* %s", params.volume);
+            const volumeDisplay = String(this.config.volumeDisplay ?? "absolute").toLowerCase() === "relative" ? "relative" : "absolute";
+            if (volumeDisplay !== "absolute") {
+              log.debug("%s [%s] volume set to relative so slider is ignored.", integrationName, entity.id);
+              break;
+            }
+
             // Remote slider: 0-100, AVR display: 0-volumeScale, EISCP protocol: 0-200 or 0-100 depending on model
             const sliderValue = Math.max(0, Math.min(100, Number(params.volume)));
             const volumeScale = this.config.volumeScale || 100;
@@ -176,18 +187,18 @@ export class CommandSender {
             const eiscpValue = adjustVolumeDispl ? avrDisplayValue * 2 : avrDisplayValue;
             const hexVolume = eiscpValue.toString(16).toUpperCase().padStart(2, "0");
 
-            // Debug logging for volume conversion
-            log.info(
-              "%s [%s] volume conversion: slider=%d volumeScale=%d adjustVolumeDispl=%s avrDisplay=%d eiscpValue=%d hex=%s",
-              integrationName,
-              entity.id,
-              sliderValue,
-              volumeScale,
-              String(adjustVolumeDispl),
-              avrDisplayValue,
-              eiscpValue,
-              hexVolume
-            );
+            // // Debug logging for volume conversion
+            // log.info(
+            //   "%s [%s] volume conversion: slider=%d volumeScale=%d adjustVolumeDispl=%s avrDisplay=%d eiscpValue=%d hex=%s",
+            //   integrationName,
+            //   entity.id,
+            //   sliderValue,
+            //   volumeScale,
+            //   String(adjustVolumeDispl),
+            //   avrDisplayValue,
+            //   eiscpValue,
+            //   hexVolume
+            // );
 
             // Use zone-specific volume command prefix
             let volumePrefix = "MVL"; // main zone
@@ -195,6 +206,8 @@ export class CommandSender {
               volumePrefix = "ZVL";
             } else if (zone === "zone3") {
               volumePrefix = "VL3";
+            } else if (zone === "zone4") {
+              volumePrefix = "VL4";
             }
             await this.eiscp.raw(`${volumePrefix}${hexVolume}`);
           }
@@ -208,7 +221,7 @@ export class CommandSender {
         case uc.MediaPlayerCommands.SelectSource:
           if (params?.source && typeof params.source === "string") {
             const request = params.source.toLowerCase();
-            
+
             if (!request.startsWith("raw")) {
               const userCmd = params.source.toLowerCase();
 
@@ -229,7 +242,7 @@ export class CommandSender {
                 await this.eiscp.command(setZonePrefix(userCmd));
               } else {
                 // if (now - this.lastCommandTime > queueThreshold) {
-                  await this.eiscp.command(userCmd);
+                await this.eiscp.command(userCmd);
                 // }
               }
             } else {

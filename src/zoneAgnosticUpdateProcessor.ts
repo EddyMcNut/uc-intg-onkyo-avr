@@ -12,30 +12,26 @@ import { ZoneMediaRenderer } from "./zoneMediaRenderer.js";
 const integrationName = "zoneAgnosticUpdateProcessor:";
 
 export class ZoneAgnosticUpdateProcessor {
-  public static readonly ZONE_AGNOSTIC_COMMANDS = new Set<string>([
-    "IFA",
-    "DSN",
-    "NST",
-    "NLT",
-    "NLT_CONTEXT",
-    "NLS",
-    "NLA",
-    "FLD",
-    "NTM",
-    "metadata"
-  ]);
+  public static readonly ZONE_AGNOSTIC_COMMANDS = new Set<string>(["IFA", "DSN", "NST", "NLT", "NLT_CONTEXT", "NLS", "NLA", "FLD", "NTM", "metadata"]);
 
   private readonly mediaStateStore = new ZoneAgnosticMediaStateStore();
   private readonly tuneInPreloader: TuneInPreloader;
   private readonly mediaRenderer: ZoneMediaRenderer;
+  private config: OnkyoConfig;
 
   constructor(
     private readonly driver: uc.IntegrationAPI,
-    private readonly config: OnkyoConfig,
+    config: OnkyoConfig,
     private readonly eiscpInstance: EiscpDriver
   ) {
+    this.config = config;
     this.tuneInPreloader = new TuneInPreloader(eiscpInstance, (entityId) => this.mediaStateStore.getPhysicalAvrId(entityId));
     this.mediaRenderer = new ZoneMediaRenderer(driver, config, this.mediaStateStore);
+  }
+
+  public updateConfig(config: OnkyoConfig): void {
+    this.config = config;
+    this.mediaRenderer.updateConfig(config);
   }
 
   public static isZoneAgnosticCommand(command: string): boolean {

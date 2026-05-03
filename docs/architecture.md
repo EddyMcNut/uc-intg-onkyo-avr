@@ -20,12 +20,14 @@ The integration uses **eISCP (Ethernet Integrated Serial Control Protocol)**, wh
 ### 1. Connection Layer
 
 **ConnectionManager** (`src/connectionManager.ts`)
+
 - Manages TCP socket connections (EiscpDriver instances) to one or more physical AVRs
 - Handles connection lifecycle (connect, disconnect, reconnect)
 - Maintains a map of physical connections (one per AVR IP address)
 - Each connection contains an EISCP driver instance and command receiver
 
 **EiscpDriver** (`src/eiscp.ts`)
+
 - Low-level eISCP protocol implementation using Node.js `net` module
 - Creates and maintains TCP socket to AVR
 - Encodes outgoing commands into eISCP packet format
@@ -37,6 +39,7 @@ The integration uses **eISCP (Ethernet Integrated Serial Control Protocol)**, wh
 ### 2. Command Flow (Outbound)
 
 **CommandSender** (`src/commandSender.ts`)
+
 - Receives commands from the Unfolded Circle integration API
 - Translates high-level media player commands (e.g., `VolumeUp`) into eISCP protocol commands
 - Routes commands to the appropriate zone (main, zone2, zone3)
@@ -44,6 +47,7 @@ The integration uses **eISCP (Ethernet Integrated Serial Control Protocol)**, wh
 - Implements rate limiting for rapid commands (like volume up/down)
 
 **Flow Example - Volume Up:**
+
 ```
 User presses Volume Up on remote
     ↓
@@ -63,6 +67,7 @@ AVR receives command and adjusts volume
 ### 3. Event Flow (Inbound)
 
 **CommandReceiver** (`src/commandReceiver.ts`)
+
 - Listens to 'data' events emitted by the EiscpDriver
 - Routes incoming messages to appropriate handlers based on command type
 - Translates eISCP responses into Unfolded Circle entity attribute updates
@@ -70,6 +75,7 @@ AVR receives command and adjusts volume
 - Updates sensors and select entities based on AVR state
 
 **Flow Example - Volume Update:**
+
 ```
 AVR volume changes (from any source: network command, IR remote, front panel)
     ↓
@@ -91,14 +97,18 @@ Unfolded Circle remote UI updates to show new volume level
 ## Event-Based Model
 
 ### Unsolicited Updates
+
 The AVR sends state updates whenever its state changes, regardless of whether the integration sent a command, a few examples:
+
 - Volume adjusted on physical remote → AVR sends volume update
 - Input changed on front panel → AVR sends input-selector update
 - Track info changes during streaming → AVR sends metadata updates
 - Power state changes → AVR sends system-power update
 
 ### Asynchronous Command-Response Pattern
+
 When you send a command:
+
 1. The command is sent immediately (non-blocking)
 2. The AVR processes the command
 3. The AVR sends back one or more state update events
@@ -108,12 +118,16 @@ When you send a command:
 This differs from a synchronous request-response model where you would wait for a specific response after each command.
 
 ### Multiple Updates from Single Command
+
 A single command can trigger multiple event messages:
+
 - Changing input might trigger: `input-selector`, `audio-information`, `video-information`, `listening-mode`, `volume`
 - Playing a network service triggers: `net-service`, `title`, `artist`, `album`, `artwork`
 
 ### Streaming Data
+
 Some information arrives as fragmented streams:
+
 - Album art URL changes
 - Metadata updates (title/artist/album) arrive as separate events
 - Display text may scroll in multiple FLD (front panel display) messages
@@ -121,11 +135,13 @@ Some information arrives as fragmented streams:
 ## State Management
 
 **AvrStateManager** (`src/avrState.ts`)
+
 - Centralized state tracking for all AVR zones
 - Caches current values: power state, source, subsource, audio format
 - Enables conditional logic (e.g., only process certain events when in specific source mode)
 
 **Why Needed:**
+
 - AVR can send lots of messages per minute during some operations
 - Need to filter/deduplicate to avoid UI thrashing
 - Context-dependent parsing (same command means different things in different sources)
@@ -133,6 +149,7 @@ Some information arrives as fragmented streams:
 ## Zone Architecture
 
 **Single Physical AVR, Multiple Zones:**
+
 - One TCP connection per physical AVR
 - Each zone (main, zone2, zone3) is a separate media player entity
 - Commands are prefixed with zone identifier before sending to AVR
@@ -140,6 +157,7 @@ Some information arrives as fragmented streams:
 - Single CommandReceiver processes events for all zones on that AVR
 
 **Multiple Physical AVRs:**
+
 - Each AVR gets its own TCP connection, which is shared by all configured zone-instances of that AVR
 - Each AVR has its own EiscpDriver and CommandReceiver instance
 - Entities are uniquely identified: `{model}_{host}_{zone}`
@@ -147,16 +165,19 @@ Some information arrives as fragmented streams:
 ## Error Handling and Resilience
 
 ### Connection Management
+
 - **Auto-reconnection**: ReconnectionManager handles dropped connections
 - **Command retry**: Commands sent while disconnected trigger reconnection attempt
 - **Graceful degradation**: Entities remain available during disconnection
 - **Timeout handling**: Commands that don't complete trigger retry logic
 
 ### State Synchronization
+
 - **Query on connect**: Full state query sent when connection established
 - **Query on wake**: State refreshed when AVR powers on from standby
 
 ### Message Processing
+
 - **Queue management**: Send and receive queues prevent overwhelming AVR and this integration
 - **Throttling**: Rapid repeated commands (volume) are rate-limited
 - **Filtering**: Noise messages (e.g., display scrolling) are filtered out
@@ -167,16 +188,19 @@ Some information arrives as fragmented streams:
 The integration maintains extensive mapping tables:
 
 **eiscpCommands** (`src/eiscp-commands.ts`)
+
 - Human-readable command names → eISCP protocol codes
 - E.g., `"system-power on"` → `"PWR01"`
 
 **eiscpMappings** (`src/eiscp-mappings.ts`)
-- Protocol values → human-readable values  
+
+- Protocol values → human-readable values
 - E.g., `"SLI10"` → `{ command: "input-selector", value: "dvd" }`
 
 ## Performance Considerations
 
 ### Queue Thresholds
+
 - **Send Delay** (`queueThreshold`): Minimum time between outgoing commands (default 100ms)
   - Prevents overwhelming AVR processor
   - Configurable per AVR in config.json
@@ -187,6 +211,7 @@ The integration maintains extensive mapping tables:
   - Only applied to video/audio info messages, not critical state updates
 
 ### Optimization Strategies
+
 - **Command deduplication**: Same command not sent within threshold window
 - **Message filtering**: Display scrolling and noise messages dropped early
 - **Conditional processing**: Context-aware parsing (only process relevant data for current source)

@@ -47,23 +47,18 @@ const ZONE3_COMMAND_MAP: Record<string, string> = {
   SLI: "SL3",
   TUN: "TU3"
 };
+const ZONE4_COMMAND_MAP: Record<string, string> = {
+  MVL: "VL4",
+  PWR: "PW4",
+  AMT: "MT4",
+  SLI: "SL4",
+  TUN: "TU4"
+};
 
 // Reverse mappings (zone-specific -> main) for parsing incoming commands
 const ZONE2_REVERSE_MAP = Object.fromEntries(Object.entries(ZONE2_COMMAND_MAP).map(([k, v]) => [v, k]));
 const ZONE3_REVERSE_MAP = Object.fromEntries(Object.entries(ZONE3_COMMAND_MAP).map(([k, v]) => [v, k]));
-
-const NSS_TO_SUBSOURCE: Record<string, string> = {
-  NSS01: "tunein",
-  NSS02: "spotify",
-  NSS03: "deezer",
-  NSS04: "tidal",
-  NSS05: "amazonmusic",
-  NSS06: "chromecast",
-  NSS07: "dts-play-fi",
-  NSS08: "airplay",
-  NSS09: "alexa",
-  NSS10: "music-server"
-};
+const ZONE4_REVERSE_MAP = Object.fromEntries(Object.entries(ZONE4_COMMAND_MAP).map(([k, v]) => [v, k]));
 
 interface Metadata {
   title?: string;
@@ -204,6 +199,8 @@ export class EiscpDriver extends EventEmitter {
       return ZONE2_COMMAND_MAP[prefix] || prefix;
     } else if (zone === "zone3") {
       return ZONE3_COMMAND_MAP[prefix] || prefix;
+    } else if (zone === "zone4") {
+      return ZONE4_COMMAND_MAP[prefix] || prefix;
     }
     return prefix;
   }
@@ -303,7 +300,7 @@ export class EiscpDriver extends EventEmitter {
         let val = match[2].trim();
         if (type === "NAT") {
           // Override artist with service name for configured streaming services
-          if (NO_TITLE.map(s => s.toLowerCase()).includes(currentSubSource)) {
+          if (NO_TITLE.map((s) => s.toLowerCase()).includes(currentSubSource)) {
             // Find matching service name from NETWORK_SERVICES (case-insensitive)
             const serviceName = NETWORK_SERVICES.find((s) => s.toLowerCase() === currentSubSource);
             this.currentMetadata.title = serviceName || val;
@@ -319,7 +316,7 @@ export class EiscpDriver extends EventEmitter {
     if (!foundMatch) {
       if (command === "NAT") {
         // Override artist with service name for configured streaming services
-        if (NO_TITLE.map(s => s.toLowerCase()).includes(currentSubSource)) {
+        if (NO_TITLE.map((s) => s.toLowerCase()).includes(currentSubSource)) {
           // Find matching service name from NETWORK_SERVICES (case-insensitive)
           const serviceName = NETWORK_SERVICES.find((s) => s.toLowerCase() === currentSubSource);
           this.currentMetadata.title = serviceName || originalValue;
@@ -531,12 +528,15 @@ export class EiscpDriver extends EventEmitter {
     // Detect zone from command prefix
     // Zone 2: starts with Z (ZPW, ZVL, ZMT, SLZ) or ends with Z (TUZ)
     // Zone 3: ends with 3 (PW3, VL3, MT3, SL3, TU3)
+    // Zone 4: ends with 4 (PW4, VL4, MT4, SL4, TU4)
     if (command.charAt(0) === "Z" && command.length === 3) {
       result.zone = "zone2";
     } else if (command.charAt(2) === "Z" && command.length === 3) {
       result.zone = "zone2";
     } else if (command.charAt(2) === "3" && command.length === 3) {
       result.zone = "zone3";
+    } else if (command.charAt(2) === "4" && command.length === 3) {
+      result.zone = "zone4";
     }
 
     // Check for special command handler
@@ -552,6 +552,8 @@ export class EiscpDriver extends EventEmitter {
       lookupCommand = ZONE2_REVERSE_MAP[command] || command;
     } else if (result.zone === "zone3") {
       lookupCommand = ZONE3_REVERSE_MAP[command] || command;
+    } else if (result.zone === "zone4") {
+      lookupCommand = ZONE4_REVERSE_MAP[command] || command;
     }
 
     // Direct lookup instead of iterating all commands
@@ -730,7 +732,9 @@ export class EiscpDriver extends EventEmitter {
             continue;
           }
 
-          value = String(value).replace(/[\x00-\x1F]/g, "").trim();
+          value = String(value)
+            .replace(/[\x00-\x1F]/g, "")
+            .trim();
 
           const rawResult = this.iscp_to_command(command, value);
           if (!rawResult || rawResult.command === "undefined") {
@@ -768,7 +772,7 @@ export class EiscpDriver extends EventEmitter {
     const task = this.sendQueue.then(async () => {
       if (this.is_connected && this.eiscp) {
         // Handle single command (most common case)
-        if (typeof data === 'string') {
+        if (typeof data === "string") {
           this.eiscp.write(this.eiscp_packet(data));
         } else {
           // const shortDelay = Math.round((this.config.send_delay! ?? DEFAULT_QUEUE_THRESHOLD) / data.length / 20) * 10;
@@ -829,13 +833,13 @@ export class EiscpDriver extends EventEmitter {
       model: this.config.model
     });
 
-    await this.raw("NTCTOP");                   // Go to TuneIn top menu
+    await this.raw("NTCTOP"); // Go to TuneIn top menu
     await delay(menuDelay);
-    await this.raw("NTCSELECT");                // Confirm / enter  
-    await delay(menuDelay*3);
+    await this.raw("NTCSELECT"); // Confirm / enter
+    await delay(menuDelay * 3);
     await this.raw(`NLSI${myPresetsPosition}`); // Navigate down to My Presets (first position)
-    await delay(menuDelay*2);
-    await this.raw(`NLSI${presetIndex}`);       // Select preset by index
+    await delay(menuDelay * 2);
+    await this.raw(`NLSI${presetIndex}`); // Select preset by index
   }
 
   /** Fast TIP detector with validation only when prefix matches */
@@ -865,16 +869,17 @@ export class EiscpDriver extends EventEmitter {
     return iscpCommand.slice(nssIndex, nssIndex + 5);
   }
 
-  private async handleNSSsend(nssCode: string, zone: string): Promise<void> { //, iscpCommand: string
+  private async handleNSSsend(nssCode: string, zone: string): Promise<void> {
+    //, iscpCommand: string
     const sliPrefix = this.getZonePrefix("SLI", zone);
     const netCommand = `${sliPrefix}2B`; // 2B = NET input
     const queryCommand = `${sliPrefix}QSTN`;
-    const newSubsource =  String(nssCode.slice(-2)).padStart(5, "0");
+    const newSubsource = String(nssCode.slice(-2)).padStart(5, "0");
 
     log.debug("%s Sending %s (NET input for zone %s) before %s", integrationName, netCommand, zone, nssCode);
     await this.raw(netCommand); // Select NET input first
     await delay(this.config.netMenuDelay ?? 2500); // Wait for AVR to fully load NET menu
-    
+
     log.debug("%s Sending network service command: %s", integrationName, nssCode);
     await this.raw(`NLSI${newSubsource}`);
     await delay(this.config.netMenuDelay ?? 2500);
@@ -945,54 +950,60 @@ export class EiscpDriver extends EventEmitter {
   }
 
   private async handleMultiZoneVolume(data: string): Promise<void> {
-    const parts = data.toLowerCase().split(/[\s]+/).filter((item) => item !== "");
-    
+    const parts = data
+      .toLowerCase()
+      .split(/[\s]+/)
+      .filter((item) => item !== "");
+
     if (parts.length !== 2) {
       log.warn("%s Invalid multi-zone-volume command format: %s", integrationName, data);
       return;
     }
 
     const action = parts[1]; // e.g., "all-up", "main-zone2-down"
-    
+
     // Determine which zones are configured for this AVR
     const configuredZones = this.config.configuredZones || ["main"]; // default to main if not specified
     const hasMain = configuredZones.includes("main");
     const hasZone2 = configuredZones.includes("zone2");
     const hasZone3 = configuredZones.includes("zone3");
-    
+    const hasZone4 = configuredZones.includes("zone4");
+
     // Map action to zone-specific volume commands (conditionally based on configured zones)
     const volumeCommands: string[] = [];
-    
+
     switch (action) {
       case "all-up":
-        if (hasMain) volumeCommands.push("MVLUP1");   // Main zone volume up
-        if (hasZone2) volumeCommands.push("ZVLUP1");  // Zone 2 volume up
-        if (hasZone3) volumeCommands.push("VL3UP1");  // Zone 3 volume up
+        if (hasMain) volumeCommands.push("MVLUP1"); // Main zone volume up
+        if (hasZone2) volumeCommands.push("ZVLUP1"); // Zone 2 volume up
+        if (hasZone3) volumeCommands.push("VL3UP1"); // Zone 3 volume up
+        if (hasZone4) volumeCommands.push("VL4UP1"); // Zone 4 volume up
         break;
       case "all-down":
         if (hasMain) volumeCommands.push("MVLDOWN1"); // Main zone volume down
         if (hasZone2) volumeCommands.push("ZVLDOWN1"); // Zone 2 volume down
         if (hasZone3) volumeCommands.push("VL3DOWN1"); // Zone 3 volume down
+        if (hasZone4) volumeCommands.push("VL4DOWN1"); // Zone 4 volume down
         break;
       case "main-zone2-up":
-        if (hasMain) volumeCommands.push("MVLUP1");   // Main zone volume up
-        if (hasZone2) volumeCommands.push("ZVLUP1");  // Zone 2 volume up
+        if (hasMain) volumeCommands.push("MVLUP1"); // Main zone volume up
+        if (hasZone2) volumeCommands.push("ZVLUP1"); // Zone 2 volume up
         break;
       case "main-zone2-down":
         if (hasMain) volumeCommands.push("MVLDOWN1"); // Main zone volume down
         if (hasZone2) volumeCommands.push("ZVLDOWN1"); // Zone 2 volume down
         break;
       case "main-zone3-up":
-        if (hasMain) volumeCommands.push("MVLUP1");   // Main zone volume up
-        if (hasZone3) volumeCommands.push("VL3UP1");  // Zone 3 volume up
+        if (hasMain) volumeCommands.push("MVLUP1"); // Main zone volume up
+        if (hasZone3) volumeCommands.push("VL3UP1"); // Zone 3 volume up
         break;
       case "main-zone3-down":
         if (hasMain) volumeCommands.push("MVLDOWN1"); // Main zone volume down
         if (hasZone3) volumeCommands.push("VL3DOWN1"); // Zone 3 volume down
         break;
       case "zone2-zone3-up":
-        if (hasZone2) volumeCommands.push("ZVLUP1");  // Zone 2 volume up
-        if (hasZone3) volumeCommands.push("VL3UP1");  // Zone 3 volume up
+        if (hasZone2) volumeCommands.push("ZVLUP1"); // Zone 2 volume up
+        if (hasZone3) volumeCommands.push("VL3UP1"); // Zone 3 volume up
         break;
       case "zone2-zone3-down":
         if (hasZone2) volumeCommands.push("ZVLDOWN1"); // Zone 2 volume down
@@ -1015,75 +1026,82 @@ export class EiscpDriver extends EventEmitter {
   }
 
   private async handleMultiZoneMuting(data: string): Promise<void> {
-    const parts = data.toLowerCase().split(/[\s]+/).filter((item) => item !== "");
-    
+    const parts = data
+      .toLowerCase()
+      .split(/[\s]+/)
+      .filter((item) => item !== "");
+
     if (parts.length !== 2) {
       log.warn("%s Invalid multi-zone-muting command format: %s", integrationName, data);
       return;
     }
 
     const action = parts[1]; // e.g., "all-on", "all-off", "all-toggle", "main-zone2-on"
-    
+
     // Determine which zones are configured for this AVR
     const configuredZones = this.config.configuredZones || ["main"]; // default to main if not specified
     const hasMain = configuredZones.includes("main");
     const hasZone2 = configuredZones.includes("zone2");
     const hasZone3 = configuredZones.includes("zone3");
-    
+    const hasZone4 = configuredZones.includes("zone4");
+
     // Map action to zone-specific mute commands (conditionally based on configured zones)
     const muteCommands: string[] = [];
-    
+
     switch (action) {
       case "all-on":
-        if (hasMain) muteCommands.push("AMT01");   // Main zone mute on
-        if (hasZone2) muteCommands.push("ZMT01");  // Zone 2 mute on
-        if (hasZone3) muteCommands.push("MT301");  // Zone 3 mute on
+        if (hasMain) muteCommands.push("AMT01"); // Main zone mute on
+        if (hasZone2) muteCommands.push("ZMT01"); // Zone 2 mute on
+        if (hasZone3) muteCommands.push("MT301"); // Zone 3 mute on
+        if (hasZone4) muteCommands.push("MT401"); // Zone 4 mute on
         break;
       case "all-off":
-        if (hasMain) muteCommands.push("AMT00");   // Main zone mute off
-        if (hasZone2) muteCommands.push("ZMT00");  // Zone 2 mute off
-        if (hasZone3) muteCommands.push("MT300");  // Zone 3 mute off
+        if (hasMain) muteCommands.push("AMT00"); // Main zone mute off
+        if (hasZone2) muteCommands.push("ZMT00"); // Zone 2 mute off
+        if (hasZone3) muteCommands.push("MT300"); // Zone 3 mute off
+        if (hasZone4) muteCommands.push("MT400"); // Zone 4 mute off
         break;
       case "all-toggle":
-        if (hasMain) muteCommands.push("AMTTG");   // Main zone mute toggle
-        if (hasZone2) muteCommands.push("ZMTTG");  // Zone 2 mute toggle
-        if (hasZone3) muteCommands.push("MT3TG");  // Zone 3 mute toggle
+        if (hasMain) muteCommands.push("AMTTG"); // Main zone mute toggle
+        if (hasZone2) muteCommands.push("ZMTTG"); // Zone 2 mute toggle
+        if (hasZone3) muteCommands.push("MT3TG"); // Zone 3 mute toggle
+        if (hasZone4) muteCommands.push("MT4TG"); // Zone 4 mute toggle
         break;
       case "main-zone2-on":
-        if (hasMain) muteCommands.push("AMT01");   // Main zone mute on
-        if (hasZone2) muteCommands.push("ZMT01");  // Zone 2 mute on
+        if (hasMain) muteCommands.push("AMT01"); // Main zone mute on
+        if (hasZone2) muteCommands.push("ZMT01"); // Zone 2 mute on
         break;
       case "main-zone2-off":
-        if (hasMain) muteCommands.push("AMT00");   // Main zone mute off
-        if (hasZone2) muteCommands.push("ZMT00");  // Zone 2 mute off
+        if (hasMain) muteCommands.push("AMT00"); // Main zone mute off
+        if (hasZone2) muteCommands.push("ZMT00"); // Zone 2 mute off
         break;
       case "main-zone2-toggle":
-        if (hasMain) muteCommands.push("AMTTG");   // Main zone mute toggle
-        if (hasZone2) muteCommands.push("ZMTTG");  // Zone 2 mute toggle
+        if (hasMain) muteCommands.push("AMTTG"); // Main zone mute toggle
+        if (hasZone2) muteCommands.push("ZMTTG"); // Zone 2 mute toggle
         break;
       case "main-zone3-on":
-        if (hasMain) muteCommands.push("AMT01");   // Main zone mute on
-        if (hasZone3) muteCommands.push("MT301");  // Zone 3 mute on
+        if (hasMain) muteCommands.push("AMT01"); // Main zone mute on
+        if (hasZone3) muteCommands.push("MT301"); // Zone 3 mute on
         break;
       case "main-zone3-off":
-        if (hasMain) muteCommands.push("AMT00");   // Main zone mute off
-        if (hasZone3) muteCommands.push("MT300");  // Zone 3 mute off
+        if (hasMain) muteCommands.push("AMT00"); // Main zone mute off
+        if (hasZone3) muteCommands.push("MT300"); // Zone 3 mute off
         break;
       case "main-zone3-toggle":
-        if (hasMain) muteCommands.push("AMTTG");   // Main zone mute toggle
-        if (hasZone3) muteCommands.push("MT3TG");  // Zone 3 mute toggle
+        if (hasMain) muteCommands.push("AMTTG"); // Main zone mute toggle
+        if (hasZone3) muteCommands.push("MT3TG"); // Zone 3 mute toggle
         break;
       case "zone2-zone3-on":
-        if (hasZone2) muteCommands.push("ZMT01");  // Zone 2 mute on
-        if (hasZone3) muteCommands.push("MT301");  // Zone 3 mute on
+        if (hasZone2) muteCommands.push("ZMT01"); // Zone 2 mute on
+        if (hasZone3) muteCommands.push("MT301"); // Zone 3 mute on
         break;
       case "zone2-zone3-off":
-        if (hasZone2) muteCommands.push("ZMT00");  // Zone 2 mute off
-        if (hasZone3) muteCommands.push("MT300");  // Zone 3 mute off
+        if (hasZone2) muteCommands.push("ZMT00"); // Zone 2 mute off
+        if (hasZone3) muteCommands.push("MT300"); // Zone 3 mute off
         break;
       case "zone2-zone3-toggle":
-        if (hasZone2) muteCommands.push("ZMTTG");  // Zone 2 mute toggle
-        if (hasZone3) muteCommands.push("MT3TG");  // Zone 3 mute toggle
+        if (hasZone2) muteCommands.push("ZMTTG"); // Zone 2 mute toggle
+        if (hasZone3) muteCommands.push("MT3TG"); // Zone 3 mute toggle
         break;
       default:
         log.warn("%s Unknown multi-zone-muting action: %s", integrationName, action);
