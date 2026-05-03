@@ -47,10 +47,18 @@ const ZONE3_COMMAND_MAP: Record<string, string> = {
   SLI: "SL3",
   TUN: "TU3"
 };
+const ZONE4_COMMAND_MAP: Record<string, string> = {
+  MVL: "VL4",
+  PWR: "PW4",
+  AMT: "MT4",
+  SLI: "SL4",
+  TUN: "TU4"
+};
 
 // Reverse mappings (zone-specific -> main) for parsing incoming commands
 const ZONE2_REVERSE_MAP = Object.fromEntries(Object.entries(ZONE2_COMMAND_MAP).map(([k, v]) => [v, k]));
 const ZONE3_REVERSE_MAP = Object.fromEntries(Object.entries(ZONE3_COMMAND_MAP).map(([k, v]) => [v, k]));
+const ZONE4_REVERSE_MAP = Object.fromEntries(Object.entries(ZONE4_COMMAND_MAP).map(([k, v]) => [v, k]));
 
 interface Metadata {
   title?: string;
@@ -191,6 +199,8 @@ export class EiscpDriver extends EventEmitter {
       return ZONE2_COMMAND_MAP[prefix] || prefix;
     } else if (zone === "zone3") {
       return ZONE3_COMMAND_MAP[prefix] || prefix;
+    } else if (zone === "zone4") {
+      return ZONE4_COMMAND_MAP[prefix] || prefix;
     }
     return prefix;
   }
@@ -518,12 +528,15 @@ export class EiscpDriver extends EventEmitter {
     // Detect zone from command prefix
     // Zone 2: starts with Z (ZPW, ZVL, ZMT, SLZ) or ends with Z (TUZ)
     // Zone 3: ends with 3 (PW3, VL3, MT3, SL3, TU3)
+    // Zone 4: ends with 4 (PW4, VL4, MT4, SL4, TU4)
     if (command.charAt(0) === "Z" && command.length === 3) {
       result.zone = "zone2";
     } else if (command.charAt(2) === "Z" && command.length === 3) {
       result.zone = "zone2";
     } else if (command.charAt(2) === "3" && command.length === 3) {
       result.zone = "zone3";
+    } else if (command.charAt(2) === "4" && command.length === 3) {
+      result.zone = "zone4";
     }
 
     // Check for special command handler
@@ -539,6 +552,8 @@ export class EiscpDriver extends EventEmitter {
       lookupCommand = ZONE2_REVERSE_MAP[command] || command;
     } else if (result.zone === "zone3") {
       lookupCommand = ZONE3_REVERSE_MAP[command] || command;
+    } else if (result.zone === "zone4") {
+      lookupCommand = ZONE4_REVERSE_MAP[command] || command;
     }
 
     // Direct lookup instead of iterating all commands
@@ -952,6 +967,7 @@ export class EiscpDriver extends EventEmitter {
     const hasMain = configuredZones.includes("main");
     const hasZone2 = configuredZones.includes("zone2");
     const hasZone3 = configuredZones.includes("zone3");
+    const hasZone4 = configuredZones.includes("zone4");
 
     // Map action to zone-specific volume commands (conditionally based on configured zones)
     const volumeCommands: string[] = [];
@@ -961,11 +977,13 @@ export class EiscpDriver extends EventEmitter {
         if (hasMain) volumeCommands.push("MVLUP1"); // Main zone volume up
         if (hasZone2) volumeCommands.push("ZVLUP1"); // Zone 2 volume up
         if (hasZone3) volumeCommands.push("VL3UP1"); // Zone 3 volume up
+        if (hasZone4) volumeCommands.push("VL4UP1"); // Zone 4 volume up
         break;
       case "all-down":
         if (hasMain) volumeCommands.push("MVLDOWN1"); // Main zone volume down
         if (hasZone2) volumeCommands.push("ZVLDOWN1"); // Zone 2 volume down
         if (hasZone3) volumeCommands.push("VL3DOWN1"); // Zone 3 volume down
+        if (hasZone4) volumeCommands.push("VL4DOWN1"); // Zone 4 volume down
         break;
       case "main-zone2-up":
         if (hasMain) volumeCommands.push("MVLUP1"); // Main zone volume up
@@ -1025,6 +1043,7 @@ export class EiscpDriver extends EventEmitter {
     const hasMain = configuredZones.includes("main");
     const hasZone2 = configuredZones.includes("zone2");
     const hasZone3 = configuredZones.includes("zone3");
+    const hasZone4 = configuredZones.includes("zone4");
 
     // Map action to zone-specific mute commands (conditionally based on configured zones)
     const muteCommands: string[] = [];
@@ -1034,16 +1053,19 @@ export class EiscpDriver extends EventEmitter {
         if (hasMain) muteCommands.push("AMT01"); // Main zone mute on
         if (hasZone2) muteCommands.push("ZMT01"); // Zone 2 mute on
         if (hasZone3) muteCommands.push("MT301"); // Zone 3 mute on
+        if (hasZone4) muteCommands.push("MT401"); // Zone 4 mute on
         break;
       case "all-off":
         if (hasMain) muteCommands.push("AMT00"); // Main zone mute off
         if (hasZone2) muteCommands.push("ZMT00"); // Zone 2 mute off
         if (hasZone3) muteCommands.push("MT300"); // Zone 3 mute off
+        if (hasZone4) muteCommands.push("MT400"); // Zone 4 mute off
         break;
       case "all-toggle":
         if (hasMain) muteCommands.push("AMTTG"); // Main zone mute toggle
         if (hasZone2) muteCommands.push("ZMTTG"); // Zone 2 mute toggle
         if (hasZone3) muteCommands.push("MT3TG"); // Zone 3 mute toggle
+        if (hasZone4) muteCommands.push("MT4TG"); // Zone 4 mute toggle
         break;
       case "main-zone2-on":
         if (hasMain) muteCommands.push("AMT01"); // Main zone mute on

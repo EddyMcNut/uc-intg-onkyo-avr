@@ -375,7 +375,8 @@ export default class SetupHandler {
             items: [
               { id: "1", label: { en: "1 zone (Main only)" } },
               { id: "2", label: { en: "2 zones (Main + Zone 2)" } },
-              { id: "3", label: { en: "3 zones (Main + Zone 2 + Zone 3)" } }
+              { id: "3", label: { en: "3 zones (Main + Zone 2 + Zone 3)" } },
+              { id: "4", label: { en: "4 zones (Main + Zone 2 + Zone 3 + Zone 4)" } }
             ]
           }
         }
@@ -647,7 +648,7 @@ export default class SetupHandler {
     const zoneCountValue = ((value) => {
       const parsed = parseInt(String(value), 10);
       if (isNaN(parsed)) return 1;
-      return parsed >= 1 && parsed <= 3 ? parsed : 1;
+      return parsed >= 1 && parsed <= 4 ? parsed : 1;
     })(input.zoneCount);
 
     const basePayload: any = {
@@ -670,6 +671,7 @@ export default class SetupHandler {
     const zones: AvrZone[] = ["main"];
     if (zoneCountValue >= 2) zones.push("zone2");
     if (zoneCountValue >= 3) zones.push("zone3");
+    if (zoneCountValue >= 4) zones.push("zone4");
 
     const errors: string[] = [];
     const normalizedAvrs: AvrConfig[] = [];
@@ -800,7 +802,8 @@ export default class SetupHandler {
               items: [
                 { id: "1", label: { en: "1 zone (Main only)" } },
                 { id: "2", label: { en: "2 zones (Main + Zone 2)" } },
-                { id: "3", label: { en: "3 zones (Main + Zone 2 + Zone 3)" } }
+                { id: "3", label: { en: "3 zones (Main + Zone 2 + Zone 3)" } },
+                { id: "4", label: { en: "4 zones (Main + Zone 2 + Zone 3 + Zone 4)" } }
               ]
             }
           }

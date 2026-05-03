@@ -88,7 +88,7 @@ export function parseBoolean(value: unknown, defaultValue: boolean): boolean {
 }
 
 /** Valid zone identifiers */
-export type AvrZone = "main" | "zone2" | "zone3";
+export type AvrZone = "main" | "zone2" | "zone3" | "zone4";
 
 /**
  * Construct an entity ID from model, host/ip, and zone.
@@ -196,7 +196,7 @@ export class ConfigManager {
 
   /** Validate zone string and return typed zone or default */
   private static validateZone(zone: string | undefined): AvrZone {
-    if (zone === "main" || zone === "zone2" || zone === "zone3") {
+    if (zone === "main" || zone === "zone2" || zone === "zone3" || zone === "zone4") {
       return zone;
     }
     return "main";
@@ -354,8 +354,8 @@ export class ConfigManager {
 
     // zone
     const zone = avr.zone ?? "main";
-    if (!["main", "zone2", "zone3"].includes(zone)) {
-      errors.push('zone must be one of "main", "zone2", "zone3"');
+    if (!["main", "zone2", "zone3", "zone4"].includes(zone)) {
+      errors.push('zone must be one of "main", "zone2", "zone3", "zone4"');
     }
 
     // albumArtURL

@@ -206,6 +206,8 @@ export class CommandSender {
               volumePrefix = "ZVL";
             } else if (zone === "zone3") {
               volumePrefix = "VL3";
+            } else if (zone === "zone4") {
+              volumePrefix = "VL4";
             }
             await this.eiscp.raw(`${volumePrefix}${hexVolume}`);
           }
