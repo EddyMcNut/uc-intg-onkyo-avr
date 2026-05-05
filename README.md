@@ -61,6 +61,7 @@ Example activities:
 - [AppleTV](./docs/atv.md)
 - [DAB Radio](./docs/dab.md)
 - [TuneIn Radio](./docs/tunein.md)
+- [Tidal](./docs/tidal.md)
 - Make sure that you add your Activities to an [Activity Group](./docs/activitygroup.md).
 - `Home` \ `Customise your remote` Add your new Activity to a page and now you can give it a try on the awesome Unfolded Circle Remote!
 - or, when not created an activity yet: `Home` \ `Customise your remote` and just add your AVR, in that case physical buttons are mapped.
