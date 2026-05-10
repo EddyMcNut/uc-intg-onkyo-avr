@@ -5,7 +5,7 @@ import { Select, SelectStates } from "@unfoldedcircle/integration-api";
 import { eiscpMappings } from "./eiscp-mappings.js";
 import { getCompatibleListeningModes } from "./listeningModeFilters.js";
 import { ConfigManager, buildEntityId } from "./configManager.js";
-import { browseTuneInMedia } from "./mediaBrowser.js";
+import { browseMedia } from "./mediaBrowser.js";
 
 export default class EntityRegistrar {
   constructor() {}
@@ -121,7 +121,7 @@ export default class EntityRegistrar {
       }
     );
     if (cmdHandler) mediaPlayerEntity.setCmdHandler(cmdHandler);
-    mediaPlayerEntity.browse = async (options: uc.BrowseOptions) => browseTuneInMedia(avrEntry, options);
+      mediaPlayerEntity.browse = async (options: uc.BrowseOptions) => browseMedia(avrEntry, options);
     return mediaPlayerEntity;
   }
 

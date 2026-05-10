@@ -117,6 +117,14 @@ function getTuneInRootItemCount(presetCount: number): number {
   return presetCount;
 }
 
+function withTuneInPaging(options: uc.BrowseOptions): uc.BrowseOptions {
+  const paging = options.paging ?? uc.Paging.default();
+  return {
+    ...options,
+    paging: new uc.Paging(paging.page, Math.min(paging.limit, 50))
+  };
+}
+
 function createRootItem(entityId: string, paging: uc.Paging): uc.BrowseMediaItem {
   const presets = getTuneInPresets(entityId);
   const items = presets.map((preset) => createTuneInPresetItem(preset)).slice(paging.offset, paging.offset + paging.limit);
@@ -130,10 +138,26 @@ function createRootItem(entityId: string, paging: uc.Paging): uc.BrowseMediaItem
   });
 }
 
-export async function browseTuneInMedia(entityId: string, options: uc.BrowseOptions): Promise<uc.StatusCodes | uc.BrowseResult> {
-  if (!isMediaBrowsingAvailable(entityId)) {
+export async function browseMedia(entityId: string, options: uc.BrowseOptions): Promise<uc.StatusCodes | uc.BrowseResult> {
+  if (isMediaBrowsingAvailable(entityId)) {
+    const subSource = avrStateManager.getSubSource(entityId);
+    switch (subSource) {
+      case "tunein":
+        return await browseTuneInMedia(entityId, withTuneInPaging(options));
+      default:
+        log.debug("%s [%s] unsupported media browsing for subSource [%s]", integrationName, entityId, subSource);
+        return uc.StatusCodes.NotFound;
+    }
+  } else {
+    log.debug("%s [%s] ignoring browse request outside NET TuneIn", integrationName, entityId);
     return uc.StatusCodes.NotFound;
   }
+}
+
+export async function browseTuneInMedia(entityId: string, options: uc.BrowseOptions): Promise<uc.StatusCodes | uc.BrowseResult> {
+  // if (!isMediaBrowsingAvailable(entityId)) {
+  //   return uc.StatusCodes.NotFound;
+  // }
 
   const tuneInPresets = getTuneInPresets(entityId);
   if (!options.media_id || options.media_id === TUNEIN_ROOT_ID) {
