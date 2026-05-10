@@ -5,5 +5,3 @@ This integration aims to use human readable commands, like `listening-mode strai
 ![](../screenshots/raw.png)
 
 Please let me know in [Discord](https://discord.com/channels/553671366411288576/1405962064521855127) what commands you have found, I will try to add them to this integration.
-
-[back to main README](../README.md#raw-messages)

@@ -14,4 +14,3 @@ In an Activity goto `User interface`, add `Text Button` and select `Input source
 
   ![](../screenshots/dimmer.png)
 
-[back to main README](../README.md#cheats)

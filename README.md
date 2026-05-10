@@ -76,13 +76,11 @@ Example activities:
 
 [Album art](./docs/album-art.md)
 
-## Cheats
-
-[Cheats](./docs/cheats.md)
-
-## Input source
+## Input source and Cheats
 
 [Input source](./docs/input-selector.md)
+
+[Cheats](./docs/cheats.md)
 
 ## Volume
 
@@ -90,11 +88,9 @@ Example activities:
 
 [Slider](./docs/volume.md#slider)
 
-## Sensors
+## Sensors and Selects
 
 [Sensors](./docs/sensor.md)
-
-## Selects
 
 [Selects](./docs/select.md)
 
@@ -102,11 +98,9 @@ Example activities:
 
 [Listening modes](./docs/listening-modes.md)
 
-## Multiple AVRs
+## Multiple AVRs and Zones
 
 [Multiple AVRs](./docs/multiple-avrs.md)
-
-## Multiple zones
 
 [Multiple zones](./docs/multiple-zones.md)
 
@@ -114,11 +108,9 @@ Example activities:
 
 [Raw messages](./docs/raw.md)
 
-## Backup and Restore
+## Backup, Restore, Logs
 
 [Backup and Restore](./docs/backup-restore.md)
-
-## Collect logs
 
 [Collect logs](./docs/collect-logs.md)
 

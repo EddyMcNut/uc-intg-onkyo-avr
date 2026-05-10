@@ -24,4 +24,3 @@ Please consider the behavior of the original Onkyo app and your AVR: in most cas
 
 _note 2: when you have configured multiple zones, it takes a couple of seconds longer to recover from a reboot of the UC Remote compared to just having only the main zone configured_
 
-[back to main README](../README.md#multiple-zones)

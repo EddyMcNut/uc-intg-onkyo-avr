@@ -63,6 +63,11 @@ class AvrStateManager {
     return this.getState(entityId).powerState;
   }
 
+  /** Get current playback status for an entity */
+  getPlaybackStatus(entityId: string): string {
+    return this.getState(entityId).playbackStatus;
+  }
+
   /** Set audio format for an entity, returns true if changed */
   setAudioFormat(entityId: string, audioFormat: string): boolean {
     const state = this.getState(entityId);

@@ -21,4 +21,3 @@ This integration has been made possible by:
 - [mitchcapper](https://github.com/mitchcapper/onkyo-eiscp/blob/importer_rewrite_proto_upgrade/eiscp/commands.py) for collecting more eISCP commands
 - [tomoffel](https://github.com/EddyMcNut/uc-intg-onkyo-avr/tree/main/eiscpdocs) for collecting more eISCP commands
 
-[back to main README](../README.md#kudos)

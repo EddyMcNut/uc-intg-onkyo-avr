@@ -18,4 +18,3 @@ Just assign the volume command to the short-press in webconfigurator, **don't** 
 
 ![](../screenshots/volume-up.png)
 
-[back to main README](../README.md#known-issues-and-solutions)

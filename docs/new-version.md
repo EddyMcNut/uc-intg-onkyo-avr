@@ -28,4 +28,3 @@ If your AVR was autodiscovered, the name will be the same when you let it be aut
 
 [Migrate from pre-v.0.7.0 to v.0.7.0+](v070-migration.md)
 
-[back to main README](../README.md#install-new-version)

@@ -56,4 +56,3 @@ If your UC Remote is running firmware v2.9.1 or higher, the mediawidget supports
 
 _note: after installing a new version of the integration or after a reboot of the remote, it might be needed to close screen on the remote and enter the already active activity again to get the MediaWidget to work_
 
-[back to main README](../README.md#installation-and-usage)

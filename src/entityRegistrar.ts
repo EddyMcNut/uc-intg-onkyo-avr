@@ -4,11 +4,56 @@ import * as uc from "@unfoldedcircle/integration-api";
 import { Select, SelectStates } from "@unfoldedcircle/integration-api";
 import { eiscpMappings } from "./eiscp-mappings.js";
 import { getCompatibleListeningModes } from "./listeningModeFilters.js";
-import { ConfigManager, buildEntityId } from "./configManager.js";
-import { browseMedia } from "./mediaBrowser.js";
+import { ConfigManager, AVR_DEFAULTS, buildEntityId } from "./configManager.js";
+import { browseMedia, isTidalMainMenuRequest, resolveTidalMenuOption, TIDAL_ROOT_ID, TIDAL_ROOT_TYPE } from "./mediaBrowser.js";
+import {
+  listTidalMenuOptions,
+  markTidalListModeActive,
+  markTraceNextTidalSelectionAfterMainMenu,
+  resetTidalBrowseState,
+  setTidalMainMenuShortcut
+} from "./tidalBrowserStore.js";
+import log from "./loggers.js";
+import { delay } from "./utils.js";
+
+const integrationName = "entityRegistrar:";
 
 export default class EntityRegistrar {
   constructor() {}
+
+  private buildTidalMenuSignature(entityId: string): string {
+    const options = listTidalMenuOptions(entityId);
+    return options.map((item) => `${item.menuIndex}:${item.title}`).join("|");
+  }
+
+  /**
+   * Wait until the Tidal menu cache changes from beforeSignature AND then stabilizes
+   * (no further changes for a full tick). This ensures the full NLS stream from the
+   * AVR has been ingested before returning browse results.
+   */
+  private async waitForTidalMenuStable(entityId: string, beforeSignature: string, menuDelay: number): Promise<void> {
+    const tick = Math.max(120, Math.floor(menuDelay / 2));
+    const deadline = Date.now() + Math.max(menuDelay * 3, 1800);
+    let lastSignature = beforeSignature;
+    let changed = false;
+
+    do {
+      await delay(tick);
+      const current = this.buildTidalMenuSignature(entityId);
+      if (!changed) {
+        if (current && current !== lastSignature) {
+          changed = true;
+          lastSignature = current;
+        }
+      } else {
+        // Signature already changed once — wait for it to stop changing
+        if (current === lastSignature) {
+          break; // stable
+        }
+        lastSignature = current;
+      }
+    } while (Date.now() < deadline);
+  }
 
   /**
    * Build a user-facing base name from an AVR entry id.
@@ -121,7 +166,66 @@ export default class EntityRegistrar {
       }
     );
     if (cmdHandler) mediaPlayerEntity.setCmdHandler(cmdHandler);
-      mediaPlayerEntity.browse = async (options: uc.BrowseOptions) => browseMedia(avrEntry, options);
+    mediaPlayerEntity.browse = async (options: uc.BrowseOptions) => {
+      const tidalMainMenu = isTidalMainMenuRequest(options.media_id, options.media_type);
+      const tidalSelection = resolveTidalMenuOption(options.media_id, options.media_type);
+      
+      if (tidalMainMenu && cmdHandler) {
+        // Main Tidal Menu selection
+        resetTidalBrowseState(avrEntry);
+        markTraceNextTidalSelectionAfterMainMenu(avrEntry);
+        log.info("%s [%s] Main Tidal Menu selected; next Tidal selection will be traced", integrationName, avrEntry);
+        await cmdHandler(mediaPlayerEntity, uc.MediaPlayerCommands.PlayMedia, {
+          media_id: String(options.media_id),
+          media_type: TIDAL_ROOT_TYPE
+        });
+
+        const beforeSignature = this.buildTidalMenuSignature(avrEntry);
+
+        const cfg = ConfigManager.get();
+        const avr = cfg?.avrs?.find((a) => buildEntityId(a.model, a.ip, a.zone) === avrEntry);
+        const menuDelay = avr?.netMenuDelay ?? AVR_DEFAULTS.netMenuDelay;
+
+        await this.waitForTidalMenuStable(avrEntry, beforeSignature, menuDelay);
+        markTidalListModeActive(avrEntry);
+
+        return browseMedia(avrEntry, {
+          ...options,
+          media_id: TIDAL_ROOT_ID,
+          media_type: TIDAL_ROOT_TYPE
+        });
+      }
+      
+      if (tidalSelection && cmdHandler) {
+        setTidalMainMenuShortcut(avrEntry, true);
+        
+        // Handle both menu folders and songs through PlayMedia
+        await cmdHandler(mediaPlayerEntity, uc.MediaPlayerCommands.PlayMedia, {
+          media_id: tidalSelection.mediaId,
+          media_type: TIDAL_ROOT_TYPE
+        });
+
+        // Only wait for signature stability if this is a menu folder, not a song
+        if (tidalSelection.isBrowsable) {
+          const beforeSignature = this.buildTidalMenuSignature(avrEntry);
+
+          const cfg = ConfigManager.get();
+          const avr = cfg?.avrs?.find((a) => buildEntityId(a.model, a.ip, a.zone) === avrEntry);
+          const menuDelay = avr?.netMenuDelay ?? AVR_DEFAULTS.netMenuDelay;
+
+          await this.waitForTidalMenuStable(avrEntry, beforeSignature, menuDelay);
+          markTidalListModeActive(avrEntry);
+        }
+
+        return browseMedia(avrEntry, {
+          ...options,
+          media_id: TIDAL_ROOT_ID,
+          media_type: TIDAL_ROOT_TYPE
+        });
+      }
+
+      return browseMedia(avrEntry, options);
+    };
     return mediaPlayerEntity;
   }
 

@@ -369,24 +369,24 @@ export class EiscpDriver extends EventEmitter {
   }
 
   private handleNLT(value: string, result: CommandResult): CommandResult {
-    // NLT format: hex data followed by ASCII text (e.g., "0E01000000090100FF0E00TuneIn Radio")
-    // Extract ASCII text portion after hex prefix
-    const textMatch = value.match(/[A-Z][a-z]/); // Find where actual text starts
-    if (!textMatch || textMatch.index === undefined) {
-      return result; // No text found, skip
-    }
-
-    const text = value.substring(textMatch.index).trim();
-    const entityId = buildEntityId(this.config.model!, this.config.host!, result.zone);
-    const currentSource = avrStateManager.getSource(entityId);
-
-    // Only process if source is NET
-    if (currentSource !== "net") {
+    // NLT format: hex payload followed by ASCII text. The text may be uppercase (e.g. "TIDAL"),
+    // so detect the first non-hex character instead of relying on title casing.
+    const asciiStart = value.search(/[^0-9A-Fa-f]/);
+    if (asciiStart === -1) {
       return result;
     }
 
+    const text = value.substring(asciiStart).replace(/\s+%s$/i, "").trim();
+    if (!text) {
+      return result;
+    }
+
+    const entityId = buildEntityId(this.config.model!, this.config.host!, result.zone);
+    const currentSource = avrStateManager.getSource(entityId);
+
     // Check if the title contains a known network service name
-    const detectedService = NETWORK_SERVICES.find((service) => text.includes(service));
+    const normalizedText = text.toLowerCase();
+    const detectedService = NETWORK_SERVICES.find((service) => normalizedText.includes(service.toLowerCase()));
     if (detectedService) {
       const currentSubSource = avrStateManager.getSubSource(entityId);
       if (currentSubSource !== detectedService.toLowerCase()) {
@@ -396,7 +396,7 @@ export class EiscpDriver extends EventEmitter {
       }
     }
 
-    if (text.trim().toLowerCase() === "my presets") {
+    if (currentSource === "net" && normalizedText === "my presets") {
       result.command = "NLT_CONTEXT";
       result.argument = "My Presets";
       return result;
@@ -878,6 +878,12 @@ export class EiscpDriver extends EventEmitter {
 
     log.debug("%s Sending %s (NET input for zone %s) before %s", integrationName, netCommand, zone, nssCode);
     await this.raw(netCommand); // Select NET input first
+    await delay(this.config.netMenuDelay ?? 2500); // Wait for AVR to switch/acknowledge NET input
+
+    // NTCTOP exits any active sub-service (e.g. Spotify) and returns to the NET root menu.
+    // Without this, if the AVR was already on NET/Spotify, SLI2B is a no-op and NLSI
+    // would select from Spotify's menu instead of the NET top-level service list.
+    await this.raw("NTCTOP");
     await delay(this.config.netMenuDelay ?? 2500); // Wait for AVR to fully load NET menu
 
     log.debug("%s Sending network service command: %s", integrationName, nssCode);

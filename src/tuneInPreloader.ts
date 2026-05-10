@@ -10,6 +10,7 @@ type PhysicalAvrIdResolver = (entityId: string) => string;
 export class TuneInPreloader {
   private readonly tuneInPreloadInFlight = new Set<string>();
   private tuneInListSequence = 0;
+  private abortRequested = false;
 
   constructor(
     private readonly eiscpInstance: EiscpDriver,
@@ -37,6 +38,7 @@ export class TuneInPreloader {
 
     this.tuneInPreloadInFlight.add(physicalAvrId);
     const menuDelay = this.eiscpInstance["config"]?.netMenuDelay ?? 2500;
+      this.abortRequested = false;
     const myPresetsPosition = String(this.eiscpInstance["config"]?.tuneinPresetPosition ?? 1).padStart(5, "0");
     const scanDelay = Math.max(200, Math.min(menuDelay || 0, 1000));
 
@@ -58,6 +60,10 @@ export class TuneInPreloader {
       const maxStagnantSteps = 12;
 
       for (let step = 0; step < 40 && (step < minimumScrollSteps || stagnantSteps < maxStagnantSteps); step += 1) {
+        if (this.abortRequested) {
+          log.info("%s [%s] preload aborted at step %d", integrationName, entityId, step);
+          break;
+        }
         await this.eiscpInstance.raw("NTCDOWN");
         await delay(scanDelay);
 
@@ -83,5 +89,18 @@ export class TuneInPreloader {
     } finally {
       this.tuneInPreloadInFlight.delete(physicalAvrId);
     }
+  }
+
+  /**
+   * Aborts an in-flight preload for this AVR. Returns true if a preload was actually
+   * running (and has been flagged to stop), false if nothing was in flight.
+   */
+  abortPreload(entityId: string): boolean {
+    const physicalAvrId = this.resolvePhysicalAvrId(entityId);
+    if (this.tuneInPreloadInFlight.has(physicalAvrId)) {
+      this.abortRequested = true;
+      return true;
+    }
+    return false;
   }
 }

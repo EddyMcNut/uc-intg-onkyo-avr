@@ -6,7 +6,7 @@ This integration will try to collect the album art, artist, title and album. All
 
 ### Prerequisite: Add your Tidal account to the AVR
 
-Use the _Controller app of your AVR_ to logon to Tidal, these examples are of the Onkyo Controller App and a TX-RZ50:
+Use the AVR menu/settings or _Controller app of your AVR_ to logon to Tidal, these examples are of the Onkyo Controller App and a TX-RZ50:
 - select source: NET
 - select subsource: Tidal
 
@@ -60,5 +60,3 @@ If `input-selector tidal` does not work, check the manual of your AVR to see if 
 - your AVR _does_ have a Tidal input: run setup of this integration again and increase the value for 'NET sub-source selection delay'
 - your AVR does _not_ have a Tidal input, just try `input-selector net`, see [input-selector](./input-selector.md#net) for more info
 
-
-[back to main README](../README.md#installation-and-usage)

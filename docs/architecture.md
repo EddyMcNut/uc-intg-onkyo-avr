@@ -228,5 +228,3 @@ The integration logs extensively to help troubleshoot issues:
 - **Raw protocol**: Optional verbose logging of raw eISCP messages
 
 Log statements use entity ID prefix for multi-AVR/multi-zone identification.
-
-[back to main README](../README.md#reported-to-work-on-different-brands-and-models)

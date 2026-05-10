@@ -95,4 +95,3 @@ Assign `multi-zone-muting all-toggle` to the muting button to mute all comfigure
 
 Lookup `multi-zone-muting` in the [JSON](../src/eiscp-commands.ts) to see the available options, for example `zone2-zone3-toggle` to toggle zones2 and 3 but not the main zone.
 
-[back to main README](../README.md#volume)

@@ -94,6 +94,14 @@ export class CommandReceiver {
     this.zoneAgnosticProcessor.updateConfig(config);
   }
 
+  /**
+   * Aborts an in-flight TuneIn preload for the given entity's AVR.
+   * Returns true if a preload was running and has been flagged to stop.
+   */
+  public abortTuneInPreload(entityId: string): boolean {
+    return this.zoneAgnosticProcessor.abortTuneInPreload(entityId);
+  }
+
   private async updateListeningModeOptionsForAudioFormat(zoneEntityId: string, audioInputValue: string): Promise<void> {
     const audioFormatType = detectAudioFormatType(audioInputValue);
     const formatChanged = avrStateManager.setAudioFormat(zoneEntityId, audioFormatType);
