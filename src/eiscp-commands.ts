@@ -32,9 +32,15 @@ export const eiscpCommands = {
         ZM3ON: { name: "main-zone3-on", description: "sets Audio Muting On for main and zone3" },
         ZM3OFF: { name: "main-zone3-off", description: "sets Audio Muting Off for main and zone3" },
         ZM3TG: { name: "main-zone3-toggle", description: "sets Audio Muting Toggle for main and zone3" },
+        ZM4ON: { name: "main-zone4-on", description: "sets Audio Muting On for main and zone4" },
+        ZM4OFF: { name: "main-zone4-off", description: "sets Audio Muting Off for main and zone4" },
+        ZM4TG: { name: "main-zone4-toggle", description: "sets Audio Muting Toggle for main and zone4" },
         Z23ON: { name: "zone2-zone3-on", description: "sets Audio Muting On for zone2 and zone3" },
         Z23OFF: { name: "zone2-zone3-off", description: "sets Audio Muting Off for zone2 and zone3" },
-        Z23TG: { name: "zone2-zone3-toggle", description: "sets Audio Muting Toggle for zone2 and zone3" }
+        Z23TG: { name: "zone2-zone3-toggle", description: "sets Audio Muting Toggle for zone2 and zone3" },
+        Z234ON: { name: "zone2-zone3-zone4-on", description: "sets Audio Muting On for zone2, zone3, and zone4" },
+        Z234OFF: { name: "zone2-zone3-zone4-off", description: "sets Audio Muting Off for zone2, zone3, and zone4" },
+        Z234TG: { name: "zone2-zone3-zone4-toggle", description: "sets Audio Muting Toggle for zone2, zone3, and zone4" }
       }
     },
     SPA: {
@@ -104,8 +110,12 @@ export const eiscpCommands = {
         ZM2DOWN1: { name: "main-zone2-down", description: "sets Volume Level Down for main and zone2 1dB step" },
         ZM3UP1: { name: "main-zone3-up", description: "sets Volume Level Up for main and zone3 1dB step" },
         ZM3DOWN1: { name: "main-zone3-down", description: "sets Volume Level Down for main and zone3 1dB step" },
+        ZM4UP1: { name: "main-zone4-up", description: "sets Volume Level Up for main and zone4 1dB step" },
+        ZM4DOWN1: { name: "main-zone4-down", description: "sets Volume Level Down for main and zone4 1dB step" },
         Z23UP1: { name: "zone2-zone3-up", description: "sets Volume Level Up for zone2 and zone3 1dB step" },
-        Z23DOWN1: { name: "zone2-zone3-down", description: "sets Volume Level Down for zone2 and zone3 1dB step" }
+        Z23DOWN1: { name: "zone2-zone3-down", description: "sets Volume Level Down for zone2 and zone3 1dB step" },
+        Z234UP1: { name: "zone2-zone3-zone4-up", description: "sets Volume Level Up for zone2, zone3, and zone4 1dB step" },
+        Z234DOWN1: { name: "zone2-zone3-zone4-down", description: "sets Volume Level Down for zone2, zone3, and zone4 1dB step" }
       }
     },
     TFR: {
