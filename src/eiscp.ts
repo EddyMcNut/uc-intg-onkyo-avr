@@ -114,6 +114,7 @@ export class EiscpDriver extends EventEmitter {
   private sendQueue: Promise<void> = Promise.resolve();
   private receiveQueue: Promise<void> = Promise.resolve();
   private currentMetadata: Metadata = {};
+  private tcpBuffer: Buffer = Buffer.alloc(0);
 
   /** Map of special command handlers for complex parsing logic */
   private readonly commandHandlers: Record<string, CommandHandler> = {
@@ -725,10 +726,12 @@ export class EiscpDriver extends EventEmitter {
     this.eiscp = net.connect(port, this.config.host!);
     this.eiscp
       .on("connect", () => {
+        this.tcpBuffer = Buffer.alloc(0); // Clear any stale bytes from a previous connection.
         this.is_connected = true;
         this.emit("connect"); // Emit connect event for waitForConnect()
       })
       .on("close", () => {
+        this.tcpBuffer = Buffer.alloc(0);
         const wasConnected = this.is_connected;
         this.is_connected = false;
         if (wasConnected) {
@@ -745,7 +748,35 @@ export class EiscpDriver extends EventEmitter {
         this.eiscp?.destroy();
       })
       .on("data", (data: Buffer) => {
-        for (const iscp_message of this.eiscp_packet_extract_all(data)) {
+        // Accumulate into a stream buffer — ISCP frames can be split across TCP segments.
+        this.tcpBuffer = Buffer.concat([this.tcpBuffer, data]);
+
+        let offset = 0;
+        while (offset + 16 <= this.tcpBuffer.length) {
+          // Verify ISCP magic at current offset.
+          if (this.tcpBuffer.toString("ascii", offset, offset + 4) !== "ISCP") {
+            // Out of sync — advance one byte and retry.
+            offset++;
+            continue;
+          }
+
+          const headerSize = this.tcpBuffer.readUInt32BE(offset + 4);
+          const dataSize = this.tcpBuffer.readUInt32BE(offset + 8);
+          if (headerSize < 16 || dataSize < 4) {
+            offset++;
+            continue;
+          }
+
+          const frameEnd = offset + headerSize + dataSize;
+          if (frameEnd > this.tcpBuffer.length) {
+            // Incomplete frame — wait for more TCP data.
+            break;
+          }
+
+          // Extract the complete ISC message (strip "!1" prefix and "\r\n" suffix).
+          const iscp_message = this.tcpBuffer.toString("ascii", offset + headerSize + 2, frameEnd - 2);
+          offset = frameEnd;
+
           let command = iscp_message.slice(0, 3);
           let value = iscp_message.slice(3);
 
@@ -784,6 +815,9 @@ export class EiscpDriver extends EventEmitter {
             this.emit("data", dataPayload);
           }
         }
+
+        // Keep any unconsumed bytes for the next data event.
+        this.tcpBuffer = offset > 0 ? this.tcpBuffer.slice(offset) : this.tcpBuffer;
       });
     return { model: this.config.model!, host: this.config.host!, port: this.config.port! };
   }

@@ -9,7 +9,7 @@ import { createTuneInBackdrop, getOrCreateTuneInThumbnail } from "./tuneInThumbn
 import { createTidalBackdrop, getOrCreateTidalThumbnail } from "./tidalThumbnails.js";
 
 const integrationName = "mediaBrowser:";
-const DEFAULT_BROWSE_PAGE_SIZE = 500;
+const DEFAULT_BROWSE_PAGE_SIZE = 25;
 const MAX_BROWSE_PAGE_SIZE = 500;
 
 export const TUNEIN_ROOT_ID = "tunein:root";
@@ -243,17 +243,13 @@ function getTuneInRootItemCount(presetCount: number): number {
 }
 
 function withTuneInPaging(options: uc.BrowseOptions): uc.BrowseOptions {
-  return {
-    ...options,
-    paging: new uc.Paging(options.paging?.page ?? 1, MAX_BROWSE_PAGE_SIZE)
-  };
+  if (options.paging) return options;
+  return { ...options, paging: new uc.Paging(1, DEFAULT_BROWSE_PAGE_SIZE) };
 }
 
 function withTidalPaging(options: uc.BrowseOptions): uc.BrowseOptions {
-  return {
-    ...options,
-    paging: new uc.Paging(options.paging?.page ?? 1, MAX_BROWSE_PAGE_SIZE)
-  };
+  if (options.paging) return options;
+  return { ...options, paging: new uc.Paging(1, DEFAULT_BROWSE_PAGE_SIZE) };
 }
 
 function createRootItem(entityId: string, paging: uc.Paging): uc.BrowseMediaItem {

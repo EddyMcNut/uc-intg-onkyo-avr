@@ -67,8 +67,15 @@ export default class EntityRegistrar {
   }
 
   /**
-   * Send NLAL requests for Tidal to retrieve list items as XML — same mechanism TuneIn uses.
-   * This runs in the background after the browse callback already returned the first 10 items.
+   * Send NLAL requests for Tidal to retrieve list items as XML.
+   *
+   * Phase 1 (awaited by caller): collects all items up to the count the AVR initially
+   * reported in its first NLT — typically 50.  The browse callback awaits this so that
+   * the remote sees those items immediately in the first browse response.
+   *
+   * Phase 2 (background): Tidal uses two-phase NLT loading — the AVR emits a second NLT
+   * with the real total once the service finishes buffering.  Phase 2 fires in the
+   * background after the browse has already returned, fetching any additional items.
    */
   private async harvestTidalListItems(
     entityId: string,
@@ -78,13 +85,12 @@ export default class EntityRegistrar {
     // Guard: don't start a second harvest if one is already running.
     if (getTidalHarvestMode(entityId)) return;
 
-    const total = getTidalTotalListItemCount(entityId);
-    if (total <= 0) return;
+    const initialTotal = getTidalTotalListItemCount(entityId);
+    if (initialTotal <= 0) return;
 
     const currentCount = listTidalMenuOptions(entityId).length;
-    if (currentCount >= total) return;
+    if (currentCount >= initialTotal) return;
 
-    const countHex = Math.min(total, 0x03e7).toString(16).toUpperCase().padStart(4, "0"); // up to 999
     const scanDelay = Math.max(150, Math.min(Math.floor(menuDelay / 3), 400));
 
     // Use the layer number from the NLT ll field — it's the exact layer NLAL needs.
@@ -94,22 +100,67 @@ export default class EntityRegistrar {
       ? [knownLayer, knownLayer - 1, knownLayer + 1].filter((l) => l > 0).map((l) => l.toString(16).toUpperCase().padStart(2, "0"))
       : ["02", "01", "03"];
 
-    log.info("%s [%s] Tidal NLAL harvest: need %d items, have %d, trying layers %s", integrationName, entityId, total, currentCount, layersToTry.join(","));
+    log.info("%s [%s] Tidal NLAL harvest: need %d items, have %d, trying layers %s", integrationName, entityId, initialTotal, currentCount, layersToTry.join(","));
 
     setTidalHarvestMode(entityId, true);
     try {
-      for (const layer of layersToTry) {
-        await rawSend(`NLAL${this.nextTidalListSequence()}${layer}0000${countHex}`);
-        await delay(scanDelay);
-        if (listTidalMenuOptions(entityId).length >= total) break;
-      }
-      // Extra wait for the AVR to respond with all NLA XML packets.
-      await delay(scanDelay * 2);
-    } finally {
+      // Phase 1 (awaited): fetch items up to the initially reported total.
+      await this.harvestNlalChunks(entityId, layersToTry, scanDelay, rawSend);
+    } catch (e) {
       setTidalHarvestMode(entityId, false);
+      throw e;
     }
 
-    log.info("%s [%s] Tidal NLAL harvest complete: %d/%d items", integrationName, entityId, listTidalMenuOptions(entityId).length, total);
+    // Phase 1 done — caller proceeds to return the browse response with these items.
+    // Phase 2 runs in the background: wait for a potential second NLT that raises the
+    // total (e.g. 50 → 639), then fetch the remaining items chunk by chunk.
+    void (async () => {
+      try {
+        await delay(scanDelay * 2);
+        const updatedTotal = getTidalTotalListItemCount(entityId);
+        const collectedAfterPhase1 = listTidalMenuOptions(entityId).length;
+        if (updatedTotal > collectedAfterPhase1) {
+          log.info("%s [%s] Tidal NLAL harvest phase 2: total updated to %d, have %d", integrationName, entityId, updatedTotal, collectedAfterPhase1);
+          await this.harvestNlalChunks(entityId, layersToTry, scanDelay, rawSend);
+        }
+      } finally {
+        setTidalHarvestMode(entityId, false);
+        const finalTotal = getTidalTotalListItemCount(entityId);
+        log.info("%s [%s] Tidal NLAL harvest complete: %d/%d items", integrationName, entityId, listTidalMenuOptions(entityId).length, finalTotal);
+      }
+    })();
+  }
+
+  /**
+   * Send NLAL requests in a loop until all items up to the current total are collected,
+   * or until a pass produces no new items (genuine stuck / wrong layer for every attempt).
+   * Uses the first layer from `layersToTry` primarily; falls back to the others only when
+   * the primary makes no progress, cycling through them until one produces items or all fail.
+   */
+  private async harvestNlalChunks(
+    entityId: string,
+    layersToTry: string[],
+    scanDelay: number,
+    rawSend: (cmd: string) => Promise<void>
+  ): Promise<void> {
+    let lastCollected = -1;
+    while (true) {
+      const total = getTidalTotalListItemCount(entityId);
+      const collected = listTidalMenuOptions(entityId).length;
+      if (collected >= total) break;
+      if (collected === lastCollected) break; // no progress on any layer — give up
+      lastCollected = collected;
+
+      for (const layer of layersToTry) {
+        const offset = listTidalMenuOptions(entityId).length;
+        const offsetHex = offset.toString(16).toUpperCase().padStart(4, "0");
+        await rawSend(`NLAL${this.nextTidalListSequence()}${layer}${offsetHex}03E7`);
+        await delay(scanDelay);
+        if (listTidalMenuOptions(entityId).length >= getTidalTotalListItemCount(entityId)) return;
+      }
+      // Small extra wait so the last NLA XML from this pass can arrive before we re-check.
+      await delay(scanDelay);
+    }
   }
 
   /**
@@ -248,7 +299,7 @@ export default class EntityRegistrar {
         markTidalListModeActive(avrEntry);
         if (rawSend) {
           // Fire harvest in the background so the remote gets the first 10 items immediately.
-          void this.harvestTidalListItems(avrEntry, menuDelay, rawSend);
+          await this.harvestTidalListItems(avrEntry, menuDelay, rawSend);
         }
 
         return browseMedia(avrEntry, {
@@ -278,8 +329,9 @@ export default class EntityRegistrar {
           await this.waitForTidalMenuStable(avrEntry, beforeSignature, menuDelay);
           markTidalListModeActive(avrEntry);
           if (rawSend) {
-            // Fire harvest in the background so the remote gets the first 10 items immediately.
-            void this.harvestTidalListItems(avrEntry, menuDelay, rawSend);
+            // Await phase 1 of the harvest so the browse response includes the first 50 items.
+            // Phase 2 (potential total increase) continues in the background.
+            await this.harvestTidalListItems(avrEntry, menuDelay, rawSend);
           }
         }
 
