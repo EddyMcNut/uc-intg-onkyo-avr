@@ -26,6 +26,10 @@ export type TidalBrowseState = {
   nlsLayerNumber: number;
   /** True while the harvest loop in entityRegistrar is scrolling to collect all list items. Prevents U0 from clearing the map. */
   harvestMode: boolean;
+  /** Stack of container mediaIds visited so far, from shallowest to deepest.
+   * Empty = at root (main Tidal menu). Each browsable selection pushes its mediaId;
+   * back navigation pops entries and sends NTCRETURN for each. */
+  navStack: string[];
 };
 
 const tidalBrowseStateByPhysicalAvr = new Map<string, TidalBrowseState>();
@@ -80,7 +84,8 @@ function getTidalBrowseState(entityId: string): TidalBrowseState | null {
     totalListItemCount: 0,
     nlsCursorOffset: 0,
     nlsLayerNumber: 0,
-    harvestMode: false
+    harvestMode: false,
+    navStack: []
   };
   tidalBrowseStateByPhysicalAvr.set(physicalAvrId, created);
   return created;
@@ -125,6 +130,25 @@ export function listTidalMenuOptions(entityId: string): TidalMenuOption[] {
   return [...state.optionsByMenuIndex.values()].sort((a, b) => a.menuIndex - b.menuIndex);
 }
 
+/**
+ * Returns the number of items that form an unbroken sequence starting at menuIndex=1.
+ * This is the correct 0-based NLAL request offset: it ignores any NLS entries that
+ * landed at high absolute positions (e.g. cursor at 66 → NLS at positions 58–67),
+ * which would otherwise inflate `listTidalMenuOptions().length` and cause the harvest
+ * to request items at the wrong offset, leaving positions 1–N unfetched.
+ */
+export function getContiguousItemCount(entityId: string): number {
+  const state = getTidalBrowseState(entityId);
+  if (!state || state.optionsByMenuIndex.size === 0) return 0;
+  const keys = [...state.optionsByMenuIndex.keys()].sort((a, b) => a - b);
+  let expected = 1;
+  for (const key of keys) {
+    if (key !== expected) break;
+    expected++;
+  }
+  return expected - 1;
+}
+
 export function shouldShowTidalMainMenuShortcut(entityId: string): boolean {
   const state = getTidalBrowseState(entityId);
   return state?.showMainMenuShortcut ?? false;
@@ -151,6 +175,7 @@ export function resetTidalBrowseState(entityId: string): void {
   state.nlsCursorOffset = 0;
   state.nlsLayerNumber = 0;
   state.harvestMode = false;
+  state.navStack = [];
 }
 
 export function markTraceNextTidalSelectionAfterMainMenu(entityId: string): void {
@@ -236,6 +261,47 @@ export function setTidalHarvestMode(entityId: string, active: boolean): void {
 
 export function getTidalHarvestMode(entityId: string): boolean {
   return getTidalBrowseState(entityId)?.harvestMode ?? false;
+}
+
+export function getTidalNavDepth(entityId: string): number {
+  return getTidalBrowseState(entityId)?.navStack.length ?? 0;
+}
+
+export function getTidalCurrentNavContainer(entityId: string): string {
+  const stack = getTidalBrowseState(entityId)?.navStack ?? [];
+  return stack[stack.length - 1] ?? "";
+}
+
+export function getTidalNavStack(entityId: string): string[] {
+  return [...(getTidalBrowseState(entityId)?.navStack ?? [])];
+}
+
+export function pushTidalNavContainer(entityId: string, containerId: string): void {
+  const state = getTidalBrowseState(entityId);
+  if (state) state.navStack.push(containerId);
+}
+
+/**
+ * Pops all entries AFTER targetId (keeping targetId as the new top).
+ * Returns how many entries were popped, or 0 if targetId is not in the stack.
+ */
+export function popTidalNavContainersTo(entityId: string, targetId: string): number {
+  const state = getTidalBrowseState(entityId);
+  if (!state || state.navStack.length === 0) return 0;
+  const idx = state.navStack.indexOf(targetId);
+  if (idx === -1) return 0;
+  const popsNeeded = state.navStack.length - (idx + 1);
+  state.navStack.splice(idx + 1);
+  return popsNeeded;
+}
+
+/** Clears the entire nav stack. Returns how many entries were cleared. */
+export function clearTidalNavStack(entityId: string): number {
+  const state = getTidalBrowseState(entityId);
+  if (!state) return 0;
+  const count = state.navStack.length;
+  state.navStack = [];
+  return count;
 }
 
 export function getTidalThumbnailForTitle(entityId: string, title: string, resolver: (state: TidalBrowseState, title: string) => string): string {

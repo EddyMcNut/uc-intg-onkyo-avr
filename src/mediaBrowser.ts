@@ -73,18 +73,26 @@ export function ingestTuneInXmlEntries(entityId: string, xmlPayload: string): vo
   }
 }
 
+const TIDAL_EXCLUDED_MENU_TITLES = new Set(["search", "logout"]);
+
 export function ingestTidalXmlEntries(entityId: string, xmlPayload: string): void {
   if (!xmlPayload) return;
-  const existingTitles = new Set(listTidalMenuOptions(entityId).map((o) => o.title));
-  let nextIndex = listTidalMenuOptions(entityId).length + 1;
-  for (const item of parseTuneInXmlItems(xmlPayload)) {
-    if (!item.title || existingTitles.has(item.title)) continue;
-    addTidalMenuOption(entityId, nextIndex++, item.title, getOrCreateTidalThumbnail);
-    existingTitles.add(item.title);
+  // Read the 0-based starting offset declared in the NLA XML response:
+  //   <items offset="50" totalitems="99">
+  // Each item at XML position i has 1-based menuIndex = xmlOffset + i + 1.
+  // This ensures correct absolute positioning regardless of which NLS entries are
+  // already in the store (e.g. NLS at positions 58–67 when cursor was at 66).
+  const offsetMatch = xmlPayload.match(/<items\b[^>]*\boffset="(\d+)"/i);
+  const xmlOffset = offsetMatch ? parseInt(offsetMatch[1], 10) : 0;
+  const xmlItems = parseTuneInXmlItems(xmlPayload);
+  for (let i = 0; i < xmlItems.length; i++) {
+    const item = xmlItems[i];
+    if (!item.title) continue;
+    if (TIDAL_EXCLUDED_MENU_TITLES.has(item.title.toLowerCase())) continue;
+    const menuIndex = xmlOffset + i + 1;
+    addTidalMenuOption(entityId, menuIndex, item.title, getOrCreateTidalThumbnail);
   }
 }
-
-const TIDAL_EXCLUDED_MENU_TITLES = new Set(["search", "logout"]);
 
 export function ingestTidalListEntry(entityId: string, entry: string): void {
   const match = entry.match(/^U(\d+)-(.*)$/);
@@ -344,9 +352,23 @@ export async function browseTidalMedia(entityId: string, options: uc.BrowseOptio
     return uc.StatusCodes.NotFound;
   }
 
-  // Tidal AVR navigation exposes each list entry as an action that replaces the current list,
-  // not as a stable child container with its own retrievable children. When the client reopens
-  // browse on a previously selected Tidal item, returning that item directly would render an
-  // empty leaf. Instead, always expose the latest known Tidal list as the browsable view.
-  return uc.BrowseResult.fromPaging(createTidalRootItem(entityId, options.paging), options.paging, totalCount);
+  // Return current items inside the option's own container ID.
+  // This creates a proper nav hierarchy: the UC remote's back button sends browse(TIDAL_ROOT_ID),
+  // which the integration intercepts to send NTCRETURN to the AVR.
+  const nowPlayingTitle = getTidalNowPlayingTitle(entityId);
+  const subItems = tidalMenuOptions
+    .slice(options.paging.offset, options.paging.offset + options.paging.limit)
+    .map((opt) => createTidalMenuItem(opt, nowPlayingTitle));
+
+  return uc.BrowseResult.fromPaging(
+    new uc.BrowseMediaItem(option.mediaId, option.title, {
+      can_browse: true,
+      media_class: uc.KnownMediaClass.Directory,
+      media_type: TIDAL_ROOT_TYPE,
+      thumbnail: createTidalBackdrop(),
+      items: subItems
+    }),
+    options.paging,
+    totalCount
+  );
 }

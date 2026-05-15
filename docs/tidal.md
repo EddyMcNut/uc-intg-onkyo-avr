@@ -46,9 +46,15 @@ To set up an Activity for Tidal, have a look at these screenshots:
 
 Commands on the remote will only work if you can also use those commands directly in your Tidal app, that depends on the subscription you have for Tidal.
 
+### Change setting directly on the Unfolded Circle Remote
+It's recommended to _disable_ the setting `Coverflow in media browser` to get the best experience for navigating the Tidal menu through this integration. To do so, click in the top right corner of the screen on the remote, select Settings > User Interface > Coverflow in media browser: off.
+
+![](../screenshots/tidal-remote-settings.png)
+
 ### Browse Tidal
 
-The mediabrowser of Unfolded Circle combined with your AVR being logged on to the Tidal service make it possibe to scroll through the Tidal menu just like you would do with the Controller app of your AVR. Some screenshots:
+The mediabrowser of Unfolded Circle combined with your AVR being logged on to the Tidal service make it possibe to scroll through the Tidal menu just like you would do with the Controller app of your AVR or navigating the menu on you AVR using your TV. The menu options can differ from the options of the Tidal app on your phone.
+Some screenshots:
 
 - s1
 - s2
@@ -58,5 +64,5 @@ The mediabrowser of Unfolded Circle combined with your AVR being logged on to th
 If `input-selector tidal` does not work, check the manual of your AVR to see if Tidal is even available as selectable input on the AVR:
 
 - your AVR _does_ have a Tidal input: run setup of this integration again and increase the value for 'NET sub-source selection delay'
-- your AVR does _not_ have a Tidal input, just try `input-selector net`, see [input-selector](./input-selector.md#net) for more info
+- your AVR does _not_ have a Tidal input, this setup is not possible, in that case you can use the Tidal app on your phone and if the Tidal app allowed send to you AVR using Bluetooth, Airplay or Chromecast
 

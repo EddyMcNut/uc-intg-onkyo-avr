@@ -8,6 +8,7 @@ import { ConfigManager, AVR_DEFAULTS, buildEntityId } from "./configManager.js";
 import { browseMedia, isTidalMainMenuRequest, resolveTidalMenuOption, TIDAL_ROOT_ID, TIDAL_ROOT_TYPE } from "./mediaBrowser.js";
 import {
   listTidalMenuOptions,
+  getContiguousItemCount,
   markTidalListModeActive,
   markTraceNextTidalSelectionAfterMainMenu,
   resetTidalBrowseState,
@@ -16,7 +17,13 @@ import {
   getTidalHarvestMode,
   getTidalNlsLayerNumber,
   setTidalHarvestMode,
-  setTidalNlsCursorOffset
+  setTidalNlsCursorOffset,
+  getTidalNavDepth,
+  getTidalCurrentNavContainer,
+  getTidalNavStack,
+  pushTidalNavContainer,
+  popTidalNavContainersTo,
+  clearTidalNavStack
 } from "./tidalBrowserStore.js";
 import log from "./loggers.js";
 import { delay } from "./utils.js";
@@ -143,20 +150,24 @@ export default class EntityRegistrar {
     scanDelay: number,
     rawSend: (cmd: string) => Promise<void>
   ): Promise<void> {
-    let lastCollected = -1;
+    // Use the count of CONTIGUOUS items from menuIndex=1, not the total items in the store.
+    // NLS entries may have been collected at high absolute positions (e.g. cursor at 66 →
+    // NLS at 58–67), which inflates listTidalMenuOptions().length without filling positions
+    // 1–57. getContiguousItemCount() correctly returns 0 in that case so we request from 0.
+    let lastContiguous = -1;
     while (true) {
       const total = getTidalTotalListItemCount(entityId);
-      const collected = listTidalMenuOptions(entityId).length;
-      if (collected >= total) break;
-      if (collected === lastCollected) break; // no progress on any layer — give up
-      lastCollected = collected;
+      const contiguous = getContiguousItemCount(entityId);
+      if (contiguous >= total) break;
+      if (contiguous === lastContiguous) break; // no progress on any layer — give up
+      lastContiguous = contiguous;
 
       for (const layer of layersToTry) {
-        const offset = listTidalMenuOptions(entityId).length;
+        const offset = getContiguousItemCount(entityId);
         const offsetHex = offset.toString(16).toUpperCase().padStart(4, "0");
         await rawSend(`NLAL${this.nextTidalListSequence()}${layer}${offsetHex}03E7`);
         await delay(scanDelay);
-        if (listTidalMenuOptions(entityId).length >= getTidalTotalListItemCount(entityId)) return;
+        if (getContiguousItemCount(entityId) >= getTidalTotalListItemCount(entityId)) return;
       }
       // Small extra wait so the last NLA XML from this pass can arrive before we re-check.
       await delay(scanDelay);
@@ -311,29 +322,86 @@ export default class EntityRegistrar {
 
       if (tidalSelection && cmdHandler) {
         setTidalMainMenuShortcut(avrEntry, true);
-        
-        // Handle both menu folders and songs through PlayMedia
-        await cmdHandler(mediaPlayerEntity, uc.MediaPlayerCommands.PlayMedia, {
-          media_id: tidalSelection.mediaId,
-          media_type: TIDAL_ROOT_TYPE
-        });
 
-        // Only wait for signature stability if this is a menu folder, not a song
-        if (tidalSelection.isBrowsable) {
-          const beforeSignature = this.buildTidalMenuSignature(avrEntry);
+        const currentContainer = getTidalCurrentNavContainer(avrEntry);
+        const navStack = getTidalNavStack(avrEntry);
+        const stackIdx = navStack.indexOf(tidalSelection.mediaId);
+        const isPaging = tidalSelection.mediaId === currentContainer && (options.paging?.offset ?? 0) > 0;
+        const isBackNav = !isPaging && stackIdx !== -1;
 
-          const cfg = ConfigManager.get();
-          const avr = cfg?.avrs?.find((a) => buildEntityId(a.model, a.ip, a.zone) === avrEntry);
-          const menuDelay = avr?.netMenuDelay ?? AVR_DEFAULTS.netMenuDelay;
+        if (!isPaging && !isBackNav) {
+          // Forward navigation: send the selection to the AVR
+          await cmdHandler(mediaPlayerEntity, uc.MediaPlayerCommands.PlayMedia, {
+            media_id: tidalSelection.mediaId,
+            media_type: TIDAL_ROOT_TYPE
+          });
 
-          await this.waitForTidalMenuStable(avrEntry, beforeSignature, menuDelay);
-          markTidalListModeActive(avrEntry);
-          if (rawSend) {
-            // Await phase 1 of the harvest so the browse response includes the first 50 items.
-            // Phase 2 (potential total increase) continues in the background.
+          if (tidalSelection.isBrowsable) {
+            const beforeSignature = this.buildTidalMenuSignature(avrEntry);
+
+            const cfg = ConfigManager.get();
+            const avr = cfg?.avrs?.find((a) => buildEntityId(a.model, a.ip, a.zone) === avrEntry);
+            const menuDelay = avr?.netMenuDelay ?? AVR_DEFAULTS.netMenuDelay;
+
+            await this.waitForTidalMenuStable(avrEntry, beforeSignature, menuDelay);
+            markTidalListModeActive(avrEntry);
+            pushTidalNavContainer(avrEntry, tidalSelection.mediaId);
+            if (rawSend) {
+              await this.harvestTidalListItems(avrEntry, menuDelay, rawSend);
+            }
+          }
+        } else if (isBackNav) {
+          // Back navigation to an ancestor container, or re-browse of the current container.
+          // popsNeeded = 0 means we're already at this container (e.g. re-opening after song
+          // playback). In that case just read from the store — do NOT re-harvest, because the
+          // AVR is in playback mode and would only return the default 10 items, wiping the store.
+          const popsNeeded = popTidalNavContainersTo(avrEntry, tidalSelection.mediaId);
+          if (popsNeeded > 0 && rawSend) {
+            log.info("%s [%s] Back to '%s': %d × NTCRETURN", integrationName, avrEntry, tidalSelection.title, popsNeeded);
+
+            const cfg = ConfigManager.get();
+            const avr = cfg?.avrs?.find((a) => buildEntityId(a.model, a.ip, a.zone) === avrEntry);
+            const menuDelay = avr?.netMenuDelay ?? AVR_DEFAULTS.netMenuDelay;
+
+            for (let i = 0; i < popsNeeded; i++) {
+              const beforeSignature = this.buildTidalMenuSignature(avrEntry);
+              await rawSend("NTCRETURN");
+              await this.waitForTidalMenuStable(avrEntry, beforeSignature, menuDelay);
+            }
+            markTidalListModeActive(avrEntry);
             await this.harvestTidalListItems(avrEntry, menuDelay, rawSend);
           }
         }
+
+        // For songs: stay in the current sub-container so back press returns to it.
+        // For folders: use the folder's own mediaId so back press sends browse(parent).
+        const returnContainerId = tidalSelection.isBrowsable
+          ? tidalSelection.mediaId
+          : (getTidalCurrentNavContainer(avrEntry) || TIDAL_ROOT_ID);
+
+        return browseMedia(avrEntry, {
+          ...options,
+          media_id: returnContainerId,
+          media_type: TIDAL_ROOT_TYPE
+        });
+      }
+
+      const backNavDepth = getTidalNavDepth(avrEntry);
+      if (options.media_id === TIDAL_ROOT_ID && backNavDepth > 0 && rawSend) {
+        log.info("%s [%s] Back to Tidal root: depth %d; sending %d × NTCRETURN", integrationName, avrEntry, backNavDepth, backNavDepth);
+
+        const cfg = ConfigManager.get();
+        const avr = cfg?.avrs?.find((a) => buildEntityId(a.model, a.ip, a.zone) === avrEntry);
+        const menuDelay = avr?.netMenuDelay ?? AVR_DEFAULTS.netMenuDelay;
+
+        const popsNeeded = clearTidalNavStack(avrEntry);
+        for (let i = 0; i < popsNeeded; i++) {
+          const beforeSignature = this.buildTidalMenuSignature(avrEntry);
+          await rawSend("NTCRETURN");
+          await this.waitForTidalMenuStable(avrEntry, beforeSignature, menuDelay);
+        }
+        markTidalListModeActive(avrEntry);
+        await this.harvestTidalListItems(avrEntry, menuDelay, rawSend);
 
         return browseMedia(avrEntry, {
           ...options,
