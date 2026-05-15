@@ -94,10 +94,6 @@ export class CommandReceiver {
     this.zoneAgnosticProcessor.updateConfig(config);
   }
 
-  /**
-   * Aborts an in-flight TuneIn preload for the given entity's AVR.
-   * Returns true if a preload was running and has been flagged to stop.
-   */
   public abortTuneInPreload(entityId: string): boolean {
     return this.zoneAgnosticProcessor.abortTuneInPreload(entityId);
   }
@@ -169,7 +165,7 @@ export class CommandReceiver {
       const entityId = buildEntityId(avrUpdates.model, avrUpdates.host, eventZone);
 
       if (await this.dispatchZoneAgnosticCommand(avrUpdates, entityId, eventZone)) {
-        await this.zoneAgnosticProcessor.renderEntity(entityId, false);
+        await this.zoneAgnosticProcessor.renderEntity(entityId);
         return;
       }
 
@@ -253,7 +249,7 @@ export class CommandReceiver {
 
           // Reset zone metadata on source change to avoid stale media details.
           this.zoneAgnosticProcessor.resetZone(entityId);
-          await this.zoneAgnosticProcessor.renderEntity(entityId, true);
+          await this.zoneAgnosticProcessor.renderEntity(entityId);
 
           switch (source) {
             case "dab":
@@ -323,7 +319,7 @@ export class CommandReceiver {
         default:
           break;
       }
-      await this.zoneAgnosticProcessor.renderEntity(entityId, false);
+      await this.zoneAgnosticProcessor.renderEntity(entityId);
     });
   }
 }

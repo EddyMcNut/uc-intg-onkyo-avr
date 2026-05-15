@@ -24,9 +24,9 @@ export class ZoneMediaRenderer {
       return;
     }
 
-    if(force) {
-      log.info("%s forcing image update obsolete?", entityId);
-    }
+    // if(force) {
+    //   log.info("%s forcing image update", entityId);
+    // }
 
     const sharedState = this.mediaStateStore.getSharedAvrMediaState(entityId);
     const physicalAvrId = this.mediaStateStore.getPhysicalAvrId(entityId);

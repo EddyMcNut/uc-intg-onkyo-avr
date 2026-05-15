@@ -54,35 +54,9 @@ export class TuneInPreloader {
       await this.requestTuneInPresetXml();
       await delay(scanDelay);
 
-      let lastCount = getTuneInPresetCount(entityId);
-      let stagnantSteps = 0;
-      const minimumScrollSteps = 12;
-      const maxStagnantSteps = 12;
-
-      for (let step = 0; step < 40 && (step < minimumScrollSteps || stagnantSteps < maxStagnantSteps); step += 1) {
-        if (this.abortRequested) {
-          log.info("%s [%s] preload aborted at step %d", integrationName, entityId, step);
-          break;
-        }
-        await this.eiscpInstance.raw("NTCDOWN");
-        await delay(scanDelay);
-
-        if ((step + 1) % 10 === 0) {
-          await this.requestTuneInPresetXml();
-          await delay(scanDelay);
-        }
-
-        const count = getTuneInPresetCount(entityId);
-        if (count > lastCount) {
-          lastCount = count;
-          stagnantSteps = 0;
-        } else {
-          stagnantSteps += 1;
-        }
-      }
-
+      const lastCount = getTuneInPresetCount(entityId);
       if (lastCount > 0) {
-        log.info("%s [%s] harvested %d TuneIn preset(s) from paged AVR list updates", integrationName, entityId, lastCount);
+        log.info("%s [%s] harvested %d TuneIn preset(s) from NLAL", integrationName, entityId, lastCount);
       }
     } catch (err) {
       log.warn("%s [%s] failed to preload TuneIn My Presets: %s", integrationName, entityId, err);

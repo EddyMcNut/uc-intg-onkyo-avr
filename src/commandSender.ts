@@ -250,8 +250,6 @@ export class CommandSender {
             const wasPreloading = (this.commandReceiver as any)?.abortTuneInPreload?.(entity.id) ?? false;
             const currentSource = avrStateManager.getSource(entity.id);
             const currentSubSource = avrStateManager.getSubSource(entity.id);
-            // Force a full service switch when preloading was still in flight: the AVR may
-            // still be physically on another NET service (e.g. Spotify).
             if (wasPreloading || currentSource !== "net" || currentSubSource !== "tunein") {
               await this.eiscp.command(setZonePrefix("input-selector tunein"));
               await delay(targetAvr.netMenuDelay ?? DEFAULT_QUEUE_THRESHOLD);

@@ -311,13 +311,7 @@ export async function browseMedia(entityId: string, options: uc.BrowseOptions): 
 export async function browseTuneInMedia(entityId: string, options: uc.BrowseOptions): Promise<uc.StatusCodes | uc.BrowseResult> {
   const tuneInPresets = getTuneInPresets(entityId);
   if (!options.media_id || options.media_id === TUNEIN_ROOT_ID) {
-    log.info(
-      "%s [%s] browsable TuneIn presets (%d): %s",
-      integrationName,
-      entityId,
-      tuneInPresets.length,
-      tuneInPresets.length > 0 ? tuneInPresets.map((preset) => `${preset.presetIndex}:${preset.title}`).join(", ") : "none"
-    );
+    log.info("%s [%s] browsable TuneIn presets: %d", integrationName, entityId, tuneInPresets.length);
     return uc.BrowseResult.fromPaging(createRootItem(entityId, options.paging), options.paging, getTuneInRootItemCount(tuneInPresets.length));
   }
 
@@ -333,13 +327,7 @@ export async function browseTidalMedia(entityId: string, options: uc.BrowseOptio
   const tidalMenuOptions = getTidalMenuOptions(entityId);
   const totalCount = tidalMenuOptions.length + (shouldShowTidalMainMenuShortcut(entityId) ? 1 : 0);
   if (!options.media_id || options.media_id === TIDAL_ROOT_ID) {
-    log.info(
-      "%s [%s] browsable Tidal menu options (%d): %s",
-      integrationName,
-      entityId,
-      tidalMenuOptions.length,
-      tidalMenuOptions.length > 0 ? tidalMenuOptions.map((option) => `${option.menuIndex}:${option.title}`).join(", ") : "none"
-    );
+    log.info("%s [%s] browsable Tidal menu options: %d", integrationName, entityId, tidalMenuOptions.length);
     return uc.BrowseResult.fromPaging(createTidalRootItem(entityId, options.paging), options.paging, totalCount);
   }
 
