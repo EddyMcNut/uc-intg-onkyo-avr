@@ -4,7 +4,7 @@ import { avrStateManager } from "./avrState.js";
 import log from "./loggers.js";
 import { looksLikeTuneInDirectory, normalizeTuneInLabel, parseTuneInXmlItems } from "./tuneInFilters.js";
 import { addTuneInPreset, getTuneInBrowseState, listTuneInPresets, type TuneInPreset, setTuneInBrowseContextState } from "./tuneInBrowserStore.js";
-import { addTidalMenuOption, listTidalMenuOptions, shouldShowTidalMainMenuShortcut, getTidalNowPlayingTitle, getTidalThumbnailForTitle, getTidalNlsCursorOffset, type TidalMenuOption } from "./tidalBrowserStore.js";
+import { addTidalMenuOption, listTidalMenuOptions, shouldShowTidalMainMenuShortcut, getTidalNowPlayingTitle, getTidalThumbnailForTitle, getTidalNlsCursorOffset, getTidalBrowseListFrozen, markTidalBrowseListFrozen, type TidalMenuOption } from "./tidalBrowserStore.js";
 import { createTuneInBackdrop, getOrCreateTuneInThumbnail } from "./tuneInThumbnails.js";
 import { createTidalBackdrop, getOrCreateTidalThumbnail } from "./tidalThumbnails.js";
 
@@ -120,6 +120,13 @@ export function ingestTidalListEntry(entityId: string, entry: string): void {
   const windowStart = Math.max(0, cursorOffset - 9);
   const absoluteMenuIndex = windowStart + parsedIndex + 1;
   addTidalMenuOption(entityId, absoluteMenuIndex, title, getOrCreateTidalThumbnail);
+
+  // Auto-unfreeze after the last NLS entry of the post-playback burst (U9 = display line 9).
+  // The AVR always sends exactly 10 entries (U0–U9) after song selection; once we've absorbed
+  // all of them we can resume normal ingestion for subsequent browse operations.
+  if (parsedIndex >= 9 && getTidalBrowseListFrozen(entityId)) {
+    markTidalBrowseListFrozen(entityId, false);
+  }
 }
 
 export function getTuneInPresetCount(entityId: string): number {

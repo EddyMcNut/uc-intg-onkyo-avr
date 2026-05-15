@@ -26,6 +26,8 @@ export type TidalBrowseState = {
   nlsLayerNumber: number;
   /** True while the harvest loop in entityRegistrar is scrolling to collect all list items. Prevents U0 from clearing the map. */
   harvestMode: boolean;
+  /** True after a non-browsable (song) item is selected via NLSI. Prevents the spontaneous post-playback NLS from the AVR (which starts at U0/index 1) from wiping the harvested list. Cleared when NLSI is sent for a browsable (directory) item or on full state reset. */
+  browseListFrozen: boolean;
   /** Stack of container mediaIds visited so far, from shallowest to deepest.
    * Empty = at root (main Tidal menu). Each browsable selection pushes its mediaId;
    * back navigation pops entries and sends NTCRETURN for each. */
@@ -85,6 +87,7 @@ function getTidalBrowseState(entityId: string): TidalBrowseState | null {
     nlsCursorOffset: 0,
     nlsLayerNumber: 0,
     harvestMode: false,
+    browseListFrozen: false,
     navStack: []
   };
   tidalBrowseStateByPhysicalAvr.set(physicalAvrId, created);
@@ -99,6 +102,13 @@ export function addTidalMenuOption(
 ): void {
   const state = getTidalBrowseState(entityId);
   if (!state) {
+    return;
+  }
+
+  // When browseListFrozen, ignore this entry completely: the AVR sends a spontaneous
+  // post-playback NLS burst (U0-U9) right after a song is selected. We must not clear
+  // or overwrite the harvested list with those playback-context entries.
+  if (state.browseListFrozen) {
     return;
   }
 
@@ -175,6 +185,7 @@ export function resetTidalBrowseState(entityId: string): void {
   state.nlsCursorOffset = 0;
   state.nlsLayerNumber = 0;
   state.harvestMode = false;
+  state.browseListFrozen = false;
   state.navStack = [];
 }
 
@@ -216,6 +227,22 @@ export function consumeTidalListModeActive(entityId: string): boolean {
   if (!state || !state.listModeActive) return false;
   state.listModeActive = false;
   return true;
+}
+
+/**
+ * Freeze or unfreeze the browse list.
+ * Set frozen=true before sending NLSI for a non-browsable (song) item so that the
+ * spontaneous post-playback NLS the AVR emits (U0 → index 1) cannot wipe the harvest.
+ * Set frozen=false before sending NLSI for a browsable (directory) item so that the
+ * new directory NLS can replace the list normally.
+ */
+export function markTidalBrowseListFrozen(entityId: string, frozen: boolean): void {
+  const state = getTidalBrowseState(entityId);
+  if (state) state.browseListFrozen = frozen;
+}
+
+export function getTidalBrowseListFrozen(entityId: string): boolean {
+  return getTidalBrowseState(entityId)?.browseListFrozen ?? false;
 }
 
 export function setTidalNowPlayingTitle(entityId: string, title: string): void {

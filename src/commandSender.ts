@@ -5,7 +5,7 @@ import { avrStateManager } from "./avrState.js";
 import log from "./loggers.js";
 import { delay } from "./utils.js";
 import { browseMedia, isMediaBrowsingAvailable, isTidalMainMenuRequest, resolveTidalMenuOption, resolveTuneInPreset } from "./mediaBrowser.js";
-import { consumeTidalListModeActive, consumeTraceNextTidalSelectionAfterMainMenu, listTidalMenuOptions } from "./tidalBrowserStore.js";
+import { consumeTidalListModeActive, consumeTraceNextTidalSelectionAfterMainMenu, listTidalMenuOptions, markTidalBrowseListFrozen } from "./tidalBrowserStore.js";
 
 const integrationName = "commandSender:";
 
@@ -349,6 +349,10 @@ export class CommandSender {
             );
           }
 
+          // Freeze the browse list when selecting a song so the spontaneous post-playback
+          // NLS the AVR sends (U0 → index 1) cannot wipe the harvested item list.
+          // Unfreeze for directory selections so the incoming directory NLS can replace the list.
+          markTidalBrowseListFrozen(entity.id, !tidalOption.isBrowsable);
           await this.eiscp.raw(`NLSI${String(menuIndexToSelect).padStart(5, "0")}`);
           break;
         }

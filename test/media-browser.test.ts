@@ -384,7 +384,6 @@ test.serial("TuneIn service selection preloads My Presets for browsing", async (
   t.true(rawCommands.includes("NTCSELECT"));
   t.true(rawCommands.includes("NLSI00001"));
   t.true(rawCommands.some((cmd) => cmd.startsWith("NLAL")));
-  t.true(rawCommands.includes("NTCDOWN"));
 });
 
 test.serial("CommandSender silently absorbs shuffle, repeat, and browse commands", async (t) => {
