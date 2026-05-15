@@ -182,7 +182,7 @@ export class ZoneAgnosticUpdateProcessor {
     this.updateFrontPanelDisplay(affectedZones, serviceName);
 
     if (normalizedService === "tunein") {
-      await this.maybePreloadTuneIn(sourceEntityId, affectedZones);
+      await this.maybePreloadTuneIn(sourceEntityId, netZones);
     }
 
     if (normalizedService === "tidal") {

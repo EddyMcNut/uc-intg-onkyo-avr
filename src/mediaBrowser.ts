@@ -352,23 +352,9 @@ export async function browseTidalMedia(entityId: string, options: uc.BrowseOptio
     return uc.StatusCodes.NotFound;
   }
 
-  // Return current items inside the option's own container ID.
-  // This creates a proper nav hierarchy: the UC remote's back button sends browse(TIDAL_ROOT_ID),
-  // which the integration intercepts to send NTCRETURN to the AVR.
-  const nowPlayingTitle = getTidalNowPlayingTitle(entityId);
-  const subItems = tidalMenuOptions
-    .slice(options.paging.offset, options.paging.offset + options.paging.limit)
-    .map((opt) => createTidalMenuItem(opt, nowPlayingTitle));
-
-  return uc.BrowseResult.fromPaging(
-    new uc.BrowseMediaItem(option.mediaId, option.title, {
-      can_browse: true,
-      media_class: uc.KnownMediaClass.Directory,
-      media_type: TIDAL_ROOT_TYPE,
-      thumbnail: createTidalBackdrop(),
-      items: subItems
-    }),
-    options.paging,
-    totalCount
-  );
+  // Tidal AVR navigation exposes each list entry as an action that replaces the current list,
+  // not as a stable child container with its own retrievable children. When the client reopens
+  // browse on a previously selected Tidal item, returning that item directly would render an
+  // empty leaf. Instead, always expose the latest known Tidal list as the browsable view.
+  return uc.BrowseResult.fromPaging(createTidalRootItem(entityId, options.paging), options.paging, totalCount);
 }

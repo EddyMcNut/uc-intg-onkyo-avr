@@ -60,6 +60,8 @@ Some screenshots:
 - s2
 - s3
 
+**When you want to go back in menu options, it's best to use `Tidal Main Menu` at the top of the options, the back button in the Media Browser does not yet set the AVR state one step back in menu navigation so you could get into unexpected behavior using the back option of the Media Browser.**
+
 ### Note
 If `input-selector tidal` does not work, check the manual of your AVR to see if Tidal is even available as selectable input on the AVR:
 

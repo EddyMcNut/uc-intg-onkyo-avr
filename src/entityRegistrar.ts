@@ -18,12 +18,6 @@ import {
   getTidalNlsLayerNumber,
   setTidalHarvestMode,
   setTidalNlsCursorOffset,
-  getTidalNavDepth,
-  getTidalCurrentNavContainer,
-  getTidalNavStack,
-  pushTidalNavContainer,
-  popTidalNavContainersTo,
-  clearTidalNavStack
 } from "./tidalBrowserStore.js";
 import log from "./loggers.js";
 import { delay } from "./utils.js";
@@ -323,14 +317,8 @@ export default class EntityRegistrar {
       if (tidalSelection && cmdHandler) {
         setTidalMainMenuShortcut(avrEntry, true);
 
-        const currentContainer = getTidalCurrentNavContainer(avrEntry);
-        const navStack = getTidalNavStack(avrEntry);
-        const stackIdx = navStack.indexOf(tidalSelection.mediaId);
-        const isPaging = tidalSelection.mediaId === currentContainer && (options.paging?.offset ?? 0) > 0;
-        const isBackNav = !isPaging && stackIdx !== -1;
-
-        if (!isPaging && !isBackNav) {
-          // Forward navigation: send the selection to the AVR
+        // Only navigate on fresh selections (offset=0); skip re-navigation on paging scrolls.
+        if ((options.paging?.offset ?? 0) === 0) {
           await cmdHandler(mediaPlayerEntity, uc.MediaPlayerCommands.PlayMedia, {
             media_id: tidalSelection.mediaId,
             media_type: TIDAL_ROOT_TYPE
@@ -345,63 +333,11 @@ export default class EntityRegistrar {
 
             await this.waitForTidalMenuStable(avrEntry, beforeSignature, menuDelay);
             markTidalListModeActive(avrEntry);
-            pushTidalNavContainer(avrEntry, tidalSelection.mediaId);
             if (rawSend) {
               await this.harvestTidalListItems(avrEntry, menuDelay, rawSend);
             }
           }
-        } else if (isBackNav) {
-          // Back navigation to an ancestor container, or re-browse of the current container.
-          // popsNeeded = 0 means we're already at this container (e.g. re-opening after song
-          // playback). In that case just read from the store — do NOT re-harvest, because the
-          // AVR is in playback mode and would only return the default 10 items, wiping the store.
-          const popsNeeded = popTidalNavContainersTo(avrEntry, tidalSelection.mediaId);
-          if (popsNeeded > 0 && rawSend) {
-            log.info("%s [%s] Back to '%s': %d × NTCRETURN", integrationName, avrEntry, tidalSelection.title, popsNeeded);
-
-            const cfg = ConfigManager.get();
-            const avr = cfg?.avrs?.find((a) => buildEntityId(a.model, a.ip, a.zone) === avrEntry);
-            const menuDelay = avr?.netMenuDelay ?? AVR_DEFAULTS.netMenuDelay;
-
-            for (let i = 0; i < popsNeeded; i++) {
-              const beforeSignature = this.buildTidalMenuSignature(avrEntry);
-              await rawSend("NTCRETURN");
-              await this.waitForTidalMenuStable(avrEntry, beforeSignature, menuDelay);
-            }
-            markTidalListModeActive(avrEntry);
-            await this.harvestTidalListItems(avrEntry, menuDelay, rawSend);
-          }
         }
-
-        // For songs: stay in the current sub-container so back press returns to it.
-        // For folders: use the folder's own mediaId so back press sends browse(parent).
-        const returnContainerId = tidalSelection.isBrowsable
-          ? tidalSelection.mediaId
-          : (getTidalCurrentNavContainer(avrEntry) || TIDAL_ROOT_ID);
-
-        return browseMedia(avrEntry, {
-          ...options,
-          media_id: returnContainerId,
-          media_type: TIDAL_ROOT_TYPE
-        });
-      }
-
-      const backNavDepth = getTidalNavDepth(avrEntry);
-      if (options.media_id === TIDAL_ROOT_ID && backNavDepth > 0 && rawSend) {
-        log.info("%s [%s] Back to Tidal root: depth %d; sending %d × NTCRETURN", integrationName, avrEntry, backNavDepth, backNavDepth);
-
-        const cfg = ConfigManager.get();
-        const avr = cfg?.avrs?.find((a) => buildEntityId(a.model, a.ip, a.zone) === avrEntry);
-        const menuDelay = avr?.netMenuDelay ?? AVR_DEFAULTS.netMenuDelay;
-
-        const popsNeeded = clearTidalNavStack(avrEntry);
-        for (let i = 0; i < popsNeeded; i++) {
-          const beforeSignature = this.buildTidalMenuSignature(avrEntry);
-          await rawSend("NTCRETURN");
-          await this.waitForTidalMenuStable(avrEntry, beforeSignature, menuDelay);
-        }
-        markTidalListModeActive(avrEntry);
-        await this.harvestTidalListItems(avrEntry, menuDelay, rawSend);
 
         return browseMedia(avrEntry, {
           ...options,
