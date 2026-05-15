@@ -16,6 +16,16 @@ export type TidalBrowseState = {
   traceNextSelectionAfterMainMenu: boolean;
   /** True immediately after browse callback finishes streaming an NLS list — AVR is in list mode. */
   listModeActive: boolean;
+  /** Title of the currently playing track, used to highlight it in the browse list. */
+  nowPlayingTitle: string;
+  /** Total number of items in the current list as reported by NLT. 0 = unknown. */
+  totalListItemCount: number;
+  /** Absolute cursor offset reported by NLT (cccc field). Used to map display-relative NLS lines to absolute indices. */
+  nlsCursorOffset: number;
+  /** Layer number from NLT ll field (chars 12-13). Used as the NLAL layer parameter for this list. 0 = unknown. */
+  nlsLayerNumber: number;
+  /** True while the harvest loop in entityRegistrar is scrolling to collect all list items. Prevents U0 from clearing the map. */
+  harvestMode: boolean;
 };
 
 const tidalBrowseStateByPhysicalAvr = new Map<string, TidalBrowseState>();
@@ -65,7 +75,12 @@ function getTidalBrowseState(entityId: string): TidalBrowseState | null {
     backgroundSignature: "",
     showMainMenuShortcut: false,
     traceNextSelectionAfterMainMenu: false,
-    listModeActive: false
+    listModeActive: false,
+    nowPlayingTitle: "",
+    totalListItemCount: 0,
+    nlsCursorOffset: 0,
+    nlsLayerNumber: 0,
+    harvestMode: false
   };
   tidalBrowseStateByPhysicalAvr.set(physicalAvrId, created);
   return created;
@@ -82,7 +97,9 @@ export function addTidalMenuOption(
     return;
   }
 
-  if (menuIndex <= 1) {
+  // In harvest mode, never clear — items accumulate with absolute indices derived from nlsCursorOffset.
+  // In normal mode, seeing menuIndex=1 (display line U0) means a new list is starting: clear.
+  if (!state.harvestMode && menuIndex <= 1) {
     state.optionsByMenuIndex.clear();
   }
 
@@ -130,6 +147,10 @@ export function resetTidalBrowseState(entityId: string): void {
 
   state.optionsByMenuIndex.clear();
   state.showMainMenuShortcut = false;
+  state.totalListItemCount = 0;
+  state.nlsCursorOffset = 0;
+  state.nlsLayerNumber = 0;
+  state.harvestMode = false;
 }
 
 export function markTraceNextTidalSelectionAfterMainMenu(entityId: string): void {
@@ -170,4 +191,57 @@ export function consumeTidalListModeActive(entityId: string): boolean {
   if (!state || !state.listModeActive) return false;
   state.listModeActive = false;
   return true;
+}
+
+export function setTidalNowPlayingTitle(entityId: string, title: string): void {
+  const state = getTidalBrowseState(entityId);
+  if (state) state.nowPlayingTitle = title;
+}
+
+export function getTidalNowPlayingTitle(entityId: string): string {
+  return getTidalBrowseState(entityId)?.nowPlayingTitle ?? "";
+}
+
+export function setTidalTotalListItemCount(entityId: string, count: number): void {
+  const state = getTidalBrowseState(entityId);
+  if (state) state.totalListItemCount = count;
+}
+
+export function getTidalTotalListItemCount(entityId: string): number {
+  return getTidalBrowseState(entityId)?.totalListItemCount ?? 0;
+}
+
+export function setTidalNlsCursorOffset(entityId: string, offset: number): void {
+  const state = getTidalBrowseState(entityId);
+  if (state) state.nlsCursorOffset = offset;
+}
+
+export function getTidalNlsCursorOffset(entityId: string): number {
+  return getTidalBrowseState(entityId)?.nlsCursorOffset ?? 0;
+}
+
+export function setTidalNlsLayerNumber(entityId: string, layer: number): void {
+  const state = getTidalBrowseState(entityId);
+  if (state) state.nlsLayerNumber = layer;
+}
+
+export function getTidalNlsLayerNumber(entityId: string): number {
+  return getTidalBrowseState(entityId)?.nlsLayerNumber ?? 0;
+}
+
+export function setTidalHarvestMode(entityId: string, active: boolean): void {
+  const state = getTidalBrowseState(entityId);
+  if (state) state.harvestMode = active;
+}
+
+export function getTidalHarvestMode(entityId: string): boolean {
+  return getTidalBrowseState(entityId)?.harvestMode ?? false;
+}
+
+export function getTidalThumbnailForTitle(entityId: string, title: string, resolver: (state: TidalBrowseState, title: string) => string): string {
+  const state = getTidalBrowseState(entityId);
+  if (!state) {
+    return "";
+  }
+  return resolver(state, title);
 }

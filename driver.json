@@ -23,7 +23,7 @@
         "field": {
           "label": {
             "value": {
-              "en": "This integration will allow you to control Onkyo AVRs on your network. Use the 'Configure' action to enter model/IP manually, or leave blank to autodiscover."
+              "en": "This integration will allow you to control Onkyo / Pioneer / Integra AVRs on your network. Use the 'Configure' action to enter model/IP manually, or leave blank to autodiscover."
             }
           }
         }

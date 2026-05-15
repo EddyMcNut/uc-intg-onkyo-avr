@@ -9,6 +9,7 @@ import { avrStateManager } from "./avrState.js";
 import { DEFAULT_QUEUE_THRESHOLD, buildEntityId } from "./configManager.js";
 import { delay } from "./utils.js";
 import { NETWORK_SERVICES, NO_TITLE } from "./constants.js";
+import { getTidalHarvestMode, setTidalNlsCursorOffset, setTidalNlsLayerNumber, setTidalTotalListItemCount } from "./tidalBrowserStore.js";
 
 export interface EiscpConfig {
   host?: string;
@@ -369,7 +370,34 @@ export class EiscpDriver extends EventEmitter {
   }
 
   private handleNLT(value: string, result: CommandResult): CommandResult {
-    // NLT format: hex payload followed by ASCII text. The text may be uppercase (e.g. "TIDAL"),
+    // NLT format: xx u y cccc iiii ll s r aa bb ss [title text]  (all hex until title)
+    //   xx   = service type (2 hex chars)
+    //   u    = UI type (1 char)
+    //   y    = layer info (1 char)
+    //   cccc = cursor position, 0-based absolute (4 hex chars) — chars 4-7
+    //   iiii = total item count (4 hex chars)                  — chars 8-11
+    const entityId = buildEntityId(this.config.model!, this.config.host!, result.zone);
+
+    if (value.length >= 12) {
+      const cursorHex = value.substring(4, 8);
+      const countHex = value.substring(8, 12);
+      const layerHex = value.length >= 14 ? value.substring(12, 14) : "";
+      if (/^[0-9A-Fa-f]{4}$/.test(cursorHex) && /^[0-9A-Fa-f]{4}$/.test(countHex)) {
+        const cursorOffset = parseInt(cursorHex, 16);
+        const totalCount = parseInt(countHex, 16);
+        const layerNumber = /^[0-9A-Fa-f]{2}$/.test(layerHex) ? parseInt(layerHex, 16) : 0;
+        if (avrStateManager.getSubSource(entityId) === "tidal") {
+          // Don't overwrite the cursor during harvest — the loop manages it locally.
+          if (!getTidalHarvestMode(entityId)) {
+            setTidalNlsCursorOffset(entityId, cursorOffset);
+          }
+          setTidalTotalListItemCount(entityId, totalCount);
+          if (layerNumber > 0) setTidalNlsLayerNumber(entityId, layerNumber);
+        }
+      }
+    }
+
+    // The hex payload is followed by ASCII/UTF-8 title text. The text may be uppercase (e.g. "TIDAL"),
     // so detect the first non-hex character instead of relying on title casing.
     const asciiStart = value.search(/[^0-9A-Fa-f]/);
     if (asciiStart === -1) {
@@ -381,7 +409,6 @@ export class EiscpDriver extends EventEmitter {
       return result;
     }
 
-    const entityId = buildEntityId(this.config.model!, this.config.host!, result.zone);
     const currentSource = avrStateManager.getSource(entityId);
 
     // Check if the title contains a known network service name
@@ -722,7 +749,7 @@ export class EiscpDriver extends EventEmitter {
           let command = iscp_message.slice(0, 3);
           let value = iscp_message.slice(3);
 
-          // log.info("%s RAW (0) RECEIVE: [%s] %s %s", integrationName, command, value);
+          log.info("%s RAW (0) RECEIVE: [%s] %s %s", integrationName, command, value);
 
           if (IGNORED_COMMANDS.has(command)) {
             continue;

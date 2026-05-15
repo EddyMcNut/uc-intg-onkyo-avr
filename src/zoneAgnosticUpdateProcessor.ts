@@ -4,8 +4,8 @@ import { OnkyoConfig } from "./configManager.js";
 import { EiscpDriver } from "./eiscp.js";
 import log from "./loggers.js";
 import { NETWORK_SERVICES, SONG_INFO } from "./constants.js";
-import { hasTuneInPresets, ingestTidalListEntry, ingestTuneInListEntry, ingestTuneInXmlEntries, setTuneInBrowseContext } from "./mediaBrowser.js";
-import { resetTidalBrowseState } from "./tidalBrowserStore.js";
+import { hasTuneInPresets, ingestTidalListEntry, ingestTidalXmlEntries, ingestTuneInListEntry, ingestTuneInXmlEntries, setTuneInBrowseContext } from "./mediaBrowser.js";
+import { resetTidalBrowseState, setTidalNowPlayingTitle } from "./tidalBrowserStore.js";
 import { TuneInPreloader } from "./tuneInPreloader.js";
 import { ZoneAgnosticMediaStateStore } from "./zoneAgnosticMediaState.js";
 import { ZoneMediaRenderer } from "./zoneMediaRenderer.js";
@@ -220,6 +220,9 @@ export class ZoneAgnosticUpdateProcessor {
     for (const zoneEntityId of this.getTuneInZones(sourceEntityId)) {
       ingestTuneInXmlEntries(zoneEntityId, xmlPayload);
     }
+    for (const zoneEntityId of this.getTidalZones(sourceEntityId)) {
+      ingestTidalXmlEntries(zoneEntityId, xmlPayload);
+    }
   }
 
   async handleFld(sourceEntityId: string, frontPanelText: string, eventZone: string): Promise<void> {
@@ -292,6 +295,11 @@ export class ZoneAgnosticUpdateProcessor {
     for (const zoneEntityId of affectedZones) {
       this.mediaStateStore.updateNowPlaying(zoneEntityId, "net", { title, album, artist });
       await this.renderZoneMedia(zoneEntityId, true);
+
+      if (avrStateManager.getSubSource(zoneEntityId) === "tidal") {
+        // NLS entries use "Song - Artist" format, which matches what NTI (stored in argument.artist) returns.
+        setTidalNowPlayingTitle(zoneEntityId, artist);
+      }
     }
 
     if (affectedZones.length > 0) {

@@ -3,7 +3,7 @@ import { createServiceThumbnails } from "./serviceThumbnails.js";
 
 const { createBackdrop, getOrCreateThumbnail } = createServiceThumbnails({
   svgFileName: "tidal.svg",
-  logoTransform: "translate(135 180) scale(.20655)",
+  logoTransform: "translate(245 248) scale(.103275)",
   logoPathAttrs: 'fill="#ffffff"',
   backgroundColor: "#000000",
   fallbackLabel: "TIDAL",

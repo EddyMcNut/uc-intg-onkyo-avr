@@ -5,6 +5,7 @@ import log from "./loggers.js";
 import { delay } from "./utils.js";
 import { ALBUM_ART, SONG_INFO } from "./constants.js";
 import type { CommandReceiver } from "./commandReceiver.js";
+import { resetTidalBrowseState } from "./tidalBrowserStore.js";
 
 const integrationName = "avrState:";
 
@@ -317,6 +318,14 @@ class AvrStateManager {
       await eiscpInstance.raw("NTIQSTN"); // Query title
       await eiscpInstance.raw("NALQSTN"); // Query album
       await eiscpInstance.raw("NSTQSTN"); // Query play/pause status
+    }
+
+    // For Tidal, reset the browse state and re-request the NLS list so the media browser stays fresh
+    if (currentSubSource === "tidal") {
+      log.info("%s [%s] refreshing Tidal browse state via NTCTOP + NTCSELECT", integrationName, entityId);
+      resetTidalBrowseState(entityId);
+      await eiscpInstance.raw("NTCTOP");
+      await eiscpInstance.raw("NTCSELECT");
     }
   }
 

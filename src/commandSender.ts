@@ -27,52 +27,6 @@ export class CommandSender {
     this.config = config;
   }
 
-  private async preserveMainAroundZoneSubsource(model: string, host: string, zone: string, action: () => Promise<void>): Promise<void> {
-    if (zone === "main") {
-      // first simple check, as most commands will be for main zone then no need to do any extra processing
-      await action();
-      return;
-    } else {
-      const targetEntityId = buildEntityId(model, host, zone);
-      const mainEntityId = buildEntityId(model, host, "main");
-      const targetSubSource = avrStateManager.getSubSource(targetEntityId);
-      const mainSubSource = avrStateManager.getSubSource(mainEntityId);
-
-      if (targetSubSource === mainSubSource) {
-        // no need to switch main source to a different subsource to cater for a request of zones 2/3
-        log.info("%s [%s] ***************** no need to switch main subsource for zone '%s'.", integrationName, targetEntityId, zone);
-        log.info("%s [%s] ***************** targetEntityId=%s mainEntityId=%s", integrationName, targetEntityId, targetEntityId, mainEntityId);
-        log.info("%s [%s] ***************** targetSubSource=%s mainSubSource=%s", integrationName, targetEntityId, targetSubSource, mainSubSource);
-        await action();
-        return;
-      }
-
-      // we are here because of a command coming from zone2/3 which needs to switch subsource (of NET) for the main zone
-      const mainSourceBefore = avrStateManager.getSource(mainEntityId);
-      const mainPowerBefore = avrStateManager.getPowerState(mainEntityId);
-      const mainVolumeBefore = avrStateManager.getVolume(mainEntityId);
-
-      log.info("%s [%s] ***************** need to switch main subsource because of a command for zone '%s'.", integrationName, targetEntityId, zone);
-      await this.eiscp.command(`main input-selector net`); // main switch to new subsource or is NET good enough?
-      await delay(DEFAULT_QUEUE_THRESHOLD);
-      await this.eiscp.command(`main volume 0`);
-      await delay(DEFAULT_QUEUE_THRESHOLD);
-      await action();
-
-      if (mainPowerBefore === "on") {
-        await delay(DEFAULT_QUEUE_THRESHOLD);
-        await this.eiscp.command(`main input-selector ${mainSourceBefore}`);
-        await delay(DEFAULT_QUEUE_THRESHOLD);
-        await this.eiscp.command(`main volume ${mainVolumeBefore}`);
-        log.info("%s [%s ***************** main zone restored to %s and volume level %s after NET subsource change for %s.", integrationName, targetEntityId, mainSourceBefore, mainVolumeBefore, zone);
-      } else {
-        await delay(DEFAULT_QUEUE_THRESHOLD * 3);
-        this.eiscp.command(`main system-power standby`);
-        log.info("%s [%s] ***************** main zone restored to %s after NET subsource change for %s.", integrationName, targetEntityId, mainPowerBefore, zone);
-      }
-    }
-  }
-
   async sharedCmdHandler(entity: uc.Entity, cmdId: string, params?: { [key: string]: string | number | boolean }): Promise<uc.StatusCodes> {
     const entityParts = entity.id.split(" ");
     if (entityParts.length < 3) {

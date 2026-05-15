@@ -4,13 +4,13 @@ import { avrStateManager } from "./avrState.js";
 import log from "./loggers.js";
 import { looksLikeTuneInDirectory, normalizeTuneInLabel, parseTuneInXmlItems } from "./tuneInFilters.js";
 import { addTuneInPreset, getTuneInBrowseState, listTuneInPresets, type TuneInPreset, setTuneInBrowseContextState } from "./tuneInBrowserStore.js";
-import { addTidalMenuOption, listTidalMenuOptions, shouldShowTidalMainMenuShortcut, type TidalMenuOption } from "./tidalBrowserStore.js";
+import { addTidalMenuOption, listTidalMenuOptions, shouldShowTidalMainMenuShortcut, getTidalNowPlayingTitle, getTidalThumbnailForTitle, getTidalNlsCursorOffset, type TidalMenuOption } from "./tidalBrowserStore.js";
 import { createTuneInBackdrop, getOrCreateTuneInThumbnail } from "./tuneInThumbnails.js";
 import { createTidalBackdrop, getOrCreateTidalThumbnail } from "./tidalThumbnails.js";
 
 const integrationName = "mediaBrowser:";
-const DEFAULT_BROWSE_PAGE_SIZE = 25;
-const MAX_BROWSE_PAGE_SIZE = 50;
+const DEFAULT_BROWSE_PAGE_SIZE = 500;
+const MAX_BROWSE_PAGE_SIZE = 500;
 
 export const TUNEIN_ROOT_ID = "tunein:root";
 export const TUNEIN_ROOT_TYPE = "tunein://presets";
@@ -73,6 +73,19 @@ export function ingestTuneInXmlEntries(entityId: string, xmlPayload: string): vo
   }
 }
 
+export function ingestTidalXmlEntries(entityId: string, xmlPayload: string): void {
+  if (!xmlPayload) return;
+  const existingTitles = new Set(listTidalMenuOptions(entityId).map((o) => o.title));
+  let nextIndex = listTidalMenuOptions(entityId).length + 1;
+  for (const item of parseTuneInXmlItems(xmlPayload)) {
+    if (!item.title || existingTitles.has(item.title)) continue;
+    addTidalMenuOption(entityId, nextIndex++, item.title, getOrCreateTidalThumbnail);
+    existingTitles.add(item.title);
+  }
+}
+
+const TIDAL_EXCLUDED_MENU_TITLES = new Set(["search", "logout"]);
+
 export function ingestTidalListEntry(entityId: string, entry: string): void {
   const match = entry.match(/^U(\d+)-(.*)$/);
   if (!match) {
@@ -89,7 +102,16 @@ export function ingestTidalListEntry(entityId: string, entry: string): void {
     return;
   }
 
-  addTidalMenuOption(entityId, parsedIndex + 1, title, getOrCreateTidalThumbnail);
+  if (TIDAL_EXCLUDED_MENU_TITLES.has(title.toLowerCase())) {
+    return;
+  }
+
+  // NLS display lines (0-9) are window-relative. The NLT `cccc` field is the cursor position (0-based),
+  // NOT the window start. Window start = max(0, cursor - 9). Absolute 1-based index = windowStart + line + 1.
+  const cursorOffset = getTidalNlsCursorOffset(entityId);
+  const windowStart = Math.max(0, cursorOffset - 9);
+  const absoluteMenuIndex = windowStart + parsedIndex + 1;
+  addTidalMenuOption(entityId, absoluteMenuIndex, title, getOrCreateTidalThumbnail);
 }
 
 export function getTuneInPresetCount(entityId: string): number {
@@ -191,22 +213,28 @@ function createTuneInPresetItem(preset: TuneInPreset): uc.BrowseMediaItem {
   });
 }
 
-function createTidalMenuItem(option: TidalMenuOption): uc.BrowseMediaItem {
+function createTidalMenuItem(option: TidalMenuOption, nowPlayingTitle: string): uc.BrowseMediaItem {
+  const isNowPlaying =
+    !option.isBrowsable &&
+    nowPlayingTitle.length > 0 &&
+    option.title.toLowerCase() === nowPlayingTitle.toLowerCase();
+
   return new uc.BrowseMediaItem(option.mediaId, option.title, {
     can_browse: option.isBrowsable,
     can_play: !option.isBrowsable,
     media_class: option.isBrowsable ? uc.KnownMediaClass.Directory : uc.KnownMediaClass.Track,
     media_type: TIDAL_ROOT_TYPE,
-    thumbnail: option.thumbnail || "icon://uc:music"
+    thumbnail: option.thumbnail || "icon://uc:music",
+    subtitle: isNowPlaying ? "▶ Now Playing" : undefined
   });
 }
 
-function createTidalMainMenuItem(): uc.BrowseMediaItem {
+function createTidalMainMenuItem(entityId: string): uc.BrowseMediaItem {
   return new uc.BrowseMediaItem(TIDAL_MAIN_MENU_ID, "Main Tidal Menu", {
     can_browse: true,
     media_class: uc.KnownMediaClass.Directory,
     media_type: TIDAL_ROOT_TYPE,
-    thumbnail: createTidalBackdrop()
+    thumbnail: getTidalThumbnailForTitle(entityId, "Main Tidal Menu", getOrCreateTidalThumbnail) || createTidalBackdrop()
   });
 }
 
@@ -215,18 +243,16 @@ function getTuneInRootItemCount(presetCount: number): number {
 }
 
 function withTuneInPaging(options: uc.BrowseOptions): uc.BrowseOptions {
-  const paging = options.paging ?? new uc.Paging(1, DEFAULT_BROWSE_PAGE_SIZE);
   return {
     ...options,
-    paging: new uc.Paging(paging.page, Math.min(paging.limit, MAX_BROWSE_PAGE_SIZE))
+    paging: new uc.Paging(options.paging?.page ?? 1, MAX_BROWSE_PAGE_SIZE)
   };
 }
 
 function withTidalPaging(options: uc.BrowseOptions): uc.BrowseOptions {
-  const paging = options.paging ?? new uc.Paging(1, DEFAULT_BROWSE_PAGE_SIZE);
   return {
     ...options,
-    paging: new uc.Paging(paging.page, Math.min(paging.limit, MAX_BROWSE_PAGE_SIZE))
+    paging: new uc.Paging(options.paging?.page ?? 1, MAX_BROWSE_PAGE_SIZE)
   };
 }
 
@@ -245,9 +271,10 @@ function createRootItem(entityId: string, paging: uc.Paging): uc.BrowseMediaItem
 
 function createTidalRootItem(entityId: string, paging: uc.Paging): uc.BrowseMediaItem {
   const options = getTidalMenuOptions(entityId);
+  const nowPlayingTitle = getTidalNowPlayingTitle(entityId);
   const rootItems = shouldShowTidalMainMenuShortcut(entityId)
-    ? [createTidalMainMenuItem(), ...options.map((option) => createTidalMenuItem(option))]
-    : options.map((option) => createTidalMenuItem(option));
+    ? [createTidalMainMenuItem(entityId), ...options.map((option) => createTidalMenuItem(option, nowPlayingTitle))]
+    : options.map((option) => createTidalMenuItem(option, nowPlayingTitle));
   const items = rootItems.slice(paging.offset, paging.offset + paging.limit);
 
   return new uc.BrowseMediaItem(TIDAL_ROOT_ID, "Tidal", {

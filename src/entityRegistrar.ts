@@ -11,7 +11,12 @@ import {
   markTidalListModeActive,
   markTraceNextTidalSelectionAfterMainMenu,
   resetTidalBrowseState,
-  setTidalMainMenuShortcut
+  setTidalMainMenuShortcut,
+  getTidalTotalListItemCount,
+  getTidalHarvestMode,
+  getTidalNlsLayerNumber,
+  setTidalHarvestMode,
+  setTidalNlsCursorOffset
 } from "./tidalBrowserStore.js";
 import log from "./loggers.js";
 import { delay } from "./utils.js";
@@ -19,7 +24,13 @@ import { delay } from "./utils.js";
 const integrationName = "entityRegistrar:";
 
 export default class EntityRegistrar {
-  constructor() {}
+  private tidalListSequence = 0;
+
+  private nextTidalListSequence(): string {
+    const seq = this.tidalListSequence & 0xffff;
+    this.tidalListSequence = (this.tidalListSequence + 1) & 0xffff;
+    return seq.toString(16).toUpperCase().padStart(4, "0");
+  }
 
   private buildTidalMenuSignature(entityId: string): string {
     const options = listTidalMenuOptions(entityId);
@@ -53,6 +64,52 @@ export default class EntityRegistrar {
         lastSignature = current;
       }
     } while (Date.now() < deadline);
+  }
+
+  /**
+   * Send NLAL requests for Tidal to retrieve list items as XML — same mechanism TuneIn uses.
+   * This runs in the background after the browse callback already returned the first 10 items.
+   */
+  private async harvestTidalListItems(
+    entityId: string,
+    menuDelay: number,
+    rawSend: (cmd: string) => Promise<void>
+  ): Promise<void> {
+    // Guard: don't start a second harvest if one is already running.
+    if (getTidalHarvestMode(entityId)) return;
+
+    const total = getTidalTotalListItemCount(entityId);
+    if (total <= 0) return;
+
+    const currentCount = listTidalMenuOptions(entityId).length;
+    if (currentCount >= total) return;
+
+    const countHex = Math.min(total, 0x03e7).toString(16).toUpperCase().padStart(4, "0"); // up to 999
+    const scanDelay = Math.max(150, Math.min(Math.floor(menuDelay / 3), 400));
+
+    // Use the layer number from the NLT ll field — it's the exact layer NLAL needs.
+    // Try that layer first, then neighbours as fallback.
+    const knownLayer = getTidalNlsLayerNumber(entityId);
+    const layersToTry = knownLayer > 0
+      ? [knownLayer, knownLayer - 1, knownLayer + 1].filter((l) => l > 0).map((l) => l.toString(16).toUpperCase().padStart(2, "0"))
+      : ["02", "01", "03"];
+
+    log.info("%s [%s] Tidal NLAL harvest: need %d items, have %d, trying layers %s", integrationName, entityId, total, currentCount, layersToTry.join(","));
+
+    setTidalHarvestMode(entityId, true);
+    try {
+      for (const layer of layersToTry) {
+        await rawSend(`NLAL${this.nextTidalListSequence()}${layer}0000${countHex}`);
+        await delay(scanDelay);
+        if (listTidalMenuOptions(entityId).length >= total) break;
+      }
+      // Extra wait for the AVR to respond with all NLA XML packets.
+      await delay(scanDelay * 2);
+    } finally {
+      setTidalHarvestMode(entityId, false);
+    }
+
+    log.info("%s [%s] Tidal NLAL harvest complete: %d/%d items", integrationName, entityId, listTidalMenuOptions(entityId).length, total);
   }
 
   /**
@@ -121,7 +178,8 @@ export default class EntityRegistrar {
   createMediaPlayerEntity(
     avrEntry: string,
     volumeScale: number,
-    cmdHandler?: (entity: uc.Entity, cmdId: string, params?: { [key: string]: string | number | boolean }) => Promise<uc.StatusCodes>
+    cmdHandler?: (entity: uc.Entity, cmdId: string, params?: { [key: string]: string | number | boolean }) => Promise<uc.StatusCodes>,
+    rawSend?: (cmd: string) => Promise<void>
   ): uc.MediaPlayer {
     const displayBaseName = this.getDisplayBaseName(avrEntry);
     const mediaPlayerEntity = new uc.MediaPlayer(
@@ -188,6 +246,10 @@ export default class EntityRegistrar {
 
         await this.waitForTidalMenuStable(avrEntry, beforeSignature, menuDelay);
         markTidalListModeActive(avrEntry);
+        if (rawSend) {
+          // Fire harvest in the background so the remote gets the first 10 items immediately.
+          void this.harvestTidalListItems(avrEntry, menuDelay, rawSend);
+        }
 
         return browseMedia(avrEntry, {
           ...options,
@@ -195,7 +257,7 @@ export default class EntityRegistrar {
           media_type: TIDAL_ROOT_TYPE
         });
       }
-      
+
       if (tidalSelection && cmdHandler) {
         setTidalMainMenuShortcut(avrEntry, true);
         
@@ -215,6 +277,10 @@ export default class EntityRegistrar {
 
           await this.waitForTidalMenuStable(avrEntry, beforeSignature, menuDelay);
           markTidalListModeActive(avrEntry);
+          if (rawSend) {
+            // Fire harvest in the background so the remote gets the first 10 items immediately.
+            void this.harvestTidalListItems(avrEntry, menuDelay, rawSend);
+          }
         }
 
         return browseMedia(avrEntry, {
