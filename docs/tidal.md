@@ -1,6 +1,6 @@
 ## Tidal
 
-As your AVR can logon to Tidal with your account, the integration can be used to browse to the Tidal menu.
+As your AVR can logon to Tidal with your account, the integration can be used to browse the Tidal menu.
 
 This integration will try to collect the album art, artist, title and album. All this is collected from the AVR, this integration does not communicate with Tidal directly. All commands, like `browse`, `play/pause`, `next` and `previous`, will be send to the AVR, the AVR will handle the communication with the Tidal service.
 
