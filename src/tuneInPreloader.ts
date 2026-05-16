@@ -10,6 +10,7 @@ type PhysicalAvrIdResolver = (entityId: string) => string;
 export class TuneInPreloader {
   private readonly tuneInPreloadInFlight = new Set<string>();
   private tuneInListSequence = 0;
+  private abortRequested = false;
 
   constructor(
     private readonly eiscpInstance: EiscpDriver,
@@ -37,6 +38,7 @@ export class TuneInPreloader {
 
     this.tuneInPreloadInFlight.add(physicalAvrId);
     const menuDelay = this.eiscpInstance["config"]?.netMenuDelay ?? 2500;
+      this.abortRequested = false;
     const myPresetsPosition = String(this.eiscpInstance["config"]?.tuneinPresetPosition ?? 1).padStart(5, "0");
     const scanDelay = Math.max(200, Math.min(menuDelay || 0, 1000));
 
@@ -52,36 +54,27 @@ export class TuneInPreloader {
       await this.requestTuneInPresetXml();
       await delay(scanDelay);
 
-      let lastCount = getTuneInPresetCount(entityId);
-      let stagnantSteps = 0;
-      const minimumScrollSteps = 12;
-      const maxStagnantSteps = 12;
-
-      for (let step = 0; step < 40 && (step < minimumScrollSteps || stagnantSteps < maxStagnantSteps); step += 1) {
-        await this.eiscpInstance.raw("NTCDOWN");
-        await delay(scanDelay);
-
-        if ((step + 1) % 10 === 0) {
-          await this.requestTuneInPresetXml();
-          await delay(scanDelay);
-        }
-
-        const count = getTuneInPresetCount(entityId);
-        if (count > lastCount) {
-          lastCount = count;
-          stagnantSteps = 0;
-        } else {
-          stagnantSteps += 1;
-        }
-      }
-
+      const lastCount = getTuneInPresetCount(entityId);
       if (lastCount > 0) {
-        log.info("%s [%s] harvested %d TuneIn preset(s) from paged AVR list updates", integrationName, entityId, lastCount);
+        log.info("%s [%s] harvested %d TuneIn preset(s) from NLAL", integrationName, entityId, lastCount);
       }
     } catch (err) {
       log.warn("%s [%s] failed to preload TuneIn My Presets: %s", integrationName, entityId, err);
     } finally {
       this.tuneInPreloadInFlight.delete(physicalAvrId);
     }
+  }
+
+  /**
+   * Aborts an in-flight preload for this AVR. Returns true if a preload was actually
+   * running (and has been flagged to stop), false if nothing was in flight.
+   */
+  abortPreload(entityId: string): boolean {
+    const physicalAvrId = this.resolvePhysicalAvrId(entityId);
+    if (this.tuneInPreloadInFlight.has(physicalAvrId)) {
+      this.abortRequested = true;
+      return true;
+    }
+    return false;
   }
 }

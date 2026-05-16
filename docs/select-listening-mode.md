@@ -23,6 +23,5 @@ As the list of all known options is very long and the AVR does not return a dyna
   - If you enter `none` the select-entity will not be created.
   - The configured list is saved, included in backups, and persists across reboots.
 
-[back to Listening modes](./listening-modes.md)
+[Listening modes](./listening-modes.md)
 
-[back to main README](../README.md#listening-modes)

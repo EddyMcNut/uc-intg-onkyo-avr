@@ -1,10 +1,10 @@
 {
   "driver_id": "onkyo_avr_custom_driver",
-  "version": "0.8.6",
+  "version": "0.8.7",
   "min_core_api": "0.20.0",
   "name": { "en": "Onkyo/Pioneer/Integra AVR" },
   "icon": "uc:music",
-  "description": { "en": "Custom integration for Unfolded Circle remotes to control your Onkyo / Pioneer / Integra AVR." },
+  "description": { "en": "Custom integration for Unfolded Circle remotes to control your Onkyo / Pioneer / Integra AVR using the eISCP protocol." },
   "developer": {
     "name": "Ed Nootebos",
     "url": "https://github.com/EddyMcNut/uc-intg-onkyo-avr"
@@ -23,7 +23,7 @@
         "field": {
           "label": {
             "value": {
-              "en": "This integration will allow you to control Onkyo AVRs on your network. Use the 'Configure' action to enter model/IP manually, or leave blank to autodiscover."
+              "en": "This integration will allow you to control Onkyo / Pioneer / Integra AVRs on your network. Use the 'Configure' action to enter model/IP manually, or leave blank to autodiscover."
             }
           }
         }

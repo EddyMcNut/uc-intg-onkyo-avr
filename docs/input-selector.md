@@ -114,8 +114,6 @@ _If a service like Spotify is not a selectable input source on your AVR, just us
 | `input-selector alexa`          |
 | `input-selector music-server`   |
 
-[back to main README](../README.md#input-source)
-
 [more on how to send different commands through `Input source`](./cheats.md)
 
 [activities examples](../README.md#installation-and-usage)

@@ -4,7 +4,8 @@ import { OnkyoConfig } from "./configManager.js";
 import { EiscpDriver } from "./eiscp.js";
 import log from "./loggers.js";
 import { NETWORK_SERVICES, SONG_INFO } from "./constants.js";
-import { hasTuneInPresets, ingestTuneInListEntry, ingestTuneInXmlEntries, setTuneInBrowseContext } from "./mediaBrowser.js";
+import { hasTuneInPresets, ingestTidalListEntry, ingestTidalXmlEntries, ingestTuneInListEntry, ingestTuneInXmlEntries, setTuneInBrowseContext } from "./mediaBrowser.js";
+import { resetTidalBrowseState, setTidalNowPlayingTitle } from "./tidalBrowserStore.js";
 import { TuneInPreloader } from "./tuneInPreloader.js";
 import { ZoneAgnosticMediaStateStore } from "./zoneAgnosticMediaState.js";
 import { ZoneMediaRenderer } from "./zoneMediaRenderer.js";
@@ -47,7 +48,21 @@ export class ZoneAgnosticUpdateProcessor {
   }
 
   private getTuneInZones(sourceEntityId: string): string[] {
-    return this.getNetZones(sourceEntityId).filter((zoneEntityId) => avrStateManager.getSubSource(zoneEntityId) === "tunein");
+    const netZones = this.getNetZones(sourceEntityId).filter((zoneEntityId) => avrStateManager.getSubSource(zoneEntityId) === "tunein");
+    if (netZones.length > 0) {
+      return netZones;
+    }
+
+    return avrStateManager.getSubSource(sourceEntityId) === "tunein" ? [sourceEntityId] : [];
+  }
+
+  private getTidalZones(sourceEntityId: string): string[] {
+    const netZones = this.getNetZones(sourceEntityId).filter((zoneEntityId) => avrStateManager.getSubSource(zoneEntityId) === "tidal");
+    if (netZones.length > 0) {
+      return netZones;
+    }
+
+    return avrStateManager.getSubSource(sourceEntityId) === "tidal" ? [sourceEntityId] : [];
   }
 
   private updateFrontPanelDisplay(zoneEntityIds: string[], text: string): void {
@@ -86,11 +101,19 @@ export class ZoneAgnosticUpdateProcessor {
   }
 
   async maybeUpdateImage(entityId: string, force: boolean = false): Promise<void> {
-    await this.mediaRenderer.maybeUpdateImage(entityId, force);
+    await this.mediaRenderer.maybeUpdateImage(entityId,);
   }
 
   private async preloadTuneInPresets(entityId: string): Promise<void> {
     await this.tuneInPreloader.preloadTuneInPresets(entityId);
+  }
+
+  /**
+   * Aborts an in-flight TuneIn preload for the given entity's AVR.
+   * Returns true if a preload was running and has been flagged to stop.
+   */
+  abortTuneInPreload(entityId: string): boolean {
+    return this.tuneInPreloader.abortPreload(entityId);
   }
 
   async handleIfa(
@@ -144,16 +167,28 @@ export class ZoneAgnosticUpdateProcessor {
   }
 
   async handleNlt(sourceEntityId: string, serviceName: string, eventZone: string): Promise<void> {
-    const affectedZones = this.getNetZones(sourceEntityId);
+    const netZones = this.getNetZones(sourceEntityId);
+    const affectedZones = netZones.length > 0 ? netZones : [sourceEntityId];
     const normalizedService = serviceName.toLowerCase();
+    const enteringTidalZones = new Set<string>();
 
     for (const zoneEntityId of affectedZones) {
+      const previousSubSource = avrStateManager.getSubSource(zoneEntityId);
       avrStateManager.setSubSource(zoneEntityId, serviceName, this.eiscpInstance, eventZone, this.driver);
+      if (normalizedService === "tidal" && previousSubSource !== "tidal") {
+        enteringTidalZones.add(zoneEntityId);
+      }
     }
     this.updateFrontPanelDisplay(affectedZones, serviceName);
 
     if (normalizedService === "tunein") {
       await this.maybePreloadTuneIn(sourceEntityId, affectedZones);
+    }
+
+    if (normalizedService === "tidal") {
+      for (const zoneEntityId of enteringTidalZones) {
+        resetTidalBrowseState(zoneEntityId);
+      }
     }
 
     await this.maybeRequestSongInfo(normalizedService, affectedZones.length);
@@ -175,11 +210,18 @@ export class ZoneAgnosticUpdateProcessor {
     for (const zoneEntityId of this.getTuneInZones(sourceEntityId)) {
       ingestTuneInListEntry(zoneEntityId, entry);
     }
+
+    for (const zoneEntityId of this.getTidalZones(sourceEntityId)) {
+      ingestTidalListEntry(zoneEntityId, entry);
+    }
   }
 
   async handleNla(sourceEntityId: string, xmlPayload: string): Promise<void> {
     for (const zoneEntityId of this.getTuneInZones(sourceEntityId)) {
       ingestTuneInXmlEntries(zoneEntityId, xmlPayload);
+    }
+    for (const zoneEntityId of this.getTidalZones(sourceEntityId)) {
+      ingestTidalXmlEntries(zoneEntityId, xmlPayload);
     }
   }
 
@@ -203,17 +245,20 @@ export class ZoneAgnosticUpdateProcessor {
 
       if (detectedService) {
         const nextSubSource = detectedService.toLowerCase();
-        const needsUpdate = netZones.some((zoneEntityId) => avrStateManager.getSubSource(zoneEntityId) !== nextSubSource);
-        if (needsUpdate) {
-          for (const zoneEntityId of netZones) {
-            avrStateManager.setSubSource(zoneEntityId, nextSubSource, this.eiscpInstance, eventZone, this.driver);
+        // "Spotify / Track Title" is a now-playing scrolling display, not a service switch.
+        // Only update subSource when the FLD shows the service name alone (no " / " separator).
+        const isNowPlayingDisplay = normalizedText.includes(nextSubSource + " / ");
+        if (!isNowPlayingDisplay) {
+          const needsUpdate = netZones.some((zoneEntityId) => avrStateManager.getSubSource(zoneEntityId) !== nextSubSource);
+          if (needsUpdate) {
+            for (const zoneEntityId of netZones) {
+              avrStateManager.setSubSource(zoneEntityId, nextSubSource, this.eiscpInstance, eventZone, this.driver);
+            }
+          }
+          if (nextSubSource === "tunein") {
+            await this.maybePreloadTuneIn(sourceEntityId, netZones);
           }
         }
-
-        if (nextSubSource === "tunein") {
-          await this.maybePreloadTuneIn(sourceEntityId, netZones);
-        }
-
         await this.maybeRequestSongInfo(nextSubSource, netZones.length);
       }
 
@@ -250,6 +295,11 @@ export class ZoneAgnosticUpdateProcessor {
     for (const zoneEntityId of affectedZones) {
       this.mediaStateStore.updateNowPlaying(zoneEntityId, "net", { title, album, artist });
       await this.renderZoneMedia(zoneEntityId, true);
+
+      if (avrStateManager.getSubSource(zoneEntityId) === "tidal") {
+        // NLS entries use "Song - Artist" format, which matches what NTI (stored in argument.artist) returns.
+        setTidalNowPlayingTitle(zoneEntityId, artist);
+      }
     }
 
     if (affectedZones.length > 0) {

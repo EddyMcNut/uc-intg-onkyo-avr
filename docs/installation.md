@@ -37,4 +37,3 @@ _next to the AVR entity, the integration also creates several [sensors](./sensor
 
 ![](../screenshots/select-entity.png)
 
-[back to main README](../README.md#installation-and-usage)

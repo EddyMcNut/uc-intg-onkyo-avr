@@ -19,13 +19,9 @@ export class ZoneMediaRenderer {
     this.config = config;
   }
 
-  async maybeUpdateImage(entityId: string, force: boolean = false): Promise<void> {
+  async maybeUpdateImage(entityId: string): Promise<void> {
     if (!this.config.albumArtURL || this.config.albumArtURL === "na") {
       return;
-    }
-
-    if(force) {
-      log.info("%s forcing image update obsolete?", entityId);
     }
 
     const sharedState = this.mediaStateStore.getSharedAvrMediaState(entityId);
@@ -83,7 +79,7 @@ export class ZoneMediaRenderer {
           }
 
           if (forceUpdate || !sharedState.currentImageUrl) {
-            await this.maybeUpdateImage(entityId, forceUpdate);
+            await this.maybeUpdateImage(entityId);
           }
         }
         break;

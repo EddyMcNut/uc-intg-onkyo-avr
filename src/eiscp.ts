@@ -9,6 +9,7 @@ import { avrStateManager } from "./avrState.js";
 import { DEFAULT_QUEUE_THRESHOLD, buildEntityId } from "./configManager.js";
 import { delay } from "./utils.js";
 import { NETWORK_SERVICES, NO_TITLE } from "./constants.js";
+import { getTidalHarvestMode, setTidalNlsCursorOffset, setTidalNlsLayerNumber, setTidalTotalListItemCount } from "./tidalBrowserStore.js";
 
 export interface EiscpConfig {
   host?: string;
@@ -113,6 +114,7 @@ export class EiscpDriver extends EventEmitter {
   private sendQueue: Promise<void> = Promise.resolve();
   private receiveQueue: Promise<void> = Promise.resolve();
   private currentMetadata: Metadata = {};
+  private tcpBuffer: Buffer = Buffer.alloc(0);
 
   /** Map of special command handlers for complex parsing logic */
   private readonly commandHandlers: Record<string, CommandHandler> = {
@@ -369,24 +371,50 @@ export class EiscpDriver extends EventEmitter {
   }
 
   private handleNLT(value: string, result: CommandResult): CommandResult {
-    // NLT format: hex data followed by ASCII text (e.g., "0E01000000090100FF0E00TuneIn Radio")
-    // Extract ASCII text portion after hex prefix
-    const textMatch = value.match(/[A-Z][a-z]/); // Find where actual text starts
-    if (!textMatch || textMatch.index === undefined) {
-      return result; // No text found, skip
+    // NLT format: xx u y cccc iiii ll s r aa bb ss [title text]  (all hex until title)
+    //   xx   = service type (2 hex chars)
+    //   u    = UI type (1 char)
+    //   y    = layer info (1 char)
+    //   cccc = cursor position, 0-based absolute (4 hex chars) — chars 4-7
+    //   iiii = total item count (4 hex chars)                  — chars 8-11
+    const entityId = buildEntityId(this.config.model!, this.config.host!, result.zone);
+
+    if (value.length >= 12) {
+      const cursorHex = value.substring(4, 8);
+      const countHex = value.substring(8, 12);
+      const layerHex = value.length >= 14 ? value.substring(12, 14) : "";
+      if (/^[0-9A-Fa-f]{4}$/.test(cursorHex) && /^[0-9A-Fa-f]{4}$/.test(countHex)) {
+        const cursorOffset = parseInt(cursorHex, 16);
+        const totalCount = parseInt(countHex, 16);
+        const layerNumber = /^[0-9A-Fa-f]{2}$/.test(layerHex) ? parseInt(layerHex, 16) : 0;
+        if (avrStateManager.getSubSource(entityId) === "tidal") {
+          // Don't overwrite the cursor during harvest — the loop manages it locally.
+          if (!getTidalHarvestMode(entityId)) {
+            setTidalNlsCursorOffset(entityId, cursorOffset);
+          }
+          setTidalTotalListItemCount(entityId, totalCount);
+          if (layerNumber > 0) setTidalNlsLayerNumber(entityId, layerNumber);
+        }
+      }
     }
 
-    const text = value.substring(textMatch.index).trim();
-    const entityId = buildEntityId(this.config.model!, this.config.host!, result.zone);
-    const currentSource = avrStateManager.getSource(entityId);
-
-    // Only process if source is NET
-    if (currentSource !== "net") {
+    // The hex payload is followed by ASCII/UTF-8 title text. The text may be uppercase (e.g. "TIDAL"),
+    // so detect the first non-hex character instead of relying on title casing.
+    const asciiStart = value.search(/[^0-9A-Fa-f]/);
+    if (asciiStart === -1) {
       return result;
     }
 
+    const text = value.substring(asciiStart).replace(/\s+%s$/i, "").trim();
+    if (!text) {
+      return result;
+    }
+
+    const currentSource = avrStateManager.getSource(entityId);
+
     // Check if the title contains a known network service name
-    const detectedService = NETWORK_SERVICES.find((service) => text.includes(service));
+    const normalizedText = text.toLowerCase();
+    const detectedService = NETWORK_SERVICES.find((service) => normalizedText.includes(service.toLowerCase()));
     if (detectedService) {
       const currentSubSource = avrStateManager.getSubSource(entityId);
       if (currentSubSource !== detectedService.toLowerCase()) {
@@ -396,7 +424,7 @@ export class EiscpDriver extends EventEmitter {
       }
     }
 
-    if (text.trim().toLowerCase() === "my presets") {
+    if (currentSource === "net" && normalizedText === "my presets") {
       result.command = "NLT_CONTEXT";
       result.argument = "My Presets";
       return result;
@@ -698,10 +726,12 @@ export class EiscpDriver extends EventEmitter {
     this.eiscp = net.connect(port, this.config.host!);
     this.eiscp
       .on("connect", () => {
+        this.tcpBuffer = Buffer.alloc(0); // Clear any stale bytes from a previous connection.
         this.is_connected = true;
         this.emit("connect"); // Emit connect event for waitForConnect()
       })
       .on("close", () => {
+        this.tcpBuffer = Buffer.alloc(0);
         const wasConnected = this.is_connected;
         this.is_connected = false;
         if (wasConnected) {
@@ -718,11 +748,39 @@ export class EiscpDriver extends EventEmitter {
         this.eiscp?.destroy();
       })
       .on("data", (data: Buffer) => {
-        for (const iscp_message of this.eiscp_packet_extract_all(data)) {
+        // Accumulate into a stream buffer — ISCP frames can be split across TCP segments.
+        this.tcpBuffer = Buffer.concat([this.tcpBuffer, data]);
+
+        let offset = 0;
+        while (offset + 16 <= this.tcpBuffer.length) {
+          // Verify ISCP magic at current offset.
+          if (this.tcpBuffer.toString("ascii", offset, offset + 4) !== "ISCP") {
+            // Out of sync — advance one byte and retry.
+            offset++;
+            continue;
+          }
+
+          const headerSize = this.tcpBuffer.readUInt32BE(offset + 4);
+          const dataSize = this.tcpBuffer.readUInt32BE(offset + 8);
+          if (headerSize < 16 || dataSize < 4) {
+            offset++;
+            continue;
+          }
+
+          const frameEnd = offset + headerSize + dataSize;
+          if (frameEnd > this.tcpBuffer.length) {
+            // Incomplete frame — wait for more TCP data.
+            break;
+          }
+
+          // Extract the complete ISC message (strip "!1" prefix and "\r\n" suffix).
+          const iscp_message = this.tcpBuffer.toString("ascii", offset + headerSize + 2, frameEnd - 2);
+          offset = frameEnd;
+
           let command = iscp_message.slice(0, 3);
           let value = iscp_message.slice(3);
 
-          // log.info("%s RAW (0) RECEIVE: [%s] %s %s", integrationName, command, value);
+          log.info("%s RAW (0) RECEIVE: [%s] %s %s", integrationName, command, value);
 
           if (IGNORED_COMMANDS.has(command)) {
             continue;
@@ -757,6 +815,9 @@ export class EiscpDriver extends EventEmitter {
             this.emit("data", dataPayload);
           }
         }
+
+        // Keep any unconsumed bytes for the next data event.
+        this.tcpBuffer = offset > 0 ? this.tcpBuffer.slice(offset) : this.tcpBuffer;
       });
     return { model: this.config.model!, host: this.config.host!, port: this.config.port! };
   }
@@ -878,6 +939,12 @@ export class EiscpDriver extends EventEmitter {
 
     log.debug("%s Sending %s (NET input for zone %s) before %s", integrationName, netCommand, zone, nssCode);
     await this.raw(netCommand); // Select NET input first
+    await delay(this.config.netMenuDelay ?? 2500); // Wait for AVR to switch/acknowledge NET input
+
+    // NTCTOP exits any active sub-service (e.g. Spotify) and returns to the NET root menu.
+    // Without this, if the AVR was already on NET/Spotify, SLI2B is a no-op and NLSI
+    // would select from Spotify's menu instead of the NET top-level service list.
+    await this.raw("NTCTOP");
     await delay(this.config.netMenuDelay ?? 2500); // Wait for AVR to fully load NET menu
 
     log.debug("%s Sending network service command: %s", integrationName, nssCode);
@@ -1001,6 +1068,14 @@ export class EiscpDriver extends EventEmitter {
         if (hasMain) volumeCommands.push("MVLDOWN1"); // Main zone volume down
         if (hasZone3) volumeCommands.push("VL3DOWN1"); // Zone 3 volume down
         break;
+      case "main-zone4-up":
+        if (hasMain) volumeCommands.push("MVLUP1"); // Main zone volume up
+        if (hasZone4) volumeCommands.push("VL4UP1"); // Zone 4 volume up
+        break;
+      case "main-zone4-down":
+        if (hasMain) volumeCommands.push("MVLDOWN1"); // Main zone volume down
+        if (hasZone4) volumeCommands.push("VL4DOWN1"); // Zone 4 volume down
+        break;
       case "zone2-zone3-up":
         if (hasZone2) volumeCommands.push("ZVLUP1"); // Zone 2 volume up
         if (hasZone3) volumeCommands.push("VL3UP1"); // Zone 3 volume up
@@ -1009,6 +1084,16 @@ export class EiscpDriver extends EventEmitter {
         if (hasZone2) volumeCommands.push("ZVLDOWN1"); // Zone 2 volume down
         if (hasZone3) volumeCommands.push("VL3DOWN1"); // Zone 3 volume down
         break;
+       case "zone2-zone3-zone4-up":
+        if (hasZone2) volumeCommands.push("ZVLUP1"); // Zone 2 volume up
+        if (hasZone3) volumeCommands.push("VL3UP1"); // Zone 3 volume up
+        if (hasZone4) volumeCommands.push("VL4UP1"); // Zone 4 volume up
+        break;
+      case "zone2-zone3-zone4-down":
+        if (hasZone2) volumeCommands.push("ZVLDOWN1"); // Zone 2 volume down
+        if (hasZone3) volumeCommands.push("VL3DOWN1"); // Zone 3 volume down
+        if (hasZone4) volumeCommands.push("VL4DOWN1"); // Zone 4 volume down
+        break;       
       default:
         log.warn("%s Unknown multi-zone-volume action: %s", integrationName, action);
         return;
@@ -1091,6 +1176,18 @@ export class EiscpDriver extends EventEmitter {
         if (hasMain) muteCommands.push("AMTTG"); // Main zone mute toggle
         if (hasZone3) muteCommands.push("MT3TG"); // Zone 3 mute toggle
         break;
+      case "main-zone4-on":
+        if (hasMain) muteCommands.push("AMT01"); // Main zone mute on
+        if (hasZone4) muteCommands.push("MT401"); // Zone 4 mute on
+        break;
+      case "main-zone4-off":
+        if (hasMain) muteCommands.push("AMT00"); // Main zone mute off
+        if (hasZone4) muteCommands.push("MT400"); // Zone 4 mute off
+        break;
+      case "main-zone4-toggle":
+        if (hasMain) muteCommands.push("AMTTG"); // Main zone mute toggle
+        if (hasZone4) muteCommands.push("MT4TG"); // Zone 4 mute toggle
+        break;
       case "zone2-zone3-on":
         if (hasZone2) muteCommands.push("ZMT01"); // Zone 2 mute on
         if (hasZone3) muteCommands.push("MT301"); // Zone 3 mute on
@@ -1102,6 +1199,21 @@ export class EiscpDriver extends EventEmitter {
       case "zone2-zone3-toggle":
         if (hasZone2) muteCommands.push("ZMTTG"); // Zone 2 mute toggle
         if (hasZone3) muteCommands.push("MT3TG"); // Zone 3 mute toggle
+        break;
+      case "zone2-zone3-zone4-on":
+        if (hasZone2) muteCommands.push("ZMT01"); // Zone 2 mute on
+        if (hasZone3) muteCommands.push("MT301"); // Zone 3 mute on
+        if (hasZone4) muteCommands.push("MT401"); // Zone 4 mute on
+        break;
+      case "zone2-zone3-zone4-off":
+        if (hasZone2) muteCommands.push("ZMT00"); // Zone 2 mute off
+        if (hasZone3) muteCommands.push("MT300"); // Zone 3 mute off
+        if (hasZone4) muteCommands.push("MT400"); // Zone 4 mute off
+        break;
+      case "zone2-zone3-zone4-toggle":
+        if (hasZone2) muteCommands.push("ZMTTG"); // Zone 2 mute toggle
+        if (hasZone3) muteCommands.push("MT3TG"); // Zone 3 mute toggle
+        if (hasZone4) muteCommands.push("MT4TG"); // Zone 4 mute toggle
         break;
       default:
         log.warn("%s Unknown multi-zone-muting action: %s", integrationName, action);

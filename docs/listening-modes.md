@@ -53,4 +53,3 @@ Different models sometimes use different names for a single listening mode, You 
 | pure-direct                                     |
 | stereo                                          |
 
-[back to main README](../README.md#listening-modes)

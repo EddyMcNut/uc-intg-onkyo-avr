@@ -5,5 +5,3 @@
 - Download
 
 ![](../screenshots/collect-logs.png)
-
-[back to main README](../README.md#collect-logs)

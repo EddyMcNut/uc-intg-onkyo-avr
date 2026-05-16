@@ -40,4 +40,3 @@ In the driver setup flow choose the `Create configuration backup` and `Restore c
 - Restoring replaces the existing configuration; be careful and keep a backup of the current config if you might need to revert.
 - The driver validates restored data against the same rules used during manual setup — invalid fields produce a clear validation error list.
 
-[back to main README](../README.md#backup-and-restore)

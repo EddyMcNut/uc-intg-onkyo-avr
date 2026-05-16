@@ -139,7 +139,12 @@ export default class OnkyoDriver {
     if (!this.entityRegistrar) this.entityRegistrar = new EntityRegistrar();
     for (const avrConfig of this.config.avrs!) {
       const avrEntry = buildEntityId(avrConfig.model, avrConfig.ip, avrConfig.zone);
-      const mediaPlayerEntity = this.entityRegistrar.createMediaPlayerEntity(avrEntry, avrConfig.volumeScale ?? 100, this.sharedCmdHandler.bind(this));
+      const physicalAVR = buildPhysicalAvrId(avrConfig.model, avrConfig.ip);
+      const rawSend = async (cmd: string): Promise<void> => {
+        const conn = this.connectionManager.getPhysicalConnection(physicalAVR);
+        await conn?.eiscp?.raw(cmd);
+      };
+      const mediaPlayerEntity = this.entityRegistrar.createMediaPlayerEntity(avrEntry, avrConfig.volumeScale ?? 100, this.sharedCmdHandler.bind(this), rawSend);
       this.driver.addAvailableEntity(mediaPlayerEntity);
       log.info("%s [%s] Media player entity registered as available", integrationName, avrEntry);
 

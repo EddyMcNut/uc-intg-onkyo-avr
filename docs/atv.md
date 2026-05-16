@@ -21,5 +21,3 @@ To set up an Activity for AppleTV, have a look at these screenshots:
   - play/pause
   - rewind/fastforward
   - mute
-
-[back to main README](../README.md#installation-and-usage)

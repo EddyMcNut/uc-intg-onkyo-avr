@@ -6,4 +6,3 @@ Make sure that you add your Activities to an Activity Group so when you switch f
 
 ![](../screenshots/activitygroup-2.png)
 
-[back to main README](../README.md#installation-and-usage)
