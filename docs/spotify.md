@@ -18,7 +18,7 @@ To set up an Activity for Spotify, have a look at these screenshots:
 
 - User interface, add mediawidget for the AVR with maximum size
 
-  ![](../screenshots/spotify-mediawidget.png)
+  ![](../screenshots/media-widget.png)
 
 - Button mapping: map to the buttons you prefer (for example previous/next can be mapped to channel up/down):
   - volume up/down

@@ -34,7 +34,7 @@ To set up an Activity for Tidal, have a look at these screenshots:
 
 - User interface, add mediawidget for the AVR with maximum size
 
-  ![](../screenshots/spotify-mediawidget.png)
+  ![](../screenshots/media-widget.png)
 
 - Button mapping: map to the buttons you prefer (for example previous/next can be mapped to channel up/down):
   - volume up/down
@@ -53,12 +53,19 @@ It's recommended to _disable_ the setting `Coverflow in media browser` to get th
 
 ### Browse Tidal
 
-The mediabrowser of Unfolded Circle combined with your AVR being logged on to the Tidal service make it possibe to scroll through the Tidal menu just like you would do with the Controller app of your AVR or navigating the menu on you AVR using your TV. The menu options can differ from the options of the Tidal app on your phone.
+The mediabrowser of Unfolded Circle combined with your AVR being logged on to the Tidal service make it possibe to scroll through the Tidal menu just like you would do with the Controller app of your AVR or navigating the menu on you AVR using your TV. 
+
+The menu options can differ from the options of the Tidal app on your phone, they will match with what the app of your AVR offers you (see screenshot in `Prerequisite: Add your Tidal account to the AVR` above).
+
 Some screenshots:
 
-- s1
-- s2
-- s3
+![](../screenshots/tidal-browse1.jpg)
+
+![](../screenshots/tidal-browse2.jpg)
+
+![](../screenshots/tidal-browse3.jpg)
+
+![](../screenshots/tidal-playing.jpg)
 
 **When you want to go back in menu options, it's best to use `Tidal Main Menu` at the top of the options, the back button in the Media Browser does not yet set the AVR state one step back in menu navigation so you could get into unexpected behavior using the back option of the Media Browser.**
 
