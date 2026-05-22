@@ -43,6 +43,7 @@ export class CommandReceiver {
   private driverVersion: string;
   private zoneAgnosticProcessor: ZoneAgnosticUpdateProcessor;
   private zoneAgnosticHandlers: Record<string, ZoneAgnosticHandler>;
+  private avInfoRequeryTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(driver: uc.IntegrationAPI, config: OnkyoConfig, eiscpInstance: EiscpDriver, driverVersion: string = "unknown") {
     this.driver = driver;
@@ -56,6 +57,8 @@ export class CommandReceiver {
         await this.zoneAgnosticProcessor.handleIfa(entityId, eventZone, avrUpdates.argument as Record<string, string> | undefined, async (zoneEntityId, audioInputValue) => {
           await this.updateListeningModeOptionsForAudioFormat(zoneEntityId, audioInputValue);
         });
+        const audioInputValue = (avrUpdates.argument as Record<string, string>)?.audioInputValue ?? "";
+        this.maybeScheduleAvInfoRequery(audioInputValue, eventZone);
       },
       DSN: async (avrUpdates, entityId, eventZone) => {
         await this.zoneAgnosticProcessor.handleDsn(entityId, avrUpdates.argument.toString(), eventZone);
@@ -130,6 +133,40 @@ export class CommandReceiver {
     this.driver.updateEntityAttributes(selectEntityId, {
       [SelectAttributes.Options]: filteredOptions
     });
+  }
+
+  /**
+   * When IFA arrives with a transient format (UNKNOWN / N/A / ---), the AVR often stabilises
+   * to the real format a few seconds later without sending another IFA.  Schedule a delayed
+   * re-query so the sensor reflects the final stable value instead of staying stuck at UNKNOWN.
+   * Cancels the timer if a known format arrives before it fires.
+   */
+  private maybeScheduleAvInfoRequery(audioInputValue: string, zone: string): void {
+    const lower = audioInputValue.toLowerCase();
+    const isTransient = lower === "unknown" || lower === "n/a" || lower === "---" || lower === "";
+
+    if (!isTransient) {
+      if (this.avInfoRequeryTimer) {
+        clearTimeout(this.avInfoRequeryTimer);
+        this.avInfoRequeryTimer = null;
+      }
+      return;
+    }
+
+    if (this.avInfoRequeryTimer) {
+      clearTimeout(this.avInfoRequeryTimer);
+    }
+
+    this.avInfoRequeryTimer = setTimeout(async () => {
+      this.avInfoRequeryTimer = null;
+      try {
+        log.info("%s [%s] re-querying AV info after transient format '%s'", integrationName, zone, audioInputValue);
+        await this.eiscpInstance.command({ zone, command: "audio-information", args: "query" });
+        await this.eiscpInstance.command({ zone, command: "video-information", args: "query" });
+      } catch (err) {
+        log.warn("%s Failed to re-query AV info after transient format: %s", integrationName, err);
+      }
+    }, 4000);
   }
 
   private async dispatchZoneAgnosticCommand(avrUpdates: AvrUpdateEvent, entityId: string, eventZone: string): Promise<boolean> {
