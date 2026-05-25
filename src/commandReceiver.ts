@@ -290,7 +290,11 @@ export class CommandReceiver {
               this.eiscpInstance.raw("DSNQSTN");
               break;
             case "fm":
-              this.eiscpInstance.raw("RDS01");
+              // RDS01 = Programme Service Name mode (fixed, non-scrolling)
+              // FLDQSTN immediately queries the display so the sensor shows the PS name without
+              // waiting for the AVR to emit a spontaneous FLD event
+              // this.eiscpInstance.raw("RDSUP");
+              this.eiscpInstance.raw("FLDQSTN");
               break;
             default:
               break;

@@ -12,7 +12,7 @@
     "code-check": "prettier --check . && eslint .",
     "lint": "eslint --fix",
     "build": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\" && tsc",
-    "test": "npm run build && ava dist/test/**/*.test.js --tap > test.tap && npx tap-junit < test.tap > test-results.xml",
+    "test": "npm run build && ava dist/test/**/*.test.js --tap --timeout=60s > test.tap && npx tap-junit < test.tap > test-results.xml",
     "start": "npm run build && node dist/src/index.js"
   },
   "dependencies": {

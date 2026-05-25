@@ -232,6 +232,9 @@ export class ZoneAgnosticUpdateProcessor {
       });
       await this.renderZoneMedia(zoneEntityId, true);
     }
+    if (fmZones.length > 0) {
+      this.updateFrontPanelDisplay(fmZones, frontPanelText);
+    }
 
     const netZones = this.getNetZones(sourceEntityId);
     if (netZones.length > 0) {
