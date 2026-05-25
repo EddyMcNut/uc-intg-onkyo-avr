@@ -1,4 +1,4 @@
-import { buildPhysicalAvrId } from "./configManager.js";
+import { physicalAvrIdFromEntityId } from "./configManager.js";
 
 export type TuneInPreset = {
   presetIndex: number;
@@ -18,32 +18,8 @@ export type TuneInBrowseState = {
 
 const tuneInBrowseStateByPhysicalAvr = new Map<string, TuneInBrowseState>();
 
-function parseEntityId(entityId: string): { model: string; host: string } | null {
-  const parts = entityId.trim().split(/\s+/);
-  if (parts.length < 3) {
-    return null;
-  }
-
-  const host = parts[parts.length - 2];
-  const model = parts.slice(0, -2).join(" ");
-  if (!host || !model) {
-    return null;
-  }
-
-  return { model, host };
-}
-
-function getPhysicalAvrId(entityId: string): string | null {
-  const parsed = parseEntityId(entityId);
-  if (!parsed) {
-    return null;
-  }
-
-  return buildPhysicalAvrId(parsed.model, parsed.host);
-}
-
 export function getTuneInBrowseState(entityId: string): TuneInBrowseState | null {
-  const physicalAvrId = getPhysicalAvrId(entityId);
+  const physicalAvrId = physicalAvrIdFromEntityId(entityId);
   if (!physicalAvrId) {
     return null;
   }

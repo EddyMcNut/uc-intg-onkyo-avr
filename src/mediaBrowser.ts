@@ -10,7 +10,6 @@ import { createTidalBackdrop, getOrCreateTidalThumbnail } from "./tidalThumbnail
 
 const integrationName = "mediaBrowser:";
 const DEFAULT_BROWSE_PAGE_SIZE = 25;
-const MAX_BROWSE_PAGE_SIZE = 500;
 
 export const TUNEIN_ROOT_ID = "tunein:root";
 export const TUNEIN_ROOT_TYPE = "tunein://presets";

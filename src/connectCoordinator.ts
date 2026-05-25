@@ -16,12 +16,20 @@ export default class ConnectCoordinator {
   private avrInstanceManager: AvrInstanceManager;
   private queryAvrState: QueryAvrStateFn;
   private queryAllZonesState: QueryAllZonesStateFn;
+  private readonly createAvrSpecificConfig: (cfg: AvrConfig) => OnkyoConfig;
 
-  constructor(connectionManager: ConnectionManager, avrInstanceManager: AvrInstanceManager, queryAvrState: QueryAvrStateFn, queryAllZonesState: QueryAllZonesStateFn) {
+  constructor(
+    connectionManager: ConnectionManager,
+    avrInstanceManager: AvrInstanceManager,
+    queryAvrState: QueryAvrStateFn,
+    queryAllZonesState: QueryAllZonesStateFn,
+    createAvrSpecificConfig?: (cfg: AvrConfig) => OnkyoConfig
+  ) {
     this.connectionManager = connectionManager;
     this.avrInstanceManager = avrInstanceManager;
     this.queryAvrState = queryAvrState;
     this.queryAllZonesState = queryAllZonesState;
+    this.createAvrSpecificConfig = createAvrSpecificConfig ?? ((c) => ({ ...c, queueThreshold: c.queueThreshold ?? DEFAULT_QUEUE_THRESHOLD } as OnkyoConfig));
   }
 
   /** Orchestrate connecting physical AVRs and creating zone instances. Returns true if any zone instances exist after connect. */
@@ -49,13 +57,20 @@ export default class ConnectCoordinator {
 
         // Create physical connection using connection manager, which will schedule reconnect on failure
         physicalConnection = await this.connectionManager.createAndConnect(physicalAVR, avrConfig, createCommandReceiverFactory(avrConfig), configuredZones);
-      } else if (!physicalConnection.eiscp.connected) {
-        log.info("%s [%s] TCP connection lost, reconnecting to AVR...", integrationName, physicalAVR);
-        const result = await this.connectionManager.attemptReconnection(physicalAVR);
-        if (result.success) {
-          this.connectionManager.cancelScheduledReconnection(physicalAVR);
-          await this.queryAllZonesState(physicalAVR, physicalConnection.eiscp, "after reconnection in connectCoordinator");
-          alreadyQueriedAvrs.add(physicalAVR);
+      } else {
+        // Existing connection — refresh config regardless of connected state
+        const configuredZones = config.avrs.filter((avr) => buildPhysicalAvrId(avr.model, avr.ip) === physicalAVR).map((avr) => avr.zone);
+        const avrSpecificConfig = this.createAvrSpecificConfig(avrConfig);
+        this.connectionManager.updateConnectionConfig(physicalAVR, avrConfig, configuredZones, avrSpecificConfig);
+
+        if (!physicalConnection.eiscp.connected) {
+          log.info("%s [%s] TCP connection lost, reconnecting to AVR...", integrationName, physicalAVR);
+          const result = await this.connectionManager.attemptReconnection(physicalAVR);
+          if (result.success) {
+            this.connectionManager.cancelScheduledReconnection(physicalAVR);
+            await this.queryAllZonesState(physicalAVR, physicalConnection.eiscp, "after reconnection in connectCoordinator");
+            alreadyQueriedAvrs.add(physicalAVR);
+          }
         }
       }
     }
@@ -66,7 +81,7 @@ export default class ConnectCoordinator {
       await this.avrInstanceManager.ensureZoneInstances(
         [avrConfig],
         (p) => this.connectionManager.getPhysicalConnection(p),
-        (c) => ({ ...c, queueThreshold: c.queueThreshold ?? DEFAULT_QUEUE_THRESHOLD }),
+        (c) => this.createAvrSpecificConfig(c),
         createCommandSender
       );
     }

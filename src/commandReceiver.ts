@@ -39,7 +39,6 @@ export class CommandReceiver {
   private config: OnkyoConfig;
   private eiscpInstance: EiscpDriver;
   private avrPreset: string = "unknown";
-  private zone: string = "";
   private driverVersion: string;
   private zoneAgnosticProcessor: ZoneAgnosticUpdateProcessor;
   private zoneAgnosticHandlers: Record<string, ZoneAgnosticHandler>;
@@ -49,7 +48,6 @@ export class CommandReceiver {
     this.driver = driver;
     this.config = config;
     this.eiscpInstance = eiscpInstance;
-    this.zone = this.config.avrs && this.config.avrs.length > 0 ? this.config.avrs[0].zone || "main" : "main";
     this.driverVersion = driverVersion;
     this.zoneAgnosticProcessor = new ZoneAgnosticUpdateProcessor(driver, config, eiscpInstance);
     this.zoneAgnosticHandlers = {
@@ -93,7 +91,6 @@ export class CommandReceiver {
 
   public updateConfig(config: OnkyoConfig): void {
     this.config = config;
-    this.zone = this.config.avrs && this.config.avrs.length > 0 ? this.config.avrs[0].zone || "main" : "main";
     this.zoneAgnosticProcessor.updateConfig(config);
   }
 

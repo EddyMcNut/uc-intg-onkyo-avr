@@ -18,20 +18,17 @@ export class ZoneAgnosticUpdateProcessor {
   private readonly mediaStateStore = new ZoneAgnosticMediaStateStore();
   private readonly tuneInPreloader: TuneInPreloader;
   private readonly mediaRenderer: ZoneMediaRenderer;
-  private config: OnkyoConfig;
 
   constructor(
     private readonly driver: uc.IntegrationAPI,
     config: OnkyoConfig,
     private readonly eiscpInstance: EiscpDriver
   ) {
-    this.config = config;
     this.tuneInPreloader = new TuneInPreloader(eiscpInstance, (entityId) => this.mediaStateStore.getPhysicalAvrId(entityId));
     this.mediaRenderer = new ZoneMediaRenderer(driver, config, this.mediaStateStore);
   }
 
   public updateConfig(config: OnkyoConfig): void {
-    this.config = config;
     this.mediaRenderer.updateConfig(config);
   }
 
@@ -100,7 +97,7 @@ export class ZoneAgnosticUpdateProcessor {
     this.mediaStateStore.resetZone(entityId);
   }
 
-  async maybeUpdateImage(entityId: string, force: boolean = false): Promise<void> {
+  async maybeUpdateImage(entityId: string, _force: boolean = false): Promise<void> {
     await this.mediaRenderer.maybeUpdateImage(entityId,);
   }
 
@@ -118,7 +115,7 @@ export class ZoneAgnosticUpdateProcessor {
 
   async handleIfa(
     sourceEntityId: string,
-    eventZone: string,
+    _eventZone: string,
     argument: Record<string, string> | undefined,
     onAudioFormatChanged: (zoneEntityId: string, audioInputValue: string) => Promise<void>
   ): Promise<void> {

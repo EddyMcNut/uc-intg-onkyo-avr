@@ -108,6 +108,17 @@ export class EiscpDriver extends EventEmitter {
   public get connected(): boolean {
     return this.is_connected;
   }
+
+  /** Read-only access to the current driver configuration. */
+  public get eiscpConfig(): Readonly<EiscpConfig> {
+    return this.config;
+  }
+
+  /** Merge a partial config patch into the current configuration. */
+  public updateConfig(patch: Partial<EiscpConfig>): void {
+    this.config = { ...this.config, ...patch };
+  }
+
   private config: EiscpConfig;
   private eiscp: net.Socket | null = null;
   private is_connected = false;

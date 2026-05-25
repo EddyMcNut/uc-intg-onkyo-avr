@@ -6,10 +6,9 @@
 
 import * as uc from "@unfoldedcircle/integration-api";
 import { SelectAttributes, SelectCommands } from "@unfoldedcircle/integration-api";
-import ConnectionManager from "./connectionManager.js";
-import AvrInstanceManager from "./avrInstanceManager.js";
-import EntityRegistrar from "./entityRegistrar.js";
+import { IPhysicalConnectionLookup, IAvrInstanceLookup, IInputSelectorOptionsProvider } from "./types.js";
 import { buildPhysicalAvrId } from "./configManager.js";
+import { ensureEiscpConnected } from "./utils.js";
 import log from "./loggers.js";
 
 const integrationName = "inputSelectorHandler:";
@@ -17,9 +16,9 @@ const integrationName = "inputSelectorHandler:";
 export default class InputSelectorHandler {
   constructor(
     private driver: uc.IntegrationAPI,
-    private connectionManager: ConnectionManager,
-    private avrInstanceManager: AvrInstanceManager,
-    private entityRegistrar: EntityRegistrar
+    private connectionManager: IPhysicalConnectionLookup,
+    private avrInstanceManager: IAvrInstanceLookup,
+    private entityRegistrar: IInputSelectorOptionsProvider
   ) {}
 
   public async handle(entity: uc.Entity, cmdId: string, params?: { [key: string]: string | number | boolean }): Promise<uc.StatusCodes> {
@@ -43,37 +42,8 @@ export default class InputSelectorHandler {
     }
 
     // Ensure connected (same reconnection logic the main driver uses)
-    if (!physicalConnection.eiscp.connected) {
-      log.info("%s [%s] Command received while disconnected, triggering reconnection...", integrationName, entity.id);
-      try {
-        await physicalConnection.eiscp.connect({
-          model: instance.config.model,
-          host: instance.config.ip,
-          port: instance.config.port
-        });
-        await physicalConnection.eiscp.waitForConnect(3000);
-        log.info("%s [%s] Reconnected on command", integrationName, entity.id);
-      } catch (connectErr) {
-        log.warn("%s [%s] Failed to reconnect on command: %s", integrationName, entity.id, connectErr);
-      }
-    }
-
-    try {
-      await physicalConnection.eiscp.waitForConnect();
-    } catch (err) {
-      log.warn("%s [%s] Could not send command, AVR not connected: %s", integrationName, entity.id, err);
-      for (let attempt = 1; attempt <= 5; attempt++) {
-        await new Promise((r) => setTimeout(r, 1000));
-        try {
-          await physicalConnection.eiscp.waitForConnect();
-          break;
-        } catch (retryErr) {
-          if (attempt === 5) {
-            log.warn("%s [%s] Could not connect to AVR after 5 attempts: %s", integrationName, entity.id, retryErr);
-            return uc.StatusCodes.Timeout;
-          }
-        }
-      }
+    if (!await ensureEiscpConnected(physicalConnection.eiscp, { model: instance.config.model, host: instance.config.ip, port: instance.config.port }, entity.id, integrationName)) {
+      return uc.StatusCodes.Timeout;
     }
 
     try {

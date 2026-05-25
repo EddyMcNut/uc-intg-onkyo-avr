@@ -1,6 +1,6 @@
 /*jslint node:true nomen:true*/
 "use strict";
-import { AvrConfig, buildEntityId } from "./configManager.js";
+import { AvrConfig, OnkyoConfig, buildEntityId } from "./configManager.js";
 import { CommandSender } from "./commandSender.js";
 import { buildPhysicalAvrId } from "./configManager.js";
 import log from "./loggers.js";
@@ -52,7 +52,7 @@ export default class AvrInstanceManager {
   async ensureZoneInstances(
     avrs: AvrConfig[],
     getPhysicalConnection: (physicalAvr: string) => PhysicalConnection | undefined,
-    createAvrSpecificConfig: (cfg: AvrConfig) => any,
+    createAvrSpecificConfig: (cfg: AvrConfig) => OnkyoConfig,
     createCommandSender: CreateCommandSenderFn
   ): Promise<void> {
     for (const avrConfig of avrs) {
@@ -64,9 +64,7 @@ export default class AvrInstanceManager {
         const existing = this.getInstance(avrEntry);
         if (existing) {
           existing.config = avrConfig;
-          if (typeof (existing.commandSender as any).updateConfig === "function") {
-            (existing.commandSender as any).updateConfig(avrSpecificConfig);
-          }
+          existing.commandSender.updateConfig(avrSpecificConfig);
         }
         log.info("%s [%s] Zone instance already exists (runtime config refreshed)", integrationName, avrEntry);
         continue;

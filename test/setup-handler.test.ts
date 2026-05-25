@@ -63,7 +63,6 @@ test.serial("handleRestorePayload: invalid payload returns RequestUserInput with
   try {
     const configModule = await importDistModule("dist/src/configManager.js");
     const SetupHandlerModule = await importDistModule("dist/src/setupHandler.js");
-    const ConfigManager = configModule.ConfigManager;
     if (typeof configModule.setConfigDir === "function") configModule.setConfigDir(tmp);
 
     const host: any = {
@@ -104,13 +103,11 @@ test.serial("handleDeleteConfigPayload: confirm=false prompts and confirm=true c
     // Seed a config
     ConfigManager.save({ avrs: [{ model: "TX-RZ50", ip: "192.168.2.103", port: 60128, zone: "main" }] });
 
-    let cleared = false;
     const host: any = {
       driver: {},
       getConfigDirPath: () => tmp,
       onConfigSaved: async () => {},
       onConfigCleared: async () => {
-        cleared = true;
         ConfigManager.clear();
       },
       log: console
@@ -186,7 +183,6 @@ test.serial("handleManualConfiguration: invalid input returns RequestUserInput w
   try {
     const configModule = await importDistModule("dist/src/configManager.js");
     const SetupHandlerModule = await importDistModule("dist/src/setupHandler.js");
-    const ConfigManager = configModule.ConfigManager;
     if (typeof configModule.setConfigDir === "function") configModule.setConfigDir(tmp);
 
     const host: any = {

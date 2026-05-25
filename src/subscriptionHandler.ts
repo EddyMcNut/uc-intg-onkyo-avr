@@ -5,7 +5,7 @@
 
 import AvrInstanceManager from "./avrInstanceManager.js";
 import ConnectionManager from "./connectionManager.js";
-import { avrStateManager } from "./avrState.js";
+import { avrStateQueryService } from "./avrStateQuery.js";
 import { buildPhysicalAvrId } from "./configManager.js";
 import log from "./loggers.js";
 
@@ -30,7 +30,7 @@ export default class SubscriptionHandler {
       return;
     }
 
-    if (!avrStateManager.shouldQuery(baseEntityId)) {
+    if (!avrStateQueryService.shouldQuery(baseEntityId)) {
       log.debug("%s [%s] Subscription received shortly after recent query, skipping", integrationName, baseEntityId);
       return;
     }
@@ -46,7 +46,7 @@ export default class SubscriptionHandler {
     if (physicalConnection.eiscp.connected) {
       const queueThreshold = instance.config.queueThreshold ?? 0;
       log.info("%s [%s] Subscribed entity connected, querying state (threshold: %dms)", integrationName, entityId, queueThreshold);
-      await avrStateManager.queryAvrState(baseEntityId, physicalConnection.eiscp, "on subscribe", instance.config.zone, queueThreshold);
+      await avrStateQueryService.queryAvrState(baseEntityId, physicalConnection.eiscp, "on subscribe", instance.config.zone, queueThreshold);
       return;
     }
 
@@ -60,7 +60,7 @@ export default class SubscriptionHandler {
       await physicalConnection.eiscp.waitForConnect(3000);
       log.info("%s [%s] Reconnected on subscription", integrationName, physicalAVR);
 
-      await avrStateManager.queryAvrState(baseEntityId, physicalConnection.eiscp, "after subscription reconnection", instance.config.zone, instance.config.queueThreshold ?? 0);
+      await avrStateQueryService.queryAvrState(baseEntityId, physicalConnection.eiscp, "after subscription reconnection", instance.config.zone, instance.config.queueThreshold ?? 0);
     } catch (err) {
       log.warn("%s [%s] Failed to reconnect on subscription: %s", integrationName, physicalAVR, err);
       this.connectionManager.scheduleReconnect(physicalAVR, physicalConnection, instance.config);

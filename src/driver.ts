@@ -3,11 +3,12 @@
 import * as uc from "@unfoldedcircle/integration-api";
 import { SelectAttributes } from "@unfoldedcircle/integration-api";
 import EiscpDriver from "./eiscp.js";
-import { ConfigManager, setConfigDir, OnkyoConfig, AvrConfig, AVR_DEFAULTS, buildEntityId, buildPhysicalAvrId, DEFAULT_QUEUE_THRESHOLD, parseBoolean } from "./configManager.js";
+import { ConfigManager, setConfigDir, OnkyoConfig, AvrConfig, buildEntityId, buildPhysicalAvrId, DEFAULT_QUEUE_THRESHOLD, normalizeAvrConfig } from "./configManager.js";
 import { CommandSender } from "./commandSender.js";
 import { CommandReceiver } from "./commandReceiver.js";
 import { ReconnectionManager } from "./reconnectionManager.js";
 import { avrStateManager } from "./avrState.js";
+import { avrStateQueryService } from "./avrStateQuery.js";
 import log from "./loggers.js";
 import SetupHandler from "./setupHandler.js";
 import EntityRegistrar from "./entityRegistrar.js";
@@ -16,38 +17,36 @@ import AvrInstanceManager from "./avrInstanceManager.js";
 import ListeningModeHandler from "./listeningModeHandler.js";
 import InputSelectorHandler from "./inputSelectorHandler.js";
 import SubscriptionHandler from "./subscriptionHandler.js";
+import ConnectCoordinator from "./connectCoordinator.js";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 const integrationName = "driver:";
 import { delay } from "./utils.js";
 
-/** Parsed setup data with concrete types (after validation/conversion) */
-interface ParsedSetupData {
-  queueThreshold: number;
-  albumArtURL: string;
-  volumeScale: number;
-  adjustVolumeDispl: boolean;
-  createSensors: boolean;
-  netMenuDelay: number;
+/**
+ * Descriptor for registering one group of entities for an AVR zone.
+ *
+ * OCP: add a new entity type by appending a new entry to the array returned by
+ * `buildEntityRegistrations()` — `registerAvailableEntities()` itself never changes.
+ */
+interface EntityRegistration {
+  /** Return true when this entity group should be registered for the given AVR. */
+  enabled: (cfg: AvrConfig) => boolean;
+  /** Build and return the entity or entities to register. */
+  create: () => uc.Entity | uc.Entity[];
+  /** Called after all entities in the group have been added. Optional. */
+  afterRegister?: (entities: uc.Entity[]) => void;
+  /** Logged when `enabled` returns false. Omit for groups that are always enabled. */
+  disabledMessage?: string;
 }
 
 export default class OnkyoDriver {
   private driver: uc.IntegrationAPI;
   private config: OnkyoConfig;
-  private remoteInStandby: boolean = false; // Track Remote standby state
   private reconnectionManager: ReconnectionManager = new ReconnectionManager();
   private connectionManager: import("./connectionManager.js").default;
   private avrInstanceManager: import("./avrInstanceManager.js").default = new AvrInstanceManager();
-  private connectCoordinator?: import("./connectCoordinator.js").default;
   private driverVersion: string = "unknown";
-  private lastSetupData: ParsedSetupData = {
-    queueThreshold: AVR_DEFAULTS.queueThreshold,
-    albumArtURL: AVR_DEFAULTS.albumArtURL,
-    volumeScale: AVR_DEFAULTS.volumeScale,
-    adjustVolumeDispl: true,
-    createSensors: AVR_DEFAULTS.createSensors,
-    netMenuDelay: AVR_DEFAULTS.netMenuDelay
-  };
 
   // Handler extracted to separate module for clarity/testing
   private setupHandler?: InstanceType<typeof SetupHandler>;
@@ -55,6 +54,7 @@ export default class OnkyoDriver {
   private listeningModeHandler: ListeningModeHandler;
   private inputSelectorHandler: InputSelectorHandler;
   private subscriptionHandler: SubscriptionHandler;
+  private connectCoordinator: ConnectCoordinator;
 
   constructor() {
     this.driver = new uc.IntegrationAPI();
@@ -84,7 +84,7 @@ export default class OnkyoDriver {
     this.config = ConfigManager.load();
 
     // Create connection manager (needs reconnectionManager and query callback)
-    this.connectionManager = new ConnectionManager(this.reconnectionManager, this.queryAllZonesState.bind(this), () => this.driverVersion);
+    this.connectionManager = new ConnectionManager(this.reconnectionManager, this.queryAllZonesState.bind(this));
 
     // Initialize entity registrar before handing it to helper classes
     this.entityRegistrar = new EntityRegistrar();
@@ -94,16 +94,20 @@ export default class OnkyoDriver {
     this.inputSelectorHandler = new InputSelectorHandler(this.driver, this.connectionManager, this.avrInstanceManager, this.entityRegistrar);
     this.subscriptionHandler = new SubscriptionHandler(this.connectionManager, this.avrInstanceManager);
 
-    // Instance manager already created as a property; create connect coordinator lazily when needed
+    // Create connect coordinator — orchestrates physical connections, zone instances, and initial queries
+    this.connectCoordinator = new ConnectCoordinator(
+      this.connectionManager,
+      this.avrInstanceManager,
+      this.queryAvrState.bind(this),
+      this.queryAllZonesState.bind(this),
+      this.createAvrSpecificConfig.bind(this)
+    );
     this.setupDriverEvents();
     this.setupEventHandlers();
     log.info("%s Loaded config at startup: %o", integrationName, this.config);
 
     // Register entities from config at startup (like Python integrations do)
     // This ensures entities survive reboots - they're registered before Connect event
-    if (this.config.avrs && this.config.avrs.length > 0) {
-      this.registerAvailableEntities();
-    }
     if (this.config.avrs && this.config.avrs.length > 0) {
       this.registerAvailableEntities();
     }
@@ -134,6 +138,68 @@ export default class OnkyoDriver {
     return this.setupHandler.handle(msg);
   }
 
+  /**
+   * Build the ordered list of entity-registration descriptors for one AVR zone.
+   *
+   * OCP extension point: to add a new entity type, append a new `EntityRegistration`
+   * entry here. The `registerAvailableEntities` loop is closed for modification.
+   */
+  private buildEntityRegistrations(avrEntry: string, avrConfig: AvrConfig, rawSend: (cmd: string) => Promise<void>): EntityRegistration[] {
+    return [
+      // ── Media player — always registered ───────────────────────────────────
+      {
+        enabled: () => true,
+        create: () =>
+          this.entityRegistrar.createMediaPlayerEntity(avrEntry, avrConfig.volumeScale ?? 100, this.sharedCmdHandler.bind(this), rawSend)
+      },
+
+      // ── Sensor entities — conditional on createSensors flag ────────────────
+      {
+        enabled: (cfg) => cfg.createSensors !== false,
+        create: () => this.entityRegistrar.createSensorEntities(avrEntry),
+        disabledMessage: `${integrationName} [${avrEntry}] Sensor entities disabled by user preference`
+      },
+
+      // ── Listening Mode select — conditional on listeningModeOptions ─────────
+      {
+        enabled: (cfg) => cfg.listeningModeOptions !== null,
+        create: () => {
+          const handler = this.listeningModeHandler?.handle.bind(this.listeningModeHandler) ?? (async () => uc.StatusCodes.Ok);
+          return this.entityRegistrar.createListeningModeSelectEntity(avrEntry, handler);
+        },
+        afterRegister: () => {
+          const options = this.entityRegistrar.getListeningModeOptions(undefined, avrEntry);
+          if (typeof this.driver.updateEntityAttributes === "function") {
+            this.driver.updateEntityAttributes(`${avrEntry}_listening_mode`, { [SelectAttributes.Options]: options });
+          }
+          if (Array.isArray(avrConfig.listeningModeOptions) && avrConfig.listeningModeOptions.length > 0) {
+            log.info("%s [%s] Loaded %d user-configured listeningModeOptions", integrationName, avrEntry, avrConfig.listeningModeOptions.length);
+          }
+        },
+        disabledMessage: `${integrationName} [${avrEntry}] Listening Mode select entity disabled by user preference (none)`
+      },
+
+      // ── Input Selector select — conditional on inputSelectorOptions ─────────
+      {
+        enabled: (cfg) => cfg.inputSelectorOptions !== null,
+        create: () => {
+          const handler = this.inputSelectorHandler?.handle.bind(this.inputSelectorHandler) ?? (async () => uc.StatusCodes.Ok);
+          return this.entityRegistrar.createInputSelectorSelectEntity(avrEntry, handler);
+        },
+        afterRegister: () => {
+          const isOptions = this.entityRegistrar.getInputSelectorOptions(avrEntry);
+          if (typeof this.driver.updateEntityAttributes === "function") {
+            this.driver.updateEntityAttributes(`${avrEntry}_input_selector`, { [SelectAttributes.Options]: isOptions });
+          }
+          if (Array.isArray(avrConfig.inputSelectorOptions) && avrConfig.inputSelectorOptions.length > 0) {
+            log.info("%s [%s] Loaded %d user-configured inputSelectorOptions", integrationName, avrEntry, avrConfig.inputSelectorOptions.length);
+          }
+        },
+        disabledMessage: `${integrationName} [${avrEntry}] Input Selector select entity disabled by user preference (none)`
+      }
+    ];
+  }
+
   private registerAvailableEntities(): void {
     log.info("%s Registering available entities from config", integrationName);
     if (!this.entityRegistrar) this.entityRegistrar = new EntityRegistrar();
@@ -144,76 +210,18 @@ export default class OnkyoDriver {
         const conn = this.connectionManager.getPhysicalConnection(physicalAVR);
         await conn?.eiscp?.raw(cmd);
       };
-      const mediaPlayerEntity = this.entityRegistrar.createMediaPlayerEntity(avrEntry, avrConfig.volumeScale ?? 100, this.sharedCmdHandler.bind(this), rawSend);
-      this.driver.addAvailableEntity(mediaPlayerEntity);
-      log.info("%s [%s] Media player entity registered as available", integrationName, avrEntry);
 
-      // Register sensor entities only if createSensors is enabled (defaults to true for backward compatibility)
-      if (avrConfig.createSensors !== false) {
-        const sensorEntities = this.entityRegistrar.createSensorEntities(avrEntry);
-        for (const sensor of sensorEntities) {
-          this.driver.addAvailableEntity(sensor);
-          log.info("%s [%s] Sensor entity registered: %s", integrationName, avrEntry, sensor.id);
+      for (const registration of this.buildEntityRegistrations(avrEntry, avrConfig, rawSend)) {
+        if (!registration.enabled(avrConfig)) {
+          if (registration.disabledMessage) log.info(registration.disabledMessage);
+          continue;
         }
-      } else {
-        log.info("%s [%s] Sensor entities disabled by user preference", integrationName, avrEntry);
-      }
-
-      // Register Listening Mode select entity.  In unit tests we sometimes
-      // use a partial driver-like object that doesn't initialize the
-      // handler, so fall back gracefully to a no-op to avoid exceptions.
-      // Skip if user configured 'none' for this entity.
-      if (avrConfig.listeningModeOptions !== null) {
-        const lmHandler = this.listeningModeHandler?.handle.bind(this.listeningModeHandler) || (async () => uc.StatusCodes.Ok);
-        const listeningModeEntity = this.entityRegistrar.createListeningModeSelectEntity(avrEntry, lmHandler);
-        this.driver.addAvailableEntity(listeningModeEntity);
-        log.info("%s [%s] Listening Mode select entity registered", integrationName, avrEntry);
-
-        // Ensure the runtime select-entity options reflect any (re)configured per-AVR list immediately
-        // If the Integration API supports updating attributes at runtime,
-        // set the select-entity options immediately from saved config.
-        const options = this.entityRegistrar.getListeningModeOptions(undefined, avrEntry);
-        // Always refresh the listening-mode select options at registration time from
-        // the current persisted config. Previously we only updated when a
-        // non-empty user-configured list existed which could leave stale options
-        // visible in other activities after reconfigure. Ensure we always call
-        // updateEntityAttributes so both running and available activity views
-        // receive the updated options (including empty arrays).
-        if (typeof this.driver.updateEntityAttributes === "function") {
-          // `options` is a string[]; augmentation above allows us to pass it
-          // directly without casting.
-          this.driver.updateEntityAttributes(`${avrEntry}_listening_mode`, {
-            [SelectAttributes.Options]: options
-          });
+        const entities = [registration.create()].flat() as uc.Entity[];
+        for (const entity of entities) {
+          this.driver.addAvailableEntity(entity);
+          log.info("%s [%s] Entity registered: %s", integrationName, avrEntry, entity.id);
         }
-
-        // Log when a user-configured list is present so operators can verify at boot
-        if (Array.isArray(avrConfig.listeningModeOptions) && avrConfig.listeningModeOptions.length > 0) {
-          log.info("%s [%s] Loaded %d user-configured listeningModeOptions", integrationName, avrEntry, avrConfig.listeningModeOptions.length);
-        }
-      } else {
-        log.info("%s [%s] Listening Mode select entity disabled by user preference (none)", integrationName, avrEntry);
-      }
-
-      // Register Input Selector select entity. Skip if user configured 'none'.
-      if (avrConfig.inputSelectorOptions !== null) {
-        const isHandler = this.inputSelectorHandler?.handle.bind(this.inputSelectorHandler) || (async () => uc.StatusCodes.Ok);
-        const inputSelectorEntity = this.entityRegistrar.createInputSelectorSelectEntity(avrEntry, isHandler);
-        this.driver.addAvailableEntity(inputSelectorEntity);
-        log.info("%s [%s] Input Selector select entity registered", integrationName, avrEntry);
-
-        const isOptions = this.entityRegistrar.getInputSelectorOptions(avrEntry);
-        if (typeof this.driver.updateEntityAttributes === "function") {
-          this.driver.updateEntityAttributes(`${avrEntry}_input_selector`, {
-            [SelectAttributes.Options]: isOptions
-          });
-        }
-
-        if (Array.isArray(avrConfig.inputSelectorOptions) && avrConfig.inputSelectorOptions.length > 0) {
-          log.info("%s [%s] Loaded %d user-configured inputSelectorOptions", integrationName, avrEntry, avrConfig.inputSelectorOptions.length);
-        }
-      } else {
-        log.info("%s [%s] Input Selector select entity disabled by user preference (none)", integrationName, avrEntry);
+        registration.afterRegister?.(entities);
       }
     }
   }
@@ -237,7 +245,6 @@ export default class OnkyoDriver {
     });
     this.driver.on(uc.Events.EnterStandby, async () => {
       log.info(`${integrationName} ===== ENTER STANDBY EVENT RECEIVED =====`);
-      this.remoteInStandby = true;
       log.info(`${integrationName} Remote entering standby, disconnecting AVR(s) to save battery...`);
 
       // Clear all reconnect timers
@@ -250,7 +257,6 @@ export default class OnkyoDriver {
     });
     this.driver.on(uc.Events.ExitStandby, async () => {
       log.info(`${integrationName} ===== EXIT STANDBY EVENT RECEIVED =====`);
-      this.remoteInStandby = false;
       await this.handleConnect();
     });
   }
@@ -270,19 +276,12 @@ export default class OnkyoDriver {
       return;
     }
 
-    // avoid duplicate queries within short timeframe
-    if (!avrStateManager.shouldQuery(avrEntry)) {
-      log.debug(`${integrationName} [${avrEntry}] Skipping repeated state query (${context})`);
-      return;
-    }
-
-    // Extract zone from avrEntry (format: "model ip zone")
     const instance = this.avrInstanceManager.getInstance(avrEntry);
     const zone = instance?.config.zone || "main";
     const queueThreshold = instance?.config.queueThreshold ?? DEFAULT_QUEUE_THRESHOLD;
 
-    // Delegate to state manager for the actual query logic
-    await avrStateManager.queryAvrState(avrEntry, eiscp, zone, context, queueThreshold);
+    // Delegate to query service (includes its own debounce guard)
+    await avrStateQueryService.queryAvrState(avrEntry, eiscp, zone, context, queueThreshold);
   }
 
   /** Query state for all zones of a physical AVR */
@@ -313,76 +312,29 @@ export default class OnkyoDriver {
       }
     }
     if (queried.length > 0) {
-      avrStateManager.recordQueries(queried);
+      avrStateQueryService.recordQueries(queried);
     }
   }
 
-  /** Create OnkyoConfig for a specific AVR zone */
+  /**
+   * Create OnkyoConfig for a specific AVR zone.
+   *
+   * OCP: all field-level coercion lives in `normalizeAvrConfig` (configConstants.ts).
+   * Adding a new config field never requires touching this method.
+   */
   private createAvrSpecificConfig(avrConfig: AvrConfig): OnkyoConfig {
-    // Defensive coercion/normalization for runtime config values
-    const queueThreshold = (() => {
-      const v = avrConfig.queueThreshold ?? AVR_DEFAULTS.queueThreshold;
-      const n = typeof v === "number" ? v : parseInt(String(v ?? ""), 10);
-      return isNaN(n) || n < 0 ? DEFAULT_QUEUE_THRESHOLD : n;
-    })();
-
-    const albumArtURL = typeof avrConfig.albumArtURL === "string" && avrConfig.albumArtURL.trim() !== "" ? avrConfig.albumArtURL.trim() : AVR_DEFAULTS.albumArtURL;
-
-    const volumeScale = (() => {
-      const v = typeof avrConfig.volumeScale === "number" ? avrConfig.volumeScale : parseInt(String(avrConfig.volumeScale ?? ""), 10);
-      return v === 80 || v === 100 ? v : AVR_DEFAULTS.volumeScale;
-    })();
-
-    const volumeDisplay = String(avrConfig.volumeDisplay ?? AVR_DEFAULTS.volumeDisplay).toLowerCase() === "relative" ? "relative" : "absolute";
-
-    const adjustVolumeDispl = parseBoolean(avrConfig.adjustVolumeDispl, AVR_DEFAULTS.adjustVolumeDispl);
-    const createSensors = parseBoolean(avrConfig.createSensors, AVR_DEFAULTS.createSensors);
-
-    const netMenuDelay = (() => {
-      const v = typeof avrConfig.netMenuDelay === "number" ? avrConfig.netMenuDelay : parseInt(String(avrConfig.netMenuDelay ?? ""), 10);
-      return isNaN(v) || v < 0 ? AVR_DEFAULTS.netMenuDelay : v;
-    })();
-
-    const tuneinPresetPosition = (() => {
-      const v = typeof avrConfig.tuneinPresetPosition === "number" ? avrConfig.tuneinPresetPosition : parseInt(String(avrConfig.tuneinPresetPosition ?? ""), 10);
-      if (isNaN(v) || v < 1 || v > 9) return AVR_DEFAULTS.tuneinPresetPosition;
-      return v;
-    })();
-
-    const port = (() => {
-      const p = typeof avrConfig.port === "number" ? avrConfig.port : parseInt(String(avrConfig.port ?? ""), 10);
-      return isNaN(p) || p < 1 || p > 65535 ? AVR_DEFAULTS.port : p;
-    })();
-
+    const n = normalizeAvrConfig(avrConfig);
     return {
-      avrs: [
-        {
-          model: avrConfig.model,
-          ip: avrConfig.ip,
-          port: port,
-          zone: avrConfig.zone,
-          queueThreshold,
-          albumArtURL,
-          volumeScale,
-          volumeDisplay,
-          adjustVolumeDispl,
-          createSensors,
-          netMenuDelay,
-          tuneinPresetPosition,
-          // Preserve user-configured listening mode options so command receivers
-          // and runtime logic can honour them after restart.
-          listeningModeOptions: Array.isArray((avrConfig as any).listeningModeOptions) ? (avrConfig as any).listeningModeOptions.map((s: string) => s.trim()) : undefined
-        }
-      ],
-      queueThreshold,
-      albumArtURL,
-      volumeScale,
-      volumeDisplay,
-      adjustVolumeDispl,
+      avrs: [{ ...n }],
+      queueThreshold: n.queueThreshold,
+      albumArtURL: n.albumArtURL,
+      volumeScale: n.volumeScale,
+      volumeDisplay: n.volumeDisplay,
+      adjustVolumeDispl: n.adjustVolumeDispl,
       // Backward compatibility fields for existing code
-      model: avrConfig.model,
-      ip: avrConfig.ip,
-      port: port
+      model: n.model,
+      ip: n.ip,
+      port: n.port
     };
   }
 
@@ -390,125 +342,15 @@ export default class OnkyoDriver {
     // Reload config to get latest AVR list
     this.config = ConfigManager.load();
 
-    // Connect to all configured AVRs
-    if (!this.config.avrs || this.config.avrs.length === 0) {
-      log.info("%s No AVRs configured", integrationName);
-      await this.driver.setDeviceState(uc.DeviceStates.Disconnected);
-      return;
-    }
-
-    // STEP 1: Create physical connections (one per unique IP)
-    const uniqueAvrs = new Map<string, AvrConfig>();
-    for (const avrConfig of this.config.avrs) {
-      const physicalAVR = buildPhysicalAvrId(avrConfig.model, avrConfig.ip);
-      if (!uniqueAvrs.has(physicalAVR)) {
-        uniqueAvrs.set(physicalAVR, avrConfig);
-      }
-    }
-
-    // Track which AVRs have already been queried (to avoid duplicate queries)
-    const alreadyQueriedAvrs = new Set<string>();
-
-    for (const [physicalAVR, avrConfig] of uniqueAvrs) {
-      // Check if we already have a physical connection to this AVR
-      let physicalConnection = this.connectionManager.getPhysicalConnection(physicalAVR);
-
-      if (!physicalConnection) {
-        // Need to create a new physical connection
-        // Collect all zones configured for this physical AVR
-        const configuredZones = this.config.avrs.filter((avr) => buildPhysicalAvrId(avr.model, avr.ip) === physicalAVR).map((avr) => avr.zone);
-
+    const hasInstances = await this.connectCoordinator.connect(
+      this.config,
+      (avrConfig) => (eiscpInstance) => {
         const avrSpecificConfig = this.createAvrSpecificConfig(avrConfig);
-        const physicalConn = await this.connectionManager.createAndConnect(
-          physicalAVR,
-          avrConfig,
-          (eiscpInstance) => {
-            // Create command receiver using Onkyo-specific class and the driver context
-            const commandReceiver = new CommandReceiver(this.driver, avrSpecificConfig, eiscpInstance, this.driverVersion);
-            return commandReceiver;
-          },
-          configuredZones
-        );
-        physicalConnection = physicalConn;
-      } else {
-        // Physical connection exists - update its config in case settings changed
-        // Collect all zones configured for this physical AVR in case they've changed
-        const configuredZones = this.config.avrs.filter((avr) => buildPhysicalAvrId(avr.model, avr.ip) === physicalAVR).map((avr) => avr.zone);
-        const avrSpecificConfig = this.createAvrSpecificConfig(avrConfig);
+        return new CommandReceiver(this.driver, avrSpecificConfig, eiscpInstance, this.driverVersion);
+      },
+      (avrSpecificConfig, eiscp, commandReceiver) => new CommandSender(this.driver, avrSpecificConfig, eiscp, commandReceiver)
+    );
 
-        this.connectionManager.updateConnectionConfig(physicalAVR, avrConfig, configuredZones, avrSpecificConfig);
-
-        if (!physicalConnection.eiscp.connected) {
-          // Physical connection exists but is disconnected, try to reconnect
-          log.info("%s [%s] TCP connection lost, reconnecting to AVR...", integrationName, physicalAVR);
-
-          const result = await this.connectionManager.attemptReconnection(physicalAVR);
-
-          if (result.success) {
-            // Cancel any scheduled reconnection since we're now connected
-            this.connectionManager.cancelScheduledReconnection(physicalAVR);
-
-            // Query state for all zones after successful reconnection
-            await this.queryAllZonesState(physicalAVR, physicalConnection.eiscp, "after reconnection in handleConnect");
-            alreadyQueriedAvrs.add(physicalAVR);
-          }
-        }
-      }
-    }
-
-    // STEP 2: Create zone instances for all zones
-    // NOTE: We need physical connections created first (even if they failed to connect)
-    // because zone instances reference the shared eiscp from physical connection
-    for (const avrConfig of this.config.avrs) {
-      const physicalAVR = buildPhysicalAvrId(avrConfig.model, avrConfig.ip);
-      const avrEntry = buildEntityId(avrConfig.model, avrConfig.ip, avrConfig.zone);
-
-      // Always run through ensureZoneInstances so existing zone instances get runtime config refreshes
-      // (for example volumeDisplay absolute/relative changes) and missing instances are created.
-      const physicalConnection = this.connectionManager.getPhysicalConnection(physicalAVR);
-      if (!physicalConnection) {
-        log.warn("%s [%s] Cannot create or refresh zone instance - no physical connection object exists", integrationName, avrEntry);
-        continue;
-      }
-
-      // Create per-zone config and command sender via AvrInstanceManager
-      await this.avrInstanceManager.ensureZoneInstances(
-        [avrConfig],
-        (p) => this.connectionManager.getPhysicalConnection(p),
-        this.createAvrSpecificConfig.bind(this),
-        (avrSpecificConfig, eiscp, commandReceiver) => new CommandSender(this.driver, avrSpecificConfig, eiscp, commandReceiver)
-      );
-
-      const created = this.avrInstanceManager.getInstance(avrEntry);
-      if (created && (created.commandSender as any)?.eiscp?.connected) {
-        log.info("%s [%s] Zone connected and available", integrationName, avrEntry);
-      }
-    }
-
-    // Query state for all connected AVRs (skip those already queried during reconnection)
-    const queriedPhysicalAvrs = new Set<string>();
-    for (const [avrEntry, instance] of this.avrInstanceManager.entries()) {
-      const physicalAVR = buildPhysicalAvrId(instance.config.model, instance.config.ip);
-
-      // Skip if this AVR was already queried during reconnection in Step 1
-      if (alreadyQueriedAvrs.has(physicalAVR)) {
-        continue;
-      }
-
-      const physicalConnection = this.connectionManager.getPhysicalConnection(physicalAVR);
-      if (physicalConnection) {
-        const queueThreshold = instance.config.queueThreshold ?? DEFAULT_QUEUE_THRESHOLD;
-        // If we already queried a zone for this physical AVR, wait before next zone
-        if (queriedPhysicalAvrs.has(physicalAVR)) {
-          await delay(queueThreshold);
-        }
-        queriedPhysicalAvrs.add(physicalAVR);
-        await this.queryAvrState(avrEntry, physicalConnection.eiscp, "after connection");
-      }
-    }
-
-    // If we have any zone instances, consider the driver connected
-    const hasInstances = !!Array.from(this.avrInstanceManager.entries()).length;
     if (hasInstances) {
       await this.driver.setDeviceState(uc.DeviceStates.Connected);
     } else {
@@ -525,9 +367,6 @@ export default class OnkyoDriver {
 
     this.driver.on(uc.Events.SubscribeEntities, async (entityIds: string[]) => {
       log.info("%s Entities subscribed: %s", integrationName, entityIds.join(", "));
-
-      // Clear standby flag when entities are subscribed
-      this.remoteInStandby = false;
 
       // Delegate each subscription to handler
       for (const entityId of entityIds) {

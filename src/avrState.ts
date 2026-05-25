@@ -4,7 +4,7 @@ import { EiscpDriver } from "./eiscp.js";
 import log from "./loggers.js";
 import { delay } from "./utils.js";
 import { ALBUM_ART, SONG_INFO } from "./constants.js";
-import type { CommandReceiver } from "./commandReceiver.js";
+import type { ICommandReceiver } from "./types.js";
 import { resetTidalBrowseState } from "./tidalBrowserStore.js";
 
 const integrationName = "avrState:";
@@ -25,9 +25,6 @@ interface EntityState {
  */
 class AvrStateManager {
   private states: Map<string, EntityState> = new Map();
-  // reuse the existing state map to also track last query timestamps
-  private lastQueries: Map<string, number> = new Map();
-  private readonly QUERY_TTL = 5000; // ms
 
   /** Get or create state for an entity */
   private getState(entityId: string): EntityState {
@@ -267,16 +264,17 @@ class AvrStateManager {
   }
 
   /** Query AVR state and clear media attributes on source change */
-  async refreshAvrState(entityId: string, eiscpInstance?: EiscpDriver, zone?: string, driver?: uc.IntegrationAPI, queueThreshold?: number, commandReceiver?: CommandReceiver): Promise<void> {
+  async refreshAvrState(entityId: string, eiscpInstance?: EiscpDriver, zone?: string, driver?: uc.IntegrationAPI, queueThreshold?: number, commandReceiver?: ICommandReceiver): Promise<void> {
     if (!eiscpInstance || !zone || !driver || !entityId) {
       return;
     }
 
     // Use provided queueThreshold or fallback to default
-    const threshold = queueThreshold ?? (typeof eiscpInstance["config"]?.send_delay === "number" ? eiscpInstance["config"].send_delay : 250);
+    const threshold = queueThreshold ?? (typeof eiscpInstance.eiscpConfig?.send_delay === "number" ? eiscpInstance.eiscpConfig.send_delay : 250);
 
     log.info("%s [%s] querying volume for zone '%s'", integrationName, entityId, zone);
     await eiscpInstance.command({ zone, command: "volume", args: "query" });
+    await eiscpInstance.command({ zone, command: "audio-muting", args: "query" });
 
     // Clear media attributes so they can be updated with new data
     // Prevents showing old data if new source does not deliver similar info
@@ -329,53 +327,6 @@ class AvrStateManager {
     }
   }
 
-  public shouldQuery(entityId: string): boolean {
-    const last = this.lastQueries.get(entityId) || 0;
-    return Date.now() - last > this.QUERY_TTL;
-  }
-
-  /** Record that we just queried the given entity. */
-  public recordQuery(entityId: string): void {
-    this.lastQueries.set(entityId, Date.now());
-  }
-
-  /** Record multiple queries at once (used by batch operations). */
-  public recordQueries(avrEntries: Iterable<string>): void {
-    const now = Date.now();
-    for (const e of avrEntries) {
-      this.lastQueries.set(e, now);
-    }
-  }
-
-  async queryAvrState(entityId: string, eiscpInstance: EiscpDriver, zone: string, context: string, queueThreshold?: number): Promise<void> {
-    if (!eiscpInstance || !zone || !entityId) return;
-
-    if (!this.shouldQuery(entityId)) {
-      log.debug(`${integrationName} [%s] skipping redundant query (%s)`, entityId, context);
-      return;
-    }
-    this.recordQuery(entityId);
-    if (!eiscpInstance || !zone || !entityId) return;
-
-    const threshold = queueThreshold ?? (typeof eiscpInstance["config"]?.send_delay === "number" ? eiscpInstance["config"].send_delay : 250);
-
-    log.info(`${integrationName} [%s] Querying AVR state for zone %s (%s)...`, entityId, zone, context);
-    try {
-      await eiscpInstance.command({ zone, command: "system-power", args: "query" });
-      await delay(threshold);
-      await eiscpInstance.command({ zone, command: "input-selector", args: "query" });
-      await delay(threshold);
-      await eiscpInstance.command({ zone, command: "volume", args: "query" });
-      await delay(threshold);
-      await eiscpInstance.command({ zone, command: "audio-muting", args: "query" });
-      await delay(threshold);
-      await eiscpInstance.command({ zone, command: "listening-mode", args: "query" });
-      await delay(threshold * 3);
-      await eiscpInstance.command({ zone, command: "fp-display", args: "query" });
-    } catch (err) {
-      log.warn(`${integrationName} [%s] Failed to query AVR state (%s):`, entityId, context, err);
-    }
-  }
 }
 
 /** Singleton instance of the state manager */

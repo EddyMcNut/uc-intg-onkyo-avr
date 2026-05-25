@@ -1,7 +1,6 @@
 import test from "ava";
-import type { IntegrationAPI, MediaPlayer, MediaPlayerCommands } from "@unfoldedcircle/integration-api";
+import type { IntegrationAPI } from "@unfoldedcircle/integration-api";
 import { pathToFileURL } from "url";
-import fs from "fs";
 import path from "path";
 
 // Tests run against compiled dist artifacts

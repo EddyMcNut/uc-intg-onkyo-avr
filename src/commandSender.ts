@@ -2,8 +2,9 @@ import * as uc from "@unfoldedcircle/integration-api";
 import { EiscpDriver } from "./eiscp.js";
 import { buildEntityId, DEFAULT_QUEUE_THRESHOLD, MAX_LENGTHS, PATTERNS, OnkyoConfig } from "./configManager.js";
 import { avrStateManager } from "./avrState.js";
+import { ICommandReceiver } from "./types.js";
 import log from "./loggers.js";
-import { delay } from "./utils.js";
+import { delay, toHex, ensureEiscpConnected } from "./utils.js";
 import { browseMedia, isMediaBrowsingAvailable, isTidalMainMenuRequest, resolveTidalMenuOption, resolveTuneInPreset } from "./mediaBrowser.js";
 import { consumeTidalListModeActive, consumeTraceNextTidalSelectionAfterMainMenu, listTidalMenuOptions, markTidalBrowseListFrozen } from "./tidalBrowserStore.js";
 
@@ -14,9 +15,9 @@ export class CommandSender {
   private config: OnkyoConfig;
   private eiscp: EiscpDriver;
   private lastCommandTime: number = 0;
-  private commandReceiver: any; // CommandReceiver type to avoid circular dependency
+  private commandReceiver: ICommandReceiver | undefined;
 
-  constructor(driver: uc.IntegrationAPI, config: OnkyoConfig, eiscp: EiscpDriver, commandReceiver: any) {
+  constructor(driver: uc.IntegrationAPI, config: OnkyoConfig, eiscp: EiscpDriver, commandReceiver: ICommandReceiver | undefined) {
     this.driver = driver;
     this.config = config;
     this.eiscp = eiscp;
@@ -47,41 +48,8 @@ export class CommandSender {
     // Check if connected, and trigger reconnection if needed
     // This handles the case where user sends a command after wake-up from standby
     // and the driver reconnection hasn't been triggered yet
-    if (!this.eiscp.connected) {
-      log.info("%s [%s] Command received while disconnected, triggering reconnection...", integrationName, entity.id);
-      try {
-        const avrConfig = targetAvr;
-        if (avrConfig) {
-          await this.eiscp.connect({
-            model: avrConfig.model,
-            host: avrConfig.ip,
-            port: avrConfig.port
-          });
-          await this.eiscp.waitForConnect(3000);
-          log.info("%s [%s] Reconnected on command", integrationName, entity.id);
-        }
-      } catch (connectErr) {
-        log.warn("%s [%s] Failed to reconnect on command: %s", integrationName, entity.id, connectErr);
-        // Fall through to retry logic below
-      }
-    }
-
-    try {
-      await this.eiscp.waitForConnect();
-    } catch (err) {
-      log.warn("%s [%s] Could not send command, AVR not connected: %s", integrationName, entity.id, err);
-      for (let attempt = 1; attempt <= 5; attempt++) {
-        await delay(1000);
-        try {
-          await this.eiscp.waitForConnect();
-          break;
-        } catch (retryErr) {
-          if (attempt === 5) {
-            log.warn("%s [%s] Could not connect to AVR after 5 attempts: %s", integrationName, entity.id, retryErr);
-            return uc.StatusCodes.Timeout;
-          }
-        }
-      }
+    if (!await ensureEiscpConnected(this.eiscp, { model: targetAvr.model, host: targetAvr.ip, port: targetAvr.port }, entity.id, integrationName)) {
+      return uc.StatusCodes.Timeout;
     }
 
     log.info("%s [%s] media-player command request: %s", integrationName, entity.id, cmdId, params || "");
@@ -93,7 +61,7 @@ export class CommandSender {
 
     const now = Date.now();
     // Determine queue threshold: prefer explicit config, then eISCP driver's send_delay, else default
-    const queueThreshold = this.config.queueThreshold ?? (typeof this.eiscp["config"]?.send_delay === "number" ? this.eiscp["config"].send_delay : DEFAULT_QUEUE_THRESHOLD);
+    const queueThreshold = this.config.queueThreshold ?? (typeof this.eiscp.eiscpConfig?.send_delay === "number" ? this.eiscp.eiscpConfig.send_delay : DEFAULT_QUEUE_THRESHOLD);
 
     if (now - this.lastCommandTime > queueThreshold) {
       switch (cmdId) {
@@ -123,7 +91,6 @@ export class CommandSender {
           break;
         case uc.MediaPlayerCommands.Volume:
           if (params?.volume !== undefined) {
-            log.debug("************* %s", params.volume);
             const volumeDisplay = String(this.config.volumeDisplay ?? "absolute").toLowerCase() === "relative" ? "relative" : "absolute";
             if (volumeDisplay !== "absolute") {
               log.debug("%s [%s] volume set to relative so slider is ignored.", integrationName, entity.id);
@@ -140,7 +107,7 @@ export class CommandSender {
 
             // Convert to EISCP: some models use 0.5 dB steps (×2), others show EISCP value directly
             const eiscpValue = adjustVolumeDispl ? avrDisplayValue * 2 : avrDisplayValue;
-            const hexVolume = eiscpValue.toString(16).toUpperCase().padStart(2, "0");
+            const hexVolume = toHex(eiscpValue, 2);
 
             // // Debug logging for volume conversion
             // log.info(
@@ -247,7 +214,7 @@ export class CommandSender {
           }
 
           if (preset) {
-            const wasPreloading = (this.commandReceiver as any)?.abortTuneInPreload?.(entity.id) ?? false;
+            const wasPreloading = this.commandReceiver?.abortTuneInPreload?.(entity.id) ?? false;
             const currentSource = avrStateManager.getSource(entity.id);
             const currentSubSource = avrStateManager.getSubSource(entity.id);
             if (wasPreloading || currentSource !== "net" || currentSubSource !== "tunein") {

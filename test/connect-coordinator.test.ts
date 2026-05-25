@@ -40,7 +40,7 @@ test.serial("connect creates physical connections and zone instances when missin
   const fakePhysicalConn = { eiscp: { connected: true }, commandReceiver: {}, avrConfig: { model: "M", ip: "1.2.3.4", port: 60128 } };
   const connMgr = {
     getPhysicalConnection: () => undefined,
-    createAndConnect: async (_physicalAVR: string, avrCfg: any, cb: any) => {
+    createAndConnect: async (_physicalAVR: string, _avrCfg: any, _cb: any) => {
       createAndConnectCalled = true;
       return fakePhysicalConn;
     },
@@ -52,19 +52,16 @@ test.serial("connect creates physical connections and zone instances when missin
 
   let ensureCalled = false;
   const avrMgr = {
-    ensureZoneInstances: async (avrs: any[], getPhysicalConnection: any, createAvrSpecificConfig: any, createCommandSender: any) => {
+    ensureZoneInstances: async (_avrs: any[], _getPhysicalConnection: any, _createAvrSpecificConfig: any, _createCommandSender: any) => {
       ensureCalled = true;
     },
     entries: () => [["M_1.2.3.4_main", { config: { model: "M", ip: "1.2.3.4", zone: "main" } }]]
   } as any;
 
-  let queryCalled = false;
   const coordinator = new ConnectCoordinator(
     connMgr as any,
     avrMgr as any,
-    async (_avrEntry: string, _eiscp: any, _ctx: string) => {
-      queryCalled = true;
-    },
+    async (_avrEntry: string, _eiscp: any, _ctx: string) => {},
     async () => {}
   );
 
@@ -89,6 +86,7 @@ test.serial("connect handles reconnection when physical connection exists but di
   const connMgr = {
     getPhysicalConnection: () => fakePhysicalConn,
     createAndConnect: async () => fakePhysicalConn,
+    updateConnectionConfig: () => {},
     attemptReconnection: async (_physicalAVR: string) => {
       attemptCalled = true;
       return { success: true };
