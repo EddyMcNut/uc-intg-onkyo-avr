@@ -17,6 +17,11 @@ The integration uses **eISCP (Ethernet Integrated Serial Control Protocol)**, wh
 
 ## Component Diagram
 
+![Component Diagram](architecture.svg)
+
+<!-- Diagram source: docs/architecture.mmd — regenerate with: npm run generate-diagram -->
+
+<!--
 ```mermaid
 graph TB
     subgraph UC["Unfolded Circle Remote"]
@@ -110,6 +115,7 @@ graph TB
     class EISCP,AVRBox avr
     class SetupH,ER,LMH,ISH,SubH entry
 ```
+-->
 
 ## Architecture Components
 

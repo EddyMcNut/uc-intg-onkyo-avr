@@ -9,6 +9,7 @@
   },
   "scripts": {
     "format": "prettier --write .",
+    "generate-diagram": "npx @mermaid-js/mermaid-cli -i docs/architecture.mmd -o docs/architecture.svg",
     "code-check": "prettier --check . && eslint .",
     "lint": "eslint --fix",
     "build": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\" && tsc",
