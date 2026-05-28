@@ -20,7 +20,10 @@ graph TB
     end
 
     subgraph PerAVR["Per Physical AVR  (one set per unique IP)"]
-        EISCP["EiscpDriver\nsrc/eiscp.ts\nTCP socket · eISCP protocol\nsend queue · receive queue"]
+        EISCP["EiscpDriver\nsrc/eiscp.ts\nTCP socket · send queue\nreceive queue"]
+        PKT["eiscp-packet.ts\npacket encode / decode"]
+        PARSER["IscpCommandParser\neiscp-command-parser.ts\nISCP → CommandResult"]
+        MZONE["eiscp-multi-zone.ts\nmulti-zone command builders"]
         CR["CommandReceiver\nsrc/commandReceiver.ts\nISCP → UC attributes"]
         ZAUP["ZoneAgnosticUpdateProcessor\nsrc/zoneAgnosticUpdateProcessor.ts\nFLD / NLT / metadata fanout"]
     end
@@ -57,6 +60,11 @@ graph TB
     CM --> RM
     AIM --> CS
 
+    %% EiscpDriver sub-modules
+    EISCP --> PKT
+    EISCP --> PARSER
+    EISCP --> MZONE
+
     %% Per-AVR: receive path
     EISCP -- "raw 'data' events" --> CR
     CR -- "zone-agnostic commands" --> ZAUP
@@ -88,4 +96,6 @@ graph TB
     class CC,CM,RM,AIM conn
     class ASM,ASQ,CFG,MAPS data
     class EISCP,AVRBox avr
+    class PKT,PARSER,MZONE util
     class SetupH,ER,LMH,ISH,SubH entry
+    classDef util fill:#6a5a2d,color:#fff,stroke:#4e4219

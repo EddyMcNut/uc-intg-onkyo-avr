@@ -21,102 +21,6 @@ The integration uses **eISCP (Ethernet Integrated Serial Control Protocol)**, wh
 
 <!-- Diagram source: docs/architecture.mmd — regenerate with: npm run generate-diagram -->
 
-<!--
-```mermaid
-graph TB
-    subgraph UC["Unfolded Circle Remote"]
-        UCAPI["IntegrationAPI\n(UC SDK)"]
-    end
-
-    subgraph Driver["OnkyoDriver  ·  src/driver.ts"]
-        direction TB
-        SetupH["SetupHandler\nsrc/setupHandler.ts"]
-        CC["ConnectCoordinator\nsrc/connectCoordinator.ts"]
-        ER["EntityRegistrar\nsrc/entityRegistrar.ts"]
-        LMH["ListeningModeHandler"]
-        ISH["InputSelectorHandler"]
-        SubH["SubscriptionHandler"]
-    end
-
-    subgraph ConnLayer["Connection Layer"]
-        CM["ConnectionManager\nsrc/connectionManager.ts"]
-        RM["ReconnectionManager\nsrc/reconnectionManager.ts"]
-        AIM["AvrInstanceManager\nsrc/avrInstanceManager.ts"]
-    end
-
-    subgraph PerAVR["Per Physical AVR  (one set per unique IP)"]
-        EISCP["EiscpDriver\nsrc/eiscp.ts\nTCP socket · eISCP protocol\nsend queue · receive queue"]
-        CR["CommandReceiver\nsrc/commandReceiver.ts\nISCP → UC attributes"]
-        ZAUP["ZoneAgnosticUpdateProcessor\nsrc/zoneAgnosticUpdateProcessor.ts\nFLD / NLT / metadata fanout"]
-    end
-
-    subgraph PerZone["Per Zone  (main / zone2 / zone3)"]
-        CS["CommandSender\nsrc/commandSender.ts\nUC command → eISCP"]
-    end
-
-    subgraph State["State & Config"]
-        ASM["AvrStateManager\nsrc/avrState.ts\nper-zone state cache"]
-        ASQ["AvrStateQueryService\nsrc/avrStateQuery.ts\ndebounced query send"]
-        CFG["ConfigManager\nsrc/configManager.ts\nconfig.json"]
-        MAPS["Command maps\neiscp-commands.ts\neiscp-mappings.ts"]
-    end
-
-    subgraph AVR["Physical AVR(s)"]
-        AVRBox["Onkyo / Pioneer / Integra AVR\nTCP port 60128"]
-    end
-
-    %% UC ↔ Driver
-    UCAPI -- "Connect / Standby events\nentity commands" --> Driver
-    Driver -- "entity attribute updates\ndevice state" --> UCAPI
-
-    %% Driver internals
-    UCAPI --> SetupH
-    UCAPI --> CC
-    CC --> CM
-    CC --> AIM
-    Driver -- "queryAvrState /\nqueryAllZonesState" --> ASQ
-
-    %% Connection layer
-    CM --> EISCP
-    CM --> CR
-    CM --> RM
-    AIM --> CS
-
-    %% Per-AVR: receive path
-    EISCP -- "raw 'data' events" --> CR
-    CR -- "zone-agnostic commands" --> ZAUP
-    CR -- "write state" --> ASM
-    ZAUP -- "read: resolve zones\nwrite: setSource (DAB)" --> ASM
-
-    %% EiscpDriver reads state for FM/NET routing
-    EISCP -- "read: source / sub-source\nfor FLD routing" --> ASM
-
-    %% Per-zone: send path
-    CS --> EISCP
-
-    %% SubscriptionHandler queries AVR on subscribe
-    SubH --> ASQ
-
-    %% State & Config
-    CFG --> Driver
-    MAPS --> CR
-    MAPS --> CS
-
-    %% AVR TCP
-    EISCP <-- "eISCP TCP" --> AVRBox
-
-    %% Style
-    classDef entry fill:#4a6fa5,color:#fff,stroke:#2d4e7a
-    classDef conn fill:#2d7a4a,color:#fff,stroke:#1a5c34
-    classDef data fill:#7a4a2d,color:#fff,stroke:#5c3419
-    classDef avr fill:#5c2d7a,color:#fff,stroke:#3e1a5c
-    class CC,CM,RM,AIM conn
-    class ASM,ASQ,CFG,MAPS data
-    class EISCP,AVRBox avr
-    class SetupH,ER,LMH,ISH,SubH entry
-```
--->
-
 ## Architecture Components
 
 ### 1. Entry Point
@@ -161,11 +65,26 @@ graph TB
 
 **EiscpDriver** (`src/eiscp.ts`)
 
-- Low-level eISCP protocol implementation using Node.js `net` module
-- Encodes outgoing commands into eISCP packet format and decodes incoming packets
-- Emits `'data'` events when messages are received from the AVR
-- Send and receive queues with configurable delays prevent overwhelming the AVR
+- Low-level TCP/UDP transport using Node.js `net`/`dgram` modules
+- Manages send and receive queues with configurable delays to prevent overwhelming the AVR
 - Handles UDP broadcast discovery
+- Emits `'data'` events when messages are received from the AVR
+- Delegates packet encoding/decoding to `eiscp-packet.ts` and command parsing to `IscpCommandParser`
+
+**eiscp-packet.ts** (pure functions)
+
+- `createEiscpPacket` — wraps an ISCP command string in a binary eISCP frame for sending
+- `extractIscpMessage` / `extractAllIscpMessages` — extracts one or more ISCP messages from a received TCP buffer
+
+**IscpCommandParser** (`src/eiscp-command-parser.ts`)
+
+- Owns all ISCP command parsing logic, zone detection, and reverse command mapping
+- Translates raw `command + value` strings into structured `CommandResult` objects
+- Maintains metadata state (title/artist/album) via `patchMetadata` / `getMetadata`
+
+**eiscp-multi-zone.ts** (pure functions)
+
+- `buildMultiZoneVolumeCommands` / `buildMultiZoneMuteCommands` — build batched zone command lists from a single multi-zone action string (e.g. `"all-up"`, `"main-zone2-toggle"`)
 
 ### 3. Command Flow (Outbound)
 
@@ -179,19 +98,21 @@ graph TB
 **Flow Example — Volume Up:**
 
 ```
+
 User presses Volume Up on remote
-    ↓
+↓
 Unfolded Circle Integration API calls entity command
-    ↓
+↓
 OnkyoDriver.sharedCmdHandler() → CommandSender.sharedCmdHandler()
-    ↓
+↓
 CommandSender calls eiscp.command("volume level-up-1db-step")
-    ↓
+↓
 EiscpDriver formats command to eISCP: "MVLUP1"
-    ↓
+↓
 EiscpDriver sends packet over TCP socket to AVR
-    ↓
+↓
 AVR adjusts volume and sends back a volume state update
+
 ```
 
 ### 4. Event Flow (Inbound)
@@ -213,17 +134,20 @@ AVR adjusts volume and sends back a volume state update
 **Flow Example — Volume Update:**
 
 ```
+
 AVR volume changes (from any source: network command, IR remote, front panel)
-    ↓
+↓
 AVR broadcasts: "MVL32" (volume = 32)
-    ↓
+↓
 EiscpDriver receives packet, parses it, emits 'data' event
-    ↓
+↓
 CommandReceiver processes volume command:
-  - Converts protocol value → display value (÷2 for 0.5 dB steps if enabled)
-  - Updates media player volume attribute and volume sensor entity
-    ↓
-Unfolded Circle remote UI updates
+
+- Converts protocol value → display value (÷2 for 0.5 dB steps if enabled)
+- Updates media player volume attribute and volume sensor entity
+  ↓
+  Unfolded Circle remote UI updates
+
 ```
 
 ### 5. State Management
@@ -244,11 +168,13 @@ Unfolded Circle remote UI updates
 Entity types are defined as `EntityRegistration` descriptors in `buildEntityRegistrations()`:
 
 ```
+
 EntityRegistration {
-  enabled(cfg)    → boolean    // whether to register for this AVR
-  create()        → Entity[]   // build the entity/entities
-  afterRegister() → void       // optional post-registration hook
+enabled(cfg) → boolean // whether to register for this AVR
+create() → Entity[] // build the entity/entities
+afterRegister() → void // optional post-registration hook
 }
+
 ```
 
 `registerAvailableEntities()` iterates this list without knowing entity types. To add a new entity type, append a descriptor — the loop never changes.
@@ -381,3 +307,7 @@ The integration logs extensively to help troubleshoot issues:
 - **Error conditions**: Connection failures, command timeouts, parsing errors
 
 Log statements use entity ID prefix (`{model} {host} {zone}`) for multi-AVR/multi-zone identification.
+
+```
+
+```

@@ -3,12 +3,13 @@ import dgram from "dgram";
 import log from "./loggers.js";
 
 import EventEmitter from "events";
-import { eiscpCommands } from "./eiscp-commands.js";
 import { eiscpMappings } from "./eiscp-mappings.js";
-import { avrStateManager } from "./avrState.js";
 import { DEFAULT_QUEUE_THRESHOLD, buildEntityId } from "./configManager.js";
 import { delay } from "./utils.js";
-import { NETWORK_SERVICES, NO_TITLE } from "./constants.js";
+import { IscpCommandParser, type CommandResult } from "./eiscp-command-parser.js";
+import { createEiscpPacket, extractIscpMessage, extractAllIscpMessages } from "./eiscp-packet.js";
+import { buildMultiZoneVolumeCommands, buildMultiZoneMuteCommands } from "./eiscp-multi-zone.js";
+import { avrStateManager } from "./avrState.js";
 import { getTidalHarvestMode, setTidalNlsCursorOffset, setTidalNlsLayerNumber, setTidalTotalListItemCount } from "./tidalBrowserStore.js";
 
 export interface EiscpConfig {
@@ -25,7 +26,6 @@ export interface EiscpConfig {
   configuredZones?: string[]; // Zones configured for this physical AVR (e.g., ["main", "zone2"])
 }
 
-const COMMANDS = eiscpCommands.commands;
 const COMMAND_MAPPINGS = eiscpMappings.command_mappings;
 const VALUE_MAPPINGS = eiscpMappings.value_mappings;
 const integrationName = "eISCP:";
@@ -56,23 +56,10 @@ const ZONE4_COMMAND_MAP: Record<string, string> = {
   TUN: "TU4"
 };
 
-// Reverse mappings (zone-specific -> main) for parsing incoming commands
-const ZONE2_REVERSE_MAP = Object.fromEntries(Object.entries(ZONE2_COMMAND_MAP).map(([k, v]) => [v, k]));
-const ZONE3_REVERSE_MAP = Object.fromEntries(Object.entries(ZONE3_COMMAND_MAP).map(([k, v]) => [v, k]));
-const ZONE4_REVERSE_MAP = Object.fromEntries(Object.entries(ZONE4_COMMAND_MAP).map(([k, v]) => [v, k]));
+// Reverse mappings (zone-specific -> main) for parsing incoming commands are in eiscp-command-parser.ts
 
-interface Metadata {
-  title?: string;
-  artist?: string;
-  album?: string;
-}
-
-/** Result from parsing an ISCP command */
-interface CommandResult {
-  command: string;
-  argument: string | number | string[] | Record<string, string>;
-  zone: string;
-}
+/** Result from parsing an ISCP command — re-exported from eiscp-command-parser.ts */
+export type { CommandResult };
 
 /** Data payload emitted on 'data' event */
 interface DataPayload {
@@ -101,9 +88,6 @@ interface CommandInput {
   args: string | number;
 }
 
-/** Handler function type for special command parsing */
-type CommandHandler = (value: string, command: string, result: CommandResult) => CommandResult;
-
 export class EiscpDriver extends EventEmitter {
   public get connected(): boolean {
     return this.is_connected;
@@ -124,24 +108,8 @@ export class EiscpDriver extends EventEmitter {
   private is_connected = false;
   private sendQueue: Promise<void> = Promise.resolve();
   private receiveQueue: Promise<void> = Promise.resolve();
-  private currentMetadata: Metadata = {};
   private tcpBuffer: Buffer = Buffer.alloc(0);
-
-  /** Map of special command handlers for complex parsing logic */
-  private readonly commandHandlers: Record<string, CommandHandler> = {
-    NTM: (value, _cmd, result) => this.handleNTM(value, result),
-    IFA: (value, _cmd, result) => this.handleIFA(value, result),
-    IFV: (value, _cmd, result) => this.handleIFV(value, result),
-    NAT: (value, cmd, result) => this.handleMetadata(value, cmd, result),
-    NTI: (value, cmd, result) => this.handleMetadata(value, cmd, result),
-    NAL: (value, cmd, result) => this.handleMetadata(value, cmd, result),
-    DSN: (value, _cmd, result) => this.handleDSN(value, result),
-    NST: (value, _cmd, result) => this.handleNST(value, result),
-    FLD: (value, _cmd, result) => this.handleFLD(value, result),
-    NLT: (value, _cmd, result) => this.handleNLT(value, result),
-    NLS: (value, _cmd, result) => this.handleNLS(value, result),
-    NLA: (value, _cmd, result) => this.handleNLA(value, result)
-  };
+  private readonly commandParser: IscpCommandParser;
 
   constructor(config?: EiscpConfig) {
     super();
@@ -158,6 +126,12 @@ export class EiscpDriver extends EventEmitter {
       tuneinPresetPosition: config?.tuneinPresetPosition ?? 1,
       configuredZones: config?.configuredZones
     };
+    this.commandParser = new IscpCommandParser((zone) => buildEntityId(this.config.model!, this.config.host!, zone), avrStateManager, {
+      getTidalHarvestMode,
+      setTidalNlsCursorOffset,
+      setTidalTotalListItemCount,
+      setTidalNlsLayerNumber
+    });
     this.setupErrorHandler();
   }
 
@@ -167,43 +141,6 @@ export class EiscpDriver extends EventEmitter {
         log.error("%s eiscp error (unhandled):", integrationName, err);
       });
     }
-  }
-
-  private timeToSeconds(timeStr: string): number {
-    if (!timeStr) return 0;
-    const parts = timeStr.split(":").map(Number);
-    if (parts.length === 3) {
-      // hh:mm:ss
-      return parts[0] * 3600 + parts[1] * 60 + parts[2];
-    } else if (parts.length === 2) {
-      // mm:ss
-      return parts[0] * 60 + parts[1];
-    } else if (parts.length === 1) {
-      // seconds
-      return parts[0];
-    }
-    return 0;
-  }
-
-  /** Parse comma-separated AV info string into trimmed parts array */
-  private parseAvInfoParts(value: string): string[] {
-    return (value?.toString() ?? "").split(",").map((p) => p.trim());
-  }
-
-  /** Get part at index, with optional space removal for source names */
-  private getAvPart(parts: string[], index: number, removeSpaces = false): string {
-    const val = parts[index] || "";
-    return removeSpaces ? val.replace(/\s+/g, "") : val;
-  }
-
-  /** Join non-empty values with separator (default: " | ") */
-  private joinFiltered(values: string[], separator = " | "): string {
-    return values.filter(Boolean).join(separator);
-  }
-
-  /** Build display value, returning "---" if resolution is unknown */
-  private buildDisplayValue(resolution: string, ...parts: string[]): string {
-    return resolution.toLowerCase() === "unknown" ? "---" : this.joinFiltered(parts);
   }
 
   /** Translate main zone command prefix to zone-specific prefix */
@@ -218,426 +155,7 @@ export class EiscpDriver extends EventEmitter {
     return prefix;
   }
 
-  // ==================== Command Handlers ====================
-
-  private handleNTM(value: string, result: CommandResult): CommandResult {
-    let [position, duration] = value.toString().split("/");
-    position = this.timeToSeconds(position).toString();
-    duration = this.timeToSeconds(duration).toString();
-    result.command = "NTM";
-    result.argument = position + "/" + duration;
-    return result;
-  }
-
-  private handleIFA(value: string, result: CommandResult): CommandResult {
-    const parts = this.parseAvInfoParts(value);
-
-    const inputSource = this.getAvPart(parts, 0, true);
-    const inputFormat = this.getAvPart(parts, 1);
-    const inputRate = this.getAvPart(parts, 2);
-    const inputChannels = this.getAvPart(parts, 3);
-    const outputFormat = this.getAvPart(parts, 4);
-    const outputChannels = this.getAvPart(parts, 5);
-
-    const inputRateChannels = inputFormat === "" ? inputSource : this.joinFiltered([inputRate, inputChannels], " ");
-    const audioInputValue = this.joinFiltered([inputFormat, inputRateChannels]);
-    const audioOutputValue = this.joinFiltered([outputFormat, outputChannels]);
-
-    result.command = "IFA";
-    result.argument = {
-      inputSource,
-      inputFormat,
-      inputRate,
-      inputChannels,
-      outputFormat,
-      outputChannels,
-      audioInputValue,
-      audioOutputValue
-    };
-    return result;
-  }
-
-  private handleIFV(value: string, result: CommandResult): CommandResult {
-    // IFV format: inputSource,inputRes,inputColor,inputBit,outDisplay,outRes,outColor,outBit,?,videoFormat
-    // Index:      0          ,1       ,2         ,3       ,4         ,5     ,6       ,7      ,8,9
-    const parts = this.parseAvInfoParts(value);
-
-    const inputSource = this.getAvPart(parts, 0, true);
-    const inputResolution = this.getAvPart(parts, 1);
-    const inputColorSpace = this.getAvPart(parts, 2);
-    const inputBitDepth = this.getAvPart(parts, 3);
-    const videoFormat = parts.length > 9 ? parts[9] : "";
-    const outputDisplay = this.getAvPart(parts, 4);
-    const outputResolution = this.getAvPart(parts, 5);
-    const outputColorSpace = this.getAvPart(parts, 6);
-    const outputBitDepth = this.getAvPart(parts, 7);
-
-    const inputColorBit = this.joinFiltered([inputColorSpace, inputBitDepth], " ");
-    const videoInputValue = this.buildDisplayValue(inputResolution, inputResolution, inputColorBit, videoFormat);
-    const outputColorBit = this.joinFiltered([outputColorSpace, outputBitDepth], " ");
-    const videoOutputValue = this.buildDisplayValue(outputResolution, outputResolution, outputColorBit, videoFormat);
-
-    result.command = "IFV";
-    result.argument = {
-      inputSource,
-      inputResolution,
-      inputColorSpace,
-      inputBitDepth,
-      videoFormat,
-      outputDisplay,
-      outputResolution,
-      outputColorSpace,
-      outputBitDepth,
-      videoInputValue,
-      videoOutputValue
-    };
-    return result;
-  }
-
-  private handleMetadata(value: string, command: string, result: CommandResult): CommandResult {
-    const originalValue = value;
-    const combined = command + value;
-    const parts = combined.split(/ISCP(?:[$.!]1|\$!1)/);
-    let foundMatch = false;
-
-    // Get current subsource to override artist for certain streaming services
-    const entityId = buildEntityId(this.config.model!, this.config.host!, result.zone);
-    const currentSubSource = avrStateManager.getSubSource(entityId);
-
-    for (const part of parts) {
-      if (!part.trim()) continue;
-      const match = part.trim().match(/^([A-Z]{3})\s*(.*)$/s);
-      if (match) {
-        foundMatch = true;
-        const type = match[1];
-        let val = match[2].trim();
-        if (type === "NAT") {
-          // Override artist with service name for configured streaming services
-          if (NO_TITLE.map((s) => s.toLowerCase()).includes(currentSubSource)) {
-            // Find matching service name from NETWORK_SERVICES (case-insensitive)
-            const serviceName = NETWORK_SERVICES.find((s) => s.toLowerCase() === currentSubSource);
-            this.currentMetadata.title = serviceName || val;
-          } else {
-            this.currentMetadata.title = val;
-          }
-        }
-        if (type === "NTI") this.currentMetadata.artist = val;
-        if (type === "NAL") this.currentMetadata.album = val;
-      }
-    }
-
-    if (!foundMatch) {
-      if (command === "NAT") {
-        // Override artist with service name for configured streaming services
-        if (NO_TITLE.map((s) => s.toLowerCase()).includes(currentSubSource)) {
-          // Find matching service name from NETWORK_SERVICES (case-insensitive)
-          const serviceName = NETWORK_SERVICES.find((s) => s.toLowerCase() === currentSubSource);
-          this.currentMetadata.title = serviceName || originalValue;
-        } else {
-          this.currentMetadata.title = originalValue;
-        }
-      }
-      if (command === "NTI") this.currentMetadata.artist = originalValue;
-      if (command === "NAL") this.currentMetadata.album = originalValue;
-    }
-
-    result.command = "metadata";
-    result.argument = { ...this.currentMetadata };
-    return result;
-  }
-
-  private handleDSN(value: string, result: CommandResult): CommandResult {
-    result.command = "DSN";
-    result.argument = value;
-    return result;
-  }
-
-  private handleNST(value: string, result: CommandResult): CommandResult {
-    const status = value.trim().charAt(0);
-    let playback = "unknown";
-
-    switch (status) {
-      case "P":
-        playback = "playing";
-        break;
-      case "p":
-        playback = "paused";
-        break;
-      case "S":
-        playback = "stopped";
-        break;
-      case "F":
-        playback = "ff";
-        break;
-      case "R":
-        playback = "fr";
-        break;
-      default:
-        return result;
-    }
-
-    result.command = "NST";
-    result.argument = playback;
-    return result;
-  }
-
-  private handleNLT(value: string, result: CommandResult): CommandResult {
-    // NLT format: xx u y cccc iiii ll s r aa bb ss [title text]  (all hex until title)
-    //   xx   = service type (2 hex chars)
-    //   u    = UI type (1 char)
-    //   y    = layer info (1 char)
-    //   cccc = cursor position, 0-based absolute (4 hex chars) — chars 4-7
-    //   iiii = total item count (4 hex chars)                  — chars 8-11
-    const entityId = buildEntityId(this.config.model!, this.config.host!, result.zone);
-
-    if (value.length >= 12) {
-      const cursorHex = value.substring(4, 8);
-      const countHex = value.substring(8, 12);
-      const layerHex = value.length >= 14 ? value.substring(12, 14) : "";
-      if (/^[0-9A-Fa-f]{4}$/.test(cursorHex) && /^[0-9A-Fa-f]{4}$/.test(countHex)) {
-        const cursorOffset = parseInt(cursorHex, 16);
-        const totalCount = parseInt(countHex, 16);
-        const layerNumber = /^[0-9A-Fa-f]{2}$/.test(layerHex) ? parseInt(layerHex, 16) : 0;
-        if (avrStateManager.getSubSource(entityId) === "tidal") {
-          // Don't overwrite the cursor during harvest — the loop manages it locally.
-          if (!getTidalHarvestMode(entityId)) {
-            setTidalNlsCursorOffset(entityId, cursorOffset);
-          }
-          setTidalTotalListItemCount(entityId, totalCount);
-          if (layerNumber > 0) setTidalNlsLayerNumber(entityId, layerNumber);
-        }
-      }
-    }
-
-    // The hex payload is followed by ASCII/UTF-8 title text. The text may be uppercase (e.g. "TIDAL"),
-    // so detect the first non-hex character instead of relying on title casing.
-    const asciiStart = value.search(/[^0-9A-Fa-f]/);
-    if (asciiStart === -1) {
-      return result;
-    }
-
-    const text = value
-      .substring(asciiStart)
-      .replace(/\s+%s$/i, "")
-      .trim();
-    if (!text) {
-      return result;
-    }
-
-    const currentSource = avrStateManager.getSource(entityId);
-
-    // Check if the title contains a known network service name
-    const normalizedText = text.toLowerCase();
-    const detectedService = NETWORK_SERVICES.find((service) => normalizedText.includes(service.toLowerCase()));
-    if (detectedService) {
-      const currentSubSource = avrStateManager.getSubSource(entityId);
-      if (currentSubSource !== detectedService.toLowerCase()) {
-        result.command = "NLT";
-        result.argument = detectedService;
-        return result;
-      }
-    }
-
-    if (currentSource === "net" && normalizedText === "my presets") {
-      result.command = "NLT_CONTEXT";
-      result.argument = "My Presets";
-      return result;
-    }
-
-    return result;
-  }
-
-  private handleNLS(value: string, result: CommandResult): CommandResult {
-    const entry = value.trim();
-    if (!/^U\d+-/.test(entry)) {
-      return result;
-    }
-
-    result.command = "NLS";
-    result.argument = entry;
-    return result;
-  }
-
-  private handleNLA(value: string, result: CommandResult): CommandResult {
-    const xmlStart = value.indexOf("<");
-    if (xmlStart === -1 || value.charAt(0) !== "X" || value.charAt(5).toUpperCase() !== "S") {
-      return result;
-    }
-
-    result.command = "NLA";
-    result.argument = value.substring(xmlStart).trim();
-    return result;
-  }
-
-  private handleFLD(value: string, result: CommandResult): CommandResult {
-    let ascii = Buffer.from(value, "hex").toString("ascii");
-    ascii = ascii.replace(/[^a-zA-Z0-9 .\-:/]/g, "").trim();
-
-    // Construct entityId from config and zone
-    const entityId = buildEntityId(this.config.model!, this.config.host!, result.zone);
-    const currentSource = avrStateManager.getSource(entityId);
-
-    // Check if FLD content matches a network service (regardless of current source)
-    const detectedService = NETWORK_SERVICES.find((service) => ascii.startsWith(service));
-
-    switch (currentSource) {
-      case "net": {
-        if (detectedService) {
-          // Known service detected - only emit if different from current subSource
-          const currentSubSource = avrStateManager.getSubSource(entityId);
-          if (currentSubSource !== detectedService.toLowerCase()) {
-            result.command = "FLD";
-            result.argument = detectedService;
-            return result;
-          }
-          // Same service, skip to prevent scroll updates
-          return result;
-        }
-        // No known service - skip scrolling text from network sources
-        return result;
-      }
-
-      case "fm": {
-        // If we detect a network service but source is FM, skip (source changing)
-        if (detectedService) {
-          return result;
-        }
-        result.command = "FLD";
-        result.argument = ascii.slice(0, -2);
-        return result;
-      }
-
-      default: {
-        // If we detect a network service but source isn't NET, skip (source changing)
-        if (detectedService) {
-          return result;
-        }
-        result.command = "FLD";
-        result.argument = ascii.slice(0, -4);
-        return result;
-      }
-    }
-  }
-
   // ==================== Packet Handling ====================
-
-  // Create a proper eISCP packet for UDP broadcast (discovery)
-  private eiscp_packet(data: string): Buffer {
-    if (data.charAt(0) !== "!") {
-      data = "!1" + data;
-    }
-    const iscp_msg = Buffer.from(data + "\x0D\x0a");
-    const header = Buffer.from([73, 83, 67, 80, 0, 0, 0, 16, 0, 0, 0, 0, 1, 0, 0, 0]);
-    header.writeUInt32BE(iscp_msg.length, 8);
-    return Buffer.concat([header, iscp_msg]);
-  }
-
-  private eiscp_packet_extract(packet: Buffer): string {
-    return packet.toString("ascii", 18, packet.length - 2);
-  }
-
-  private eiscp_packet_extract_all(packet: Buffer): string[] {
-    const messages: string[] = [];
-    let offset = 0;
-
-    while (offset + 16 <= packet.length && packet.toString("ascii", offset, offset + 4) === "ISCP") {
-      const headerSize = packet.readUInt32BE(offset + 4);
-      const dataSize = packet.readUInt32BE(offset + 8);
-      const frameEnd = offset + headerSize + dataSize;
-
-      if (headerSize < 16 || dataSize < 4 || frameEnd > packet.length) {
-        break;
-      }
-
-      messages.push(packet.toString("ascii", offset + headerSize + 2, frameEnd - 2));
-      offset = frameEnd;
-    }
-
-    if (messages.length === 0) {
-      return [this.eiscp_packet_extract(packet)];
-    }
-
-    return messages;
-  }
-
-  private iscp_to_command(command: string, value: string): CommandResult {
-    const result: CommandResult = {
-      command: "undefined",
-      argument: "undefined",
-      zone: "main"
-    };
-
-    // Detect zone from command prefix
-    // Zone 2: starts with Z (ZPW, ZVL, ZMT, SLZ) or ends with Z (TUZ)
-    // Zone 3: ends with 3 (PW3, VL3, MT3, SL3, TU3)
-    // Zone 4: ends with 4 (PW4, VL4, MT4, SL4, TU4)
-    if (command.charAt(0) === "Z" && command.length === 3) {
-      result.zone = "zone2";
-    } else if (command.charAt(2) === "Z" && command.length === 3) {
-      result.zone = "zone2";
-    } else if (command.charAt(2) === "3" && command.length === 3) {
-      result.zone = "zone3";
-    } else if (command.charAt(2) === "4" && command.length === 3) {
-      result.zone = "zone4";
-    }
-
-    // Check for special command handler
-    const upperCommand = command.toUpperCase();
-    const handler = this.commandHandlers[upperCommand];
-    if (handler) {
-      return handler(value, command, result);
-    }
-
-    // Map zone-specific command codes back to main zone for lookup
-    let lookupCommand = command;
-    if (result.zone === "zone2") {
-      lookupCommand = ZONE2_REVERSE_MAP[command] || command;
-    } else if (result.zone === "zone3") {
-      lookupCommand = ZONE3_REVERSE_MAP[command] || command;
-    } else if (result.zone === "zone4") {
-      lookupCommand = ZONE4_REVERSE_MAP[command] || command;
-    }
-
-    // Direct lookup instead of iterating all commands
-    type CommandType = {
-      name: string;
-      values: { [key: string]: { name: string | string[] } };
-    };
-    const cmdObj = (COMMANDS as unknown as Record<string, CommandType>)[lookupCommand];
-    if (!cmdObj) {
-      return result;
-    }
-
-    result.command = cmdObj.name;
-    const valuesObj = cmdObj.values;
-
-    if (valuesObj[value]?.name !== undefined) {
-      result.argument = valuesObj[value].name;
-    } else if (value === "N/A") {
-      // Skip N/A values (zone is off or unavailable)
-      // result.argument remains "undefined"
-    } else if (
-      VALUE_MAPPINGS.hasOwnProperty(lookupCommand as keyof typeof VALUE_MAPPINGS) &&
-      Object.prototype.hasOwnProperty.call(VALUE_MAPPINGS[lookupCommand as keyof typeof VALUE_MAPPINGS], "intgrRange")
-    ) {
-      result.argument = parseInt(value, 16);
-    } else if (typeof value === "string" && value.match(/^([0-9A-F]{2})+(,([0-9A-F]{2})+)*$/i)) {
-      // Handle hex-encoded string(s), possibly comma-separated
-      result.argument = value.split(",").map((hexStr) => {
-        hexStr = hexStr.trim();
-        let str = "";
-        for (let i = 0; i < hexStr.length; i += 2) {
-          str += String.fromCharCode(parseInt(hexStr.substring(i, i + 2), 16));
-        }
-        return str;
-      });
-      if (result.argument.length === 1) {
-        result.argument = result.argument[0];
-      }
-    }
-
-    return result;
-  }
 
   async discover(options?: { devices?: number; timeout?: number; address?: string; port?: number; subnetBroadcast?: string }): Promise<DiscoveredDevice[]> {
     return new Promise((resolve, reject) => {
@@ -669,7 +187,7 @@ export class EiscpDriver extends EventEmitter {
           }
         })
         .on("message", (packet: Buffer, rinfo: dgram.RemoteInfo) => {
-          const message = this.eiscp_packet_extract_all(packet)[0] ?? this.eiscp_packet_extract(packet);
+          const message = extractAllIscpMessages(packet)[0] ?? extractIscpMessage(packet);
           const command = message.slice(0, 3);
           if (command === "ECN") {
             const data = message.slice(3).split("/");
@@ -688,7 +206,7 @@ export class EiscpDriver extends EventEmitter {
         })
         .on("listening", () => {
           client.setBroadcast(true);
-          const buffer = this.eiscp_packet("!xECNQSTN");
+          const buffer = createEiscpPacket("!xECNQSTN");
           client.send(buffer, 0, buffer.length, opts.port, opts.address, (err) => {
             if (err) {
               // Log but don't fail - network might not be ready yet (ENETUNREACH)
@@ -808,15 +326,15 @@ export class EiscpDriver extends EventEmitter {
             .replace(/[\x00-\x1F]/g, "")
             .trim();
 
-          const rawResult = this.iscp_to_command(command, value);
-          if (!rawResult || rawResult.command === "undefined") {
+          const parsed = this.commandParser.parse(command, value);
+          if (!parsed) {
             continue;
           }
 
           const dataPayload: DataPayload = {
-            command: rawResult.command ?? undefined,
-            argument: rawResult.argument ?? undefined,
-            zone: rawResult.zone ?? undefined,
+            command: parsed.command,
+            argument: parsed.argument,
+            zone: parsed.zone,
             iscpCommand: iscp_message,
             host: this.config.host,
             port: this.config.port,
@@ -848,12 +366,12 @@ export class EiscpDriver extends EventEmitter {
       if (this.is_connected && this.eiscp) {
         // Handle single command (most common case)
         if (typeof data === "string") {
-          this.eiscp.write(this.eiscp_packet(data));
+          this.eiscp.write(createEiscpPacket(data));
         } else {
           // const shortDelay = Math.round((this.config.send_delay! ?? DEFAULT_QUEUE_THRESHOLD) / data.length / 20) * 10;
           // console.log("%s ***************", integrationName, data.length, shortDelay);
           for (const cmd of data) {
-            this.eiscp.write(this.eiscp_packet(cmd));
+            this.eiscp.write(createEiscpPacket(cmd));
             // await delay(shortDelay);
           }
         }
@@ -896,11 +414,10 @@ export class EiscpDriver extends EventEmitter {
 
     log.info("%s TuneIn preset %d: navigating to My Presets (position %s), selecting index %s", integrationName, preset, myPresetsPosition, presetIndex);
 
-    this.currentMetadata.artist = "Selecting preset " + preset + "...";
-    this.currentMetadata.album = "please wait";
+    this.commandParser.patchMetadata({ artist: "Selecting preset " + preset + "...", album: "please wait" });
     this.emit("data", {
       command: "metadata",
-      argument: { ...this.currentMetadata },
+      argument: { ...this.commandParser.getMetadata() },
       zone: "main",
       iscpCommand: iscpCommand,
       host: this.config.host,
@@ -1041,87 +558,17 @@ export class EiscpDriver extends EventEmitter {
       return;
     }
 
-    const action = parts[1]; // e.g., "all-up", "main-zone2-down"
+    const action = parts[1];
+    const configuredZones = this.config.configuredZones || ["main"];
+    const commands = buildMultiZoneVolumeCommands(action, configuredZones);
 
-    // Determine which zones are configured for this AVR
-    const configuredZones = this.config.configuredZones || ["main"]; // default to main if not specified
-    const hasMain = configuredZones.includes("main");
-    const hasZone2 = configuredZones.includes("zone2");
-    const hasZone3 = configuredZones.includes("zone3");
-    const hasZone4 = configuredZones.includes("zone4");
-
-    // Map action to zone-specific volume commands (conditionally based on configured zones)
-    const volumeCommands: string[] = [];
-
-    switch (action) {
-      case "all-up":
-        if (hasMain) volumeCommands.push("MVLUP1"); // Main zone volume up
-        if (hasZone2) volumeCommands.push("ZVLUP1"); // Zone 2 volume up
-        if (hasZone3) volumeCommands.push("VL3UP1"); // Zone 3 volume up
-        if (hasZone4) volumeCommands.push("VL4UP1"); // Zone 4 volume up
-        break;
-      case "all-down":
-        if (hasMain) volumeCommands.push("MVLDOWN1"); // Main zone volume down
-        if (hasZone2) volumeCommands.push("ZVLDOWN1"); // Zone 2 volume down
-        if (hasZone3) volumeCommands.push("VL3DOWN1"); // Zone 3 volume down
-        if (hasZone4) volumeCommands.push("VL4DOWN1"); // Zone 4 volume down
-        break;
-      case "main-zone2-up":
-        if (hasMain) volumeCommands.push("MVLUP1"); // Main zone volume up
-        if (hasZone2) volumeCommands.push("ZVLUP1"); // Zone 2 volume up
-        break;
-      case "main-zone2-down":
-        if (hasMain) volumeCommands.push("MVLDOWN1"); // Main zone volume down
-        if (hasZone2) volumeCommands.push("ZVLDOWN1"); // Zone 2 volume down
-        break;
-      case "main-zone3-up":
-        if (hasMain) volumeCommands.push("MVLUP1"); // Main zone volume up
-        if (hasZone3) volumeCommands.push("VL3UP1"); // Zone 3 volume up
-        break;
-      case "main-zone3-down":
-        if (hasMain) volumeCommands.push("MVLDOWN1"); // Main zone volume down
-        if (hasZone3) volumeCommands.push("VL3DOWN1"); // Zone 3 volume down
-        break;
-      case "main-zone4-up":
-        if (hasMain) volumeCommands.push("MVLUP1"); // Main zone volume up
-        if (hasZone4) volumeCommands.push("VL4UP1"); // Zone 4 volume up
-        break;
-      case "main-zone4-down":
-        if (hasMain) volumeCommands.push("MVLDOWN1"); // Main zone volume down
-        if (hasZone4) volumeCommands.push("VL4DOWN1"); // Zone 4 volume down
-        break;
-      case "zone2-zone3-up":
-        if (hasZone2) volumeCommands.push("ZVLUP1"); // Zone 2 volume up
-        if (hasZone3) volumeCommands.push("VL3UP1"); // Zone 3 volume up
-        break;
-      case "zone2-zone3-down":
-        if (hasZone2) volumeCommands.push("ZVLDOWN1"); // Zone 2 volume down
-        if (hasZone3) volumeCommands.push("VL3DOWN1"); // Zone 3 volume down
-        break;
-      case "zone2-zone3-zone4-up":
-        if (hasZone2) volumeCommands.push("ZVLUP1"); // Zone 2 volume up
-        if (hasZone3) volumeCommands.push("VL3UP1"); // Zone 3 volume up
-        if (hasZone4) volumeCommands.push("VL4UP1"); // Zone 4 volume up
-        break;
-      case "zone2-zone3-zone4-down":
-        if (hasZone2) volumeCommands.push("ZVLDOWN1"); // Zone 2 volume down
-        if (hasZone3) volumeCommands.push("VL3DOWN1"); // Zone 3 volume down
-        if (hasZone4) volumeCommands.push("VL4DOWN1"); // Zone 4 volume down
-        break;
-      default:
-        log.warn("%s Unknown multi-zone-volume action: %s", integrationName, action);
-        return;
-    }
-
-    if (volumeCommands.length === 0) {
+    if (commands.length === 0) {
       log.warn("%s No zones configured for multi-zone-volume action: %s (configured zones: %s)", integrationName, action, configuredZones.join(", "));
       return;
     }
 
-    log.info("%s Multi-zone volume command: %s -> sending %d zone commands (configured zones: %s)", integrationName, data, volumeCommands.length, configuredZones.join(", "));
-
-    // Send all zone commands at once with a single 100ms delay at the end
-    this.enqueueSend(volumeCommands);
+    log.info("%s Multi-zone volume command: %s -> sending %d zone commands (configured zones: %s)", integrationName, data, commands.length, configuredZones.join(", "));
+    this.enqueueSend(commands);
   }
 
   private async handleMultiZoneMuting(data: string): Promise<void> {
@@ -1135,114 +582,17 @@ export class EiscpDriver extends EventEmitter {
       return;
     }
 
-    const action = parts[1]; // e.g., "all-on", "all-off", "all-toggle", "main-zone2-on"
+    const action = parts[1];
+    const configuredZones = this.config.configuredZones || ["main"];
+    const commands = buildMultiZoneMuteCommands(action, configuredZones);
 
-    // Determine which zones are configured for this AVR
-    const configuredZones = this.config.configuredZones || ["main"]; // default to main if not specified
-    const hasMain = configuredZones.includes("main");
-    const hasZone2 = configuredZones.includes("zone2");
-    const hasZone3 = configuredZones.includes("zone3");
-    const hasZone4 = configuredZones.includes("zone4");
-
-    // Map action to zone-specific mute commands (conditionally based on configured zones)
-    const muteCommands: string[] = [];
-
-    switch (action) {
-      case "all-on":
-        if (hasMain) muteCommands.push("AMT01"); // Main zone mute on
-        if (hasZone2) muteCommands.push("ZMT01"); // Zone 2 mute on
-        if (hasZone3) muteCommands.push("MT301"); // Zone 3 mute on
-        if (hasZone4) muteCommands.push("MT401"); // Zone 4 mute on
-        break;
-      case "all-off":
-        if (hasMain) muteCommands.push("AMT00"); // Main zone mute off
-        if (hasZone2) muteCommands.push("ZMT00"); // Zone 2 mute off
-        if (hasZone3) muteCommands.push("MT300"); // Zone 3 mute off
-        if (hasZone4) muteCommands.push("MT400"); // Zone 4 mute off
-        break;
-      case "all-toggle":
-        if (hasMain) muteCommands.push("AMTTG"); // Main zone mute toggle
-        if (hasZone2) muteCommands.push("ZMTTG"); // Zone 2 mute toggle
-        if (hasZone3) muteCommands.push("MT3TG"); // Zone 3 mute toggle
-        if (hasZone4) muteCommands.push("MT4TG"); // Zone 4 mute toggle
-        break;
-      case "main-zone2-on":
-        if (hasMain) muteCommands.push("AMT01"); // Main zone mute on
-        if (hasZone2) muteCommands.push("ZMT01"); // Zone 2 mute on
-        break;
-      case "main-zone2-off":
-        if (hasMain) muteCommands.push("AMT00"); // Main zone mute off
-        if (hasZone2) muteCommands.push("ZMT00"); // Zone 2 mute off
-        break;
-      case "main-zone2-toggle":
-        if (hasMain) muteCommands.push("AMTTG"); // Main zone mute toggle
-        if (hasZone2) muteCommands.push("ZMTTG"); // Zone 2 mute toggle
-        break;
-      case "main-zone3-on":
-        if (hasMain) muteCommands.push("AMT01"); // Main zone mute on
-        if (hasZone3) muteCommands.push("MT301"); // Zone 3 mute on
-        break;
-      case "main-zone3-off":
-        if (hasMain) muteCommands.push("AMT00"); // Main zone mute off
-        if (hasZone3) muteCommands.push("MT300"); // Zone 3 mute off
-        break;
-      case "main-zone3-toggle":
-        if (hasMain) muteCommands.push("AMTTG"); // Main zone mute toggle
-        if (hasZone3) muteCommands.push("MT3TG"); // Zone 3 mute toggle
-        break;
-      case "main-zone4-on":
-        if (hasMain) muteCommands.push("AMT01"); // Main zone mute on
-        if (hasZone4) muteCommands.push("MT401"); // Zone 4 mute on
-        break;
-      case "main-zone4-off":
-        if (hasMain) muteCommands.push("AMT00"); // Main zone mute off
-        if (hasZone4) muteCommands.push("MT400"); // Zone 4 mute off
-        break;
-      case "main-zone4-toggle":
-        if (hasMain) muteCommands.push("AMTTG"); // Main zone mute toggle
-        if (hasZone4) muteCommands.push("MT4TG"); // Zone 4 mute toggle
-        break;
-      case "zone2-zone3-on":
-        if (hasZone2) muteCommands.push("ZMT01"); // Zone 2 mute on
-        if (hasZone3) muteCommands.push("MT301"); // Zone 3 mute on
-        break;
-      case "zone2-zone3-off":
-        if (hasZone2) muteCommands.push("ZMT00"); // Zone 2 mute off
-        if (hasZone3) muteCommands.push("MT300"); // Zone 3 mute off
-        break;
-      case "zone2-zone3-toggle":
-        if (hasZone2) muteCommands.push("ZMTTG"); // Zone 2 mute toggle
-        if (hasZone3) muteCommands.push("MT3TG"); // Zone 3 mute toggle
-        break;
-      case "zone2-zone3-zone4-on":
-        if (hasZone2) muteCommands.push("ZMT01"); // Zone 2 mute on
-        if (hasZone3) muteCommands.push("MT301"); // Zone 3 mute on
-        if (hasZone4) muteCommands.push("MT401"); // Zone 4 mute on
-        break;
-      case "zone2-zone3-zone4-off":
-        if (hasZone2) muteCommands.push("ZMT00"); // Zone 2 mute off
-        if (hasZone3) muteCommands.push("MT300"); // Zone 3 mute off
-        if (hasZone4) muteCommands.push("MT400"); // Zone 4 mute off
-        break;
-      case "zone2-zone3-zone4-toggle":
-        if (hasZone2) muteCommands.push("ZMTTG"); // Zone 2 mute toggle
-        if (hasZone3) muteCommands.push("MT3TG"); // Zone 3 mute toggle
-        if (hasZone4) muteCommands.push("MT4TG"); // Zone 4 mute toggle
-        break;
-      default:
-        log.warn("%s Unknown multi-zone-muting action: %s", integrationName, action);
-        return;
-    }
-
-    if (muteCommands.length === 0) {
+    if (commands.length === 0) {
       log.warn("%s No zones configured for multi-zone-muting action: %s (configured zones: %s)", integrationName, action, configuredZones.join(", "));
       return;
     }
 
-    log.info("%s Multi-zone muting command: %s -> sending %d zone commands (configured zones: %s)", integrationName, data, muteCommands.length, configuredZones.join(", "));
-
-    // Send all zone commands at once with a single 100ms delay at the end
-    this.enqueueSend(muteCommands);
+    log.info("%s Multi-zone muting command: %s -> sending %d zone commands (configured zones: %s)", integrationName, data, commands.length, configuredZones.join(", "));
+    this.enqueueSend(commands);
   }
 
   private command_to_iscp(command: string, args: string | number | undefined, zone: string): string {
