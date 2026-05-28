@@ -206,23 +206,18 @@ export function normalizeAvrConfig(raw: AvrConfig): NormalizedAvrConfig {
     return isNaN(n) || n < 0 ? DEFAULT_QUEUE_THRESHOLD : n;
   })();
 
-  const albumArtURL =
-    typeof raw.albumArtURL === "string" && raw.albumArtURL.trim() !== ""
-      ? raw.albumArtURL.trim()
-      : AVR_DEFAULTS.albumArtURL;
+  const albumArtURL = typeof raw.albumArtURL === "string" && raw.albumArtURL.trim() !== "" ? raw.albumArtURL.trim() : AVR_DEFAULTS.albumArtURL;
 
   const volumeScale = (() => {
     const v = typeof raw.volumeScale === "number" ? raw.volumeScale : parseInt(String(raw.volumeScale ?? ""), 10);
     return v === 80 || v === 100 ? v : AVR_DEFAULTS.volumeScale;
   })();
 
-  const volumeDisplay: VolumeDisplay =
-    String(raw.volumeDisplay ?? AVR_DEFAULTS.volumeDisplay).toLowerCase() === "relative" ? "relative" : "absolute";
+  const volumeDisplay: VolumeDisplay = String(raw.volumeDisplay ?? AVR_DEFAULTS.volumeDisplay).toLowerCase() === "relative" ? "relative" : "absolute";
 
   const adjustVolumeDispl = parseBoolean(raw.adjustVolumeDispl, AVR_DEFAULTS.adjustVolumeDispl);
 
-  const entityNameStyle: EntityNameStyle =
-    String(raw.entityNameStyle ?? AVR_DEFAULTS.entityNameStyle).toLowerCase() === "short" ? "short" : "long";
+  const entityNameStyle: EntityNameStyle = String(raw.entityNameStyle ?? AVR_DEFAULTS.entityNameStyle).toLowerCase() === "short" ? "short" : "long";
 
   const createSensors = parseBoolean(raw.createSensors, AVR_DEFAULTS.createSensors);
 
@@ -232,10 +227,7 @@ export function normalizeAvrConfig(raw: AvrConfig): NormalizedAvrConfig {
   })();
 
   const tuneinPresetPosition = (() => {
-    const v =
-      typeof raw.tuneinPresetPosition === "number"
-        ? raw.tuneinPresetPosition
-        : parseInt(String(raw.tuneinPresetPosition ?? ""), 10);
+    const v = typeof raw.tuneinPresetPosition === "number" ? raw.tuneinPresetPosition : parseInt(String(raw.tuneinPresetPosition ?? ""), 10);
     if (isNaN(v) || v < 1 || v > 9) return AVR_DEFAULTS.tuneinPresetPosition;
     return v;
   })();
@@ -259,9 +251,7 @@ export function normalizeAvrConfig(raw: AvrConfig): NormalizedAvrConfig {
     createSensors,
     netMenuDelay,
     tuneinPresetPosition,
-    listeningModeOptions: Array.isArray(raw.listeningModeOptions)
-      ? raw.listeningModeOptions.map((s) => s.trim())
-      : raw.listeningModeOptions,
+    listeningModeOptions: Array.isArray(raw.listeningModeOptions) ? raw.listeningModeOptions.map((s) => s.trim()) : raw.listeningModeOptions,
     inputSelectorOptions: raw.inputSelectorOptions
   };
 }

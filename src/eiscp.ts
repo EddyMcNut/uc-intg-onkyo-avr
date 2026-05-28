@@ -416,7 +416,10 @@ export class EiscpDriver extends EventEmitter {
       return result;
     }
 
-    const text = value.substring(asciiStart).replace(/\s+%s$/i, "").trim();
+    const text = value
+      .substring(asciiStart)
+      .replace(/\s+%s$/i, "")
+      .trim();
     if (!text) {
       return result;
     }
@@ -1095,7 +1098,7 @@ export class EiscpDriver extends EventEmitter {
         if (hasZone2) volumeCommands.push("ZVLDOWN1"); // Zone 2 volume down
         if (hasZone3) volumeCommands.push("VL3DOWN1"); // Zone 3 volume down
         break;
-       case "zone2-zone3-zone4-up":
+      case "zone2-zone3-zone4-up":
         if (hasZone2) volumeCommands.push("ZVLUP1"); // Zone 2 volume up
         if (hasZone3) volumeCommands.push("VL3UP1"); // Zone 3 volume up
         if (hasZone4) volumeCommands.push("VL4UP1"); // Zone 4 volume up
@@ -1104,7 +1107,7 @@ export class EiscpDriver extends EventEmitter {
         if (hasZone2) volumeCommands.push("ZVLDOWN1"); // Zone 2 volume down
         if (hasZone3) volumeCommands.push("VL3DOWN1"); // Zone 3 volume down
         if (hasZone4) volumeCommands.push("VL4DOWN1"); // Zone 4 volume down
-        break;       
+        break;
       default:
         log.warn("%s Unknown multi-zone-volume action: %s", integrationName, action);
         return;

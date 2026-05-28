@@ -248,6 +248,7 @@ EntityRegistration {
 `registerAvailableEntities()` iterates this list without knowing entity types. To add a new entity type, append a descriptor — the loop never changes.
 
 Current registrations (in order):
+
 1. **Media player** — always registered
 2. **Sensor entities** — conditional on `createSensors` flag (volume, source, audio/video format, front panel display…)
 3. **Listening Mode select** — conditional on `listeningModeOptions` not being `null`
@@ -374,4 +375,3 @@ The integration logs extensively to help troubleshoot issues:
 - **Error conditions**: Connection failures, command timeouts, parsing errors
 
 Log statements use entity ID prefix (`{model} {host} {zone}`) for multi-AVR/multi-zone identification.
-

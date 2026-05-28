@@ -43,7 +43,7 @@ export default class ListeningModeHandler {
     }
 
     // Ensure connected (same reconnection logic the main driver uses)
-    if (!await ensureEiscpConnected(physicalConnection.eiscp, { model: instance.config.model, host: instance.config.ip, port: instance.config.port }, entity.id, integrationName)) {
+    if (!(await ensureEiscpConnected(physicalConnection.eiscp, { model: instance.config.model, host: instance.config.ip, port: instance.config.port }, entity.id, integrationName))) {
       return uc.StatusCodes.Timeout;
     }
 

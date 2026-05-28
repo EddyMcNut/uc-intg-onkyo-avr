@@ -149,8 +149,7 @@ export default class OnkyoDriver {
       // ── Media player — always registered ───────────────────────────────────
       {
         enabled: () => true,
-        create: () =>
-          this.entityRegistrar.createMediaPlayerEntity(avrEntry, avrConfig.volumeScale ?? 100, this.sharedCmdHandler.bind(this), rawSend)
+        create: () => this.entityRegistrar.createMediaPlayerEntity(avrEntry, avrConfig.volumeScale ?? 100, this.sharedCmdHandler.bind(this), rawSend)
       },
 
       // ── Sensor entities — conditional on createSensors flag ────────────────

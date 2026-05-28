@@ -4,7 +4,15 @@ import { avrStateManager } from "./avrState.js";
 import log from "./loggers.js";
 import { looksLikeTuneInDirectory, normalizeTuneInLabel, parseTuneInXmlItems } from "./tuneInFilters.js";
 import { addTuneInPreset, getTuneInBrowseState, listTuneInPresets, type TuneInPreset, setTuneInBrowseContextState } from "./tuneInBrowserStore.js";
-import { addTidalMenuOption, listTidalMenuOptions, shouldShowTidalMainMenuShortcut, getTidalNowPlayingTitle, getTidalThumbnailForTitle, getTidalNlsCursorOffset, type TidalMenuOption } from "./tidalBrowserStore.js";
+import {
+  addTidalMenuOption,
+  listTidalMenuOptions,
+  shouldShowTidalMainMenuShortcut,
+  getTidalNowPlayingTitle,
+  getTidalThumbnailForTitle,
+  getTidalNlsCursorOffset,
+  type TidalMenuOption
+} from "./tidalBrowserStore.js";
 import { createTuneInBackdrop, getOrCreateTuneInThumbnail } from "./tuneInThumbnails.js";
 import { createTidalBackdrop, getOrCreateTidalThumbnail } from "./tidalThumbnails.js";
 
@@ -119,7 +127,6 @@ export function ingestTidalListEntry(entityId: string, entry: string): void {
   const windowStart = Math.max(0, cursorOffset - 9);
   const absoluteMenuIndex = windowStart + parsedIndex + 1;
   addTidalMenuOption(entityId, absoluteMenuIndex, title, getOrCreateTidalThumbnail);
-
 }
 
 export function getTuneInPresetCount(entityId: string): number {
@@ -222,10 +229,7 @@ function createTuneInPresetItem(preset: TuneInPreset): uc.BrowseMediaItem {
 }
 
 function createTidalMenuItem(option: TidalMenuOption, nowPlayingTitle: string): uc.BrowseMediaItem {
-  const isNowPlaying =
-    !option.isBrowsable &&
-    nowPlayingTitle.length > 0 &&
-    option.title.toLowerCase() === nowPlayingTitle.toLowerCase();
+  const isNowPlaying = !option.isBrowsable && nowPlayingTitle.length > 0 && option.title.toLowerCase() === nowPlayingTitle.toLowerCase();
 
   return new uc.BrowseMediaItem(option.mediaId, option.title, {
     can_browse: option.isBrowsable,

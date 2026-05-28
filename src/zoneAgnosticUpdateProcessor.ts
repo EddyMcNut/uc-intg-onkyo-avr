@@ -98,7 +98,7 @@ export class ZoneAgnosticUpdateProcessor {
   }
 
   async maybeUpdateImage(entityId: string, _force: boolean = false): Promise<void> {
-    await this.mediaRenderer.maybeUpdateImage(entityId,);
+    await this.mediaRenderer.maybeUpdateImage(entityId);
   }
 
   private async preloadTuneInPresets(entityId: string): Promise<void> {

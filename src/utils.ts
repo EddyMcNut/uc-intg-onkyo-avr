@@ -17,12 +17,7 @@ export function toHex(n: number, width: number): string {
  * @returns `true` when connected and ready, `false` when all attempts are exhausted
  *          (caller should return StatusCodes.Timeout in that case).
  */
-export async function ensureEiscpConnected(
-  eiscp: EiscpDriver,
-  connectOptions: { model?: string; host?: string; port?: number },
-  entityId: string,
-  integrationName: string
-): Promise<boolean> {
+export async function ensureEiscpConnected(eiscp: EiscpDriver, connectOptions: { model?: string; host?: string; port?: number }, entityId: string, integrationName: string): Promise<boolean> {
   if (!eiscp.connected) {
     log.info("%s [%s] Command received while disconnected, triggering reconnection...", integrationName, entityId);
     try {

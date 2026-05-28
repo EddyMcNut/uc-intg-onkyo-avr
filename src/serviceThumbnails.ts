@@ -118,9 +118,7 @@ export function createServiceThumbnails(config: ServiceThumbnailConfig) {
           const dataUri = `data:${mimeType};base64,${base64}`;
           const svgContent = extension === ".svg" ? fileContents.toString("utf8") : "";
           const pathMatch = svgContent.match(/<path[^>]*d=(['"])([\s\S]*?)\1[^>]*>/i);
-          const logoMarkup = pathMatch
-            ? `<g transform="${config.logoTransform}"><path ${config.logoPathAttrs} d="${pathMatch[2]}"/></g>`
-            : null;
+          const logoMarkup = pathMatch ? `<g transform="${config.logoTransform}"><path ${config.logoPathAttrs} d="${pathMatch[2]}"/></g>` : null;
 
           cachedAsset = { dataUri, signature, inlineSafe: dataUri.length <= MAX_INLINE_BACKGROUND_DATA_LENGTH, logoMarkup };
           return cachedAsset;
@@ -145,7 +143,9 @@ export function createServiceThumbnails(config: ServiceThumbnailConfig) {
       markup.push(asset.logoMarkup);
     } else {
       markup.push(`<rect x="205" y="276" width="230" height="42" rx="14" fill="#ffffff" fill-opacity="${config.fallbackBgOpacity}"/>`);
-      markup.push(`<text x="320" y="304" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="24" font-weight="700" letter-spacing=".5" fill="${config.fallbackLabelColor}">${config.fallbackLabel}</text>`);
+      markup.push(
+        `<text x="320" y="304" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="24" font-weight="700" letter-spacing=".5" fill="${config.fallbackLabelColor}">${config.fallbackLabel}</text>`
+      );
     }
 
     return markup.join("");

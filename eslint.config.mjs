@@ -23,7 +23,7 @@ export default [
 
     rules: {
       "prettier/prettier": "error",
-      "@typescript-eslint/no-unused-vars": "error"
+      "@typescript-eslint/no-unused-vars": ["error", { argsIgnorePattern: "^_" }]
     },
 
     settings: {

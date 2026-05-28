@@ -527,12 +527,7 @@ test.serial("CommandSender remaps stale Tidal index using title encoded in media
 
   const entityId = "M 1.2.3.7 main";
   const eiscp = new MockEiscp();
-  const sender = new CommandSender(
-    { updateEntityAttributes: () => true } as any,
-    { avrs: [{ model: "M", ip: "1.2.3.7", zone: "main", port: 60128, netMenuDelay: 0 }] },
-    eiscp as any,
-    null
-  );
+  const sender = new CommandSender({ updateEntityAttributes: () => true } as any, { avrs: [{ model: "M", ip: "1.2.3.7", zone: "main", port: 60128, netMenuDelay: 0 }] }, eiscp as any, null);
 
   avrStateManager.setSource(entityId, "net");
   avrStateManager.setSubSource(entityId, "tidal");
@@ -579,12 +574,7 @@ test.serial("CommandSender first selection after Main Tidal Menu skips pre-list 
 
   const entityId = "M 1.2.3.8 main";
   const eiscp = new MockEiscp();
-  const sender = new CommandSender(
-    { updateEntityAttributes: () => true } as any,
-    { avrs: [{ model: "M", ip: "1.2.3.8", zone: "main", port: 60128, netMenuDelay: 0 }] },
-    eiscp as any,
-    null
-  );
+  const sender = new CommandSender({ updateEntityAttributes: () => true } as any, { avrs: [{ model: "M", ip: "1.2.3.8", zone: "main", port: 60128, netMenuDelay: 0 }] }, eiscp as any, null);
 
   avrStateManager.setSource(entityId, "net");
   avrStateManager.setSubSource(entityId, "tidal");
@@ -613,19 +603,20 @@ test.serial("CommandSender in-Tidal track selection uses direct NLSI when AVR is
     public connected = true;
     public commands: string[] = [];
     public rawCommands: string[] = [];
-    async waitForConnect() { return; }
-    async command(cmd: string) { this.commands.push(cmd); }
-    async raw(cmd: string) { this.rawCommands.push(cmd); }
+    async waitForConnect() {
+      return;
+    }
+    async command(cmd: string) {
+      this.commands.push(cmd);
+    }
+    async raw(cmd: string) {
+      this.rawCommands.push(cmd);
+    }
   }
 
   const entityId = "M 1.2.3.9 main";
   const eiscp = new MockEiscp();
-  const sender = new CommandSender(
-    { updateEntityAttributes: () => true } as any,
-    { avrs: [{ model: "M", ip: "1.2.3.9", zone: "main", port: 60128, netMenuDelay: 0 }] },
-    eiscp as any,
-    null
-  );
+  const sender = new CommandSender({ updateEntityAttributes: () => true } as any, { avrs: [{ model: "M", ip: "1.2.3.9", zone: "main", port: 60128, netMenuDelay: 0 }] }, eiscp as any, null);
 
   avrStateManager.setSource(entityId, "net");
   avrStateManager.setSubSource(entityId, "tidal");
@@ -656,19 +647,20 @@ test.serial("CommandSender in-Tidal track selection sends list before NLSI when 
     public connected = true;
     public commands: string[] = [];
     public rawCommands: string[] = [];
-    async waitForConnect() { return; }
-    async command(cmd: string) { this.commands.push(cmd); }
-    async raw(cmd: string) { this.rawCommands.push(cmd); }
+    async waitForConnect() {
+      return;
+    }
+    async command(cmd: string) {
+      this.commands.push(cmd);
+    }
+    async raw(cmd: string) {
+      this.rawCommands.push(cmd);
+    }
   }
 
   const entityId = "M 1.2.3.10 main";
   const eiscp = new MockEiscp();
-  const sender = new CommandSender(
-    { updateEntityAttributes: () => true } as any,
-    { avrs: [{ model: "M", ip: "1.2.3.10", zone: "main", port: 60128, netMenuDelay: 0 }] },
-    eiscp as any,
-    null
-  );
+  const sender = new CommandSender({ updateEntityAttributes: () => true } as any, { avrs: [{ model: "M", ip: "1.2.3.10", zone: "main", port: 60128, netMenuDelay: 0 }] }, eiscp as any, null);
 
   avrStateManager.setSource(entityId, "net");
   avrStateManager.setSubSource(entityId, "tidal");
@@ -695,19 +687,20 @@ test.serial("CommandSender in-Tidal menu selection uses direct NLSI even when AV
     public connected = true;
     public commands: string[] = [];
     public rawCommands: string[] = [];
-    async waitForConnect() { return; }
-    async command(cmd: string) { this.commands.push(cmd); }
-    async raw(cmd: string) { this.rawCommands.push(cmd); }
+    async waitForConnect() {
+      return;
+    }
+    async command(cmd: string) {
+      this.commands.push(cmd);
+    }
+    async raw(cmd: string) {
+      this.rawCommands.push(cmd);
+    }
   }
 
   const entityId = "M 1.2.3.11 main";
   const eiscp = new MockEiscp();
-  const sender = new CommandSender(
-    { updateEntityAttributes: () => true } as any,
-    { avrs: [{ model: "M", ip: "1.2.3.11", zone: "main", port: 60128, netMenuDelay: 0 }] },
-    eiscp as any,
-    null
-  );
+  const sender = new CommandSender({ updateEntityAttributes: () => true } as any, { avrs: [{ model: "M", ip: "1.2.3.11", zone: "main", port: 60128, netMenuDelay: 0 }] }, eiscp as any, null);
 
   avrStateManager.setSource(entityId, "net");
   avrStateManager.setSubSource(entityId, "tidal");

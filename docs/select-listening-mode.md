@@ -24,4 +24,3 @@ As the list of all known options is very long and the AVR does not return a dyna
   - The configured list is saved, included in backups, and persists across reboots.
 
 [Listening modes](./listening-modes.md)
-

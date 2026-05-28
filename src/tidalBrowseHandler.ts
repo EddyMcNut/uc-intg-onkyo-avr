@@ -100,10 +100,7 @@ export class TidalBrowseHandler {
     // Use the layer number from the NLT ll field — it's the exact layer NLAL needs.
     // Try that layer first, then neighbours as fallback.
     const knownLayer = getTidalNlsLayerNumber(entityId);
-    const layersToTry =
-      knownLayer > 0
-        ? [knownLayer, knownLayer - 1, knownLayer + 1].filter((l) => l > 0).map((l) => toHex(l, 2))
-        : ["02", "01", "03"];
+    const layersToTry = knownLayer > 0 ? [knownLayer, knownLayer - 1, knownLayer + 1].filter((l) => l > 0).map((l) => toHex(l, 2)) : ["02", "01", "03"];
 
     log.info("%s [%s] Tidal NLAL harvest: need %d items, have %d, trying layers %s", integrationName, entityId, initialTotal, currentCount, layersToTry.join(","));
 

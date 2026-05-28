@@ -14,11 +14,7 @@ export default class ConnectionManager {
   private physicalConnections: Map<string, PhysicalConnection> = new Map();
   private readonly createEiscpDriver: EiscpDriverFactory;
 
-  constructor(
-    reconnectionManager: ReconnectionManager,
-    queryAllZonesState: (physicalAvr: string, eiscp: EiscpDriver, context: string) => Promise<void>,
-    createEiscpDriver?: EiscpDriverFactory
-  ) {
+  constructor(reconnectionManager: ReconnectionManager, queryAllZonesState: (physicalAvr: string, eiscp: EiscpDriver, context: string) => Promise<void>, createEiscpDriver?: EiscpDriverFactory) {
     this.reconnectionManager = reconnectionManager;
     this.queryAllZonesState = queryAllZonesState;
     // Default to the concrete EiscpDriver so production callers need no change.

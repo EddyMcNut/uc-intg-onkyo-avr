@@ -249,7 +249,7 @@ export class CommandReceiver {
           const volumeSensorValue = volumeDisplay === "relative" ? scaledValue - 82 : scaledValue;
 
           this.driver.updateEntityAttributes(entityId, {
-            [uc.MediaPlayerAttributes.Volume]: volumeSensorValue// sliderValue //volumeDisplay === "relative" ? volumeSensorValue : sliderValue
+            [uc.MediaPlayerAttributes.Volume]: volumeSensorValue // sliderValue //volumeDisplay === "relative" ? volumeSensorValue : sliderValue
           });
           avrStateManager.setVolume(entityId, eiscpValue); //eiscpValue
           // log.info("%s [%s] volume set to: %s", integrationName, entityId, sliderValue);

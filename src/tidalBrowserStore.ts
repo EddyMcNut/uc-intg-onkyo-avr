@@ -70,12 +70,7 @@ function getTidalBrowseState(entityId: string): TidalBrowseState | null {
   return created;
 }
 
-export function addTidalMenuOption(
-  entityId: string,
-  menuIndex: number,
-  title: string,
-  thumbnailResolver?: (state: TidalBrowseState, title: string) => string
-): void {
+export function addTidalMenuOption(entityId: string, menuIndex: number, title: string, thumbnailResolver?: (state: TidalBrowseState, title: string) => string): void {
   const state = getTidalBrowseState(entityId);
   if (!state) {
     return;

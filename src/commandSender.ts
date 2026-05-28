@@ -48,7 +48,7 @@ export class CommandSender {
     // Check if connected, and trigger reconnection if needed
     // This handles the case where user sends a command after wake-up from standby
     // and the driver reconnection hasn't been triggered yet
-    if (!await ensureEiscpConnected(this.eiscp, { model: targetAvr.model, host: targetAvr.ip, port: targetAvr.port }, entity.id, integrationName)) {
+    if (!(await ensureEiscpConnected(this.eiscp, { model: targetAvr.model, host: targetAvr.ip, port: targetAvr.port }, entity.id, integrationName))) {
       return uc.StatusCodes.Timeout;
     }
 
@@ -251,21 +251,13 @@ export class CommandSender {
 
           // Capture the selected title from the cached list; we'll use it to remap to the
           // freshest AVR list index right before selecting, avoiding stale-index mismatches.
-          const requestedTitle = /^Menu \d+$/.test(tidalOption.title)
-            ? listTidalMenuOptions(entity.id).find((item) => item.menuIndex === tidalOption.menuIndex)?.title
-            : tidalOption.title;
+          const requestedTitle = /^Menu \d+$/.test(tidalOption.title) ? listTidalMenuOptions(entity.id).find((item) => item.menuIndex === tidalOption.menuIndex)?.title : tidalOption.title;
           if (shouldTraceSelection) {
             const cached = listTidalMenuOptions(entity.id)
               .slice(0, 12)
               .map((item) => `${item.menuIndex}:${item.title}`)
               .join(", ");
-            log.info(
-              "%s [%s] TRACE cached Tidal menu before command: [%s] requestedTitle='%s'",
-              integrationName,
-              entity.id,
-              cached,
-              requestedTitle ?? ""
-            );
+            log.info("%s [%s] TRACE cached Tidal menu before command: [%s] requestedTitle='%s'", integrationName, entity.id, cached, requestedTitle ?? "");
           }
 
           const currentSource = avrStateManager.getSource(entity.id);
@@ -293,27 +285,13 @@ export class CommandSender {
           if (requestedTitle) {
             const remapped = listTidalMenuOptions(entity.id).find((item) => item.title === requestedTitle);
             if (remapped && remapped.menuIndex !== tidalOption.menuIndex) {
-              log.debug(
-                "%s [%s] remapped Tidal selection '%s' from index %d to %d",
-                integrationName,
-                entity.id,
-                requestedTitle,
-                tidalOption.menuIndex,
-                remapped.menuIndex
-              );
+              log.debug("%s [%s] remapped Tidal selection '%s' from index %d to %d", integrationName, entity.id, requestedTitle, tidalOption.menuIndex, remapped.menuIndex);
               menuIndexToSelect = remapped.menuIndex;
             }
           }
 
           if (shouldTraceSelection) {
-            log.info(
-              "%s [%s] TRACE final Tidal selection index=%d source=%s subsource=%s",
-              integrationName,
-              entity.id,
-              menuIndexToSelect,
-              currentSource,
-              currentSubSource
-            );
+            log.info("%s [%s] TRACE final Tidal selection index=%d source=%s subsource=%s", integrationName, entity.id, menuIndexToSelect, currentSource, currentSubSource);
           }
 
           // Freeze the browse list when selecting a song so the spontaneous post-playback

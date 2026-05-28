@@ -326,7 +326,6 @@ class AvrStateManager {
       await eiscpInstance.raw("NTCSELECT");
     }
   }
-
 }
 
 /** Singleton instance of the state manager */

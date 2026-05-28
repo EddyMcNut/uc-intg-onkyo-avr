@@ -29,7 +29,7 @@ export default class ConnectCoordinator {
     this.avrInstanceManager = avrInstanceManager;
     this.queryAvrState = queryAvrState;
     this.queryAllZonesState = queryAllZonesState;
-    this.createAvrSpecificConfig = createAvrSpecificConfig ?? ((c) => ({ ...c, queueThreshold: c.queueThreshold ?? DEFAULT_QUEUE_THRESHOLD } as OnkyoConfig));
+    this.createAvrSpecificConfig = createAvrSpecificConfig ?? ((c) => ({ ...c, queueThreshold: c.queueThreshold ?? DEFAULT_QUEUE_THRESHOLD }) as OnkyoConfig);
   }
 
   /** Orchestrate connecting physical AVRs and creating zone instances. Returns true if any zone instances exist after connect. */

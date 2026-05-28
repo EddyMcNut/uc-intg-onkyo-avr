@@ -36,4 +36,3 @@ If `input-selector spotify` does not work, check the manual of your AVR to see i
 - your AVR does _not_ have a Spotify input, just try `input-selector net`, see [input-selector](./input-selector.md#net) for more info
 
 _note: after installing a new version of the integration or after a reboot of the remote, it might be needed to close screen on the remote and enter the already active activity again to get the MediaWidget to work, hit next to go to the next song and trigger refresh of the album art_
-

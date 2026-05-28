@@ -36,4 +36,3 @@ _next to the AVR entity, the integration also creates several [sensors](./sensor
 ![](../screenshots/configured-entities.png)
 
 ![](../screenshots/select-entity.png)
-
