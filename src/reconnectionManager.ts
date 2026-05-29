@@ -36,10 +36,7 @@ export type OnReconnectedCallback = (physicalAVR: string) => Promise<void>;
 /** Callback to check if reconnection should be skipped */
 export type ShouldSkipCallback = () => boolean;
 
-/**
- * Manages reconnection logic for AVR connections.
- * Handles progressive timeouts, scheduled retries, and timer management.
- */
+// Manages reconnection logic: progressive timeouts, scheduled retries, and timer management.
 export class ReconnectionManager {
   private readonly config: ReconnectionConfig;
   private readonly timers: Map<string, NodeJS.Timeout> = new Map();

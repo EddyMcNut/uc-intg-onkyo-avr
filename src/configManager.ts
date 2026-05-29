@@ -12,19 +12,13 @@ const integrationName = "configManager:";
 let CONFIG_DIR = process.env.UC_CONFIG_HOME || process.cwd();
 let CONFIG_PATH = path.resolve(CONFIG_DIR, "config.json");
 
-/**
- * Set the configuration directory explicitly (used by the driver when the
- * Integration API exposes the proper config dir). This ensures the
- * integration reads/writes the same files the Integration Manager will back up.
- */
+// Set the config directory to match the Integration API's path so backups/restores work correctly.
 export function setConfigDir(dir: string) {
   CONFIG_DIR = dir || process.env.UC_CONFIG_HOME || process.cwd();
   CONFIG_PATH = path.resolve(CONFIG_DIR, "config.json");
 }
 
-/**
- * Helper to get current config path (useful for testing/manager compatibility)
- */
+// Returns the current config file path (useful for testing/manager compatibility).
 export function getConfigPath(): string {
   return CONFIG_PATH;
 }

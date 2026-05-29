@@ -10,6 +10,11 @@ export type EiscpInstance = EiscpDriver;
 export type CommandSender = CommandSenderClass;
 export type CommandReceiver = CommandReceiverClass;
 
+export interface AvrInstance {
+  config: AvrConfig;
+  commandSender: CommandSender;
+}
+
 export type PhysicalConnection = {
   eiscp: EiscpInstance;
   commandReceiver: CommandReceiver;
@@ -25,39 +30,19 @@ export type QueryAllZonesStateFn = (physicalAvr: string, eiscp: EiscpInstance, c
 /** Factory that creates a new EiscpDriver instance — inject this instead of calling `new EiscpDriver()` directly. */
 export type EiscpDriverFactory = (config: EiscpConfig) => EiscpInstance;
 
-/**
- * Narrow interfaces — ISP: handlers declare only the methods they actually call,
- * not the full concrete class. Each concrete class satisfies these structurally.
- */
+// Narrow interfaces — ISP: handlers declare only the methods they actually call; concrete classes satisfy these structurally.
 
 /** One-method slice of ConnectionManager used by the select-entity handlers. */
 export interface IPhysicalConnectionLookup {
   getPhysicalConnection(physicalAVR: string): PhysicalConnection | undefined;
 }
 
-/**
- * One-method slice of AvrInstanceManager used by the select-entity handlers.
- * Uses a structural inline type to avoid a circular import with avrInstanceManager.ts.
- */
+/** One-method slice of the AVR instance map used by the select-entity handlers. */
 export interface IAvrInstanceLookup {
-  getInstance(entry: string): { config: AvrConfig } | undefined;
+  get(entry: string): AvrInstance | undefined;
 }
 
-/** One-method slice of EntityRegistrar used by ListeningModeHandler. */
-export interface IListeningModeOptionsProvider {
-  getListeningModeOptions(audioFormat?: string, avrEntry?: string): string[];
-}
-
-/** One-method slice of EntityRegistrar used by InputSelectorHandler. */
-export interface IInputSelectorOptionsProvider {
-  getInputSelectorOptions(avrEntry?: string): string[];
-}
-
-/**
- * DIP: the subset of CommandReceiver that CommandSender and avrState actually call.
- * Placing the interface here breaks the would-be circular import between
- * commandSender.ts and commandReceiver.ts.
- */
+// DIP: subset of CommandReceiver that CommandSender and avrState call. Interface placed here to break circular import.
 export interface ICommandReceiver {
   abortTuneInPreload(entityId: string): boolean;
   maybeUpdateImage(entityId: string, force?: boolean): Promise<void>;

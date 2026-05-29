@@ -1,12 +1,6 @@
-/**
- * Pure functions for eISCP packet encoding and TCP frame extraction.
- * No external dependencies — fully unit-testable in isolation.
- */
+// Pure functions for eISCP packet encoding and TCP frame extraction. No external dependencies.
 
-/**
- * Wrap a raw ISCP command string in a binary eISCP packet.
- * Prepends "!1" if the message does not already start with "!".
- */
+// Wrap a raw ISCP command string in a binary eISCP packet. Prepends "!1" if the message does not start with "!".
 export function createEiscpPacket(data: string): Buffer {
   if (data.charAt(0) !== "!") {
     data = "!1" + data;
@@ -17,18 +11,12 @@ export function createEiscpPacket(data: string): Buffer {
   return Buffer.concat([header, iscpMsg]);
 }
 
-/**
- * Fallback single-frame extraction.
- * Strips the 18-byte header prefix and the trailing "\r\n".
- */
+// Fallback single-frame extraction: strips the 18-byte header prefix and the trailing "\r\n".
 export function extractIscpMessage(packet: Buffer): string {
   return packet.toString("ascii", 18, packet.length - 2);
 }
 
-/**
- * Extract all ISCP messages from a buffer that may contain concatenated eISCP frames.
- * Falls back to single-frame extraction if no valid multi-frame structure is detected.
- */
+// Extract all ISCP messages from a buffer that may contain concatenated eISCP frames. Falls back to single-frame extraction.
 export function extractAllIscpMessages(packet: Buffer): string[] {
   const messages: string[] = [];
   let offset = 0;

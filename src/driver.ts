@@ -13,22 +13,17 @@ import log from "./loggers.js";
 import SetupHandler from "./setupHandler.js";
 import EntityRegistrar from "./entityRegistrar.js";
 import ConnectionManager from "./connectionManager.js";
-import AvrInstanceManager from "./avrInstanceManager.js";
-import ListeningModeHandler from "./listeningModeHandler.js";
-import InputSelectorHandler from "./inputSelectorHandler.js";
+import { SelectEntityHandler } from "./selectEntityHandler.js";
 import SubscriptionHandler from "./subscriptionHandler.js";
 import ConnectCoordinator from "./connectCoordinator.js";
+import { AvrInstance } from "./types.js";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-const integrationName = "driver:";
 import { delay } from "./utils.js";
 
-/**
- * Descriptor for registering one group of entities for an AVR zone.
- *
- * OCP: add a new entity type by appending a new entry to the array returned by
- * `buildEntityRegistrations()` — `registerAvailableEntities()` itself never changes.
- */
+const integrationName = "driver:";
+
+// Descriptor for registering one group of entities for an AVR zone. OCP: add a type by appending to buildEntityRegistrations() — the loop never changes.
 interface EntityRegistration {
   /** Return true when this entity group should be registered for the given AVR. */
   enabled: (cfg: AvrConfig) => boolean;
@@ -45,14 +40,14 @@ export default class OnkyoDriver {
   private config: OnkyoConfig;
   private reconnectionManager: ReconnectionManager = new ReconnectionManager();
   private connectionManager: import("./connectionManager.js").default;
-  private avrInstanceManager: import("./avrInstanceManager.js").default = new AvrInstanceManager();
+  private readonly avrInstances = new Map<string, AvrInstance>();
   private driverVersion: string = "unknown";
 
   // Handler extracted to separate module for clarity/testing
   private setupHandler?: InstanceType<typeof SetupHandler>;
   private entityRegistrar: EntityRegistrar;
-  private listeningModeHandler: ListeningModeHandler;
-  private inputSelectorHandler: InputSelectorHandler;
+  private listeningModeHandler: SelectEntityHandler;
+  private inputSelectorHandler: SelectEntityHandler;
   private subscriptionHandler: SubscriptionHandler;
   private connectCoordinator: ConnectCoordinator;
 
@@ -90,14 +85,19 @@ export default class OnkyoDriver {
     this.entityRegistrar = new EntityRegistrar();
 
     // initialize helpers
-    this.listeningModeHandler = new ListeningModeHandler(this.driver, this.connectionManager, this.avrInstanceManager, this.entityRegistrar);
-    this.inputSelectorHandler = new InputSelectorHandler(this.driver, this.connectionManager, this.avrInstanceManager, this.entityRegistrar);
-    this.subscriptionHandler = new SubscriptionHandler(this.connectionManager, this.avrInstanceManager);
+    this.listeningModeHandler = new SelectEntityHandler(this.driver, this.connectionManager, this.avrInstances, "_listening_mode", "listening-mode", "Listening Mode", (avrEntry) => {
+      const audioFormat = avrStateManager.getAudioFormat(avrEntry);
+      return this.entityRegistrar.getListeningModeOptions(audioFormat !== "unknown" ? audioFormat : undefined, avrEntry);
+    });
+    this.inputSelectorHandler = new SelectEntityHandler(this.driver, this.connectionManager, this.avrInstances, "_input_selector", "input-selector", "Input Selector", (avrEntry) =>
+      this.entityRegistrar.getInputSelectorOptions(avrEntry)
+    );
+    this.subscriptionHandler = new SubscriptionHandler(this.connectionManager, this.avrInstances);
 
     // Create connect coordinator — orchestrates physical connections, zone instances, and initial queries
     this.connectCoordinator = new ConnectCoordinator(
       this.connectionManager,
-      this.avrInstanceManager,
+      this.avrInstances,
       this.queryAvrState.bind(this),
       this.queryAllZonesState.bind(this),
       this.createAvrSpecificConfig.bind(this)
@@ -127,7 +127,7 @@ export default class OnkyoDriver {
         onConfigCleared: async () => {
           ConfigManager.clear();
           this.config = ConfigManager.load();
-          this.avrInstanceManager.clearInstances();
+          this.avrInstances.clear();
           this.connectionManager.clearAllConnections();
           await this.driver.setDeviceState(uc.DeviceStates.Disconnected);
         },
@@ -138,12 +138,7 @@ export default class OnkyoDriver {
     return this.setupHandler.handle(msg);
   }
 
-  /**
-   * Build the ordered list of entity-registration descriptors for one AVR zone.
-   *
-   * OCP extension point: to add a new entity type, append a new `EntityRegistration`
-   * entry here. The `registerAvailableEntities` loop is closed for modification.
-   */
+  // Build entity-registration descriptors for one AVR zone. OCP: append to add types — the loop is closed.
   private buildEntityRegistrations(avrEntry: string, avrConfig: AvrConfig, rawSend: (cmd: string) => Promise<void>): EntityRegistration[] {
     return [
       // ── Media player — always registered ───────────────────────────────────
@@ -230,10 +225,8 @@ export default class OnkyoDriver {
       log.info(`${integrationName} ===== CONNECT EVENT RECEIVED =====`);
       // Log current version from driver.json
       try {
-        const fs = await import("fs");
-        const path = await import("path");
-        const driverJsonPath = path.resolve(process.cwd(), "driver.json");
-        const driverJsonRaw = fs.readFileSync(driverJsonPath, "utf-8");
+        const driverJsonPath = resolve(process.cwd(), "driver.json");
+        const driverJsonRaw = readFileSync(driverJsonPath, "utf-8");
         const driverJson = JSON.parse(driverJsonRaw);
         this.driverVersion = driverJson.version || "unknown";
         log.info(`${integrationName} Driver version: ${this.driverVersion}`);
@@ -260,13 +253,6 @@ export default class OnkyoDriver {
     });
   }
 
-  /**
-   * Create Listening Mode select entity
-   */
-
-  /**
-   * Handle Listening Mode select entity commands
-   */
   // listening mode behavior now extracted to ListeningModeHandler
 
   private async queryAvrState(avrEntry: string, eiscp: EiscpDriver, context: string): Promise<void> {
@@ -275,7 +261,7 @@ export default class OnkyoDriver {
       return;
     }
 
-    const instance = this.avrInstanceManager.getInstance(avrEntry);
+    const instance = this.avrInstances.get(avrEntry);
     const zone = instance?.config.zone || "main";
     const queueThreshold = instance?.config.queueThreshold ?? DEFAULT_QUEUE_THRESHOLD;
 
@@ -287,7 +273,7 @@ export default class OnkyoDriver {
   private async queryAllZonesState(physicalAVR: string, eiscp: EiscpDriver, context: string): Promise<void> {
     const queried: string[] = [];
     let firstZone = true;
-    for (const [avrEntry, instance] of this.avrInstanceManager.entries()) {
+    for (const [avrEntry, instance] of this.avrInstances) {
       const entryPhysicalAVR = buildPhysicalAvrId(instance.config.model, instance.config.ip);
       if (entryPhysicalAVR === physicalAVR) {
         // For non-initial queries, only query zones that are powered on
@@ -315,12 +301,7 @@ export default class OnkyoDriver {
     }
   }
 
-  /**
-   * Create OnkyoConfig for a specific AVR zone.
-   *
-   * OCP: all field-level coercion lives in `normalizeAvrConfig` (configConstants.ts).
-   * Adding a new config field never requires touching this method.
-   */
+  // Create OnkyoConfig for a specific AVR zone. OCP: field coercion lives in normalizeAvrConfig — this method never changes.
   private createAvrSpecificConfig(avrConfig: AvrConfig): OnkyoConfig {
     const n = normalizeAvrConfig(avrConfig);
     return {
@@ -385,7 +366,7 @@ export default class OnkyoDriver {
   // Use the sender class for command handling
   private async sharedCmdHandler(entity: uc.Entity, cmdId: string, params?: { [key: string]: string | number | boolean }): Promise<uc.StatusCodes> {
     // Get the AVR instance for this entity
-    const instance = this.avrInstanceManager.getInstance(entity.id);
+    const instance = this.avrInstances.get(entity.id);
     if (!instance) {
       log.error("%s [%s] No AVR instance found for entity", integrationName, entity.id);
       return uc.StatusCodes.NotFound;

@@ -10,17 +10,16 @@ import { IscpCommandParser, type CommandResult } from "./eiscp-command-parser.js
 import { createEiscpPacket, extractIscpMessage, extractAllIscpMessages } from "./eiscp-packet.js";
 import { buildMultiZoneVolumeCommands, buildMultiZoneMuteCommands } from "./eiscp-multi-zone.js";
 import { avrStateManager } from "./avrState.js";
-import { getTidalHarvestMode, setTidalNlsCursorOffset, setTidalNlsLayerNumber, setTidalTotalListItemCount } from "./tidalBrowserStore.js";
+import { getTidalBrowseState } from "./tidalBrowserStore.js";
 
 export interface EiscpConfig {
   host?: string;
   port?: number;
   model?: string;
   reconnect?: boolean;
-  reconnect_sleep?: number;
-  verify_commands?: boolean;
-  send_delay?: number;
-  receive_delay?: number;
+  reconnectSleep?: number;
+  sendDelay?: number;
+  receiveDelay?: number;
   netMenuDelay?: number;
   tuneinPresetPosition?: number;
   configuredZones?: string[]; // Zones configured for this physical AVR (e.g., ["main", "zone2"])
@@ -90,7 +89,7 @@ interface CommandInput {
 
 export class EiscpDriver extends EventEmitter {
   public get connected(): boolean {
-    return this.is_connected;
+    return this.isConnected;
   }
 
   /** Read-only access to the current driver configuration. */
@@ -105,7 +104,7 @@ export class EiscpDriver extends EventEmitter {
 
   private config: EiscpConfig;
   private eiscp: net.Socket | null = null;
-  private is_connected = false;
+  private isConnected = false;
   private sendQueue: Promise<void> = Promise.resolve();
   private receiveQueue: Promise<void> = Promise.resolve();
   private tcpBuffer: Buffer = Buffer.alloc(0);
@@ -118,24 +117,16 @@ export class EiscpDriver extends EventEmitter {
       port: config?.port ?? 60128,
       model: config?.model,
       reconnect: config?.reconnect ?? false,
-      reconnect_sleep: config?.reconnect_sleep ?? 5,
-      verify_commands: config?.verify_commands ?? false,
-      send_delay: config?.send_delay ?? DEFAULT_QUEUE_THRESHOLD,
-      receive_delay: config?.receive_delay ?? DEFAULT_QUEUE_THRESHOLD,
+      reconnectSleep: config?.reconnectSleep ?? 5,
+      sendDelay: config?.sendDelay ?? DEFAULT_QUEUE_THRESHOLD,
+      receiveDelay: config?.receiveDelay ?? DEFAULT_QUEUE_THRESHOLD,
       netMenuDelay: config?.netMenuDelay ?? 2500,
       tuneinPresetPosition: config?.tuneinPresetPosition ?? 1,
       configuredZones: config?.configuredZones
     };
     this.commandParser = new IscpCommandParser((zone) => buildEntityId(this.config.model!, this.config.host!, zone), avrStateManager, {
-      getTidalHarvestMode,
-      setTidalNlsCursorOffset,
-      setTidalTotalListItemCount,
-      setTidalNlsLayerNumber
+      getBrowseState: getTidalBrowseState
     });
-    this.setupErrorHandler();
-  }
-
-  private setupErrorHandler() {
     if (this.listenerCount("error") === 0) {
       this.on("error", (err: Error) => {
         log.error("%s eiscp error (unhandled):", integrationName, err);
@@ -145,17 +136,9 @@ export class EiscpDriver extends EventEmitter {
 
   /** Translate main zone command prefix to zone-specific prefix */
   private getZonePrefix(prefix: string, zone: string): string {
-    if (zone === "zone2") {
-      return ZONE2_COMMAND_MAP[prefix] || prefix;
-    } else if (zone === "zone3") {
-      return ZONE3_COMMAND_MAP[prefix] || prefix;
-    } else if (zone === "zone4") {
-      return ZONE4_COMMAND_MAP[prefix] || prefix;
-    }
-    return prefix;
+    const zoneMaps: Record<string, Record<string, string>> = { zone2: ZONE2_COMMAND_MAP, zone3: ZONE3_COMMAND_MAP, zone4: ZONE4_COMMAND_MAP };
+    return zoneMaps[zone]?.[prefix] ?? prefix;
   }
-
-  // ==================== Packet Handling ====================
 
   async discover(options?: { devices?: number; timeout?: number; address?: string; port?: number; subnetBroadcast?: string }): Promise<DiscoveredDevice[]> {
     return new Promise((resolve, reject) => {
@@ -168,7 +151,7 @@ export class EiscpDriver extends EventEmitter {
         port: options?.port ?? 60128
       };
       const client = dgram.createSocket("udp4");
-      let timeout_timer: NodeJS.Timeout;
+      let timeoutTimer: NodeJS.Timeout;
       function close() {
         try {
           client.close();
@@ -182,7 +165,7 @@ export class EiscpDriver extends EventEmitter {
             client.close();
           } catch {}
           // Don't reject immediately - allow timeout to complete for graceful handling, Only reject if timeout hasn't been set yet (meaning bind failed)
-          if (!timeout_timer) {
+          if (!timeoutTimer) {
             reject(err);
           }
         })
@@ -199,7 +182,7 @@ export class EiscpDriver extends EventEmitter {
               areacode: data[2]
             });
             if (result.length >= opts.devices) {
-              clearTimeout(timeout_timer);
+              clearTimeout(timeoutTimer);
               close();
             }
           }
@@ -212,11 +195,11 @@ export class EiscpDriver extends EventEmitter {
               // Log but don't fail - network might not be ready yet (ENETUNREACH)
               log.error("%s UDP send error (network may not be ready):", integrationName, err);
               // Close client and resolve with empty result - configured AVRs will still be tried
-              clearTimeout(timeout_timer);
+              clearTimeout(timeoutTimer);
               close();
             }
           });
-          timeout_timer = setTimeout(close, opts.timeout * 1000);
+          timeoutTimer = setTimeout(close, opts.timeout * 1000);
         })
         .on("close", () => {
           log.info("%s UDP socket closed", integrationName);
@@ -246,7 +229,7 @@ export class EiscpDriver extends EventEmitter {
     // Ensure port is always a number
     const port = typeof this.config.port === "number" ? this.config.port : 60128;
     // If already connected, return info
-    if (this.is_connected && this.eiscp) {
+    if (this.isConnected && this.eiscp) {
       return { model: this.config.model!, host: this.config.host!, port };
     }
     // If socket exists, try to connect
@@ -259,24 +242,24 @@ export class EiscpDriver extends EventEmitter {
     this.eiscp
       .on("connect", () => {
         this.tcpBuffer = Buffer.alloc(0); // Clear any stale bytes from a previous connection.
-        this.is_connected = true;
+        this.isConnected = true;
         this.emit("connect"); // Emit connect event for waitForConnect()
       })
       .on("close", () => {
         this.tcpBuffer = Buffer.alloc(0);
-        const wasConnected = this.is_connected;
-        this.is_connected = false;
+        const wasConnected = this.isConnected;
+        this.isConnected = false;
         if (wasConnected) {
           log.warn("%s Connection closed for %s at %s:%d", integrationName, this.config.model, this.config.host, this.config.port || 60128);
         }
         if (this.config.reconnect) {
-          log.info("%s Scheduling reconnection in %ds", integrationName, this.config.reconnect_sleep);
-          setTimeout(() => this.connect(), this.config.reconnect_sleep! * 1000);
+          log.info("%s Scheduling reconnection in %ds", integrationName, this.config.reconnectSleep);
+          setTimeout(() => this.connect(), this.config.reconnectSleep! * 1000);
         }
       })
       .on("error", (err) => {
         log.error("%s Socket error for %s at %s:%d - %s", integrationName, this.config.model, this.config.host, this.config.port || 60128, err.message);
-        this.is_connected = false;
+        this.isConnected = false;
         this.eiscp?.destroy();
       })
       .on("data", (data: Buffer) => {
@@ -306,13 +289,11 @@ export class EiscpDriver extends EventEmitter {
           }
 
           // Extract the complete ISC message (strip "!1" prefix and "\r\n" suffix).
-          const iscp_message = this.tcpBuffer.toString("ascii", offset + headerSize + 2, frameEnd - 2);
+          const iscpMessage = this.tcpBuffer.toString("ascii", offset + headerSize + 2, frameEnd - 2);
           offset = frameEnd;
 
-          let command = iscp_message.slice(0, 3);
-          let value = iscp_message.slice(3);
-
-          // log.info("%s RAW (0) RECEIVE: [%s] %s %s", integrationName, command, value);
+          let command = iscpMessage.slice(0, 3);
+          let value = iscpMessage.slice(3);
 
           if (IGNORED_COMMANDS.has(command)) {
             continue;
@@ -335,7 +316,7 @@ export class EiscpDriver extends EventEmitter {
             command: parsed.command,
             argument: parsed.argument,
             zone: parsed.zone,
-            iscpCommand: iscp_message,
+            iscpCommand: iscpMessage,
             host: this.config.host,
             port: this.config.port,
             model: this.config.model
@@ -355,7 +336,7 @@ export class EiscpDriver extends EventEmitter {
   }
 
   disconnect() {
-    if (this.is_connected && this.eiscp) {
+    if (this.isConnected && this.eiscp) {
       this.eiscp.destroy();
     }
   }
@@ -363,19 +344,16 @@ export class EiscpDriver extends EventEmitter {
   /** Enqueue a command to be sent with proper delay between commands */
   private enqueueSend(data: string | string[]): Promise<void> {
     const task = this.sendQueue.then(async () => {
-      if (this.is_connected && this.eiscp) {
+      if (this.isConnected && this.eiscp) {
         // Handle single command (most common case)
         if (typeof data === "string") {
           this.eiscp.write(createEiscpPacket(data));
         } else {
-          // const shortDelay = Math.round((this.config.send_delay! ?? DEFAULT_QUEUE_THRESHOLD) / data.length / 20) * 10;
-          // console.log("%s ***************", integrationName, data.length, shortDelay);
           for (const cmd of data) {
             this.eiscp.write(createEiscpPacket(cmd));
-            // await delay(shortDelay);
           }
         }
-        await delay(this.config.send_delay! ?? DEFAULT_QUEUE_THRESHOLD);
+        await delay(this.config.sendDelay! ?? DEFAULT_QUEUE_THRESHOLD);
       } else {
         throw new Error("Send command while not connected");
       }
@@ -388,7 +366,7 @@ export class EiscpDriver extends EventEmitter {
   private enqueueIncoming(data: DataPayload): void {
     this.receiveQueue = this.receiveQueue
       .then(async () => {
-        await delay(this.config.receive_delay! ?? DEFAULT_QUEUE_THRESHOLD);
+        await delay(this.config.receiveDelay! ?? DEFAULT_QUEUE_THRESHOLD);
         this.emit("data", data);
       })
       .catch((err) => {
@@ -398,7 +376,7 @@ export class EiscpDriver extends EventEmitter {
 
   /** Send a raw ISCP command */
   async raw(data: string): Promise<void> {
-    if (!data || data === "") {
+    if (!data) {
       throw new Error("No data provided");
     }
     return this.enqueueSend(data);
@@ -414,7 +392,7 @@ export class EiscpDriver extends EventEmitter {
 
     log.info("%s TuneIn preset %d: navigating to My Presets (position %s), selecting index %s", integrationName, preset, myPresetsPosition, presetIndex);
 
-    this.commandParser.patchMetadata({ artist: "Selecting preset " + preset + "...", album: "please wait" });
+    this.commandParser.patchMetadata({ artist: `Selecting preset ${preset}...`, album: "please wait" });
     this.emit("data", {
       command: "metadata",
       argument: { ...this.commandParser.getMetadata() },
@@ -462,7 +440,7 @@ export class EiscpDriver extends EventEmitter {
   }
 
   private async handleNSSsend(nssCode: string, zone: string): Promise<void> {
-    //, iscpCommand: string
+    const menuDelay = this.config.netMenuDelay ?? 2500;
     const sliPrefix = this.getZonePrefix("SLI", zone);
     const netCommand = `${sliPrefix}2B`; // 2B = NET input
     const queryCommand = `${sliPrefix}QSTN`;
@@ -470,17 +448,17 @@ export class EiscpDriver extends EventEmitter {
 
     log.debug("%s Sending %s (NET input for zone %s) before %s", integrationName, netCommand, zone, nssCode);
     await this.raw(netCommand); // Select NET input first
-    await delay(this.config.netMenuDelay ?? 2500); // Wait for AVR to switch/acknowledge NET input
+    await delay(menuDelay); // Wait for AVR to switch/acknowledge NET input
 
     // NTCTOP exits any active sub-service (e.g. Spotify) and returns to the NET root menu.
     // Without this, if the AVR was already on NET/Spotify, SLI2B is a no-op and NLSI
     // would select from Spotify's menu instead of the NET top-level service list.
     await this.raw("NTCTOP");
-    await delay(this.config.netMenuDelay ?? 2500); // Wait for AVR to fully load NET menu
+    await delay(menuDelay); // Wait for AVR to fully load NET menu
 
     log.debug("%s Sending network service command: %s", integrationName, nssCode);
     await this.raw(`NLSI${newSubsource}`);
-    await delay(this.config.netMenuDelay ?? 2500);
+    await delay(menuDelay);
     await this.raw(queryCommand); // Query input-selector to ensure source state updates
   }
 
@@ -499,9 +477,8 @@ export class EiscpDriver extends EventEmitter {
     // Handle network service selection (NSSxx), including embedded forms like "SLINSS01".
     const nssCode = this.extractNSSCode(iscpCommand);
     if (nssCode) {
-      return this.handleNSSsend(nssCode, zone); //, iscpCommand
+      return this.handleNSSsend(nssCode, zone);
     }
-    // await this.raw(iscpCommand);
   }
 
   /** Send a command to the AVR */
@@ -533,7 +510,7 @@ export class EiscpDriver extends EventEmitter {
         command = parts[0];
         args = parts[1];
       } else {
-        await this.sendIscp(this.command_to_iscp(data, undefined, "main"), "main");
+        await this.sendIscp(this.commandToIscp(data, undefined, "main"), "main");
         return;
       }
     } else if (typeof data === "object" && data !== null) {
@@ -541,10 +518,10 @@ export class EiscpDriver extends EventEmitter {
       command = data.command;
       args = data.args;
     } else {
-      await this.sendIscp(this.command_to_iscp(String(data), undefined, "main"), "main");
+      await this.sendIscp(this.commandToIscp(String(data), undefined, "main"), "main");
       return;
     }
-    await this.sendIscp(this.command_to_iscp(command, args, zone), zone);
+    await this.sendIscp(this.commandToIscp(command, args, zone), zone);
   }
 
   private async handleMultiZoneVolume(data: string): Promise<void> {
@@ -559,7 +536,7 @@ export class EiscpDriver extends EventEmitter {
     }
 
     const action = parts[1];
-    const configuredZones = this.config.configuredZones || ["main"];
+    const configuredZones = this.config.configuredZones ?? ["main"];
     const commands = buildMultiZoneVolumeCommands(action, configuredZones);
 
     if (commands.length === 0) {
@@ -583,7 +560,7 @@ export class EiscpDriver extends EventEmitter {
     }
 
     const action = parts[1];
-    const configuredZones = this.config.configuredZones || ["main"];
+    const configuredZones = this.config.configuredZones ?? ["main"];
     const commands = buildMultiZoneMuteCommands(action, configuredZones);
 
     if (commands.length === 0) {
@@ -595,15 +572,14 @@ export class EiscpDriver extends EventEmitter {
     this.enqueueSend(commands);
   }
 
-  private command_to_iscp(command: string, args: string | number | undefined, zone: string): string {
+  private commandToIscp(command: string, args: string | number | undefined, zone: string): string {
     const prefix = (COMMAND_MAPPINGS as Record<string, string>)[command];
     let value: string;
     const valueMap = (VALUE_MAPPINGS as unknown as Record<string, Record<string, { value: string }>>)[prefix];
     if (args !== undefined && valueMap && Object.prototype.hasOwnProperty.call(valueMap, args)) {
       value = valueMap[String(args)].value;
     } else if (valueMap && Object.prototype.hasOwnProperty.call(valueMap, "intgrRange")) {
-      value = (+args!).toString(16).toUpperCase();
-      value = value.length < 2 ? "0" + value : value;
+      value = (+args!).toString(16).toUpperCase().padStart(2, "0");
     } else {
       log.warn("%s not found in JSON: %s %s", integrationName, command, args);
       value = String(args ?? "");
@@ -632,7 +608,7 @@ export class EiscpDriver extends EventEmitter {
 
   waitForConnect(timeoutMs = 5000): Promise<void> {
     return new Promise((resolve, reject) => {
-      if (this.is_connected) {
+      if (this.isConnected) {
         resolve();
         return;
       }

@@ -1,9 +1,4 @@
-/**
- * Pure configuration types, constants, and utility functions.
- *
- * This module contains no I/O, no state, and no side effects.
- * ConfigManager (config I/O) lives in configManager.ts and imports from here.
- */
+// Pure configuration types, constants, and utility functions. No I/O, no state, no side effects.
 
 export const DEFAULT_QUEUE_THRESHOLD = 100;
 
@@ -28,12 +23,7 @@ export const PATTERNS = {
   RAW_COMMAND: /^[A-Z0-9]+$/ // Uppercase letters and numbers only
 } as const;
 
-/**
- * Parse a select-entity options field from user input.
- * - Returns `null` when the user typed 'none' (signal: don't create the entity).
- * - Returns an empty array when the input is blank / undefined (use driver defaults).
- * - Returns the trimmed, non-empty items otherwise.
- */
+// Parse a select-entity options field: null = 'none' (don't create entity), [] = blank (use defaults), else trimmed non-empty items.
 export function parseSelectOptions(raw: unknown): string[] | null {
   if (raw === null) return null;
   if (raw === undefined || raw === "") return [];
@@ -70,28 +60,17 @@ export function parseBoolean(value: unknown, defaultValue: boolean): boolean {
 /** Valid zone identifiers */
 export type AvrZone = "main" | "zone2" | "zone3" | "zone4";
 
-/**
- * Construct an entity ID from model, host/ip, and zone.
- * Format: "MODEL IP ZONE" (e.g., "TX-RZ50 192.168.2.103 main")
- */
+// Construct entity ID: "MODEL IP ZONE" (e.g. "TX-RZ50 192.168.2.103 main").
 export function buildEntityId(model: string, host: string, zone: string): string {
   return `${model} ${host} ${zone}`;
 }
 
-/**
- * Construct a physical AVR identifier from model and host/ip.
- * Format: "MODEL IP" (e.g., "TX-RZ50 192.168.2.103")
- * Used to identify a physical AVR regardless of zone.
- */
+// Construct physical AVR ID: "MODEL IP" (e.g. "TX-RZ50 192.168.2.103"), zone-agnostic.
 export function buildPhysicalAvrId(model: string, host: string): string {
   return `${model} ${host}`;
 }
 
-/**
- * Derive the physical AVR identifier directly from an entity ID.
- * Entity IDs have the form "MODEL HOST ZONE" (e.g., "TX-RZ50 192.168.2.103 main").
- * Returns null when the entity ID cannot be parsed (fewer than 3 whitespace-separated parts).
- */
+// Derive physical AVR ID from entity ID "MODEL HOST ZONE" — returns null if fewer than 3 parts.
 export function physicalAvrIdFromEntityId(entityId: string): string | null {
   const parts = entityId.trim().split(/\s+/);
   if (parts.length < 3) {
@@ -136,19 +115,9 @@ export interface AvrConfig {
   createSensors?: boolean; // true = create sensor entities for this AVR
   netMenuDelay?: number; // delay in ms for NET menu to load (default 2500)
   tuneinPresetPosition?: number; // position of "My Presets" in TuneIn menu (1-9, default 1)
-  /**
-   * Optional user-configured listening mode options.
-   * - `undefined` / `[]`: show all/dynamic options.
-   * - Non-empty array: show exactly these options.
-   * - `null`: do not create the Listening Mode select entity.
-   */
+  // undefined/[] = all options, non-empty = exact options, null = don't create entity.
   listeningModeOptions?: string[] | null;
-  /**
-   * Optional user-configured input selector options.
-   * - `undefined` / `[]`: show all available inputs.
-   * - Non-empty array: show exactly these options.
-   * - `null`: do not create the Input Selector select entity.
-   */
+  // undefined/[] = all inputs, non-empty = exact options, null = don't create entity.
   inputSelectorOptions?: string[] | null;
 }
 
@@ -168,12 +137,7 @@ export interface OnkyoConfig {
   selectedAvr?: string;
 }
 
-/**
- * An AVR config with all optional fields resolved to their concrete defaults.
- *
- * Returned by `normalizeAvrConfig`. Callers that need a fully-coerced config
- * use this type rather than the raw `AvrConfig`.
- */
+// AVR config with all optional fields resolved to defaults. Returned by normalizeAvrConfig.
 export interface NormalizedAvrConfig {
   model: string;
   ip: string;
@@ -192,13 +156,7 @@ export interface NormalizedAvrConfig {
   inputSelectorOptions: string[] | null | undefined;
 }
 
-/**
- * Coerce and apply defaults to a raw `AvrConfig` at runtime.
- *
- * OCP rationale: adding a new config field requires touching only this function
- * and the `AvrConfig`/`NormalizedAvrConfig` interfaces — callers (`createAvrSpecificConfig`)
- * remain closed for modification.
- */
+// Coerce and apply defaults to a raw AvrConfig. OCP: adding a field only requires touching this function and AvrConfig/NormalizedAvrConfig.
 export function normalizeAvrConfig(raw: AvrConfig): NormalizedAvrConfig {
   const queueThreshold = (() => {
     const v = raw.queueThreshold ?? AVR_DEFAULTS.queueThreshold;

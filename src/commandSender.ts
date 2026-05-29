@@ -6,7 +6,7 @@ import { ICommandReceiver } from "./types.js";
 import log from "./loggers.js";
 import { delay, toHex, ensureEiscpConnected } from "./utils.js";
 import { browseMedia, isMediaBrowsingAvailable, isTidalMainMenuRequest, resolveTidalMenuOption, resolveTuneInPreset } from "./mediaBrowser.js";
-import { consumeTidalListModeActive, consumeTraceNextTidalSelectionAfterMainMenu, listTidalMenuOptions, markTidalBrowseListFrozen } from "./tidalBrowserStore.js";
+import { consumeTidalListModeActive, consumeTraceNextTidalSelectionAfterMainMenu, listTidalMenuOptions, getTidalBrowseState } from "./tidalBrowserStore.js";
 
 const integrationName = "commandSender:";
 
@@ -61,7 +61,7 @@ export class CommandSender {
 
     const now = Date.now();
     // Determine queue threshold: prefer explicit config, then eISCP driver's send_delay, else default
-    const queueThreshold = this.config.queueThreshold ?? (typeof this.eiscp.eiscpConfig?.send_delay === "number" ? this.eiscp.eiscpConfig.send_delay : DEFAULT_QUEUE_THRESHOLD);
+    const queueThreshold = this.config.queueThreshold ?? (typeof this.eiscp.eiscpConfig?.sendDelay === "number" ? this.eiscp.eiscpConfig.sendDelay : DEFAULT_QUEUE_THRESHOLD);
 
     if (now - this.lastCommandTime > queueThreshold) {
       switch (cmdId) {
@@ -78,16 +78,12 @@ export class CommandSender {
           await this.eiscp.command(setZonePrefix("audio-muting toggle"));
           break;
         case uc.MediaPlayerCommands.VolumeUp:
-          // if (now - this.lastCommandTime > queueThreshold) {
           this.lastCommandTime = now;
-          await this.eiscp.command(setZonePrefix("volume level-up-1db-step"));
-          // }
+          await this.eiscp.raw(zone === "main" ? "MVLUP1" : zone === "zone2" ? "ZVLUP1" : zone === "zone3" ? "VL3UP1" : "VL4UP1");
           break;
         case uc.MediaPlayerCommands.VolumeDown:
-          // if (now - this.lastCommandTime > queueThreshold) {
           this.lastCommandTime = now;
-          await this.eiscp.command(setZonePrefix("volume level-down-1db-step"));
-          // }
+          await this.eiscp.raw(zone === "main" ? "MVLDOWN1" : zone === "zone2" ? "ZVLDOWN1" : zone === "zone3" ? "VL3DOWN1" : "VL4DOWN1");
           break;
         case uc.MediaPlayerCommands.Volume:
           if (params?.volume !== undefined) {
@@ -108,19 +104,6 @@ export class CommandSender {
             // Convert to EISCP: some models use 0.5 dB steps (×2), others show EISCP value directly
             const eiscpValue = adjustVolumeDispl ? avrDisplayValue * 2 : avrDisplayValue;
             const hexVolume = toHex(eiscpValue, 2);
-
-            // // Debug logging for volume conversion
-            // log.info(
-            //   "%s [%s] volume conversion: slider=%d volumeScale=%d adjustVolumeDispl=%s avrDisplay=%d eiscpValue=%d hex=%s",
-            //   integrationName,
-            //   entity.id,
-            //   sliderValue,
-            //   volumeScale,
-            //   String(adjustVolumeDispl),
-            //   avrDisplayValue,
-            //   eiscpValue,
-            //   hexVolume
-            // );
 
             // Use zone-specific volume command prefix
             let volumePrefix = "MVL"; // main zone
@@ -297,7 +280,8 @@ export class CommandSender {
           // Freeze the browse list when selecting a song so the spontaneous post-playback
           // NLS the AVR sends (U0 → index 1) cannot wipe the harvested item list.
           // Unfreeze for directory selections so the incoming directory NLS can replace the list.
-          markTidalBrowseListFrozen(entity.id, !tidalOption.isBrowsable);
+          const tidalState = getTidalBrowseState(entity.id);
+          if (tidalState) tidalState.browseListFrozen = !tidalOption.isBrowsable;
           await this.eiscp.raw(`NLSI${String(menuIndexToSelect).padStart(5, "0")}`);
           break;
         }

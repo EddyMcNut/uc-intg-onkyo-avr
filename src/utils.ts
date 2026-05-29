@@ -9,14 +9,8 @@ export function toHex(n: number, width: number): string {
   return n.toString(16).toUpperCase().padStart(width, "0");
 }
 
-/**
- * Ensure an eISCP connection is ready before sending a command.
- * If the driver is currently disconnected, triggers a reconnect and waits up to 3 s.
- * Then waits for connection readiness, retrying up to 5 times with 1 s between attempts.
- *
- * @returns `true` when connected and ready, `false` when all attempts are exhausted
- *          (caller should return StatusCodes.Timeout in that case).
- */
+// Ensure eISCP connection is ready before sending a command. Triggers reconnect if disconnected, retries up to 5 times.
+// Returns true when connected and ready, false when all attempts are exhausted (caller should return StatusCodes.Timeout).
 export async function ensureEiscpConnected(eiscp: EiscpDriver, connectOptions: { model?: string; host?: string; port?: number }, entityId: string, integrationName: string): Promise<boolean> {
   if (!eiscp.connected) {
     log.info("%s [%s] Command received while disconnected, triggering reconnection...", integrationName, entityId);

@@ -167,7 +167,7 @@ test.serial("TuneIn selection keeps subsource and state so browse can be repeate
   } as any;
 
   const entityId = "M 1.2.3.4 main";
-  const processor = new ZoneAgnosticUpdateProcessor(mockDriver, { ip: "1.2.3.4", albumArtURL: "na" } as any, mockEiscp);
+  const processor = new ZoneAgnosticUpdateProcessor(mockDriver, { ip: "1.2.3.4", albumArtURL: "na" } as any, mockEiscp, avrStateManager);
 
   avrStateManager.setPowerState(entityId, "on", mockDriver);
   avrStateManager.setSource(entityId, "net", undefined, undefined, mockDriver);
@@ -293,7 +293,7 @@ test.serial("Tidal browse survives DAB-to-NET transition when NLT/NLS arrive ear
   } as any;
 
   const entityId = "TX-RZ50 192.168.2.103 main";
-  const processor = new ZoneAgnosticUpdateProcessor(mockDriver, { ip: "192.168.2.103", albumArtURL: "na" } as any, mockEiscp);
+  const processor = new ZoneAgnosticUpdateProcessor(mockDriver, { ip: "192.168.2.103", albumArtURL: "na" } as any, mockEiscp, avrStateManager);
   const registrar = new EntityRegistrar();
   const player = registrar.createMediaPlayerEntity(entityId, 100, async () => uc.StatusCodes.Ok);
 
@@ -332,7 +332,7 @@ test.serial("Repeated NLT tidal updates do not clear existing Tidal menu options
   } as any;
 
   const entityId = "TX-RZ50 192.168.2.104 main";
-  const processor = new ZoneAgnosticUpdateProcessor(mockDriver, { ip: "192.168.2.104", albumArtURL: "na" } as any, mockEiscp);
+  const processor = new ZoneAgnosticUpdateProcessor(mockDriver, { ip: "192.168.2.104", albumArtURL: "na" } as any, mockEiscp, avrStateManager);
   const registrar = new EntityRegistrar();
   const player = registrar.createMediaPlayerEntity(entityId, 100, async () => uc.StatusCodes.Ok);
 
@@ -373,7 +373,7 @@ test.serial("TuneIn service selection preloads My Presets for browsing", async (
   } as any;
 
   const entityId = "M 1.2.3.4 main";
-  const processor = new ZoneAgnosticUpdateProcessor(mockDriver, { ip: "1.2.3.4", albumArtURL: "na" } as any, mockEiscp);
+  const processor = new ZoneAgnosticUpdateProcessor(mockDriver, { ip: "1.2.3.4", albumArtURL: "na" } as any, mockEiscp, avrStateManager);
 
   avrStateManager.setPowerState(entityId, "on", mockDriver);
   avrStateManager.setSource(entityId, "net", undefined, undefined, mockDriver);
@@ -552,7 +552,7 @@ test.serial("CommandSender first selection after Main Tidal Menu skips pre-list 
 
   const CommandSender = senderModule.CommandSender as any;
   const { avrStateManager } = avrStateModule as any;
-  const { markTraceNextTidalSelectionAfterMainMenu } = tidalStoreModule as any;
+  const { getTidalBrowseState } = tidalStoreModule as any;
 
   class MockEiscp {
     public connected = true;
@@ -578,7 +578,8 @@ test.serial("CommandSender first selection after Main Tidal Menu skips pre-list 
 
   avrStateManager.setSource(entityId, "net");
   avrStateManager.setSubSource(entityId, "tidal");
-  markTraceNextTidalSelectionAfterMainMenu(entityId);
+  const browseState47 = getTidalBrowseState(entityId);
+  if (browseState47) browseState47.traceNextSelectionAfterMainMenu = true;
 
   const status = await sender.sharedCmdHandler(new uc.MediaPlayer(entityId, { en: entityId }, {}), uc.MediaPlayerCommands.PlayMedia, {
     media_id: "tidal:menu:3:Playlists",
@@ -597,7 +598,7 @@ test.serial("CommandSender in-Tidal track selection uses direct NLSI when AVR is
 
   const CommandSender = senderModule.CommandSender as any;
   const { avrStateManager } = avrStateModule as any;
-  const { markTidalListModeActive } = storeModule as any;
+  const { getTidalBrowseState } = storeModule as any;
 
   class MockEiscp {
     public connected = true;
@@ -623,7 +624,8 @@ test.serial("CommandSender in-Tidal track selection uses direct NLSI when AVR is
   // Simulate a song playing in the background while user was browsing menus
   avrStateManager.setPlaybackStatus(entityId, "playing", undefined);
   // Browse callback just finished streaming the NLS list — AVR is in list mode
-  markTidalListModeActive(entityId);
+  const browseState48 = getTidalBrowseState(entityId);
+  if (browseState48) browseState48.listModeActive = true;
 
   const status = await sender.sharedCmdHandler(new uc.MediaPlayer(entityId, { en: entityId }, {}), uc.MediaPlayerCommands.PlayMedia, {
     media_id: "tidal:menu:4:Chattahoochee%20-%20Alan%20Jackson",

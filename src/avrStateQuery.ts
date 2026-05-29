@@ -1,11 +1,4 @@
-/**
- * AVR state query service.
- *
- * Manages the protocol-level query commands sent to the AVR (system-power, volume, etc.)
- * and the debounce mechanism that prevents redundant queries within a short window.
- *
- * Extracted from AvrStateManager so that class can focus solely on per-entity state tracking.
- */
+// AVR state query service — manages protocol-level queries (system-power, volume, etc.) and debounce to prevent redundant queries.
 import { EiscpDriver } from "./eiscp.js";
 import log from "./loggers.js";
 import { delay } from "./utils.js";
@@ -49,7 +42,7 @@ class AvrStateQueryService {
     }
     this.recordQuery(entityId);
 
-    const threshold = queueThreshold ?? (typeof eiscpInstance.eiscpConfig?.send_delay === "number" ? eiscpInstance.eiscpConfig.send_delay : 250);
+    const threshold = queueThreshold ?? (typeof eiscpInstance.eiscpConfig?.sendDelay === "number" ? eiscpInstance.eiscpConfig.sendDelay : 250);
 
     log.info(`${integrationName} [%s] Querying AVR state for zone %s (%s)...`, entityId, zone, context);
     try {

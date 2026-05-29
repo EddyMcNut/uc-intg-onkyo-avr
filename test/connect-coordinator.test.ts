@@ -38,10 +38,12 @@ test.serial("connect creates physical connections and zone instances when missin
 
   let createAndConnectCalled = false;
   const fakePhysicalConn = { eiscp: { connected: true }, commandReceiver: {}, avrConfig: { model: "M", ip: "1.2.3.4", port: 60128 } };
+  let storedConn: any = undefined;
   const connMgr = {
-    getPhysicalConnection: () => undefined,
+    getPhysicalConnection: () => storedConn,
     createAndConnect: async (_physicalAVR: string, _avrCfg: any, _cb: any) => {
       createAndConnectCalled = true;
+      storedConn = fakePhysicalConn;
       return fakePhysicalConn;
     },
     attemptReconnection: async () => ({ success: false }),
@@ -50,17 +52,11 @@ test.serial("connect creates physical connections and zone instances when missin
     disconnectAll: () => {}
   };
 
-  let ensureCalled = false;
-  const avrMgr = {
-    ensureZoneInstances: async (_avrs: any[], _getPhysicalConnection: any, _createAvrSpecificConfig: any, _createCommandSender: any) => {
-      ensureCalled = true;
-    },
-    entries: () => [["M_1.2.3.4_main", { config: { model: "M", ip: "1.2.3.4", zone: "main" } }]]
-  } as any;
+  const avrInstances = new Map<string, any>();
 
   const coordinator = new ConnectCoordinator(
     connMgr as any,
-    avrMgr as any,
+    avrInstances,
     async (_avrEntry: string, _eiscp: any, _ctx: string) => {},
     async () => {}
   );
@@ -73,7 +69,7 @@ test.serial("connect creates physical connections and zone instances when missin
   );
 
   t.true(createAndConnectCalled);
-  t.true(ensureCalled);
+  t.is(avrInstances.size, 1);
   t.true(res);
 });
 
@@ -96,18 +92,12 @@ test.serial("connect handles reconnection when physical connection exists but di
     disconnectAll: () => {}
   } as any;
 
-  let ensureCalled = false;
   let queryAllCalled = false;
-  const avrMgr = {
-    ensureZoneInstances: async () => {
-      ensureCalled = true;
-    },
-    entries: () => [["M_1.2.3.4_main", { config: { model: "M", ip: "1.2.3.4", zone: "main" } }]]
-  } as any;
+  const avrInstances = new Map<string, any>();
 
   const coordinator = new ConnectCoordinator(
     connMgr as any,
-    avrMgr as any,
+    avrInstances,
     async () => {},
     async () => {
       queryAllCalled = true;
@@ -122,7 +112,7 @@ test.serial("connect handles reconnection when physical connection exists but di
   );
 
   t.true(attemptCalled);
-  t.true(ensureCalled);
+  t.is(avrInstances.size, 1);
   t.true(queryAllCalled);
   t.true(res);
 });

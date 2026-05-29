@@ -1,14 +1,4 @@
-/*
- * Module augmentation to improve typings for the integration API.
- *
- * A few driver calls pass values that are more complex than the original
- * `string|number|boolean` union found in the shipped types (e.g. select
- * entity options arrays).  Without augmentation we are forced to sprinkle
- * `as any` casts whenever we call `updateEntityAttributes` with those
- * structures.  The integration API itself is forgiving at runtime, so we
- * widen the type here to keep the code clean and safely typed moving
- * forward.
- */
+// Module augmentation to widen integration-API typings (e.g. updateEntityAttributes accepts richer values like select options arrays).
 
 import "@unfoldedcircle/integration-api";
 

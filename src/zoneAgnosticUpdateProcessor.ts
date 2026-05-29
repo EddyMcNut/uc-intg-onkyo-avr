@@ -1,16 +1,25 @@
 import * as uc from "@unfoldedcircle/integration-api";
-import { avrStateManager } from "./avrState.js";
 import { OnkyoConfig } from "./configManager.js";
 import { EiscpDriver } from "./eiscp.js";
 import log from "./loggers.js";
 import { NETWORK_SERVICES, SONG_INFO } from "./constants.js";
 import { hasTuneInPresets, ingestTidalListEntry, ingestTidalXmlEntries, ingestTuneInListEntry, ingestTuneInXmlEntries, setTuneInBrowseContext } from "./mediaBrowser.js";
-import { resetTidalBrowseState, setTidalNowPlayingTitle } from "./tidalBrowserStore.js";
+import { resetTidalBrowseState, getTidalBrowseState } from "./tidalBrowserStore.js";
 import { TuneInPreloader } from "./tuneInPreloader.js";
 import { ZoneAgnosticMediaStateStore } from "./zoneAgnosticMediaState.js";
 import { ZoneMediaRenderer } from "./zoneMediaRenderer.js";
 
 const integrationName = "zoneAgnosticUpdateProcessor:";
+
+export interface AvrStateApi {
+  getSource(entityId: string): string;
+  getSubSource(entityId: string): string;
+  getEntitiesBySource(source: string): string[];
+  getEntitiesByPhysicalAvrAndSource(physicalAvrId: string, source: string): string[];
+  setSource(entityId: string, source: string, eiscpInstance?: EiscpDriver, zone?: string, driver?: uc.IntegrationAPI): boolean;
+  setSubSource(entityId: string, subSource: string, eiscpInstance?: EiscpDriver, zone?: string, driver?: uc.IntegrationAPI): boolean;
+  setPlaybackStatus(entityId: string, playbackStatus: string, driver?: uc.IntegrationAPI): boolean;
+}
 
 export class ZoneAgnosticUpdateProcessor {
   public static readonly ZONE_AGNOSTIC_COMMANDS = new Set<string>(["IFA", "DSN", "NST", "NLT", "NLT_CONTEXT", "NLS", "NLA", "FLD", "NTM", "metadata"]);
@@ -22,7 +31,8 @@ export class ZoneAgnosticUpdateProcessor {
   constructor(
     private readonly driver: uc.IntegrationAPI,
     config: OnkyoConfig,
-    private readonly eiscpInstance: EiscpDriver
+    private readonly eiscpInstance: EiscpDriver,
+    private readonly state: AvrStateApi
   ) {
     this.tuneInPreloader = new TuneInPreloader(eiscpInstance, (entityId) => this.mediaStateStore.getPhysicalAvrId(entityId));
     this.mediaRenderer = new ZoneMediaRenderer(driver, config, this.mediaStateStore);
@@ -41,25 +51,25 @@ export class ZoneAgnosticUpdateProcessor {
   }
 
   private getNetZones(sourceEntityId: string): string[] {
-    return avrStateManager.getEntitiesByPhysicalAvrAndSource(this.getPhysicalAvrId(sourceEntityId), "net");
+    return this.state.getEntitiesByPhysicalAvrAndSource(this.getPhysicalAvrId(sourceEntityId), "net");
   }
 
   private getTuneInZones(sourceEntityId: string): string[] {
-    const netZones = this.getNetZones(sourceEntityId).filter((zoneEntityId) => avrStateManager.getSubSource(zoneEntityId) === "tunein");
+    const netZones = this.getNetZones(sourceEntityId).filter((zoneEntityId) => this.state.getSubSource(zoneEntityId) === "tunein");
     if (netZones.length > 0) {
       return netZones;
     }
 
-    return avrStateManager.getSubSource(sourceEntityId) === "tunein" ? [sourceEntityId] : [];
+    return this.state.getSubSource(sourceEntityId) === "tunein" ? [sourceEntityId] : [];
   }
 
   private getTidalZones(sourceEntityId: string): string[] {
-    const netZones = this.getNetZones(sourceEntityId).filter((zoneEntityId) => avrStateManager.getSubSource(zoneEntityId) === "tidal");
+    const netZones = this.getNetZones(sourceEntityId).filter((zoneEntityId) => this.state.getSubSource(zoneEntityId) === "tidal");
     if (netZones.length > 0) {
       return netZones;
     }
 
-    return avrStateManager.getSubSource(sourceEntityId) === "tidal" ? [sourceEntityId] : [];
+    return this.state.getSubSource(sourceEntityId) === "tidal" ? [sourceEntityId] : [];
   }
 
   private updateFrontPanelDisplay(zoneEntityIds: string[], text: string): void {
@@ -121,8 +131,8 @@ export class ZoneAgnosticUpdateProcessor {
   ): Promise<void> {
     const audioInputValue = argument?.audioInputValue ?? "";
     const audioOutputValue = argument?.audioOutputValue ?? "";
-    const source = avrStateManager.getSource(sourceEntityId);
-    const affectedZones = avrStateManager.getEntitiesBySource(source);
+    const source = this.state.getSource(sourceEntityId);
+    const affectedZones = this.state.getEntitiesBySource(source);
     const targetZones = affectedZones.length > 0 ? affectedZones : [sourceEntityId];
 
     for (const zoneEntityId of targetZones) {
@@ -149,9 +159,9 @@ export class ZoneAgnosticUpdateProcessor {
   }
 
   async handleDsn(sourceEntityId: string, stationName: string, eventZone: string): Promise<void> {
-    avrStateManager.setSource(sourceEntityId, "dab", this.eiscpInstance, eventZone, this.driver);
+    this.state.setSource(sourceEntityId, "dab", this.eiscpInstance, eventZone, this.driver);
 
-    const affectedZones = avrStateManager.getEntitiesByPhysicalAvrAndSource(this.getPhysicalAvrId(sourceEntityId), "dab");
+    const affectedZones = this.state.getEntitiesByPhysicalAvrAndSource(this.getPhysicalAvrId(sourceEntityId), "dab");
     for (const zoneEntityId of affectedZones) {
       this.mediaStateStore.updateNowPlaying(zoneEntityId, "dab", {
         station: stationName,
@@ -170,8 +180,8 @@ export class ZoneAgnosticUpdateProcessor {
     const enteringTidalZones = new Set<string>();
 
     for (const zoneEntityId of affectedZones) {
-      const previousSubSource = avrStateManager.getSubSource(zoneEntityId);
-      avrStateManager.setSubSource(zoneEntityId, serviceName, this.eiscpInstance, eventZone, this.driver);
+      const previousSubSource = this.state.getSubSource(zoneEntityId);
+      this.state.setSubSource(zoneEntityId, serviceName, this.eiscpInstance, eventZone, this.driver);
       if (normalizedService === "tidal" && previousSubSource !== "tidal") {
         enteringTidalZones.add(zoneEntityId);
       }
@@ -193,7 +203,7 @@ export class ZoneAgnosticUpdateProcessor {
 
   async handleNst(sourceEntityId: string, playbackStatus: string): Promise<void> {
     for (const zoneEntityId of this.getNetZones(sourceEntityId)) {
-      avrStateManager.setPlaybackStatus(zoneEntityId, playbackStatus, this.driver);
+      this.state.setPlaybackStatus(zoneEntityId, playbackStatus, this.driver);
     }
   }
 
@@ -224,7 +234,7 @@ export class ZoneAgnosticUpdateProcessor {
 
   async handleFld(sourceEntityId: string, frontPanelText: string, eventZone: string): Promise<void> {
     const physicalAvrId = this.getPhysicalAvrId(sourceEntityId);
-    const fmZones = avrStateManager.getEntitiesByPhysicalAvrAndSource(physicalAvrId, "fm");
+    const fmZones = this.state.getEntitiesByPhysicalAvrAndSource(physicalAvrId, "fm");
     for (const zoneEntityId of fmZones) {
       this.mediaStateStore.updateNowPlaying(zoneEntityId, "fm", {
         station: frontPanelText,
@@ -249,10 +259,10 @@ export class ZoneAgnosticUpdateProcessor {
         // Only update subSource when the FLD shows the service name alone (no " / " separator).
         const isNowPlayingDisplay = normalizedText.includes(nextSubSource + " / ");
         if (!isNowPlayingDisplay) {
-          const needsUpdate = netZones.some((zoneEntityId) => avrStateManager.getSubSource(zoneEntityId) !== nextSubSource);
+          const needsUpdate = netZones.some((zoneEntityId) => this.state.getSubSource(zoneEntityId) !== nextSubSource);
           if (needsUpdate) {
             for (const zoneEntityId of netZones) {
-              avrStateManager.setSubSource(zoneEntityId, nextSubSource, this.eiscpInstance, eventZone, this.driver);
+              this.state.setSubSource(zoneEntityId, nextSubSource, this.eiscpInstance, eventZone, this.driver);
             }
           }
           if (nextSubSource === "tunein") {
@@ -296,9 +306,10 @@ export class ZoneAgnosticUpdateProcessor {
       this.mediaStateStore.updateNowPlaying(zoneEntityId, "net", { title, album, artist });
       await this.renderZoneMedia(zoneEntityId, true);
 
-      if (avrStateManager.getSubSource(zoneEntityId) === "tidal") {
+      if (this.state.getSubSource(zoneEntityId) === "tidal") {
         // NLS entries use "Song - Artist" format, which matches what NTI (stored in argument.artist) returns.
-        setTidalNowPlayingTitle(zoneEntityId, artist);
+        const tidalState = getTidalBrowseState(zoneEntityId);
+        if (tidalState) tidalState.nowPlayingTitle = artist;
       }
     }
 

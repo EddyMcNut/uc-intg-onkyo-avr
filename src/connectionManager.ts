@@ -2,7 +2,7 @@
 "use strict";
 import log from "./loggers.js";
 import { ReconnectionManager } from "./reconnectionManager.js";
-import { AvrConfig, OnkyoConfig } from "./configManager.js";
+import { AvrConfig, OnkyoConfig, DEFAULT_QUEUE_THRESHOLD } from "./configManager.js";
 import EiscpDriver from "./eiscp.js";
 import { PhysicalConnection, CreateCommandReceiverFn, QueryAllZonesStateFn, EiscpDriverFactory } from "./types.js";
 
@@ -39,7 +39,7 @@ export default class ConnectionManager {
       connection.eiscp.updateConfig({
         netMenuDelay: avrConfig.netMenuDelay,
         tuneinPresetPosition: avrConfig.tuneinPresetPosition,
-        send_delay: avrConfig.queueThreshold || 100,
+        sendDelay: avrConfig.queueThreshold ?? DEFAULT_QUEUE_THRESHOLD,
         configuredZones: configuredZones
       });
       if (runtimeConfig) {
@@ -58,7 +58,7 @@ export default class ConnectionManager {
       host: avrConfig.ip,
       port: avrConfig.port,
       model: avrConfig.model,
-      send_delay: avrConfig.queueThreshold || 100,
+      sendDelay: avrConfig.queueThreshold ?? DEFAULT_QUEUE_THRESHOLD,
       netMenuDelay: avrConfig.netMenuDelay,
       tuneinPresetPosition: avrConfig.tuneinPresetPosition,
       configuredZones: configuredZones

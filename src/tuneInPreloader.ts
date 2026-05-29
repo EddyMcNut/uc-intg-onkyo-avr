@@ -3,7 +3,7 @@ import log from "./loggers.js";
 import { delay, toHex } from "./utils.js";
 import { getTuneInPresetCount, hasTuneInPresets, setTuneInBrowseContext } from "./mediaBrowser.js";
 
-const integrationName = "zoneAgnosticUpdateProcessor:";
+const integrationName = "tuneInPreloader:";
 
 type PhysicalAvrIdResolver = (entityId: string) => string;
 

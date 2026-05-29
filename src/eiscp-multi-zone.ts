@@ -1,10 +1,5 @@
-/**
- * Pure functions for building multi-zone volume and mute command batches.
- * No side effects — easily testable and extensible to additional zones.
- *
- * Action string format: "all-<direction>" or "<zone1>-<zone2>-...-<direction>"
- * e.g. "all-up", "main-zone2-down", "zone2-zone3-zone4-toggle"
- */
+// Pure functions for building multi-zone volume and mute command batches. No side effects.
+// Action string format: "all-<direction>" or "<zone1>-<zone2>-...-<direction>" (e.g. "all-up", "main-zone2-down").
 
 const ZONE_VOLUME: Record<string, { up: string; down: string }> = {
   main: { up: "MVLUP1", down: "MVLDOWN1" },

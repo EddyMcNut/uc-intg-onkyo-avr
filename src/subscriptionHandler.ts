@@ -1,9 +1,6 @@
-/*
- * Move entity-subscription logic out of OnkyoDriver to reduce file size and
- * make the behaviour easier to test in isolation.
- */
+// Subscription logic extracted from OnkyoDriver to reduce file size and make behaviour easier to test.
 
-import AvrInstanceManager from "./avrInstanceManager.js";
+import { AvrInstance } from "./types.js";
 import ConnectionManager from "./connectionManager.js";
 import { avrStateQueryService } from "./avrStateQuery.js";
 import { buildPhysicalAvrId } from "./configManager.js";
@@ -14,7 +11,7 @@ const integrationName = "subscriptionHandler:";
 export default class SubscriptionHandler {
   constructor(
     private connectionManager: ConnectionManager,
-    private avrInstanceManager: AvrInstanceManager
+    private avrInstances: ReadonlyMap<string, AvrInstance>
   ) {}
 
   public async handle(entityId: string): Promise<void> {
@@ -24,7 +21,7 @@ export default class SubscriptionHandler {
       ""
     );
 
-    const instance = this.avrInstanceManager.getInstance(baseEntityId);
+    const instance = this.avrInstances.get(baseEntityId);
     if (!instance) {
       log.info("%s [%s] Subscribed entity has no instance yet, waiting for Connect event", integrationName, entityId);
       return;

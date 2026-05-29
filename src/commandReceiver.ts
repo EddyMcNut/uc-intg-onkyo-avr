@@ -49,7 +49,7 @@ export class CommandReceiver {
     this.config = config;
     this.eiscpInstance = eiscpInstance;
     this.driverVersion = driverVersion;
-    this.zoneAgnosticProcessor = new ZoneAgnosticUpdateProcessor(driver, config, eiscpInstance);
+    this.zoneAgnosticProcessor = new ZoneAgnosticUpdateProcessor(driver, config, eiscpInstance, avrStateManager);
     this.zoneAgnosticHandlers = {
       IFA: async (avrUpdates, entityId, eventZone) => {
         await this.zoneAgnosticProcessor.handleIfa(entityId, eventZone, avrUpdates.argument as Record<string, string> | undefined, async (zoneEntityId, audioInputValue) => {
@@ -181,11 +181,6 @@ export class CommandReceiver {
     return false;
   }
 
-  /** Get config for external access (e.g., from avrState) */
-  public getConfig(): OnkyoConfig {
-    return this.config;
-  }
-
   async maybeUpdateImage(entityId: string, force: boolean = false) {
     await this.zoneAgnosticProcessor.maybeUpdateImage(entityId, force);
   }
@@ -224,7 +219,7 @@ export class CommandReceiver {
         }
         case "audio-muting": {
           this.driver.updateEntityAttributes(entityId, {
-            [uc.MediaPlayerAttributes.Muted]: avrUpdates.argument === "on" ? true : false
+            [uc.MediaPlayerAttributes.Muted]: avrUpdates.argument === "on"
           });
           const muteSensorId = `${entityId}_mute_sensor`;
           const muteState = avrUpdates.argument === "on" ? "ON" : "OFF";
@@ -238,21 +233,19 @@ export class CommandReceiver {
         case "volume": {
           // EISCP protocol: 0-200 or 0-100 depending on model, AVR display: 0-volumeScale, Remote slider: 0-100
           const eiscpValue = Number(avrUpdates.argument);
-          const volumeScale = this.config.volumeScale || 100;
+          const volumeScale = this.config.volumeScale ?? 100;
           const adjustVolumeDispl = this.config.adjustVolumeDispl ?? true;
           const volumeDisplay = String(this.config.volumeDisplay ?? "absolute").toLowerCase() === "relative" ? "relative" : "absolute";
 
           // Convert: EISCP → AVR display scale (÷2 for 0.5 dB steps if enabled) → slider
           const avrDisplayValue = adjustVolumeDispl ? Math.round(eiscpValue / 2) : eiscpValue;
-          // const sliderValue = Math.round((avrDisplayValue * 100) / volumeScale);
           const scaledValue = Math.round((avrDisplayValue * 100) / volumeScale);
           const volumeSensorValue = volumeDisplay === "relative" ? scaledValue - 82 : scaledValue;
 
           this.driver.updateEntityAttributes(entityId, {
-            [uc.MediaPlayerAttributes.Volume]: volumeSensorValue // sliderValue //volumeDisplay === "relative" ? volumeSensorValue : sliderValue
+            [uc.MediaPlayerAttributes.Volume]: volumeSensorValue
           });
-          avrStateManager.setVolume(entityId, eiscpValue); //eiscpValue
-          // log.info("%s [%s] volume set to: %s", integrationName, entityId, sliderValue);
+          avrStateManager.setVolume(entityId, eiscpValue);
 
           // Update volume sensor
           const volumeSensorId = `${entityId}_volume_sensor`;
@@ -265,11 +258,10 @@ export class CommandReceiver {
         case "preset": {
           this.avrPreset = avrUpdates.argument.toString();
           log.info("%s [%s] preset set to: %s", integrationName, entityId, this.avrPreset);
-          // this.eiscpInstance.command("input-selector query");
           break;
         }
         case "input-selector": {
-          let source = avrUpdates.argument.toString().split(",")[0];
+          const source = avrUpdates.argument.toString().split(",")[0];
           avrStateManager.setSource(entityId, source, this.eiscpInstance, eventZone, this.driver);
           this.driver.updateEntityAttributes(entityId, {
             [uc.MediaPlayerAttributes.Source]: source
@@ -290,10 +282,8 @@ export class CommandReceiver {
               this.eiscpInstance.raw("DSNQSTN");
               break;
             case "fm":
-              // RDS01 = Programme Service Name mode (fixed, non-scrolling)
               // FLDQSTN immediately queries the display so the sensor shows the PS name without
               // waiting for the AVR to emit a spontaneous FLD event
-              // this.eiscpInstance.raw("RDSUP");
               this.eiscpInstance.raw("FLDQSTN");
               break;
             default:

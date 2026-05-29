@@ -1,6 +1,7 @@
 import { eiscpCommands } from "./eiscp-commands.js";
 import { eiscpMappings } from "./eiscp-mappings.js";
 import { NETWORK_SERVICES, NO_TITLE } from "./constants.js";
+import type { TidalBrowseState } from "./tidalBrowserStore.js";
 
 const COMMANDS = eiscpCommands.commands;
 const VALUE_MAPPINGS = eiscpMappings.value_mappings;
@@ -16,10 +17,7 @@ export interface AvrStateReader {
 }
 
 export interface TidalStoreApi {
-  getTidalHarvestMode(entityId: string): boolean;
-  setTidalNlsCursorOffset(entityId: string, offset: number): void;
-  setTidalTotalListItemCount(entityId: string, count: number): void;
-  setTidalNlsLayerNumber(entityId: string, layer: number): void;
+  getBrowseState(entityId: string): TidalBrowseState | null;
 }
 
 export interface Metadata {
@@ -36,20 +34,12 @@ export interface CommandResult {
 
 type CommandHandler = (value: string, command: string, result: CommandResult) => CommandResult;
 
-/**
- * Parses raw ISCP command strings into structured CommandResult objects.
- * Owns the current metadata state (title/artist/album) for streaming services.
- */
+// Parses raw ISCP command strings into structured CommandResult objects; owns current metadata state.
 export class IscpCommandParser {
   private currentMetadata: Metadata = {};
   private readonly commandHandlers: Record<string, CommandHandler>;
 
-  /**
-   * @param getEntityId Returns the UC entity ID for a given zone name.
-   *   Called at parse time so config changes are always reflected.
-   * @param stateReader Provides current source/subSource for an entity (injected for testability).
-   * @param tidalStore Tidal browse-state accessors (injected for testability).
-   */
+  // getEntityId: returns UC entity ID for a zone (called at parse time). stateReader/tidalStore: injected for testability.
   constructor(
     private readonly getEntityId: (zone: string) => string,
     private readonly stateReader: AvrStateReader,
@@ -373,12 +363,13 @@ export class IscpCommandParser {
         const totalCount = parseInt(countHex, 16);
         const layerNumber = /^[0-9A-Fa-f]{2}$/.test(layerHex) ? parseInt(layerHex, 16) : 0;
         if (this.stateReader.getSubSource(entityId) === "tidal") {
-          // Don't overwrite the cursor during harvest — the loop manages it locally.
-          if (!this.tidalStore.getTidalHarvestMode(entityId)) {
-            this.tidalStore.setTidalNlsCursorOffset(entityId, cursorOffset);
+          const tidalState = this.tidalStore.getBrowseState(entityId);
+          if (tidalState) {
+            // Don't overwrite the cursor during harvest — the loop manages it locally.
+            if (!tidalState.harvestMode) tidalState.nlsCursorOffset = cursorOffset;
+            tidalState.totalListItemCount = totalCount;
+            if (layerNumber > 0) tidalState.nlsLayerNumber = layerNumber;
           }
-          this.tidalStore.setTidalTotalListItemCount(entityId, totalCount);
-          if (layerNumber > 0) this.tidalStore.setTidalNlsLayerNumber(entityId, layerNumber);
         }
       }
     }

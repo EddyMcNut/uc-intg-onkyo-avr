@@ -4,17 +4,34 @@ import { avrStateManager } from "./avrState.js";
 import log from "./loggers.js";
 import { looksLikeTuneInDirectory, normalizeTuneInLabel, parseTuneInXmlItems } from "./tuneInFilters.js";
 import { addTuneInPreset, getTuneInBrowseState, listTuneInPresets, type TuneInPreset, setTuneInBrowseContextState } from "./tuneInBrowserStore.js";
-import {
-  addTidalMenuOption,
-  listTidalMenuOptions,
-  shouldShowTidalMainMenuShortcut,
-  getTidalNowPlayingTitle,
-  getTidalThumbnailForTitle,
-  getTidalNlsCursorOffset,
-  type TidalMenuOption
-} from "./tidalBrowserStore.js";
-import { createTuneInBackdrop, getOrCreateTuneInThumbnail } from "./tuneInThumbnails.js";
-import { createTidalBackdrop, getOrCreateTidalThumbnail } from "./tidalThumbnails.js";
+import { addTidalMenuOption, listTidalMenuOptions, getTidalThumbnailForTitle, getTidalBrowseState, type TidalMenuOption } from "./tidalBrowserStore.js";
+import { createServiceThumbnails } from "./serviceThumbnails.js";
+
+const { createBackdrop: createTuneInBackdrop, getOrCreateThumbnail: getOrCreateTuneInThumbnail } = createServiceThumbnails({
+  svgFileName: "tunein.svg",
+  logoTransform: "translate(202 228) scale(.38)",
+  logoPathAttrs: 'fill="#17245f" fill-rule="evenodd" clip-rule="evenodd"',
+  backgroundColor: "rgb(20,216,204)",
+  fallbackLabel: "tunein",
+  fallbackLabelColor: "#17245f",
+  fallbackBgOpacity: ".22",
+  textColor: "#17245f",
+  fallbackIcon: "icon://uc:radio",
+  logName: "TuneIn"
+});
+
+const { createBackdrop: createTidalBackdrop, getOrCreateThumbnail: getOrCreateTidalThumbnail } = createServiceThumbnails({
+  svgFileName: "tidal.svg",
+  logoTransform: "translate(245 248) scale(.103275)",
+  logoPathAttrs: 'fill="#ffffff"',
+  backgroundColor: "#000000",
+  fallbackLabel: "TIDAL",
+  fallbackLabelColor: "#00fecc",
+  fallbackBgOpacity: ".15",
+  textColor: "#00fecc",
+  fallbackIcon: "icon://uc:music",
+  logName: "Tidal"
+});
 
 const integrationName = "mediaBrowser:";
 const DEFAULT_BROWSE_PAGE_SIZE = 25;
@@ -84,11 +101,8 @@ const TIDAL_EXCLUDED_MENU_TITLES = new Set(["search", "logout"]);
 
 export function ingestTidalXmlEntries(entityId: string, xmlPayload: string): void {
   if (!xmlPayload) return;
-  // Read the 0-based starting offset declared in the NLA XML response:
-  //   <items offset="50" totalitems="99">
-  // Each item at XML position i has 1-based menuIndex = xmlOffset + i + 1.
-  // This ensures correct absolute positioning regardless of which NLS entries are
-  // already in the store (e.g. NLS at positions 58–67 when cursor was at 66).
+  // xmlOffset is the 0-based starting offset from the NLA XML <items offset="N"> attribute.
+  // Each item at XML position i has 1-based menuIndex = xmlOffset + i + 1, ensuring correct absolute positioning.
   const offsetMatch = xmlPayload.match(/<items\b[^>]*\boffset="(\d+)"/i);
   const xmlOffset = offsetMatch ? parseInt(offsetMatch[1], 10) : 0;
   const xmlItems = parseTuneInXmlItems(xmlPayload);
@@ -121,9 +135,8 @@ export function ingestTidalListEntry(entityId: string, entry: string): void {
     return;
   }
 
-  // NLS display lines (0-9) are window-relative. The NLT `cccc` field is the cursor position (0-based),
-  // NOT the window start. Window start = max(0, cursor - 9). Absolute 1-based index = windowStart + line + 1.
-  const cursorOffset = getTidalNlsCursorOffset(entityId);
+  // NLS display lines (0-9) are window-relative; window start = max(0, cursor - 9). Absolute 1-based index = windowStart + line + 1.
+  const cursorOffset = getTidalBrowseState(entityId)?.nlsCursorOffset ?? 0;
   const windowStart = Math.max(0, cursorOffset - 9);
   const absoluteMenuIndex = windowStart + parsedIndex + 1;
   addTidalMenuOption(entityId, absoluteMenuIndex, title, getOrCreateTidalThumbnail);
@@ -279,10 +292,11 @@ function createRootItem(entityId: string, paging: uc.Paging): uc.BrowseMediaItem
 
 function createTidalRootItem(entityId: string, paging: uc.Paging): uc.BrowseMediaItem {
   const options = getTidalMenuOptions(entityId);
-  const nowPlayingTitle = getTidalNowPlayingTitle(entityId);
-  const rootItems = shouldShowTidalMainMenuShortcut(entityId)
-    ? [createTidalMainMenuItem(entityId), ...options.map((option) => createTidalMenuItem(option, nowPlayingTitle))]
-    : options.map((option) => createTidalMenuItem(option, nowPlayingTitle));
+  const nowPlayingTitle = getTidalBrowseState(entityId)?.nowPlayingTitle ?? "";
+  const rootItems =
+    (getTidalBrowseState(entityId)?.showMainMenuShortcut ?? false)
+      ? [createTidalMainMenuItem(entityId), ...options.map((option) => createTidalMenuItem(option, nowPlayingTitle))]
+      : options.map((option) => createTidalMenuItem(option, nowPlayingTitle));
   const items = rootItems.slice(paging.offset, paging.offset + paging.limit);
 
   return new uc.BrowseMediaItem(TIDAL_ROOT_ID, "Tidal", {
@@ -329,7 +343,7 @@ export async function browseTuneInMedia(entityId: string, options: uc.BrowseOpti
 
 export async function browseTidalMedia(entityId: string, options: uc.BrowseOptions): Promise<uc.StatusCodes | uc.BrowseResult> {
   const tidalMenuOptions = getTidalMenuOptions(entityId);
-  const totalCount = tidalMenuOptions.length + (shouldShowTidalMainMenuShortcut(entityId) ? 1 : 0);
+  const totalCount = tidalMenuOptions.length + ((getTidalBrowseState(entityId)?.showMainMenuShortcut ?? false) ? 1 : 0);
   if (!options.media_id || options.media_id === TIDAL_ROOT_ID) {
     log.info("%s [%s] browsable Tidal menu options: %d", integrationName, entityId, tidalMenuOptions.length);
     return uc.BrowseResult.fromPaging(createTidalRootItem(entityId, options.paging), options.paging, totalCount);
@@ -344,9 +358,7 @@ export async function browseTidalMedia(entityId: string, options: uc.BrowseOptio
     return uc.StatusCodes.NotFound;
   }
 
-  // Tidal AVR navigation exposes each list entry as an action that replaces the current list,
-  // not as a stable child container with its own retrievable children. When the client reopens
-  // browse on a previously selected Tidal item, returning that item directly would render an
-  // empty leaf. Instead, always expose the latest known Tidal list as the browsable view.
+  // Tidal AVR navigation replaces the current list on each selection (no stable child containers).
+  // Always return the latest known Tidal list, not the selected item, so the client sees a browsable view.
   return uc.BrowseResult.fromPaging(createTidalRootItem(entityId, options.paging), options.paging, totalCount);
 }

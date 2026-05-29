@@ -1,7 +1,4 @@
-/**
- * Listening mode audio format compatibility mapping
- * Maps audio format types to compatible listening modes
- */
+// Listening mode audio format compatibility mapping — maps audio format types to compatible listening modes.
 
 /** Audio format categories */
 export enum AudioFormatType {
@@ -158,9 +155,7 @@ const multichannelPCMModes = [...stereoCompatibleModes, "action", "film", "mono-
 /** Listening modes that work with analog inputs */
 const analogModes = [...stereoCompatibleModes];
 
-/**
- * Get compatible listening modes based on audio format
- */
+// Returns compatible listening modes for the given audio format string, or null if format is unknown.
 export function getCompatibleListeningModes(audioFormat: string | undefined): string[] | null {
   if (!audioFormat) {
     return null; // No filtering if format unknown
@@ -207,9 +202,7 @@ export function getCompatibleListeningModes(audioFormat: string | undefined): st
   return stereoCompatibleModes;
 }
 
-/**
- * Detect audio format type from IFA audio input string
- */
+// Detect audio format type from IFA audio input string.
 export function detectAudioFormatType(audioInput: string): string {
   if (!audioInput) {
     return "unknown";

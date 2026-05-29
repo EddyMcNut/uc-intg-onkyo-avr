@@ -1,5 +1,5 @@
 import * as uc from "@unfoldedcircle/integration-api";
-import { buildPhysicalAvrId } from "./configManager.js";
+import { physicalAvrIdFromEntityId } from "./configManager.js";
 import { EiscpDriver } from "./eiscp.js";
 import log from "./loggers.js";
 import { delay } from "./utils.js";
@@ -19,10 +19,7 @@ interface EntityState {
   volume: number;
 }
 
-/**
- * Manages per-entity state for AVR sources.
- * Each entity (AVR zone) has its own independent source tracking.
- */
+// Manages per-entity state (source, volume, power, etc.) — each AVR zone has independent state.
 class AvrStateManager {
   private states: Map<string, EntityState> = new Map();
 
@@ -47,8 +44,7 @@ class AvrStateManager {
   }
 
   getVolume(entityId: string): number {
-    const avrDisplayValue = this.getState(entityId).volume;
-    return avrDisplayValue;
+    return this.getState(entityId).volume;
   }
 
   /** Get current audio format for an entity */
@@ -147,12 +143,7 @@ class AvrStateManager {
     const entities: string[] = [];
 
     for (const [entityId, state] of this.states.entries()) {
-      const [model, host] = entityId.split(" ");
-      if (!model || !host) {
-        continue;
-      }
-
-      if (buildPhysicalAvrId(model, host) === physicalAvrId && state.source === normalizedSource && this.isEntityOn(entityId)) {
+      if (physicalAvrIdFromEntityId(entityId) === physicalAvrId && state.source === normalizedSource && this.isEntityOn(entityId)) {
         entities.push(entityId);
       }
     }
@@ -270,7 +261,7 @@ class AvrStateManager {
     }
 
     // Use provided queueThreshold or fallback to default
-    const threshold = queueThreshold ?? (typeof eiscpInstance.eiscpConfig?.send_delay === "number" ? eiscpInstance.eiscpConfig.send_delay : 250);
+    const threshold = queueThreshold ?? (typeof eiscpInstance.eiscpConfig?.sendDelay === "number" ? eiscpInstance.eiscpConfig.sendDelay : 250);
 
     log.info("%s [%s] querying volume for zone '%s'", integrationName, entityId, zone);
     await eiscpInstance.command({ zone, command: "volume", args: "query" });

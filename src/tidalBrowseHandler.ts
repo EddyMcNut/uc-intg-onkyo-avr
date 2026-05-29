@@ -2,18 +2,7 @@
 "use strict";
 import * as uc from "@unfoldedcircle/integration-api";
 import { browseMedia, isTidalMainMenuRequest, resolveTidalMenuOption, TIDAL_ROOT_ID, TIDAL_ROOT_TYPE } from "./mediaBrowser.js";
-import {
-  listTidalMenuOptions,
-  getContiguousItemCount,
-  markTidalListModeActive,
-  markTraceNextTidalSelectionAfterMainMenu,
-  resetTidalBrowseState,
-  setTidalMainMenuShortcut,
-  getTidalTotalListItemCount,
-  getTidalHarvestMode,
-  getTidalNlsLayerNumber,
-  setTidalHarvestMode
-} from "./tidalBrowserStore.js";
+import { listTidalMenuOptions, getContiguousItemCount, resetTidalBrowseState, getTidalBrowseState } from "./tidalBrowserStore.js";
 import { ConfigManager, AVR_DEFAULTS, buildEntityId } from "./configManager.js";
 import log from "./loggers.js";
 import { delay, toHex } from "./utils.js";
@@ -23,14 +12,8 @@ const integrationName = "tidalBrowseHandler:";
 type CmdHandlerFn = (entity: uc.Entity, cmdId: string, params?: { [key: string]: string | number | boolean }) => Promise<uc.StatusCodes>;
 type RawSendFn = (cmd: string) => Promise<void>;
 
-/**
- * Encapsulates all Tidal-specific browse and list-harvest logic for a media player entity.
- * Extracted from EntityRegistrar to keep that class focused on entity creation only.
- *
- * One instance is shared across all entities registered by a given EntityRegistrar so that
- * the NLAL sequence counter (required to be globally unique per physical AVR session) is
- * managed in a single place.
- */
+// Encapsulates Tidal browse/harvest logic for a media player entity. One instance shared per EntityRegistrar
+// so the NLAL sequence counter (globally unique per physical AVR session) is managed in a single place.
 export class TidalBrowseHandler {
   private tidalListSequence = 0;
 
@@ -45,11 +28,7 @@ export class TidalBrowseHandler {
     return options.map((item) => `${item.menuIndex}:${item.title}`).join("|");
   }
 
-  /**
-   * Wait until the Tidal menu cache changes from beforeSignature AND then stabilizes
-   * (no further changes for a full tick). This ensures the full NLS stream from the
-   * AVR has been ingested before returning browse results.
-   */
+  // Wait for the Tidal menu cache to change from beforeSignature and then stabilize, ensuring the full NLS stream is ingested.
   private async waitForMenuStable(entityId: string, beforeSignature: string, menuDelay: number): Promise<void> {
     const tick = Math.max(120, Math.floor(menuDelay / 2));
     const deadline = Date.now() + Math.max(menuDelay * 3, 1800);
@@ -87,29 +66,29 @@ export class TidalBrowseHandler {
    */
   private async harvestListItems(entityId: string, menuDelay: number, rawSend: RawSendFn): Promise<void> {
     // Guard: don't start a second harvest if one is already running.
-    if (getTidalHarvestMode(entityId)) return;
+    const state = getTidalBrowseState(entityId);
+    if (!state || state.harvestMode) return;
 
-    const initialTotal = getTidalTotalListItemCount(entityId);
-    if (initialTotal <= 0) return;
+    if (state.totalListItemCount <= 0) return;
 
     const currentCount = listTidalMenuOptions(entityId).length;
-    if (currentCount >= initialTotal) return;
+    if (currentCount >= state.totalListItemCount) return;
 
     const scanDelay = Math.max(150, Math.min(Math.floor(menuDelay / 3), 400));
 
     // Use the layer number from the NLT ll field — it's the exact layer NLAL needs.
     // Try that layer first, then neighbours as fallback.
-    const knownLayer = getTidalNlsLayerNumber(entityId);
+    const knownLayer = state.nlsLayerNumber;
     const layersToTry = knownLayer > 0 ? [knownLayer, knownLayer - 1, knownLayer + 1].filter((l) => l > 0).map((l) => toHex(l, 2)) : ["02", "01", "03"];
 
-    log.info("%s [%s] Tidal NLAL harvest: need %d items, have %d, trying layers %s", integrationName, entityId, initialTotal, currentCount, layersToTry.join(","));
+    log.info("%s [%s] Tidal NLAL harvest: need %d items, have %d, trying layers %s", integrationName, entityId, state.totalListItemCount, currentCount, layersToTry.join(","));
 
-    setTidalHarvestMode(entityId, true);
+    state.harvestMode = true;
     try {
       // Phase 1 (awaited): fetch items up to the initially reported total.
       await this.harvestNlalChunks(entityId, layersToTry, scanDelay, rawSend);
     } catch (e) {
-      setTidalHarvestMode(entityId, false);
+      state.harvestMode = false;
       throw e;
     }
 
@@ -119,16 +98,14 @@ export class TidalBrowseHandler {
     void (async () => {
       try {
         await delay(scanDelay * 2);
-        const updatedTotal = getTidalTotalListItemCount(entityId);
         const collectedAfterPhase1 = listTidalMenuOptions(entityId).length;
-        if (updatedTotal > collectedAfterPhase1) {
-          log.info("%s [%s] Tidal NLAL harvest phase 2: total updated to %d, have %d", integrationName, entityId, updatedTotal, collectedAfterPhase1);
+        if (state.totalListItemCount > collectedAfterPhase1) {
+          log.info("%s [%s] Tidal NLAL harvest phase 2: total updated to %d, have %d", integrationName, entityId, state.totalListItemCount, collectedAfterPhase1);
           await this.harvestNlalChunks(entityId, layersToTry, scanDelay, rawSend);
         }
       } finally {
-        setTidalHarvestMode(entityId, false);
-        const finalTotal = getTidalTotalListItemCount(entityId);
-        log.info("%s [%s] Tidal NLAL harvest complete: %d/%d items", integrationName, entityId, listTidalMenuOptions(entityId).length, finalTotal);
+        state.harvestMode = false;
+        log.info("%s [%s] Tidal NLAL harvest complete: %d/%d items", integrationName, entityId, listTidalMenuOptions(entityId).length, state.totalListItemCount);
       }
     })();
   }
@@ -138,11 +115,12 @@ export class TidalBrowseHandler {
    * or until a pass produces no new items (genuine stuck / wrong layer for every attempt).
    */
   private async harvestNlalChunks(entityId: string, layersToTry: string[], scanDelay: number, rawSend: RawSendFn): Promise<void> {
+    const state = getTidalBrowseState(entityId);
+    if (!state) return;
     let lastContiguous = -1;
     while (true) {
-      const total = getTidalTotalListItemCount(entityId);
       const contiguous = getContiguousItemCount(entityId);
-      if (contiguous >= total) break;
+      if (contiguous >= state.totalListItemCount) break;
       if (contiguous === lastContiguous) break; // no progress on any layer — give up
       lastContiguous = contiguous;
 
@@ -151,7 +129,7 @@ export class TidalBrowseHandler {
         const offsetHex = toHex(offset, 4);
         await rawSend(`NLAL${this.nextTidalListSequence()}${layer}${offsetHex}03E7`);
         await delay(scanDelay);
-        if (getContiguousItemCount(entityId) >= getTidalTotalListItemCount(entityId)) return;
+        if (getContiguousItemCount(entityId) >= state.totalListItemCount) return;
       }
       // Small extra wait so the last NLA XML from this pass can arrive before we re-check.
       await delay(scanDelay);
@@ -181,7 +159,8 @@ export class TidalBrowseHandler {
     if (tidalMainMenu && cmdHandler) {
       // Main Tidal Menu selection
       resetTidalBrowseState(entityId);
-      markTraceNextTidalSelectionAfterMainMenu(entityId);
+      const browseState = getTidalBrowseState(entityId);
+      if (browseState) browseState.traceNextSelectionAfterMainMenu = true;
       log.info("%s [%s] Main Tidal Menu selected; next Tidal selection will be traced", integrationName, entityId);
       await cmdHandler(mediaPlayerEntity, uc.MediaPlayerCommands.PlayMedia, {
         media_id: String(options.media_id),
@@ -192,7 +171,7 @@ export class TidalBrowseHandler {
       const menuDelay = this.getMenuDelay(entityId);
 
       await this.waitForMenuStable(entityId, beforeSignature, menuDelay);
-      markTidalListModeActive(entityId);
+      if (browseState) browseState.listModeActive = true;
       if (rawSend) {
         await this.harvestListItems(entityId, menuDelay, rawSend);
       }
@@ -205,7 +184,8 @@ export class TidalBrowseHandler {
     }
 
     if (tidalSelection && cmdHandler) {
-      setTidalMainMenuShortcut(entityId, true);
+      const browseState = getTidalBrowseState(entityId);
+      if (browseState) browseState.showMainMenuShortcut = true;
 
       // Only navigate on fresh selections (offset=0); skip re-navigation on paging scrolls.
       if ((options.paging?.offset ?? 0) === 0) {
@@ -219,7 +199,7 @@ export class TidalBrowseHandler {
           const menuDelay = this.getMenuDelay(entityId);
 
           await this.waitForMenuStable(entityId, beforeSignature, menuDelay);
-          markTidalListModeActive(entityId);
+          if (browseState) browseState.listModeActive = true;
           if (rawSend) {
             await this.harvestListItems(entityId, menuDelay, rawSend);
           }
