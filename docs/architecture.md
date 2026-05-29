@@ -313,4 +313,3 @@ The integration logs extensively to help troubleshoot issues:
 - **Error conditions**: Connection failures, command timeouts, parsing errors
 
 Log statements use entity ID prefix (`{model} {host} {zone}`) for multi-AVR/multi-zone identification.
-
