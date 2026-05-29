@@ -49,7 +49,7 @@ The integration uses **eISCP (Ethernet Integrated Serial Control Protocol)**, wh
 - Manages a map of `PhysicalConnection` objects — one per unique AVR IP
 - Each `PhysicalConnection` holds: an `EiscpDriver` (TCP socket), a `CommandReceiver` (event listener), and the stored `AvrConfig`
 - `createAndConnect` — creates the `EiscpDriver`, wires up the `CommandReceiver`, opens TCP socket; schedules reconnection on failure
-- `updateConnectionConfig` — patches a live connection's runtime settings (send delay, zones, tuner preset position) without disconnecting
+- `updateConnectionConfig` — patches a live connection's runtime settings (send delay, net menu delay, zones, tuner preset position) without disconnecting
 - `scheduleReconnect` / `cancelScheduledReconnection` — delegates to `ReconnectionManager`
 
 **ReconnectionManager** (`src/reconnectionManager.ts`)
@@ -85,9 +85,12 @@ The integration uses **eISCP (Ethernet Integrated Serial Control Protocol)**, wh
 **CommandSender** (`src/commandSender.ts`)
 
 - Receives commands from the Unfolded Circle integration API via `sharedCmdHandler`
-- Translates high-level media player commands (e.g., `VolumeUp`) into eISCP protocol commands
-- Routes commands to the appropriate zone (main, zone2, zone3)
-- Verifies connection state before sending; retries once with reconnect if disconnected
+- Translates high-level media player commands into eISCP protocol commands and sends them via `EiscpDriver`
+- Routes commands to the appropriate zone (main, zone2, zone3) via the `setZonePrefix` helper
+- Verifies connection state before sending; triggers reconnection if disconnected
+- Two send paths:
+  - **`eiscp.command(name)`** — for most commands (power, mute, source, presets…); looks up the human-readable name in `eiscp-commands.ts` to get the raw ISCP code
+  - **`eiscp.raw(code)`** — for volume up/down and absolute volume set; sends the zone-specific raw ISCP code directly (e.g. `"MVLUP1"`, `"ZVLDOWN1"`) bypassing the command lookup
 
 **Flow Example — Volume Up:**
 
@@ -99,11 +102,9 @@ Unfolded Circle Integration API calls entity command
 ↓
 OnkyoDriver.sharedCmdHandler() → CommandSender.sharedCmdHandler()
 ↓
-CommandSender calls eiscp.command("volume level-up-1db-step")
+CommandSender calls eiscp.raw("MVLUP1")  — raw main-zone volume-up code, no lookup
 ↓
-EiscpDriver formats command to eISCP: "MVLUP1"
-↓
-EiscpDriver sends packet over TCP socket to AVR
+EiscpDriver wraps the raw code in an eISCP packet and sends it over TCP to the AVR
 ↓
 AVR adjusts volume and sends back a volume state update
 
@@ -161,7 +162,7 @@ CommandReceiver processes volume command:
 
 - Centralized, per-zone state tracking: power, source, sub-source, volume, audio format, playback status
 - Enables context-dependent parsing (e.g., same FLD message means different things for FM vs. NET)
-- When source changes, triggers `setSource` which calls `queryAvrState` for the zone
+- When source changes, triggers `setSource` which calls `refreshAvrState` — re-queries volume, muting, AV info, input selector, listening mode, and fp-display for the zone
 
 **AvrStateQueryService** (`src/avrStateQuery.ts`)
 
@@ -293,7 +294,7 @@ Some information arrives as fragmented streams:
 
 - **Send delay** (`queueThreshold`): Minimum time between outgoing commands (default 100 ms). Configurable per AVR. Critical for rapid commands (volume, cursor navigation).
 
-- **Receive delay** (`receive_delay`): Throttle for low-priority incoming messages (default 100 ms). Applied only to throttled commands (IFA, IFV, FLD) via the receive queue.
+- **Receive delay** (`receiveDelay`): Throttle for low-priority incoming messages (default 100 ms). Applied only to throttled commands (IFA, IFV, FLD) via the receive queue.
 
 ### Optimization Strategies
 
