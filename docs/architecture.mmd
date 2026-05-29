@@ -8,15 +8,14 @@ graph TB
         SetupH["SetupHandler\nsrc/setupHandler.ts"]
         CC["ConnectCoordinator\nsrc/connectCoordinator.ts"]
         ER["EntityRegistrar\nsrc/entityRegistrar.ts"]
-        LMH["ListeningModeHandler"]
-        ISH["InputSelectorHandler"]
+        SEH["SelectEntityHandler\nsrc/selectEntityHandler.ts"]
         SubH["SubscriptionHandler"]
     end
 
     subgraph ConnLayer["Connection Layer"]
         CM["ConnectionManager\nsrc/connectionManager.ts"]
         RM["ReconnectionManager\nsrc/reconnectionManager.ts"]
-        AIM["AvrInstanceManager\nsrc/avrInstanceManager.ts"]
+        INSTANCES["avrInstances\nMap&lt;string, AvrInstance&gt;\n(plain Map, owned by OnkyoDriver)"]
     end
 
     subgraph PerAVR["Per Physical AVR  (one set per unique IP)"]
@@ -26,6 +25,8 @@ graph TB
         MZONE["eiscp-multi-zone.ts\nmulti-zone command builders"]
         CR["CommandReceiver\nsrc/commandReceiver.ts\nISCP → UC attributes"]
         ZAUP["ZoneAgnosticUpdateProcessor\nsrc/zoneAgnosticUpdateProcessor.ts\nFLD / NLT / metadata fanout"]
+        ZAMSS["ZoneAgnosticMediaStateStore\nsrc/zoneAgnosticMediaState.ts\nnow-playing · image cache"]
+        ZMR["ZoneMediaRenderer\nsrc/zoneMediaRenderer.ts\nalbum-art fetch + push"]
     end
 
     subgraph PerZone["Per Zone  (main / zone2 / zone3)"]
@@ -51,14 +52,14 @@ graph TB
     UCAPI --> SetupH
     UCAPI --> CC
     CC --> CM
-    CC --> AIM
+    CC -- "ensureZoneInstances()" --> INSTANCES
     Driver -- "queryAvrState /\nqueryAllZonesState" --> ASQ
 
     %% Connection layer
     CM --> EISCP
     CM --> CR
     CM --> RM
-    AIM --> CS
+    INSTANCES --> CS
 
     %% EiscpDriver sub-modules
     EISCP --> PKT
@@ -70,6 +71,8 @@ graph TB
     CR -- "zone-agnostic commands" --> ZAUP
     CR -- "write state" --> ASM
     ZAUP -- "read: resolve zones\nwrite: setSource (DAB)" --> ASM
+    ZAUP --> ZAMSS
+    ZAUP --> ZMR
 
     %% EiscpDriver reads state for FM/NET routing
     EISCP -- "read: source / sub-source\nfor FLD routing" --> ASM
@@ -93,9 +96,9 @@ graph TB
     classDef conn fill:#2d7a4a,color:#fff,stroke:#1a5c34
     classDef data fill:#7a4a2d,color:#fff,stroke:#5c3419
     classDef avr fill:#5c2d7a,color:#fff,stroke:#3e1a5c
-    class CC,CM,RM,AIM conn
+    class CC,CM,RM,INSTANCES conn
     class ASM,ASQ,CFG,MAPS data
     class EISCP,AVRBox avr
     class PKT,PARSER,MZONE util
-    class SetupH,ER,LMH,ISH,SubH entry
+    class SetupH,ER,SEH,SubH entry
     classDef util fill:#6a5a2d,color:#fff,stroke:#4e4219

@@ -1,6 +1,6 @@
 # Architecture and Operation
 
-This document describes the generic architecture and operational model of the Onkyo/Pioneer/Integra AVR integration for Unfolded Circle remotes.
+This generated document describes the generic architecture and operational model of the Onkyo/Pioneer/Integra AVR integration for Unfolded Circle remotes.
 
 ## Overview
 
@@ -41,7 +41,7 @@ The integration uses **eISCP (Ethernet Integrated Serial Control Protocol)**, wh
 - Called from `handleConnect()` on every `Connect` and `ExitStandby` event
 - Runs in three steps:
   1. **Physical connections** — for each unique AVR IP, either create a new connection (`ConnectionManager.createAndConnect`) or refresh config and reconnect if the existing TCP socket is lost
-  2. **Zone instances** — for each configured zone, delegate to `AvrInstanceManager.ensureZoneInstances`
+  2. **Zone instances** — for each configured zone, call `ensureZoneInstances()` (also in `connectCoordinator.ts`) to create or refresh `AvrInstance` entries in the `avrInstances` Map
   3. **State queries** — for each newly connected zone, call `queryAvrState` (skipping zones already queried during reconnection in step 1)
 
 **ConnectionManager** (`src/connectionManager.ts`)
@@ -56,12 +56,6 @@ The integration uses **eISCP (Ethernet Integrated Serial Control Protocol)**, wh
 
 - Implements progressive retry logic (configurable timeouts: 3 s, 5 s, 8 s)
 - Supports scheduled reconnections (default 30 s delay) and immediate cancellation
-
-**AvrInstanceManager** (`src/avrInstanceManager.ts`)
-
-- Manages zone-level `AvrInstance` objects — one per `{model}_{host}_{zone}` entity
-- Each instance holds the zone `AvrConfig` and its `CommandSender`
-- `ensureZoneInstances` — creates a new instance if absent; refreshes config on existing ones
 
 **EiscpDriver** (`src/eiscp.ts`)
 
@@ -130,6 +124,17 @@ AVR adjusts volume and sends back a volume state update
 - Fans out FLD (front panel display), NLT (service name), metadata, and similar events to all relevant zones on the same physical AVR
 - For NET zones: updates the front panel display sensor and detects sub-source changes (Spotify, TuneIn, Tidal…)
 - For FM zones: updates both the media player station/artist and the front panel display sensor
+- Owns a `ZoneAgnosticMediaStateStore` for shared media state; delegates album-art fetching to `ZoneMediaRenderer`
+
+**ZoneAgnosticMediaStateStore** (`src/zoneAgnosticMediaState.ts`)
+
+- Stores shared per-physical-AVR media state: now-playing metadata keyed by source, current image URL and hash
+- Keyed by physical AVR ID (derived from entity ID via `physicalAvrIdFromEntityId`) so all zones of the same AVR share the same image and now-playing cache
+
+**ZoneMediaRenderer** (`src/zoneMediaRenderer.ts`)
+
+- Fetches album art from the AVR's HTTP endpoint, deduplicates via content hash, and pushes the image URL to the Unfolded Circle entity
+- Retries up to 3 times when the hash matches the previous image (handles delayed AVR image rotation)
 
 **Flow Example — Volume Update:**
 
@@ -190,9 +195,9 @@ Current registrations (in order):
 
 **SetupHandler** (`src/setupHandler.ts`) — setup UI flow (manual config, auto-discovery, backup/restore)
 
-**ListeningModeHandler** (`src/listeningModeHandler.ts`) — handles select-entity commands for listening mode
+**EntityRegistrar** (`src/entityRegistrar.ts`) — builds entity objects (media player, sensors, select entities) and provides helpers for display name formatting and dynamic option lists (listening modes, input selector)
 
-**InputSelectorHandler** (`src/inputSelectorHandler.ts`) — handles select-entity commands for input selector
+**SelectEntityHandler** (`src/selectEntityHandler.ts`) — generic parameterised handler for select-entity commands (Listening Mode, Input Selector); the entity suffix, EISCP command name, log label, and options callback differ per use — no separate files per entity type
 
 **SubscriptionHandler** (`src/subscriptionHandler.ts`) — handles entity subscribe/unsubscribe events; queries state for newly subscribed entities
 
@@ -246,7 +251,7 @@ Some information arrives as fragmented streams:
 **Multiple Physical AVRs:**
 
 - Each AVR gets its own TCP connection, shared by all configured zones on that AVR
-- Entities are uniquely identified: `{model}_{host}_{zone}`
+- Entities are uniquely identified by `buildEntityId`: `"MODEL HOST ZONE"` (space-separated, e.g. `"TX-RZ50 192.168.2.103 main"`)
 
 ## Error Handling and Resilience
 
@@ -308,6 +313,3 @@ The integration logs extensively to help troubleshoot issues:
 
 Log statements use entity ID prefix (`{model} {host} {zone}`) for multi-AVR/multi-zone identification.
 
-```
-
-```
