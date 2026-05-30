@@ -309,6 +309,12 @@ export class CommandReceiver {
             this.driver.updateEntityAttributes(selectEntityId, {
               [SelectAttributes.CurrentOption]: listeningMode
             });
+            // Query AV info on every valid listening-mode update — this catches
+            // content changes on the same source (e.g. switching tracks on Apple TV)
+            // where the AVR doesn't push IFA/IFV spontaneously.
+            log.info("%s [%s] querying AV info after listening-mode update", integrationName, entityId);
+            this.eiscpInstance.command({ zone: eventZone, command: "audio-information", args: "query" }).catch(() => {});
+            this.eiscpInstance.command({ zone: eventZone, command: "video-information", args: "query" }).catch(() => {});
           }
           break;
         }
