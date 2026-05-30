@@ -66,8 +66,7 @@ export default class OnkyoDriver {
       log.warn("%s Could not read driver version in constructor:", integrationName, err);
     }
 
-    // Ensure ConfigManager uses the Integration API config dir so the Integration
-    // Manager can back up and restore the same files
+    // Ensure ConfigManager uses the Integration API config dir so the Integration Manager can back up and restore the same files
     try {
       const configDir = this.driver.getConfigDirPath();
       setConfigDir(configDir);
@@ -104,10 +103,9 @@ export default class OnkyoDriver {
     );
     this.setupDriverEvents();
     this.setupEventHandlers();
-    log.info("%s Loaded config at startup: %o", integrationName, this.config);
+    // log.info("%s Loaded config at startup: %o", integrationName, this.config);
 
-    // Register entities from config at startup (like Python integrations do)
-    // This ensures entities survive reboots - they're registered before Connect event
+    // Register entities from config at startup (like Python integrations do) This ensures entities survive reboots - they're registered before Connect event
     if (this.config.avrs && this.config.avrs.length > 0) {
       this.registerAvailableEntities();
     }
@@ -167,7 +165,7 @@ export default class OnkyoDriver {
             this.driver.updateEntityAttributes(`${avrEntry}_listening_mode`, { [SelectAttributes.Options]: options });
           }
           if (Array.isArray(avrConfig.listeningModeOptions) && avrConfig.listeningModeOptions.length > 0) {
-            log.info("%s [%s] Loaded %d user-configured listeningModeOptions", integrationName, avrEntry, avrConfig.listeningModeOptions.length);
+            // log.info("%s [%s] Loaded %d user-configured listeningModeOptions", integrationName, avrEntry, avrConfig.listeningModeOptions.length);
           }
         },
         disabledMessage: `${integrationName} [${avrEntry}] Listening Mode select entity disabled by user preference (none)`
@@ -186,7 +184,7 @@ export default class OnkyoDriver {
             this.driver.updateEntityAttributes(`${avrEntry}_input_selector`, { [SelectAttributes.Options]: isOptions });
           }
           if (Array.isArray(avrConfig.inputSelectorOptions) && avrConfig.inputSelectorOptions.length > 0) {
-            log.info("%s [%s] Loaded %d user-configured inputSelectorOptions", integrationName, avrEntry, avrConfig.inputSelectorOptions.length);
+            // log.info("%s [%s] Loaded %d user-configured inputSelectorOptions", integrationName, avrEntry, avrConfig.inputSelectorOptions.length);
           }
         },
         disabledMessage: `${integrationName} [${avrEntry}] Input Selector select entity disabled by user preference (none)`
@@ -195,7 +193,7 @@ export default class OnkyoDriver {
   }
 
   private registerAvailableEntities(): void {
-    log.info("%s Registering available entities from config", integrationName);
+    // log.info("%s Registering available entities from config", integrationName);
     if (!this.entityRegistrar) this.entityRegistrar = new EntityRegistrar();
     for (const avrConfig of this.config.avrs!) {
       const avrEntry = buildEntityId(avrConfig.model, avrConfig.ip, avrConfig.zone);
@@ -207,13 +205,13 @@ export default class OnkyoDriver {
 
       for (const registration of this.buildEntityRegistrations(avrEntry, avrConfig, rawSend)) {
         if (!registration.enabled(avrConfig)) {
-          if (registration.disabledMessage) log.info(registration.disabledMessage);
+          if (registration.disabledMessage) // log.info(registration.disabledMessage);
           continue;
         }
         const entities = [registration.create()].flat() as uc.Entity[];
         for (const entity of entities) {
           this.driver.addAvailableEntity(entity);
-          log.info("%s [%s] Entity registered: %s", integrationName, avrEntry, entity.id);
+          // log.info("%s [%s] Entity registered: %s", integrationName, avrEntry, entity.id);
         }
         registration.afterRegister?.(entities);
       }
@@ -222,22 +220,22 @@ export default class OnkyoDriver {
 
   private setupDriverEvents() {
     this.driver.on(uc.Events.Connect, async () => {
-      log.info(`${integrationName} ===== CONNECT EVENT RECEIVED =====`);
+      // log.info(`${integrationName} ===== CONNECT EVENT RECEIVED =====`);
       // Log current version from driver.json
       try {
         const driverJsonPath = resolve(process.cwd(), "driver.json");
         const driverJsonRaw = readFileSync(driverJsonPath, "utf-8");
         const driverJson = JSON.parse(driverJsonRaw);
         this.driverVersion = driverJson.version || "unknown";
-        log.info(`${integrationName} Driver version: ${this.driverVersion}`);
+        // log.info(`${integrationName} Driver version: ${this.driverVersion}`);
       } catch (err) {
         log.warn(`${integrationName} Could not read driver version from driver.json:`, err);
       }
       await this.handleConnect();
     });
     this.driver.on(uc.Events.EnterStandby, async () => {
-      log.info(`${integrationName} ===== ENTER STANDBY EVENT RECEIVED =====`);
-      log.info(`${integrationName} Remote entering standby, disconnecting AVR(s) to save battery...`);
+      // log.info(`${integrationName} ===== ENTER STANDBY EVENT RECEIVED =====`);
+      // log.info(`${integrationName} Remote entering standby, disconnecting AVR(s) to save battery...`);
 
       // Clear all reconnect timers
       this.connectionManager.cancelAllScheduledReconnections();
@@ -248,12 +246,10 @@ export default class OnkyoDriver {
       await this.driver.setDeviceState(uc.DeviceStates.Disconnected);
     });
     this.driver.on(uc.Events.ExitStandby, async () => {
-      log.info(`${integrationName} ===== EXIT STANDBY EVENT RECEIVED =====`);
+      // log.info(`${integrationName} ===== EXIT STANDBY EVENT RECEIVED =====`);
       await this.handleConnect();
     });
   }
-
-  // listening mode behavior now extracted to ListeningModeHandler
 
   private async queryAvrState(avrEntry: string, eiscp: EiscpDriver, context: string): Promise<void> {
     if (!eiscp.connected) {
@@ -276,11 +272,10 @@ export default class OnkyoDriver {
     for (const [avrEntry, instance] of this.avrInstances) {
       const entryPhysicalAVR = buildPhysicalAvrId(instance.config.model, instance.config.ip);
       if (entryPhysicalAVR === physicalAVR) {
-        // For non-initial queries, only query zones that are powered on
-        // Initial queries (after connection) will query all zones to get power state
+        // For non-initial queries, only query zones that are powered on Initial queries (after connection) will query all zones to get power state
         const isInitialQuery = context.includes("after reconnection") || context.includes("after connection");
         if (!isInitialQuery && !avrStateManager.isEntityOn(avrEntry)) {
-          log.debug("%s [%s] Skipping query for zone in standby (%s)", integrationName, avrEntry, context);
+          // log.debug("%s [%s] Skipping query for zone in standby (%s)", integrationName, avrEntry, context);
           continue;
         }
 
@@ -346,7 +341,7 @@ export default class OnkyoDriver {
     });
 
     this.driver.on(uc.Events.SubscribeEntities, async (entityIds: string[]) => {
-      log.info("%s Entities subscribed: %s", integrationName, entityIds.join(", "));
+      // log.info("%s Entities subscribed: %s", integrationName, entityIds.join(", "));
 
       // Delegate each subscription to handler
       for (const entityId of entityIds) {
@@ -356,12 +351,10 @@ export default class OnkyoDriver {
 
     this.driver.on(uc.Events.UnsubscribeEntities, async (entityIds: string[]) => {
       for (const entityId of entityIds) {
-        log.info("%s [%s] Unsubscribed entity", integrationName, entityId);
+        // log.info("%s [%s] Unsubscribed entity", integrationName, entityId);
       }
     });
   }
-
-  // subscription handling moved to SubscriptionHandler
 
   // Use the sender class for command handling
   private async sharedCmdHandler(entity: uc.Entity, cmdId: string, params?: { [key: string]: string | number | boolean }): Promise<uc.StatusCodes> {
@@ -375,6 +368,6 @@ export default class OnkyoDriver {
   }
 
   async init() {
-    log.info("%s Initializing...", integrationName);
+    // log.info("%s Initializing...", integrationName);
   }
 }

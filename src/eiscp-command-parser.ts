@@ -71,10 +71,7 @@ export class IscpCommandParser {
     Object.assign(this.currentMetadata, patch);
   }
 
-  /**
-   * Parse a raw ISCP command into a structured result.
-   * Returns null if the command maps to nothing useful (unknown command, zone offline, no match).
-   */
+  // Parse a raw ISCP command into a structured result. Returns null if the command maps to nothing useful (unknown command, zone offline, no match).
   parse(command: string, value: string): CommandResult | null {
     const result: CommandResult = {
       command: "undefined",
@@ -374,8 +371,7 @@ export class IscpCommandParser {
       }
     }
 
-    // The hex payload is followed by ASCII/UTF-8 title text. The text may be uppercase (e.g. "TIDAL"),
-    // so detect the first non-hex character instead of relying on title casing.
+    // The hex payload is followed by ASCII/UTF-8 title text. The text may be uppercase (e.g. "TIDAL"), so detect the first non-hex character instead of relying on title casing.
     const asciiStart = value.search(/[^0-9A-Fa-f]/);
     if (asciiStart === -1) {
       return result;

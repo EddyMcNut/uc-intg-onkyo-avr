@@ -135,7 +135,7 @@ export class ConfigManager {
     const existingIndex = this.config.avrs.findIndex((a) => a.ip === normalizedAvr.ip && a.zone === normalizedAvr.zone);
     if (existingIndex >= 0) {
       // AVR already exists, update it with new settings from setup
-      log.info(`${integrationName} Updating existing AVR at ${normalizedAvr.ip} zone ${normalizedAvr.zone}`);
+      // log.info(`${integrationName} Updating existing AVR at ${normalizedAvr.ip} zone ${normalizedAvr.zone}`);
       this.config.avrs[existingIndex] = normalizedAvr;
       this.save(this.config);
       return;
@@ -151,7 +151,7 @@ export class ConfigManager {
     this.config = {} as OnkyoConfig;
     try {
       fs.writeFileSync(CONFIG_PATH, JSON.stringify(this.config, null, 2), "utf-8");
-      log.info(`${integrationName} Cleared configuration and persisted empty config file`);
+      // log.info(`${integrationName} Cleared configuration and persisted empty config file`);
     } catch (err) {
       log.error(`${integrationName} Failed to clear config:`, err);
     }
@@ -161,10 +161,7 @@ export class ConfigManager {
     return this.config;
   }
 
-  /**
-   * Validate a single AVR object from a restored payload.
-   * Returns an object with errors (if any) and a normalized AvrConfig when valid.
-   */
+  // Validate a single AVR object from a restored payload. Returns an object with errors (if any) and a normalized AvrConfig when valid.
   static validateAvrPayload(avr: any): { errors: string[]; normalized?: AvrConfig } {
     const errors: string[] = [];
 

@@ -27,7 +27,7 @@ export async function ensureZoneInstances(
     if (existing) {
       existing.config = avrConfig;
       existing.commandSender.updateConfig(avrSpecificConfig);
-      log.info("%s [%s] Zone instance already exists (runtime config refreshed)", integrationName, avrEntry);
+      // log.info("%s [%s] Zone instance already exists (runtime config refreshed)", integrationName, avrEntry);
       continue;
     }
 
@@ -39,7 +39,7 @@ export async function ensureZoneInstances(
 
     const commandSender = createCommandSender(avrSpecificConfig, physicalConnection.eiscp, physicalConnection.commandReceiver);
     instances.set(avrEntry, { config: avrConfig, commandSender });
-    log.info("%s [%s] Zone instance created%s", integrationName, avrEntry, physicalConnection.eiscp.connected ? " (connected)" : " (will connect when AVR available)");
+    // log.info("%s [%s] Zone instance created%s", integrationName, avrEntry, physicalConnection.eiscp.connected ? " (connected)" : " (will connect when AVR available)");
   }
 }
 
@@ -67,7 +67,7 @@ export default class ConnectCoordinator {
   /** Orchestrate connecting physical AVRs and creating zone instances. Returns true if any zone instances exist after connect. */
   async connect(config: OnkyoConfig, createCommandReceiverFactory: CreateCommandReceiverFactory, createCommandSender: CreateCommandSenderFn): Promise<boolean> {
     if (!config || !config.avrs || config.avrs.length === 0) {
-      log.info("%s No AVRs configured", integrationName);
+      // log.info("%s No AVRs configured", integrationName);
       return false;
     }
 
@@ -96,7 +96,7 @@ export default class ConnectCoordinator {
         this.connectionManager.updateConnectionConfig(physicalAVR, avrConfig, configuredZones, avrSpecificConfig);
 
         if (!physicalConnection.eiscp.connected) {
-          log.info("%s [%s] TCP connection lost, reconnecting to AVR...", integrationName, physicalAVR);
+          // log.info("%s [%s] TCP connection lost, reconnecting to AVR...", integrationName, physicalAVR);
           const result = await this.connectionManager.attemptReconnection(physicalAVR);
           if (result.success) {
             this.connectionManager.cancelScheduledReconnection(physicalAVR);

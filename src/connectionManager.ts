@@ -17,8 +17,7 @@ export default class ConnectionManager {
   constructor(reconnectionManager: ReconnectionManager, queryAllZonesState: (physicalAvr: string, eiscp: EiscpDriver, context: string) => Promise<void>, createEiscpDriver?: EiscpDriverFactory) {
     this.reconnectionManager = reconnectionManager;
     this.queryAllZonesState = queryAllZonesState;
-    // Default to the concrete EiscpDriver so production callers need no change.
-    // Tests can inject a fake factory to avoid opening real TCP sockets.
+    // Default to the concrete EiscpDriver so production callers need no change. Tests can inject a fake factory to avoid opening real TCP sockets.
     this.createEiscpDriver = createEiscpDriver ?? ((config) => new EiscpDriver(config));
   }
 
@@ -45,14 +44,14 @@ export default class ConnectionManager {
       if (runtimeConfig) {
         connection.commandReceiver.updateConfig(runtimeConfig);
       }
-      log.info(
+      // log.info(
         `${integrationName} [${physicalAVR}] Updated connection config (netMenuDelay: ${avrConfig.netMenuDelay}, tuneinPresetPosition: ${avrConfig.tuneinPresetPosition}, zones: ${configuredZones?.join(", ") || "default"})`
       );
     }
   }
 
   async createAndConnect(physicalAVR: string, avrConfig: AvrConfig, createCommandReceiver: CreateCommandReceiverFn, configuredZones?: string[]): Promise<PhysicalConnection> {
-    log.info(`${integrationName} [${physicalAVR}] Connecting to AVR at ${avrConfig.ip}:${avrConfig.port}`);
+    // log.info(`${integrationName} [${physicalAVR}] Connecting to AVR at ${avrConfig.ip}:${avrConfig.port}`);
 
     const eiscpInstance = this.createEiscpDriver({
       host: avrConfig.ip,
@@ -85,11 +84,11 @@ export default class ConnectionManager {
       }
 
       await eiscpInstance.waitForConnect(3000);
-      log.info(`${integrationName} [${physicalAVR}] Connected to AVR`);
+      // log.info(`${integrationName} [${physicalAVR}] Connected to AVR`);
       return physicalConnection;
     } catch (err) {
       log.error(`${integrationName} [${physicalAVR}] Failed to connect to AVR:`, err);
-      log.info(`${integrationName} [${physicalAVR}] Zone instances will be created but unavailable until connection succeeds`);
+      // log.info(`${integrationName} [${physicalAVR}] Zone instances will be created but unavailable until connection succeeds`);
       // schedule reconnect
       this.scheduleReconnect(physicalAVR, physicalConnection, avrConfig);
       return physicalConnection;
@@ -137,7 +136,7 @@ export default class ConnectionManager {
     for (const [physicalAVR, connection] of this.physicalConnections) {
       try {
         if (connection.eiscp.connected) {
-          log.info(`${integrationName} [${physicalAVR}] Disconnecting AVR`);
+          // log.info(`${integrationName} [${physicalAVR}] Disconnecting AVR`);
           connection.eiscp.disconnect();
         }
       } catch (err) {

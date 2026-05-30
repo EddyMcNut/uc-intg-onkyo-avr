@@ -29,22 +29,19 @@ class AvrStateQueryService {
     }
   }
 
-  /**
-   * Send the full set of EISCP state-query commands for one AVR zone.
-   * Includes debounce: returns early if the entity was queried too recently.
-   */
+  // Send the full set of EISCP state-query commands for one AVR zone. Includes debounce: returns early if the entity was queried too recently.
   async queryAvrState(entityId: string, eiscpInstance: EiscpDriver, zone: string, context: string, queueThreshold?: number): Promise<void> {
     if (!eiscpInstance || !zone || !entityId) return;
 
     if (!this.shouldQuery(entityId)) {
-      log.debug(`${integrationName} [%s] skipping redundant query (%s)`, entityId, context);
+      // log.debug(`${integrationName} [%s] skipping redundant query (%s)`, entityId, context);
       return;
     }
     this.recordQuery(entityId);
 
     const threshold = queueThreshold ?? (typeof eiscpInstance.eiscpConfig?.sendDelay === "number" ? eiscpInstance.eiscpConfig.sendDelay : 250);
 
-    log.info(`${integrationName} [%s] Querying AVR state for zone %s (%s)...`, entityId, zone, context);
+    // log.info(`${integrationName} [%s] Querying AVR state for zone %s (%s)...`, entityId, zone, context);
     try {
       await eiscpInstance.command({ zone, command: "system-power", args: "query" });
       await delay(threshold);

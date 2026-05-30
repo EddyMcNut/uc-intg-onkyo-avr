@@ -11,11 +11,7 @@ import { TidalBrowseHandler } from "./tidalBrowseHandler.js";
 export default class EntityRegistrar {
   private readonly tidalBrowseHandler = new TidalBrowseHandler();
 
-  /**
-   * Build a user-facing base name from an AVR entry id.
-   * Input format is typically: "MODEL HOST ZONE".
-   * Long style keeps the full entry, short style omits HOST (IP/hostname).
-   */
+  // Build a user-facing base name from an AVR entry id. Input format is typically: "MODEL HOST ZONE". Long style keeps the full entry, short style omits HOST (IP/hostname).
   private getDisplayBaseName(avrEntry: string): string {
     const cfg = ConfigManager.get();
     const match = cfg?.avrs?.find((a) => buildEntityId(a.model, a.ip, a.zone) === avrEntry);
@@ -43,11 +39,7 @@ export default class EntityRegistrar {
     return `${model} ${zoneLabel}`;
   }
 
-  /**
-   * Return listening mode options. If an AVR-specific `listeningModeOptions`
-   * is configured, return it exactly. Otherwise fall back to dynamic filtering
-   * by audio format (or return all available modes).
-   */
+  // Return listening mode options. If an AVR-specific `listeningModeOptions` is configured, return it exactly. Otherwise fall back to dynamic filtering by audio format (or return all available modes).
   getListeningModeOptions(audioFormat?: string, avrEntry?: string): string[] {
     // If avrEntry provided and config contains user-specified options, return them
     if (avrEntry) {
@@ -286,11 +278,7 @@ export default class EntityRegistrar {
     return selectEntity;
   }
 
-  /**
-   * Return input selector options for the given AVR entry. If a user-configured
-   * `inputSelectorOptions` list is present it is returned exactly; otherwise all
-   * SLI keys (excluding navigation/query keys) are returned sorted.
-   */
+  // Return input selector options for the given AVR entry. If a user-configured `inputSelectorOptions` list is present it is returned exactly; otherwise all SLI keys (excluding navigation/query keys) are returned sorted.
   getInputSelectorOptions(avrEntry?: string): string[] {
     if (avrEntry) {
       try {

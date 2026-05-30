@@ -12,8 +12,7 @@ const integrationName = "tidalBrowseHandler:";
 type CmdHandlerFn = (entity: uc.Entity, cmdId: string, params?: { [key: string]: string | number | boolean }) => Promise<uc.StatusCodes>;
 type RawSendFn = (cmd: string) => Promise<void>;
 
-// Encapsulates Tidal browse/harvest logic for a media player entity. One instance shared per EntityRegistrar
-// so the NLAL sequence counter (globally unique per physical AVR session) is managed in a single place.
+// Encapsulates Tidal browse/harvest logic for a media player entity. One instance shared per EntityRegistrar so the NLAL sequence counter (globally unique per physical AVR session) is managed in a single place.
 export class TidalBrowseHandler {
   private tidalListSequence = 0;
 
@@ -76,12 +75,11 @@ export class TidalBrowseHandler {
 
     const scanDelay = Math.max(150, Math.min(Math.floor(menuDelay / 3), 400));
 
-    // Use the layer number from the NLT ll field — it's the exact layer NLAL needs.
-    // Try that layer first, then neighbours as fallback.
+    // Use the layer number from the NLT ll field — it's the exact layer NLAL needs. Try that layer first, then neighbours as fallback.
     const knownLayer = state.nlsLayerNumber;
     const layersToTry = knownLayer > 0 ? [knownLayer, knownLayer - 1, knownLayer + 1].filter((l) => l > 0).map((l) => toHex(l, 2)) : ["02", "01", "03"];
 
-    log.info("%s [%s] Tidal NLAL harvest: need %d items, have %d, trying layers %s", integrationName, entityId, state.totalListItemCount, currentCount, layersToTry.join(","));
+    // log.info("%s [%s] Tidal NLAL harvest: need %d items, have %d, trying layers %s", integrationName, entityId, state.totalListItemCount, currentCount, layersToTry.join(","));
 
     state.harvestMode = true;
     try {
@@ -92,28 +90,23 @@ export class TidalBrowseHandler {
       throw e;
     }
 
-    // Phase 1 done — caller proceeds to return the browse response with these items.
-    // Phase 2 runs in the background: wait for a potential second NLT that raises the
-    // total (e.g. 50 → 639), then fetch the remaining items chunk by chunk.
+    // Phase 1 done — caller proceeds to return the browse response with these items. Phase 2 runs in the background: wait for a potential second NLT that raises the total (e.g. 50 → 639), then fetch the remaining items chunk by chunk.
     void (async () => {
       try {
         await delay(scanDelay * 2);
         const collectedAfterPhase1 = listTidalMenuOptions(entityId).length;
         if (state.totalListItemCount > collectedAfterPhase1) {
-          log.info("%s [%s] Tidal NLAL harvest phase 2: total updated to %d, have %d", integrationName, entityId, state.totalListItemCount, collectedAfterPhase1);
+          // log.info("%s [%s] Tidal NLAL harvest phase 2: total updated to %d, have %d", integrationName, entityId, state.totalListItemCount, collectedAfterPhase1);
           await this.harvestNlalChunks(entityId, layersToTry, scanDelay, rawSend);
         }
       } finally {
         state.harvestMode = false;
-        log.info("%s [%s] Tidal NLAL harvest complete: %d/%d items", integrationName, entityId, listTidalMenuOptions(entityId).length, state.totalListItemCount);
+        // log.info("%s [%s] Tidal NLAL harvest complete: %d/%d items", integrationName, entityId, listTidalMenuOptions(entityId).length, state.totalListItemCount);
       }
     })();
   }
 
-  /**
-   * Send NLAL requests in a loop until all items up to the current total are collected,
-   * or until a pass produces no new items (genuine stuck / wrong layer for every attempt).
-   */
+  // Send NLAL requests in a loop until all items up to the current total are collected, or until a pass produces no new items (genuine stuck / wrong layer for every attempt).
   private async harvestNlalChunks(entityId: string, layersToTry: string[], scanDelay: number, rawSend: RawSendFn): Promise<void> {
     const state = getTidalBrowseState(entityId);
     if (!state) return;
@@ -142,10 +135,7 @@ export class TidalBrowseHandler {
     return avr?.netMenuDelay ?? AVR_DEFAULTS.netMenuDelay;
   }
 
-  /**
-   * Handle a browse request. Returns a result for Tidal requests, or `undefined`
-   * when the request is not Tidal-related (caller should delegate to browseMedia).
-   */
+  // Handle a browse request. Returns a result for Tidal requests, or `undefined` when the request is not Tidal-related (caller should delegate to browseMedia).
   async browse(
     entityId: string,
     options: uc.BrowseOptions,
@@ -161,7 +151,7 @@ export class TidalBrowseHandler {
       resetTidalBrowseState(entityId);
       const browseState = getTidalBrowseState(entityId);
       if (browseState) browseState.traceNextSelectionAfterMainMenu = true;
-      log.info("%s [%s] Main Tidal Menu selected; next Tidal selection will be traced", integrationName, entityId);
+      // log.info("%s [%s] Main Tidal Menu selected; next Tidal selection will be traced", integrationName, entityId);
       await cmdHandler(mediaPlayerEntity, uc.MediaPlayerCommands.PlayMedia, {
         media_id: String(options.media_id),
         media_type: TIDAL_ROOT_TYPE

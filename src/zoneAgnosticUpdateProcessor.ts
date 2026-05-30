@@ -5,6 +5,7 @@ import log from "./loggers.js";
 import { NETWORK_SERVICES, SONG_INFO } from "./constants.js";
 import { hasTuneInPresets, ingestTidalListEntry, ingestTidalXmlEntries, ingestTuneInListEntry, ingestTuneInXmlEntries, setTuneInBrowseContext } from "./mediaBrowser.js";
 import { resetTidalBrowseState, getTidalBrowseState } from "./tidalBrowserStore.js";
+import { updateNowPlayingStation } from "./tuneInBrowserStore.js";
 import { TuneInPreloader } from "./tuneInPreloader.js";
 import { ZoneAgnosticMediaStateStore } from "./zoneAgnosticMediaState.js";
 import { ZoneMediaRenderer } from "./zoneMediaRenderer.js";
@@ -115,10 +116,7 @@ export class ZoneAgnosticUpdateProcessor {
     await this.tuneInPreloader.preloadTuneInPresets(entityId);
   }
 
-  /**
-   * Aborts an in-flight TuneIn preload for the given entity's AVR.
-   * Returns true if a preload was running and has been flagged to stop.
-   */
+  // Aborts an in-flight TuneIn preload for the given entity's AVR. Returns true if a preload was running and has been flagged to stop.
   abortTuneInPreload(entityId: string): boolean {
     return this.tuneInPreloader.abortPreload(entityId);
   }
@@ -170,7 +168,7 @@ export class ZoneAgnosticUpdateProcessor {
       await this.renderZoneMedia(zoneEntityId, true);
     }
 
-    log.info("%s DAB station set to %s (updated %d zone(s))", integrationName, stationName, affectedZones.length);
+    // log.info("%s DAB station set to %s (updated %d zone(s))", integrationName, stationName, affectedZones.length);
   }
 
   async handleNlt(sourceEntityId: string, serviceName: string, eventZone: string): Promise<void> {
@@ -255,8 +253,7 @@ export class ZoneAgnosticUpdateProcessor {
 
       if (detectedService) {
         const nextSubSource = detectedService.toLowerCase();
-        // "Spotify / Track Title" is a now-playing scrolling display, not a service switch.
-        // Only update subSource when the FLD shows the service name alone (no " / " separator).
+        // "Spotify / Track Title" is a now-playing scrolling display, not a service switch. Only update subSource when the FLD shows the service name alone (no " / " separator).
         const isNowPlayingDisplay = normalizedText.includes(nextSubSource + " / ");
         if (!isNowPlayingDisplay) {
           const needsUpdate = netZones.some((zoneEntityId) => this.state.getSubSource(zoneEntityId) !== nextSubSource);
@@ -311,10 +308,16 @@ export class ZoneAgnosticUpdateProcessor {
         const tidalState = getTidalBrowseState(zoneEntityId);
         if (tidalState) tidalState.nowPlayingTitle = artist;
       }
+
+      if (this.state.getSubSource(zoneEntityId) === "tunein") {
+        // Only keep the station name when NTI returns a value that matches a known preset.
+        // NTI also sends track/show titles (which would overwrite the station name).
+        updateNowPlayingStation(zoneEntityId, artist);
+      }
     }
 
     if (affectedZones.length > 0) {
-      log.info("%s metadata updated: %s - %s (updated %d zone(s))", integrationName, artist, title, affectedZones.length);
+      // log.info("%s metadata updated: %s - %s (updated %d zone(s))", integrationName, artist, title, affectedZones.length);
     }
   }
 

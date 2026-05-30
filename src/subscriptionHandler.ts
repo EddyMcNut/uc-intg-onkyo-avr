@@ -1,5 +1,3 @@
-// Subscription logic extracted from OnkyoDriver to reduce file size and make behaviour easier to test.
-
 import { AvrInstance } from "./types.js";
 import ConnectionManager from "./connectionManager.js";
 import { avrStateQueryService } from "./avrStateQuery.js";
@@ -23,12 +21,12 @@ export default class SubscriptionHandler {
 
     const instance = this.avrInstances.get(baseEntityId);
     if (!instance) {
-      log.info("%s [%s] Subscribed entity has no instance yet, waiting for Connect event", integrationName, entityId);
+      // log.info("%s [%s] Subscribed entity has no instance yet, waiting for Connect event", integrationName, entityId);
       return;
     }
 
     if (!avrStateQueryService.shouldQuery(baseEntityId)) {
-      log.debug("%s [%s] Subscription received shortly after recent query, skipping", integrationName, baseEntityId);
+      // log.debug("%s [%s] Subscription received shortly after recent query, skipping", integrationName, baseEntityId);
       return;
     }
 
@@ -36,18 +34,18 @@ export default class SubscriptionHandler {
     const physicalConnection = this.connectionManager.getPhysicalConnection(physicalAVR);
 
     if (!physicalConnection) {
-      log.info("%s [%s] Subscribed entity has no connection yet, waiting for Connect event", integrationName, entityId);
+      // log.info("%s [%s] Subscribed entity has no connection yet, waiting for Connect event", integrationName, entityId);
       return;
     }
 
     if (physicalConnection.eiscp.connected) {
       const queueThreshold = instance.config.queueThreshold ?? 0;
-      log.info("%s [%s] Subscribed entity connected, querying state (threshold: %dms)", integrationName, entityId, queueThreshold);
+      // log.info("%s [%s] Subscribed entity connected, querying state (threshold: %dms)", integrationName, entityId, queueThreshold);
       await avrStateQueryService.queryAvrState(baseEntityId, physicalConnection.eiscp, instance.config.zone, "on subscribe", queueThreshold);
       return;
     }
 
-    log.info("%s [%s] Subscribed entity not connected, attempting reconnection...", integrationName, entityId);
+    // log.info("%s [%s] Subscribed entity not connected, attempting reconnection...", integrationName, entityId);
     try {
       await physicalConnection.eiscp.connect({
         model: instance.config.model,
@@ -55,7 +53,7 @@ export default class SubscriptionHandler {
         port: instance.config.port
       });
       await physicalConnection.eiscp.waitForConnect(3000);
-      log.info("%s [%s] Reconnected on subscription", integrationName, physicalAVR);
+      // log.info("%s [%s] Reconnected on subscription", integrationName, physicalAVR);
 
       await avrStateQueryService.queryAvrState(baseEntityId, physicalConnection.eiscp, instance.config.zone, "after subscription reconnection", instance.config.queueThreshold ?? 0);
     } catch (err) {

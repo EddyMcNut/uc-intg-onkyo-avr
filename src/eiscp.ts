@@ -55,8 +55,6 @@ const ZONE4_COMMAND_MAP: Record<string, string> = {
   TUN: "TU4"
 };
 
-// Reverse mappings (zone-specific -> main) for parsing incoming commands are in eiscp-command-parser.ts
-
 /** Result from parsing an ISCP command — re-exported from eiscp-command-parser.ts */
 export type { CommandResult };
 
@@ -202,7 +200,7 @@ export class EiscpDriver extends EventEmitter {
           timeoutTimer = setTimeout(close, opts.timeout * 1000);
         })
         .on("close", () => {
-          log.info("%s UDP socket closed", integrationName);
+          // log.info("%s UDP socket closed", integrationName);
         })
         .bind(0, undefined, (err?: Error) => {
           if (err) log.error("%s UDP bind error:", integrationName, err);
@@ -253,7 +251,7 @@ export class EiscpDriver extends EventEmitter {
           log.warn("%s Connection closed for %s at %s:%d", integrationName, this.config.model, this.config.host, this.config.port || 60128);
         }
         if (this.config.reconnect) {
-          log.info("%s Scheduling reconnection in %ds", integrationName, this.config.reconnectSleep);
+          // log.info("%s Scheduling reconnection in %ds", integrationName, this.config.reconnectSleep);
           setTimeout(() => this.connect(), this.config.reconnectSleep! * 1000);
         }
       })
@@ -392,7 +390,7 @@ export class EiscpDriver extends EventEmitter {
     const menuDelay = this.config.netMenuDelay ?? 2500;
     const myPresetsPosition = String(this.config.tuneinPresetPosition ?? 1).padStart(5, "0");
 
-    log.info("%s TuneIn preset %d: navigating to My Presets (position %s), selecting index %s", integrationName, preset, myPresetsPosition, presetIndex);
+    // log.info("%s TuneIn preset %d: navigating to My Presets (position %s), selecting index %s", integrationName, preset, myPresetsPosition, presetIndex);
 
     this.commandParser.patchMetadata({ artist: `Selecting preset ${preset}...`, album: "please wait" });
     this.emit("data", {
@@ -448,17 +446,15 @@ export class EiscpDriver extends EventEmitter {
     const queryCommand = `${sliPrefix}QSTN`;
     const newSubsource = String(nssCode.slice(-2)).padStart(5, "0");
 
-    log.debug("%s Sending %s (NET input for zone %s) before %s", integrationName, netCommand, zone, nssCode);
+    // log.debug("%s Sending %s (NET input for zone %s) before %s", integrationName, netCommand, zone, nssCode);
     await this.raw(netCommand); // Select NET input first
     await delay(menuDelay); // Wait for AVR to switch/acknowledge NET input
 
-    // NTCTOP exits any active sub-service (e.g. Spotify) and returns to the NET root menu.
-    // Without this, if the AVR was already on NET/Spotify, SLI2B is a no-op and NLSI
-    // would select from Spotify's menu instead of the NET top-level service list.
+    // NTCTOP exits any active sub-service (e.g. Spotify) and returns to the NET root menu. Without this, if the AVR was already on NET/Spotify, SLI2B is a no-op and NLSI would select from Spotify's menu instead of the NET top-level service list.
     await this.raw("NTCTOP");
     await delay(menuDelay); // Wait for AVR to fully load NET menu
 
-    log.debug("%s Sending network service command: %s", integrationName, nssCode);
+    // log.debug("%s Sending network service command: %s", integrationName, nssCode);
     await this.raw(`NLSI${newSubsource}`);
     await delay(menuDelay);
     await this.raw(queryCommand); // Query input-selector to ensure source state updates
@@ -546,7 +542,7 @@ export class EiscpDriver extends EventEmitter {
       return;
     }
 
-    log.info("%s Multi-zone volume command: %s -> sending %d zone commands (configured zones: %s)", integrationName, data, commands.length, configuredZones.join(", "));
+    // log.info("%s Multi-zone volume command: %s -> sending %d zone commands (configured zones: %s)", integrationName, data, commands.length, configuredZones.join(", "));
     this.enqueueSend(commands);
   }
 
@@ -570,7 +566,7 @@ export class EiscpDriver extends EventEmitter {
       return;
     }
 
-    log.info("%s Multi-zone muting command: %s -> sending %d zone commands (configured zones: %s)", integrationName, data, commands.length, configuredZones.join(", "));
+    // log.info("%s Multi-zone muting command: %s -> sending %d zone commands (configured zones: %s)", integrationName, data, commands.length, configuredZones.join(", "));
     this.enqueueSend(commands);
   }
 

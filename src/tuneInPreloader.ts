@@ -41,7 +41,7 @@ export class TuneInPreloader {
     const scanDelay = Math.max(200, Math.min(menuDelay || 0, 1000));
 
     try {
-      log.info("%s [%s] preloading TuneIn My Presets for media browsing (position %s)", integrationName, entityId, myPresetsPosition);
+      // log.info("%s [%s] preloading TuneIn My Presets for media browsing (position %s)", integrationName, entityId, myPresetsPosition);
       setTuneInBrowseContext(entityId, "My Presets");
       await this.eiscpInstance.raw("NTCTOP");
       await delay(menuDelay);
@@ -54,7 +54,7 @@ export class TuneInPreloader {
 
       const lastCount = getTuneInPresetCount(entityId);
       if (lastCount > 0) {
-        log.info("%s [%s] harvested %d TuneIn preset(s) from NLAL", integrationName, entityId, lastCount);
+        // log.info("%s [%s] harvested %d TuneIn preset(s) from NLAL", integrationName, entityId, lastCount);
       }
     } catch (err) {
       log.warn("%s [%s] failed to preload TuneIn My Presets: %s", integrationName, entityId, err);
@@ -63,10 +63,7 @@ export class TuneInPreloader {
     }
   }
 
-  /**
-   * Aborts an in-flight preload for this AVR. Returns true if a preload was actually
-   * running (and has been flagged to stop), false if nothing was in flight.
-   */
+  // Aborts an in-flight preload for this AVR. Returns true if a preload was actually running (and has been flagged to stop), false if nothing was in flight.
   abortPreload(entityId: string): boolean {
     const physicalAvrId = this.resolvePhysicalAvrId(entityId);
     if (this.tuneInPreloadInFlight.has(physicalAvrId)) {

@@ -2,7 +2,7 @@ import * as uc from "@unfoldedcircle/integration-api";
 import { MEDIA_BROWSING } from "./constants.js";
 import { avrStateManager } from "./avrState.js";
 import log from "./loggers.js";
-import { looksLikeTuneInDirectory, normalizeTuneInLabel, parseTuneInXmlItems } from "./tuneInFilters.js";
+import { looksLikeTuneInDirectory, normalizeTuneInLabel, extractTuneInStationKey, parseTuneInXmlItems } from "./tuneInFilters.js";
 import { addTuneInPreset, getTuneInBrowseState, listTuneInPresets, type TuneInPreset, setTuneInBrowseContextState } from "./tuneInBrowserStore.js";
 import { addTidalMenuOption, listTidalMenuOptions, getTidalThumbnailForTitle, getTidalBrowseState, type TidalMenuOption } from "./tidalBrowserStore.js";
 import { createServiceThumbnails } from "./serviceThumbnails.js";
@@ -35,20 +35,13 @@ const { createBackdrop: createTidalBackdrop, getOrCreateThumbnail: getOrCreateTi
 
 const integrationName = "mediaBrowser:";
 const DEFAULT_BROWSE_PAGE_SIZE = 25;
+const NOW_PLAYING_LABEL = "▶ Now Playing";
 
 export const TUNEIN_ROOT_ID = "tunein:root";
 export const TUNEIN_ROOT_TYPE = "tunein://presets";
 export const TIDAL_ROOT_ID = "tidal:root";
 export const TIDAL_ROOT_TYPE = "tidal://menu";
 export const TIDAL_MAIN_MENU_ID = "tidal:main-menu";
-
-function getTuneInPresets(entityId: string): TuneInPreset[] {
-  return listTuneInPresets(entityId);
-}
-
-function getTidalMenuOptions(entityId: string): TidalMenuOption[] {
-  return listTidalMenuOptions(entityId);
-}
 
 export function setTuneInBrowseContext(entityId: string, title: string): void {
   setTuneInBrowseContextState(entityId, title);
@@ -75,7 +68,7 @@ export function ingestTuneInListEntry(entityId: string, entry: string): void {
     return;
   }
 
-  addTuneInPreset(entityId, title, getOrCreateTuneInThumbnail);
+  addTuneInPreset(entityId, title, extractTuneInStationKey(rawTitle), rawTitle, getOrCreateTuneInThumbnail);
 }
 
 export function ingestTuneInXmlEntries(entityId: string, xmlPayload: string): void {
@@ -93,7 +86,7 @@ export function ingestTuneInXmlEntries(entityId: string, xmlPayload: string): vo
       continue;
     }
 
-    addTuneInPreset(entityId, item.title, getOrCreateTuneInThumbnail);
+    addTuneInPreset(entityId, item.title, item.stationKey, item.rawLabel, getOrCreateTuneInThumbnail);
   }
 }
 
@@ -101,8 +94,7 @@ const TIDAL_EXCLUDED_MENU_TITLES = new Set(["search", "logout"]);
 
 export function ingestTidalXmlEntries(entityId: string, xmlPayload: string): void {
   if (!xmlPayload) return;
-  // xmlOffset is the 0-based starting offset from the NLA XML <items offset="N"> attribute.
-  // Each item at XML position i has 1-based menuIndex = xmlOffset + i + 1, ensuring correct absolute positioning.
+  // xmlOffset is the 0-based starting offset from the NLA XML <items offset="N"> attribute. Each item at XML position i has 1-based menuIndex = xmlOffset + i + 1, ensuring correct absolute positioning.
   const offsetMatch = xmlPayload.match(/<items\b[^>]*\boffset="(\d+)"/i);
   const xmlOffset = offsetMatch ? parseInt(offsetMatch[1], 10) : 0;
   const xmlItems = parseTuneInXmlItems(xmlPayload);
@@ -143,11 +135,11 @@ export function ingestTidalListEntry(entityId: string, entry: string): void {
 }
 
 export function getTuneInPresetCount(entityId: string): number {
-  return getTuneInPresets(entityId).length;
+  return listTuneInPresets(entityId).length;
 }
 
 export function hasTuneInPresets(entityId: string): boolean {
-  return getTuneInPresetCount(entityId) > 0;
+  return listTuneInPresets(entityId).length > 0;
 }
 
 export function isMediaBrowsingAvailable(entityId: string, subSource?: string): boolean {
@@ -178,6 +170,8 @@ export function resolveTuneInPreset(mediaId?: string, mediaType?: string): TuneI
   return {
     presetIndex,
     title: `Preset ${presetIndex}`,
+    stationKey: `Preset ${presetIndex}`,
+    rawLabel: `Preset ${presetIndex}`,
     mediaId,
     thumbnail: createTuneInBackdrop()
   };
@@ -232,12 +226,20 @@ export function isTidalMainMenuRequest(mediaId?: string, mediaType?: string): bo
   return mediaId === TIDAL_MAIN_MENU_ID;
 }
 
-function createTuneInPresetItem(preset: TuneInPreset): uc.BrowseMediaItem {
+function createTuneInPresetItem(preset: TuneInPreset, nowPlayingStation: string): uc.BrowseMediaItem {
+  const lower = nowPlayingStation.toLowerCase();
+  const isNowPlaying =
+    lower.length > 0 &&
+    (preset.rawLabel.toLowerCase() === lower ||
+      preset.stationKey.toLowerCase() === lower ||
+      preset.title.toLowerCase() === lower);
+
   return new uc.BrowseMediaItem(preset.mediaId, preset.title, {
     can_play: true,
     media_class: uc.KnownMediaClass.Radio,
     media_type: uc.KnownMediaContentType.Radio,
-    thumbnail: preset.thumbnail || "icon://uc:radio"
+    thumbnail: preset.thumbnail || "icon://uc:radio",
+    subtitle: isNowPlaying ? NOW_PLAYING_LABEL : undefined
   });
 }
 
@@ -250,7 +252,7 @@ function createTidalMenuItem(option: TidalMenuOption, nowPlayingTitle: string): 
     media_class: option.isBrowsable ? uc.KnownMediaClass.Directory : uc.KnownMediaClass.Track,
     media_type: TIDAL_ROOT_TYPE,
     thumbnail: option.thumbnail || "icon://uc:music",
-    subtitle: isNowPlaying ? "▶ Now Playing" : undefined
+    subtitle: isNowPlaying ? NOW_PLAYING_LABEL : undefined
   });
 }
 
@@ -267,19 +269,15 @@ function getTuneInRootItemCount(presetCount: number): number {
   return presetCount;
 }
 
-function withTuneInPaging(options: uc.BrowseOptions): uc.BrowseOptions {
-  if (options.paging) return options;
-  return { ...options, paging: new uc.Paging(1, DEFAULT_BROWSE_PAGE_SIZE) };
-}
-
-function withTidalPaging(options: uc.BrowseOptions): uc.BrowseOptions {
+function withPaging(options: uc.BrowseOptions): uc.BrowseOptions {
   if (options.paging) return options;
   return { ...options, paging: new uc.Paging(1, DEFAULT_BROWSE_PAGE_SIZE) };
 }
 
 function createRootItem(entityId: string, paging: uc.Paging): uc.BrowseMediaItem {
-  const presets = getTuneInPresets(entityId);
-  const items = presets.map((preset) => createTuneInPresetItem(preset)).slice(paging.offset, paging.offset + paging.limit);
+  const presets = listTuneInPresets(entityId);
+  const nowPlayingStation = getTuneInBrowseState(entityId)?.nowPlayingStation ?? "";
+  const items = presets.map((preset) => createTuneInPresetItem(preset, nowPlayingStation)).slice(paging.offset, paging.offset + paging.limit);
 
   return new uc.BrowseMediaItem(TUNEIN_ROOT_ID, "TuneIn", {
     can_browse: true,
@@ -291,7 +289,7 @@ function createRootItem(entityId: string, paging: uc.Paging): uc.BrowseMediaItem
 }
 
 function createTidalRootItem(entityId: string, paging: uc.Paging): uc.BrowseMediaItem {
-  const options = getTidalMenuOptions(entityId);
+  const options = listTidalMenuOptions(entityId);
   const nowPlayingTitle = getTidalBrowseState(entityId)?.nowPlayingTitle ?? "";
   const rootItems =
     (getTidalBrowseState(entityId)?.showMainMenuShortcut ?? false)
@@ -313,23 +311,23 @@ export async function browseMedia(entityId: string, options: uc.BrowseOptions): 
   if (isMediaBrowsingAvailable(entityId, subSource)) {
     switch (subSource) {
       case "tunein":
-        return await browseTuneInMedia(entityId, withTuneInPaging(options));
+        return await browseTuneInMedia(entityId, withPaging(options));
       case "tidal":
-        return await browseTidalMedia(entityId, withTidalPaging(options));
+        return await browseTidalMedia(entityId, withPaging(options));
       default:
-        log.debug("%s [%s] unsupported media browsing for subSource [%s]", integrationName, entityId, subSource);
+        // log.debug("%s [%s] unsupported media browsing for subSource [%s]", integrationName, entityId, subSource);
         return uc.StatusCodes.NotFound;
     }
   } else {
-    log.debug("%s [%s] ignoring browse request outside browsable context", integrationName, entityId);
+    // log.debug("%s [%s] ignoring browse request outside browsable context", integrationName, entityId);
     return uc.StatusCodes.NotFound;
   }
 }
 
 export async function browseTuneInMedia(entityId: string, options: uc.BrowseOptions): Promise<uc.StatusCodes | uc.BrowseResult> {
-  const tuneInPresets = getTuneInPresets(entityId);
+  const tuneInPresets = listTuneInPresets(entityId);
   if (!options.media_id || options.media_id === TUNEIN_ROOT_ID) {
-    log.info("%s [%s] browsable TuneIn presets: %d", integrationName, entityId, tuneInPresets.length);
+    // log.info("%s [%s] browsable TuneIn presets: %d", integrationName, entityId, tuneInPresets.length);
     return uc.BrowseResult.fromPaging(createRootItem(entityId, options.paging), options.paging, getTuneInRootItemCount(tuneInPresets.length));
   }
 
@@ -338,14 +336,14 @@ export async function browseTuneInMedia(entityId: string, options: uc.BrowseOpti
     return uc.StatusCodes.NotFound;
   }
 
-  return new uc.BrowseResult(createTuneInPresetItem(preset), uc.Pagination.fromPaging(options.paging));
+  return new uc.BrowseResult(createTuneInPresetItem(preset, ""), uc.Pagination.fromPaging(options.paging));
 }
 
 export async function browseTidalMedia(entityId: string, options: uc.BrowseOptions): Promise<uc.StatusCodes | uc.BrowseResult> {
-  const tidalMenuOptions = getTidalMenuOptions(entityId);
+  const tidalMenuOptions = listTidalMenuOptions(entityId);
   const totalCount = tidalMenuOptions.length + ((getTidalBrowseState(entityId)?.showMainMenuShortcut ?? false) ? 1 : 0);
   if (!options.media_id || options.media_id === TIDAL_ROOT_ID) {
-    log.info("%s [%s] browsable Tidal menu options: %d", integrationName, entityId, tidalMenuOptions.length);
+    // log.info("%s [%s] browsable Tidal menu options: %d", integrationName, entityId, tidalMenuOptions.length);
     return uc.BrowseResult.fromPaging(createTidalRootItem(entityId, options.paging), options.paging, totalCount);
   }
 
@@ -358,7 +356,6 @@ export async function browseTidalMedia(entityId: string, options: uc.BrowseOptio
     return uc.StatusCodes.NotFound;
   }
 
-  // Tidal AVR navigation replaces the current list on each selection (no stable child containers).
-  // Always return the latest known Tidal list, not the selected item, so the client sees a browsable view.
+  // Tidal AVR navigation replaces the current list on each selection (no stable child containers). Always return the latest known Tidal list, not the selected item, so the client sees a browsable view.
   return uc.BrowseResult.fromPaging(createTidalRootItem(entityId, options.paging), options.paging, totalCount);
 }

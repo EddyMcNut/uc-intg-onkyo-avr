@@ -29,7 +29,7 @@ export class SelectEntityHandler {
   }
 
   public async handle(entity: uc.Entity, cmdId: string, params?: { [key: string]: string | number | boolean }): Promise<uc.StatusCodes> {
-    log.info("%s [%s] %s command: %s", this.integrationName, entity.id, this.logLabel, cmdId, params);
+    // log.info("%s [%s] %s command: %s", this.integrationName, entity.id, this.logLabel, cmdId, params);
 
     const avrEntry = entity.id.replace(this.entitySuffix, "");
     const instance = this.avrInstanceManager.get(avrEntry);
@@ -88,7 +88,7 @@ export class SelectEntityHandler {
         return uc.StatusCodes.BadRequest;
       }
 
-      log.info("%s [%s] Setting %s to: %s", this.integrationName, entity.id, this.logLabel.toLowerCase(), newOption);
+      // log.info("%s [%s] Setting %s to: %s", this.integrationName, entity.id, this.logLabel.toLowerCase(), newOption);
       await physicalConnection.eiscp.command({
         zone: instance.config.zone,
         command: this.eiscpCommand,

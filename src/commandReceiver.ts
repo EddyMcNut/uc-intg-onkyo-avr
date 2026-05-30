@@ -114,7 +114,7 @@ export class CommandReceiver {
 
     const cfgAvr = this.config.avrs ? this.config.avrs.find((a) => buildEntityId(a.model, a.ip, a.zone) === zoneEntityId) : undefined;
     if (cfgAvr && Array.isArray(cfgAvr.listeningModeOptions) && cfgAvr.listeningModeOptions.length > 0) {
-      log.info("%s [%s] using user-configured listeningModeOptions (%d entries)", integrationName, zoneEntityId, cfgAvr.listeningModeOptions.length);
+      // log.info("%s [%s] using user-configured listeningModeOptions (%d entries)", integrationName, zoneEntityId, cfgAvr.listeningModeOptions.length);
       this.driver.updateEntityAttributes(selectEntityId, {
         [SelectAttributes.Options]: cfgAvr.listeningModeOptions
       });
@@ -126,18 +126,13 @@ export class CommandReceiver {
     const allModes = Object.keys(lmdMappings).filter((key) => !excludeKeys.includes(key));
     const filteredOptions = allModes.filter((mode) => compatibleModes.includes(mode)).sort();
 
-    log.info("%s [%s] updating listening mode options for format: %s (%d modes)", integrationName, zoneEntityId, audioFormatType, filteredOptions.length);
+    // log.info("%s [%s] updating listening mode options for format: %s (%d modes)", integrationName, zoneEntityId, audioFormatType, filteredOptions.length);
     this.driver.updateEntityAttributes(selectEntityId, {
       [SelectAttributes.Options]: filteredOptions
     });
   }
 
-  /**
-   * When IFA arrives with a transient format (UNKNOWN / N/A / ---), the AVR often stabilises
-   * to the real format a few seconds later without sending another IFA.  Schedule a delayed
-   * re-query so the sensor reflects the final stable value instead of staying stuck at UNKNOWN.
-   * Cancels the timer if a known format arrives before it fires.
-   */
+  // Schedule a delayed re-query so the sensor reflects the final stable value instead of staying stuck at UNKNOWN. Cancels the timer if a known format arrives before it fires.
   private maybeScheduleAvInfoRequery(audioInputValue: string, zone: string): void {
     const lower = audioInputValue.toLowerCase();
     const isTransient = lower === "unknown" || lower === "n/a" || lower === "---" || lower === "";
@@ -157,7 +152,7 @@ export class CommandReceiver {
     this.avInfoRequeryTimer = setTimeout(async () => {
       this.avInfoRequeryTimer = null;
       try {
-        log.info("%s [%s] re-querying AV info after transient format '%s'", integrationName, zone, audioInputValue);
+        // log.info("%s [%s] re-querying AV info after transient format '%s'", integrationName, zone, audioInputValue);
         await this.eiscpInstance.command({ zone, command: "audio-information", args: "query" });
         await this.eiscpInstance.command({ zone, command: "video-information", args: "query" });
       } catch (err) {
@@ -201,8 +196,8 @@ export class CommandReceiver {
       switch (avrUpdates.command) {
         case "system-power": {
           const powerState = avrUpdates.argument === "on" ? uc.MediaPlayerStates.On : uc.MediaPlayerStates.Standby;
-          log.info("** Onkyo AVR custom integration version %s **", this.driverVersion);
-          log.info("%s [%s] power set to: %s", integrationName, entityId, powerState);
+          // log.info("** Onkyo AVR custom integration version %s **", this.driverVersion);
+          // log.info("%s [%s] power set to: %s", integrationName, entityId, powerState);
 
           // Track power state in state manager
           avrStateManager.setPowerState(entityId, avrUpdates.argument as string, this.driver);
@@ -227,7 +222,7 @@ export class CommandReceiver {
             [uc.SensorAttributes.State]: uc.SensorStates.On,
             [uc.SensorAttributes.Value]: muteState
           });
-          log.info("%s [%s] audio-muting set to: %s", integrationName, entityId, muteState);
+          // log.info("%s [%s] audio-muting set to: %s", integrationName, entityId, muteState);
           break;
         }
         case "volume": {
@@ -257,7 +252,7 @@ export class CommandReceiver {
         }
         case "preset": {
           this.avrPreset = avrUpdates.argument.toString();
-          log.info("%s [%s] preset set to: %s", integrationName, entityId, this.avrPreset);
+          // log.info("%s [%s] preset set to: %s", integrationName, entityId, this.avrPreset);
           break;
         }
         case "input-selector": {
@@ -266,7 +261,7 @@ export class CommandReceiver {
           this.driver.updateEntityAttributes(entityId, {
             [uc.MediaPlayerAttributes.Source]: source
           });
-          log.info("%s [%s] input-selector (source) set to: %s", integrationName, entityId, source);
+          // log.info("%s [%s] input-selector (source) set to: %s", integrationName, entityId, source);
           // Mirror the current value into the input-selector select entity
           const inputSelectorEntityId = `${entityId}_input_selector`;
           this.driver.updateEntityAttributes(inputSelectorEntityId, {
@@ -282,8 +277,7 @@ export class CommandReceiver {
               this.eiscpInstance.raw("DSNQSTN");
               break;
             case "fm":
-              // FLDQSTN immediately queries the display so the sensor shows the PS name without
-              // waiting for the AVR to emit a spontaneous FLD event
+              // FLDQSTN immediately queries the display so the sensor shows the PS name without waiting for the AVR to emit a spontaneous FLD event
               this.eiscpInstance.raw("FLDQSTN");
               break;
             default:
@@ -301,18 +295,16 @@ export class CommandReceiver {
           // Handle both string and array (take first element if array)
           const listeningMode = Array.isArray(avrUpdates.argument) ? avrUpdates.argument[0] : (avrUpdates.argument as string);
           if (listeningMode === "undefined" || listeningMode === "unknown") {
-            log.info("%s [%s] listening-mode '%s', keeping current value (no re-query)", integrationName, entityId, listeningMode);
+            // log.info("%s [%s] listening-mode '%s', keeping current value (no re-query)", integrationName, entityId, listeningMode);
           } else {
-            log.info("%s [%s] listening-mode set to: %s", integrationName, entityId, listeningMode);
+            // log.info("%s [%s] listening-mode set to: %s", integrationName, entityId, listeningMode);
             // Update the listening mode select entity
             const selectEntityId = `${entityId}_listening_mode`;
             this.driver.updateEntityAttributes(selectEntityId, {
               [SelectAttributes.CurrentOption]: listeningMode
             });
-            // Query AV info on every valid listening-mode update — this catches
-            // content changes on the same source (e.g. switching tracks on Apple TV)
-            // where the AVR doesn't push IFA/IFV spontaneously.
-            log.info("%s [%s] querying AV info after listening-mode update", integrationName, entityId);
+            // Query AV info on every valid listening-mode update — this catches content changes on the same source (e.g. switching tracks on Apple TV) where the AVR doesn't push IFA/IFV spontaneously.
+            // log.info("%s [%s] querying AV info after listening-mode update", integrationName, entityId);
             this.eiscpInstance.command({ zone: eventZone, command: "audio-information", args: "query" }).catch(() => {});
             this.eiscpInstance.command({ zone: eventZone, command: "video-information", args: "query" }).catch(() => {});
           }
