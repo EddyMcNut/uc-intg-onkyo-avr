@@ -43,7 +43,7 @@ export default class SubscriptionHandler {
     if (physicalConnection.eiscp.connected) {
       const queueThreshold = instance.config.queueThreshold ?? 0;
       log.info("%s [%s] Subscribed entity connected, querying state (threshold: %dms)", integrationName, entityId, queueThreshold);
-      await avrStateQueryService.queryAvrState(baseEntityId, physicalConnection.eiscp, "on subscribe", instance.config.zone, queueThreshold);
+      await avrStateQueryService.queryAvrState(baseEntityId, physicalConnection.eiscp, instance.config.zone, "on subscribe", queueThreshold);
       return;
     }
 
@@ -57,7 +57,7 @@ export default class SubscriptionHandler {
       await physicalConnection.eiscp.waitForConnect(3000);
       log.info("%s [%s] Reconnected on subscription", integrationName, physicalAVR);
 
-      await avrStateQueryService.queryAvrState(baseEntityId, physicalConnection.eiscp, "after subscription reconnection", instance.config.zone, instance.config.queueThreshold ?? 0);
+      await avrStateQueryService.queryAvrState(baseEntityId, physicalConnection.eiscp, instance.config.zone, "after subscription reconnection", instance.config.queueThreshold ?? 0);
     } catch (err) {
       log.warn("%s [%s] Failed to reconnect on subscription: %s", integrationName, physicalAVR, err);
       this.connectionManager.scheduleReconnect(physicalAVR, physicalConnection, instance.config);
