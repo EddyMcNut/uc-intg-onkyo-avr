@@ -196,8 +196,8 @@ export class CommandReceiver {
       switch (avrUpdates.command) {
         case "system-power": {
           const powerState = avrUpdates.argument === "on" ? uc.MediaPlayerStates.On : uc.MediaPlayerStates.Standby;
-          // log.info("** Onkyo AVR custom integration version %s **", this.driverVersion);
-          // log.info("%s [%s] power set to: %s", integrationName, entityId, powerState);
+          log.info("** Onkyo AVR custom integration version %s **", this.driverVersion);
+          log.info("%s [%s] power set to: %s", integrationName, entityId, powerState);
 
           // Track power state in state manager
           avrStateManager.setPowerState(entityId, avrUpdates.argument as string, this.driver);

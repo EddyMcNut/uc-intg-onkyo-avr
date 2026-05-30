@@ -307,7 +307,7 @@ export default class SetupHandler {
     const restoreData = typeof input.restore_data === "string" && input.restore_data.trim() ? input.restore_data : input.backup_data;
 
     if (restoreModeSelected) {
-      this.host.// log.info("%s Detected manager-driven restore request%s", integrationName, restoreData ? " with payload" : " awaiting payload");
+      this.host.log.info("%s Detected manager-driven restore request%s", integrationName, restoreData ? " with payload" : " awaiting payload");
     }
 
     if (restoreRequested) {
@@ -500,7 +500,7 @@ export default class SetupHandler {
         const rawCfg = fs2.readFileSync(cfgPath, "utf-8");
         configData = JSON.parse(rawCfg);
       } else {
-        this.host.// log.info("%s Config file not present at %s, falling back to ConfigManager.get()", integrationName, cfgPath);
+        this.host.log.info("%s Config file not present at %s, falling back to ConfigManager.get()", integrationName, cfgPath);
         configData = ConfigManager.get();
       }
     } catch (err) {
@@ -554,7 +554,7 @@ export default class SetupHandler {
 
       ConfigManager.save(validation.normalized as Partial<OnkyoConfig>);
       await this.host.onConfigSaved();
-      this.host.// log.info("%s Restore payload applied successfully", integrationName);
+      this.host.log.info("%s Restore payload applied successfully", integrationName);
       return new uc.SetupComplete();
     } catch (err) {
       this.host.log.error("%s Failed to parse or apply restore data (reconfigure):", integrationName, err);
@@ -580,7 +580,7 @@ export default class SetupHandler {
 
     try {
       await this.host.onConfigCleared();
-      this.host.// log.info("%s Configuration deleted by user%s", integrationName, reconfigureMode ? " (via reconfigure)" : "");
+      this.host.log.info("%s Configuration deleted by user%s", integrationName, reconfigureMode ? " (via reconfigure)" : "");
       return new uc.SetupComplete();
     } catch (err) {
       this.host.log.error("%s Failed to delete configuration%s:", integrationName, reconfigureMode ? " (via reconfigure)" : "", err);
@@ -645,7 +645,7 @@ export default class SetupHandler {
         // Save discovered AVR
         ConfigManager.addAvr(discoveredAvr);
         await this.host.onConfigSaved();
-        this.host.// log.info("%s Auto-discovered AVR and saved configuration: %s", integrationName, JSON.stringify(discoveredAvr));
+        this.host.log.info("%s Auto-discovered AVR and saved configuration: %s", integrationName, JSON.stringify(discoveredAvr));
         return new uc.SetupComplete();
       } catch (err) {
         this.host.log.error("%s Failed during auto-discovery:", integrationName, err);
@@ -709,7 +709,7 @@ export default class SetupHandler {
     }
 
     for (const avrCfg of normalizedAvrs) {
-      this.host.// log.info(
+      this.host.log.info(
         "%s Adding AVR config for zone %s with volumeScale: %d, volumeDisplay: %s, adjustVolumeDispl: %s, entityNameStyle: %s, createSensors: %s, netMenuDelay: %d, tuneinPresetPosition: %d",
         integrationName,
         avrCfg.zone,
