@@ -160,10 +160,7 @@ test.serial("Media player browse returns TuneIn full menu items from NET TuneIn"
   ingestTuneInMenuListEntry(entityId, "U0-Browse");
   ingestTuneInMenuListEntry(entityId, "U1-Stations");
   ingestTuneInMenuListEntry(entityId, "U2-Station A");
-  ingestTuneInMenuXmlEntries(
-    entityId,
-    '<?xml version="1.0" encoding="UTF-8"?><response status="ok"><items offset="0003"><item iconid="2F" title="Station B" url="0"/></items></response>'
-  );
+  ingestTuneInMenuXmlEntries(entityId, '<?xml version="1.0" encoding="UTF-8"?><response status="ok"><items offset="0003"><item iconid="2F" title="Station B" url="0"/></items></response>');
 
   const result = await player.browse({
     media_id: "tunein:menu-root",
@@ -172,7 +169,10 @@ test.serial("Media player browse returns TuneIn full menu items from NET TuneIn"
   });
 
   t.true(result instanceof uc.BrowseResult);
-  t.deepEqual((result as uc.BrowseResult).media?.items?.map((item) => item.title), ["Browse", "Stations", "Station A", "Station B"]);
+  t.deepEqual(
+    (result as uc.BrowseResult).media?.items?.map((item) => item.title),
+    ["Browse", "Stations", "Station A", "Station B"]
+  );
   t.is((result as uc.BrowseResult).pagination.count, 4);
 });
 
@@ -205,7 +205,10 @@ test.serial("Media player browse hides TuneIn Login menu item", async (t) => {
   });
 
   t.true(result instanceof uc.BrowseResult);
-  t.deepEqual((result as uc.BrowseResult).media?.items?.map((item) => item.title), ["Browse", "Station A"]);
+  t.deepEqual(
+    (result as uc.BrowseResult).media?.items?.map((item) => item.title),
+    ["Browse", "Station A"]
+  );
   t.is((result as uc.BrowseResult).pagination.count, 2);
 });
 

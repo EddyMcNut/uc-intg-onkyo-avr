@@ -69,11 +69,11 @@ Some screenshots:
 
 ![](../screenshots/tidal-playing.jpg)
 
-**When you want to go back in menu options, it's best to use `Tidal Main Menu` at the top of the options, the back button in the Media Browser does not yet set the AVR state one step back in menu navigation so you could get into unexpected behavior using the back option of the Media Browser.**
+**When you want to go back in menu options, it's best to use `Tidal Main Menu` or `Back` at the top of the options, the back button in the Media Browser itself does not yet set the AVR state one step back in menu navigation so you could get into unexpected behavior using the back option of the Media Browser.**
 
 ### Note
 
 If `input-selector tidal` does not work, check the manual of your AVR to see if Tidal is even available as selectable input on the AVR:
 
 - your AVR _does_ have a Tidal input: run setup of this integration again and increase the value for 'NET sub-source selection delay'
-- your AVR does _not_ have a Tidal input, this setup is not possible, in that case you can use the Tidal app on your phone and if the Tidal app allowed send to you AVR using Bluetooth, Airplay or Chromecast
+- your AVR does _not_ have a Tidal input, this setup is not possible, in that case you can use the Tidal app on your phone and if the Tidal app allowes then send to you AVR using Bluetooth, Airplay or ChromeCast

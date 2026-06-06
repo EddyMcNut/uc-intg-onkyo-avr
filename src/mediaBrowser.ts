@@ -5,7 +5,7 @@ import log from "./loggers.js";
 import { looksLikeTuneInDirectory, normalizeTuneInLabel, extractTuneInStationKey, parseTuneInXmlItems } from "./tuneInFilters.js";
 import { addTuneInPreset, getTuneInBrowseState, listTuneInPresets, type TuneInPreset, setTuneInBrowseContextState } from "./tuneInBrowserStore.js";
 import { addTuneInMenuOption, listTuneInMenuOptions, getTuneInMenuBrowseState, type TuneInMenuOption } from "./tuneInMenuStore.js";
-import { addTidalMenuOption, listTidalMenuOptions, getTidalThumbnailForTitle, getTidalBrowseState, type TidalMenuOption } from "./tidalBrowserStore.js";
+import { addTidalMenuOption, listTidalMenuOptions, getTidalBrowseState, type TidalMenuOption } from "./tidalBrowserStore.js";
 import { createServiceThumbnails } from "./serviceThumbnails.js";
 
 const { createBackdrop: createTuneInBackdrop, getOrCreateThumbnail: getOrCreateTuneInThumbnail } = createServiceThumbnails({
@@ -332,11 +332,7 @@ export function isTidalMainMenuRequest(mediaId?: string, mediaType?: string): bo
 
 function createTuneInPresetItem(preset: TuneInPreset, nowPlayingStation: string): uc.BrowseMediaItem {
   const lower = nowPlayingStation.toLowerCase();
-  const isNowPlaying =
-    lower.length > 0 &&
-    (preset.rawLabel.toLowerCase() === lower ||
-      preset.stationKey.toLowerCase() === lower ||
-      preset.title.toLowerCase() === lower);
+  const isNowPlaying = lower.length > 0 && (preset.rawLabel.toLowerCase() === lower || preset.stationKey.toLowerCase() === lower || preset.title.toLowerCase() === lower);
 
   return new uc.BrowseMediaItem(preset.mediaId, preset.title, {
     can_play: true,
@@ -360,7 +356,7 @@ function createTidalMenuItem(option: TidalMenuOption, nowPlayingTitle: string): 
   });
 }
 
-function createTidalMainMenuItem(entityId: string): uc.BrowseMediaItem {
+function createTidalMainMenuItem(_entityId: string): uc.BrowseMediaItem {
   return new uc.BrowseMediaItem(TIDAL_MAIN_MENU_ID, "Main Tidal Menu", {
     can_browse: true,
     media_class: uc.KnownMediaClass.Directory,
@@ -470,9 +466,7 @@ function getTuneInMenuRootItemCount(menuCount: number, showMainMenuShortcut: boo
 
 function createTuneInMenuItem(option: TuneInMenuOption, nowPlayingStation: string): uc.BrowseMediaItem {
   const lower = nowPlayingStation.toLowerCase();
-  const isNowPlaying =
-    lower.length > 0 &&
-    option.title.toLowerCase() === lower;
+  const isNowPlaying = lower.length > 0 && option.title.toLowerCase() === lower;
 
   return new uc.BrowseMediaItem(option.mediaId, option.title, {
     can_browse: option.isBrowsable,
@@ -548,7 +542,7 @@ export function resolveTuneInMenuOption(entityId: string, mediaId?: string, medi
     menuIndex,
     title,
     mediaId,
-    isBrowsable: option?.isBrowsable ?? looksLikeTuneInDirectory(title)  // consistent with handler fallback
+    isBrowsable: option?.isBrowsable ?? looksLikeTuneInDirectory(title) // consistent with handler fallback
   };
 }
 

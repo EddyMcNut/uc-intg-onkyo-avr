@@ -5,7 +5,7 @@ import EiscpDriver from "./eiscp.js";
 import { ConfigManager, parseBoolean, parseSelectOptions, OnkyoConfig, AvrConfig, AvrZone, AVR_DEFAULTS, LogLevel } from "./configManager.js";
 import log, { setLogLevel } from "./loggers.js";
 
-const integrationName = "setupHandler:";
+const _integrationName = "setupHandler:";
 
 type SetupHost = {
   driver: uc.IntegrationAPI;
@@ -93,7 +93,9 @@ function parseManualInput(input: ManualConfigInput): ManualConfigFormValues {
       return parsed >= 1 && parsed <= 9 ? parsed : AVR_DEFAULTS.tuneinPresetPosition;
     })(),
     tuneinMenuStyleValue: String(input.tuneinMenuStyle ?? AVR_DEFAULTS.tuneinMenuStyle).toLowerCase() === "full" ? "full" : "mypresets",
-    logLevelValue: (["debug", "info", "warn", "error"].includes(String(input.logLevel ?? "").toLowerCase()) ? String(input.logLevel).toLowerCase() : ConfigManager.get().logLevel ?? "warn") as LogLevel,
+    logLevelValue: (["debug", "info", "warn", "error"].includes(String(input.logLevel ?? "").toLowerCase())
+      ? String(input.logLevel).toLowerCase()
+      : (ConfigManager.get().logLevel ?? "warn")) as LogLevel,
     zoneCountValue: (() => {
       const parsed = parseInt(String(input.zoneCount), 10);
       if (isNaN(parsed)) return 1;
@@ -382,7 +384,7 @@ export default class SetupHandler {
     if (!action && hasManualFields) {
       try {
         return await this.handleManualConfiguration(input as ManualConfigInput);
-      } catch (err) {
+      } catch (_err) {
         // this.host.log.error("%s Failed to save configuration:", integrationName, err);
         return new uc.SetupError("OTHER");
       }
@@ -465,7 +467,7 @@ export default class SetupHandler {
       // Has manual fields - validate and persist
       try {
         return await this.handleManualConfiguration(input as ManualConfigInput);
-      } catch (err) {
+      } catch (_err) {
         // this.host.log.error("%s Failed to save configuration:", integrationName, err);
         return new uc.SetupError("OTHER");
       }
@@ -529,7 +531,7 @@ export default class SetupHandler {
       const driverJson = JSON.parse(driverJsonRaw);
       driverId = driverJson.driver_id || driverId;
       driverVersion = driverJson.version || driverVersion;
-    } catch (err) {
+    } catch (_err) {
       // this.host.log.warn(`${integrationName} Could not read driver.json metadata for backup:`, err);
     }
 
@@ -545,7 +547,7 @@ export default class SetupHandler {
         // this.host.log.info("%s Config file not present at %s, falling back to ConfigManager.get()", integrationName, cfgPath);
         configData = ConfigManager.get();
       }
-    } catch (err) {
+    } catch (_err) {
       // this.host.log.warn(`${integrationName} Failed to read config file for backup, falling back to in-memory ConfigManager:`, err);
       configData = ConfigManager.get();
     }
@@ -598,13 +600,13 @@ export default class SetupHandler {
       await this.host.onConfigSaved();
       // this.host.log.info("%s Restore payload applied successfully", integrationName);
       return new uc.SetupComplete();
-    } catch (err) {
+    } catch (_err) {
       // this.host.log.error("%s Failed to parse or apply restore data (reconfigure):", integrationName, err);
       return new uc.SetupError("OTHER");
     }
   }
 
-  private async handleDeleteConfigPayload(confirm?: boolean, reconfigureMode: boolean = false): Promise<uc.SetupAction> {
+  private async handleDeleteConfigPayload(confirm?: boolean, _reconfigureMode: boolean = false): Promise<uc.SetupAction> {
     if (!confirm) {
       return new uc.RequestUserInput("Confirm delete", [
         {
@@ -624,7 +626,7 @@ export default class SetupHandler {
       await this.host.onConfigCleared();
       // this.host.log.info("%s Configuration deleted by user%s", integrationName, reconfigureMode ? " (via reconfigure)" : "");
       return new uc.SetupComplete();
-    } catch (err) {
+    } catch (_err) {
       // this.host.log.error("%s Failed to delete configuration%s:", integrationName, reconfigureMode ? " (via reconfigure)" : "", err);
       return new uc.SetupError("OTHER");
     }
@@ -692,7 +694,7 @@ export default class SetupHandler {
         await this.host.onConfigSaved();
         // this.host.log.info("%s Auto-discovered AVR and saved configuration: %s", integrationName, JSON.stringify(discoveredAvr));
         return new uc.SetupComplete();
-      } catch (err) {
+      } catch (_err) {
         // this.host.log.error("%s Failed during auto-discovery:", integrationName, err);
         return new uc.RequestUserInput("Manual configuration", [
           {

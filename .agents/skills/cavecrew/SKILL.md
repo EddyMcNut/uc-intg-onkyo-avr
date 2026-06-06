@@ -15,15 +15,15 @@ Cavecrew = three subagent presets that emit caveman output. Same job as Anthropi
 
 ## When to use cavecrew vs alternatives
 
-| Task | Use |
-|---|---|
-| "Where is X defined / what calls Y / list uses of Z" | `cavecrew-investigator` |
-| Same but you also want suggestions/architecture commentary | `Explore` (vanilla) |
-| Surgical edit, ≤2 files, scope obvious | `cavecrew-builder` |
-| New feature / 3+ files / cross-cutting refactor | Main thread or `feature-dev:code-architect` |
-| Review diff, branch, or file for bugs | `cavecrew-reviewer` |
-| Deep code review with rationale + alternatives | `Code Reviewer` (vanilla) |
-| One-line answer you already know | Main thread, no subagent |
+| Task                                                       | Use                                         |
+| ---------------------------------------------------------- | ------------------------------------------- |
+| "Where is X defined / what calls Y / list uses of Z"       | `cavecrew-investigator`                     |
+| Same but you also want suggestions/architecture commentary | `Explore` (vanilla)                         |
+| Surgical edit, ≤2 files, scope obvious                     | `cavecrew-builder`                          |
+| New feature / 3+ files / cross-cutting refactor            | Main thread or `feature-dev:code-architect` |
+| Review diff, branch, or file for bugs                      | `cavecrew-reviewer`                         |
+| Deep code review with rationale + alternatives             | `Code Reviewer` (vanilla)                   |
+| One-line answer you already know                           | Main thread, no subagent                    |
 
 Rule of thumb: **if you'd want the subagent's output in 1/3 the tokens, pick cavecrew. If you'd want prose, pick vanilla.**
 
@@ -36,30 +36,37 @@ Subagent tool results get injected into main context verbatim. A vanilla `Explor
 What main thread can rely on per agent:
 
 **`cavecrew-investigator`**
+
 ```
 <Header>:
 - path:line — `symbol` — short note
 totals: <counts>.
 ```
+
 Or `No match.` Always file-path-first, line-number-attached, backticked symbols. Safe to grep with `path:\d+`.
 
 **`cavecrew-builder`**
+
 ```
 <path:line-range> — <change ≤10 words>.
 verified: <re-read OK | mismatch @ path:line>.
 ```
+
 Or one of: `too-big.` / `needs-confirm.` / `ambiguous.` / `regressed.` (terminal first token).
 
 **`cavecrew-reviewer`**
+
 ```
 path:line: <emoji> <severity>: <problem>. <fix>.
 totals: N🔴 N🟡 N🔵 N❓
 ```
+
 Or `No issues.` Findings sorted file → line ascending.
 
 ## Chaining patterns
 
 **Locate → fix → verify** (most common):
+
 1. `cavecrew-investigator` returns site list.
 2. Main thread picks 1-2 sites, hands paths to `cavecrew-builder`.
 3. `cavecrew-reviewer` audits the diff.

@@ -66,13 +66,7 @@ export function getTuneInMenuBrowseState(entityId: string): TuneInMenuBrowseStat
   return created;
 }
 
-export function addTuneInMenuOption(
-  entityId: string,
-  menuIndex: number,
-  title: string,
-  isBrowsable: boolean,
-  thumbnailResolver?: (state: TuneInMenuBrowseState, title: string) => string
-): void {
+export function addTuneInMenuOption(entityId: string, menuIndex: number, title: string, isBrowsable: boolean, thumbnailResolver?: (state: TuneInMenuBrowseState, title: string) => string): void {
   const state = getTuneInMenuBrowseState(entityId);
   if (!state) {
     return;
@@ -153,11 +147,7 @@ export function setTuneInMenuBrowseFrozen(entityId: string, frozen: boolean): vo
   state.browseListFrozen = frozen;
 }
 
-export function getTuneInMenuThumbnailForTitle(
-  entityId: string,
-  title: string,
-  resolver: (state: TuneInMenuBrowseState, title: string) => string
-): string {
+export function getTuneInMenuThumbnailForTitle(entityId: string, title: string, resolver: (state: TuneInMenuBrowseState, title: string) => string): string {
   const state = getTuneInMenuBrowseState(entityId);
   if (!state) {
     return "";

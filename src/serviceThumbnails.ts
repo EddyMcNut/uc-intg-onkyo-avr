@@ -137,16 +137,16 @@ export function createServiceThumbnails(config: ServiceThumbnailConfig) {
           const base64 = fileContents.toString("base64");
           const dataUri = `data:${mimeType};base64,${base64}`;
           const svgContent = extension === ".svg" ? fileContents.toString("utf8") : "";
-const pathMatch = svgContent.match(/<(path|polygon)[^>]*(?:d|points)=(['"])([\s\S]*?)\2[^>]*>/i);
-  let logoMarkup = null;
-  if (pathMatch) {
-    const tag = pathMatch[1].toLowerCase();
-    const rawData = pathMatch[3];
-    const d = tag === "polygon" ? polygonPointsToPath(rawData) : rawData;
-    if (d) {
-      logoMarkup = `<g transform="${config.logoTransform}"><path ${config.logoPathAttrs} d="${escapeXml(d)}"/></g>`;
-    }
-  }
+          const pathMatch = svgContent.match(/<(path|polygon)[^>]*(?:d|points)=(['"])([\s\S]*?)\2[^>]*>/i);
+          let logoMarkup = null;
+          if (pathMatch) {
+            const tag = pathMatch[1].toLowerCase();
+            const rawData = pathMatch[3];
+            const d = tag === "polygon" ? polygonPointsToPath(rawData) : rawData;
+            if (d) {
+              logoMarkup = `<g transform="${config.logoTransform}"><path ${config.logoPathAttrs} d="${escapeXml(d)}"/></g>`;
+            }
+          }
 
           cachedAsset = { dataUri, signature, inlineSafe: dataUri.length <= MAX_INLINE_BACKGROUND_DATA_LENGTH, logoMarkup };
           return cachedAsset;

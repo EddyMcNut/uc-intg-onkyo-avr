@@ -9,5 +9,3 @@
 - **If your AVR does not have an endpoint for Album Art, set the value to `na` to prevent errors.**
 
   ![](../screenshots/albumArtNo.png)
-
-_note: after installing a new version of the integration or after a reboot of the remote, it might be needed to close screen on the remote and enter the already active activity again to get the MediaWidget to work, hit next to go to the next song and trigger refresh of the album art_

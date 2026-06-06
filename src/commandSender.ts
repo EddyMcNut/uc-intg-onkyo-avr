@@ -5,7 +5,19 @@ import { avrStateManager } from "./avrState.js";
 import { ICommandReceiver } from "./types.js";
 import log from "./loggers.js";
 import { delay, toHex, ensureEiscpConnected } from "./utils.js";
-import { browseMedia, isMediaBrowsingAvailable, isTidalMainMenuRequest, isTuneInMenuRootRequest, resolveTidalMenuOption, resolveTuneInMenuOption, resolveTuneInPreset, TIDAL_BACK_ID, TUNEIN_MENU_BACK_ID, TUNEIN_MENU_ROOT_TYPE, TIDAL_ROOT_TYPE } from "./mediaBrowser.js";
+import {
+  browseMedia,
+  isMediaBrowsingAvailable,
+  isTidalMainMenuRequest,
+  isTuneInMenuRootRequest,
+  resolveTidalMenuOption,
+  resolveTuneInMenuOption,
+  resolveTuneInPreset,
+  TIDAL_BACK_ID,
+  TUNEIN_MENU_BACK_ID,
+  TUNEIN_MENU_ROOT_TYPE,
+  TIDAL_ROOT_TYPE
+} from "./mediaBrowser.js";
 import { consumeTidalListModeActive, consumeTraceNextTidalSelectionAfterMainMenu, listTidalMenuOptions, getTidalBrowseState } from "./tidalBrowserStore.js";
 import { consumeTuneInListModeActive, setTuneInMenuBrowseFrozen, setTuneInMenuNowPlayingStation } from "./tuneInMenuStore.js";
 

@@ -8,11 +8,11 @@ Tells the main thread when to spawn a caveman-style subagent versus the vanilla 
 
 Three subagents:
 
-| Subagent | Job | Use when |
-|----------|-----|----------|
-| `cavecrew-investigator` | Locate code (read-only) | "Where is X defined / what calls Y / list uses of Z" |
-| `cavecrew-builder` | Surgical edit, 1-2 files | Scope is obvious, ≤2 files. Refuses 3+ file scope. |
-| `cavecrew-reviewer` | Diff/file review | One-line findings with severity emoji |
+| Subagent                | Job                      | Use when                                             |
+| ----------------------- | ------------------------ | ---------------------------------------------------- |
+| `cavecrew-investigator` | Locate code (read-only)  | "Where is X defined / what calls Y / list uses of Z" |
+| `cavecrew-builder`      | Surgical edit, 1-2 files | Scope is obvious, ≤2 files. Refuses 3+ file scope.   |
+| `cavecrew-reviewer`     | Diff/file review         | One-line findings with severity emoji                |
 
 Use vanilla `Explore` or `Code Reviewer` when you want prose, architecture commentary, or rationale. Use main thread directly for one-line answers and 3+ file refactors.
 

@@ -51,8 +51,6 @@ Users report it also to work with:
 - Pioneer VSA-LX805
 - Integra (model unknown)
 
-[Architecture and Operation](./docs/architecture.md)
-
 ## Installation and usage
 
 [Installation](./docs/installation.md)
@@ -116,6 +114,10 @@ Example activities:
 
 [Collect logs](./docs/collect-logs.md)
 
-## Known issues and solutions
+## Other
 
 [Known issues and solutions](./docs/known-issues.md)
+
+[Architecture and Operation](./docs/architecture.md)
+
+[Log level](./docs/loglevel.md)
