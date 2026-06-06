@@ -95,11 +95,13 @@ export const AVR_DEFAULTS = {
   createSensors: true,
   netMenuDelay: 500,
   tuneinPresetPosition: 1,
+  tuneinMenuStyle: "mypresets",
   port: 60128
 } as const;
 
 export type EntityNameStyle = "long" | "short";
 export type VolumeDisplay = "absolute" | "relative";
+export type TuneInMenuStyle = "mypresets" | "full";
 
 export interface AvrConfig {
   model: string;
@@ -115,6 +117,7 @@ export interface AvrConfig {
   createSensors?: boolean; // true = create sensor entities for this AVR
   netMenuDelay?: number; // delay in ms for NET menu to load (default 2500)
   tuneinPresetPosition?: number; // position of "My Presets" in TuneIn menu (1-9, default 1)
+  tuneinMenuStyle?: TuneInMenuStyle; // choose TuneIn navigation mode: mypresets or full
   // undefined/[] = all options, non-empty = exact options, null = don't create entity.
   listeningModeOptions?: string[] | null;
   // undefined/[] = all inputs, non-empty = exact options, null = don't create entity.
@@ -152,6 +155,7 @@ export interface NormalizedAvrConfig {
   createSensors: boolean;
   netMenuDelay: number;
   tuneinPresetPosition: number;
+  tuneinMenuStyle: TuneInMenuStyle;
   listeningModeOptions: string[] | null | undefined;
   inputSelectorOptions: string[] | null | undefined;
 }
@@ -190,6 +194,8 @@ export function normalizeAvrConfig(raw: AvrConfig): NormalizedAvrConfig {
     return v;
   })();
 
+  const tuneinMenuStyle: TuneInMenuStyle = String(raw.tuneinMenuStyle ?? AVR_DEFAULTS.tuneinMenuStyle).toLowerCase() === "full" ? "full" : "mypresets";
+
   const port = (() => {
     const p = typeof raw.port === "number" ? raw.port : parseInt(String(raw.port ?? ""), 10);
     return isNaN(p) || p < 1 || p > 65535 ? AVR_DEFAULTS.port : p;
@@ -209,6 +215,7 @@ export function normalizeAvrConfig(raw: AvrConfig): NormalizedAvrConfig {
     createSensors,
     netMenuDelay,
     tuneinPresetPosition,
+    tuneinMenuStyle,
     listeningModeOptions: Array.isArray(raw.listeningModeOptions) ? raw.listeningModeOptions.map((s) => s.trim()) : raw.listeningModeOptions,
     inputSelectorOptions: raw.inputSelectorOptions
   };

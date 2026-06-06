@@ -32,6 +32,7 @@ interface ManualConfigInput {
   createSensors?: unknown;
   netMenuDelay?: unknown;
   tuneinPresetPosition?: unknown;
+  tuneinMenuStyle?: unknown;
   entityNameStyle?: unknown;
 }
 
@@ -51,6 +52,7 @@ interface ManualConfigFormValues {
   createSensorsValue: boolean;
   netMenuDelayValue: number;
   tuneinPresetPositionValue: number;
+  tuneinMenuStyleValue: "mypresets" | "full";
   errorMessage?: string;
 }
 
@@ -88,6 +90,7 @@ function parseManualInput(input: ManualConfigInput): ManualConfigFormValues {
       if (isNaN(parsed)) return AVR_DEFAULTS.tuneinPresetPosition;
       return parsed >= 1 && parsed <= 9 ? parsed : AVR_DEFAULTS.tuneinPresetPosition;
     })(),
+    tuneinMenuStyleValue: String(input.tuneinMenuStyle ?? AVR_DEFAULTS.tuneinMenuStyle).toLowerCase() === "full" ? "full" : "mypresets",
     zoneCountValue: (() => {
       const parsed = parseInt(String(input.zoneCount), 10);
       if (isNaN(parsed)) return 1;
@@ -122,6 +125,20 @@ function buildManualConfigForm(values: ManualConfigFormValues): uc.RequestUserIn
       label: { en: "TuneIn 'My Presets' menu position (1-9). Default `1`" },
       field: { number: { value: values.tuneinPresetPositionValue } },
       description: { en: "Position of 'My Presets' in your AVR's TuneIn menu (1=first, 2=second, etc.)" }
+    },
+    {
+      id: "tuneinMenuStyle",
+      label: { en: "TuneIn menu mode" },
+      field: {
+        dropdown: {
+          value: String(values.tuneinMenuStyleValue),
+          items: [
+            { id: "mypresets", label: { en: "My Presets (default)" } },
+            { id: "full", label: { en: "Full menu" } }
+          ]
+        }
+      },
+      description: { en: "Choose how TuneIn navigation is handled when selecting presets." }
     },
     {
       id: "volumeScale",
@@ -307,7 +324,7 @@ export default class SetupHandler {
     const restoreData = typeof input.restore_data === "string" && input.restore_data.trim() ? input.restore_data : input.backup_data;
 
     if (restoreModeSelected) {
-      this.host.log.info("%s Detected manager-driven restore request%s", integrationName, restoreData ? " with payload" : " awaiting payload");
+      // this.host.log.info("%s Detected manager-driven restore request%s", integrationName, restoreData ? " with payload" : " awaiting payload");
     }
 
     if (restoreRequested) {
@@ -338,6 +355,7 @@ export default class SetupHandler {
       input.createSensors ||
       input.netMenuDelay ||
       input.tuneinPresetPosition ||
+      input.tuneinMenuStyle ||
       input.entityNameStyle
     );
 
@@ -345,7 +363,7 @@ export default class SetupHandler {
       try {
         return await this.handleManualConfiguration(input as ManualConfigInput);
       } catch (err) {
-        this.host.log.error("%s Failed to save configuration:", integrationName, err);
+        // this.host.log.error("%s Failed to save configuration:", integrationName, err);
         return new uc.SetupError("OTHER");
       }
     }
@@ -415,6 +433,7 @@ export default class SetupHandler {
         input.createSensors ||
         input.netMenuDelay ||
         input.tuneinPresetPosition ||
+        input.tuneinMenuStyle ||
         input.entityNameStyle
       );
 
@@ -426,7 +445,7 @@ export default class SetupHandler {
       try {
         return await this.handleManualConfiguration(input as ManualConfigInput);
       } catch (err) {
-        this.host.log.error("%s Failed to save configuration:", integrationName, err);
+        // this.host.log.error("%s Failed to save configuration:", integrationName, err);
         return new uc.SetupError("OTHER");
       }
     }
@@ -452,7 +471,8 @@ export default class SetupHandler {
       zoneCountValue: currentAvr && cfg.avrs ? cfg.avrs.filter((a) => a.model === currentAvr.model && a.ip === currentAvr.ip).length : 1,
       createSensorsValue: currentAvr?.createSensors ?? AVR_DEFAULTS.createSensors,
       netMenuDelayValue: currentAvr?.netMenuDelay ?? AVR_DEFAULTS.netMenuDelay,
-      tuneinPresetPositionValue: currentAvr?.tuneinPresetPosition ?? AVR_DEFAULTS.tuneinPresetPosition
+      tuneinPresetPositionValue: currentAvr?.tuneinPresetPosition ?? AVR_DEFAULTS.tuneinPresetPosition,
+      tuneinMenuStyleValue: currentAvr?.tuneinMenuStyle ?? AVR_DEFAULTS.tuneinMenuStyle
     });
   }
 
@@ -488,7 +508,7 @@ export default class SetupHandler {
       driverId = driverJson.driver_id || driverId;
       driverVersion = driverJson.version || driverVersion;
     } catch (err) {
-      this.host.log.warn(`${integrationName} Could not read driver.json metadata for backup:`, err);
+      // this.host.log.warn(`${integrationName} Could not read driver.json metadata for backup:`, err);
     }
 
     let configData: any = {};
@@ -500,11 +520,11 @@ export default class SetupHandler {
         const rawCfg = fs2.readFileSync(cfgPath, "utf-8");
         configData = JSON.parse(rawCfg);
       } else {
-        this.host.log.info("%s Config file not present at %s, falling back to ConfigManager.get()", integrationName, cfgPath);
+        // this.host.log.info("%s Config file not present at %s, falling back to ConfigManager.get()", integrationName, cfgPath);
         configData = ConfigManager.get();
       }
     } catch (err) {
-      this.host.log.warn(`${integrationName} Failed to read config file for backup, falling back to in-memory ConfigManager:`, err);
+      // this.host.log.warn(`${integrationName} Failed to read config file for backup, falling back to in-memory ConfigManager:`, err);
       configData = ConfigManager.get();
     }
 
@@ -537,7 +557,7 @@ export default class SetupHandler {
 
       const validation = ConfigManager.validateConfigPayload(newConfigObj);
       if (validation.errors && validation.errors.length > 0) {
-        this.host.log.warn("%s Restore payload validation failed with %d error(s)", integrationName, validation.errors.length);
+        // this.host.log.warn("%s Restore payload validation failed with %d error(s)", integrationName, validation.errors.length);
         return new uc.RequestUserInput("Restore data", [
           {
             id: "info",
@@ -554,10 +574,10 @@ export default class SetupHandler {
 
       ConfigManager.save(validation.normalized as Partial<OnkyoConfig>);
       await this.host.onConfigSaved();
-      this.host.log.info("%s Restore payload applied successfully", integrationName);
+      // this.host.log.info("%s Restore payload applied successfully", integrationName);
       return new uc.SetupComplete();
     } catch (err) {
-      this.host.log.error("%s Failed to parse or apply restore data (reconfigure):", integrationName, err);
+      // this.host.log.error("%s Failed to parse or apply restore data (reconfigure):", integrationName, err);
       return new uc.SetupError("OTHER");
     }
   }
@@ -580,10 +600,10 @@ export default class SetupHandler {
 
     try {
       await this.host.onConfigCleared();
-      this.host.log.info("%s Configuration deleted by user%s", integrationName, reconfigureMode ? " (via reconfigure)" : "");
+      // this.host.log.info("%s Configuration deleted by user%s", integrationName, reconfigureMode ? " (via reconfigure)" : "");
       return new uc.SetupComplete();
     } catch (err) {
-      this.host.log.error("%s Failed to delete configuration%s:", integrationName, reconfigureMode ? " (via reconfigure)" : "", err);
+      // this.host.log.error("%s Failed to delete configuration%s:", integrationName, reconfigureMode ? " (via reconfigure)" : "", err);
       return new uc.SetupError("OTHER");
     }
   }
@@ -629,7 +649,8 @@ export default class SetupHandler {
           port: Number(found.port) || AVR_DEFAULTS.port,
           zone: "main",
           volumeDisplay: cfg.volumeDisplayValue,
-          entityNameStyle: cfg.entityNameStyleValue
+          entityNameStyle: cfg.entityNameStyleValue,
+          tuneinMenuStyle: cfg.tuneinMenuStyleValue
         };
 
         // Use parseSelectOptions which handles the 'none' sentinel (-> null = don't create entity)
@@ -645,10 +666,10 @@ export default class SetupHandler {
         // Save discovered AVR
         ConfigManager.addAvr(discoveredAvr);
         await this.host.onConfigSaved();
-        this.host.log.info("%s Auto-discovered AVR and saved configuration: %s", integrationName, JSON.stringify(discoveredAvr));
+        // this.host.log.info("%s Auto-discovered AVR and saved configuration: %s", integrationName, JSON.stringify(discoveredAvr));
         return new uc.SetupComplete();
       } catch (err) {
-        this.host.log.error("%s Failed during auto-discovery:", integrationName, err);
+        // this.host.log.error("%s Failed during auto-discovery:", integrationName, err);
         return new uc.RequestUserInput("Manual configuration", [
           {
             id: "info",
@@ -684,7 +705,8 @@ export default class SetupHandler {
       entityNameStyle: cfg.entityNameStyleValue,
       createSensors: cfg.createSensorsValue,
       netMenuDelay: cfg.netMenuDelayValue,
-      tuneinPresetPosition: cfg.tuneinPresetPositionValue
+      tuneinPresetPosition: cfg.tuneinPresetPositionValue,
+      tuneinMenuStyle: cfg.tuneinMenuStyleValue
     };
 
     const zones: AvrZone[] = ["main"];
@@ -709,18 +731,19 @@ export default class SetupHandler {
     }
 
     for (const avrCfg of normalizedAvrs) {
-      this.host.log.info(
-        "%s Adding AVR config for zone %s with volumeScale: %d, volumeDisplay: %s, adjustVolumeDispl: %s, entityNameStyle: %s, createSensors: %s, netMenuDelay: %d, tuneinPresetPosition: %d",
-        integrationName,
-        avrCfg.zone,
-        avrCfg.volumeScale,
-        avrCfg.volumeDisplay,
-        avrCfg.adjustVolumeDispl,
-        avrCfg.entityNameStyle,
-        avrCfg.createSensors,
-        avrCfg.netMenuDelay,
-        avrCfg.tuneinPresetPosition
-      );
+      // this.host.log.info(
+      //   "%s Adding AVR config for zone %s with volumeScale: %d, volumeDisplay: %s, adjustVolumeDispl: %s, entityNameStyle: %s, createSensors: %s, netMenuDelay: %d, tuneinPresetPosition: %d, tuneinMenuStyle: %s",
+      //   integrationName,
+      //   avrCfg.zone,
+      //   avrCfg.volumeScale,
+      //   avrCfg.volumeDisplay,
+      //   avrCfg.adjustVolumeDispl,
+      //   avrCfg.entityNameStyle,
+      //   avrCfg.createSensors,
+      //   avrCfg.netMenuDelay,
+      //   avrCfg.tuneinPresetPosition,
+      //   avrCfg.tuneinMenuStyle
+      // );
       ConfigManager.addAvr(avrCfg);
     }
 

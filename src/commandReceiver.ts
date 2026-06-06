@@ -156,7 +156,7 @@ export class CommandReceiver {
         await this.eiscpInstance.command({ zone, command: "audio-information", args: "query" });
         await this.eiscpInstance.command({ zone, command: "video-information", args: "query" });
       } catch (err) {
-        log.warn("%s Failed to re-query AV info after transient format: %s", integrationName, err);
+        // log.warn("%s Failed to re-query AV info after transient format: %s", integrationName, err);
       }
     }, 4000);
   }
@@ -169,7 +169,7 @@ export class CommandReceiver {
     }
 
     if (ZoneAgnosticUpdateProcessor.isZoneAgnosticCommand(avrUpdates.command)) {
-      log.warn("%s [%s] command '%s' is declared zone-agnostic but has no dispatch handler", integrationName, entityId, avrUpdates.command);
+      // log.warn("%s [%s] command '%s' is declared zone-agnostic but has no dispatch handler", integrationName, entityId, avrUpdates.command);
       return true;
     }
 
@@ -182,7 +182,7 @@ export class CommandReceiver {
 
   setupEiscpListener() {
     this.eiscpInstance.on("error", (err: Error) => {
-      log.error("%s eiscp error: %s", integrationName, err);
+      // log.error("%s eiscp error: %s", integrationName, err);
     });
     this.eiscpInstance.on("data", async (avrUpdates: AvrUpdateEvent) => {
       const eventZone = avrUpdates.zone || "main";

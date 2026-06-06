@@ -4,6 +4,7 @@ import { avrStateManager } from "./avrState.js";
 import log from "./loggers.js";
 import { looksLikeTuneInDirectory, normalizeTuneInLabel, extractTuneInStationKey, parseTuneInXmlItems } from "./tuneInFilters.js";
 import { addTuneInPreset, getTuneInBrowseState, listTuneInPresets, type TuneInPreset, setTuneInBrowseContextState } from "./tuneInBrowserStore.js";
+import { addTuneInMenuOption, listTuneInMenuOptions, getTuneInMenuBrowseState, type TuneInMenuOption } from "./tuneInMenuStore.js";
 import { addTidalMenuOption, listTidalMenuOptions, getTidalThumbnailForTitle, getTidalBrowseState, type TidalMenuOption } from "./tidalBrowserStore.js";
 import { createServiceThumbnails } from "./serviceThumbnails.js";
 
@@ -39,6 +40,8 @@ const NOW_PLAYING_LABEL = "▶ Now Playing";
 
 export const TUNEIN_ROOT_ID = "tunein:root";
 export const TUNEIN_ROOT_TYPE = "tunein://presets";
+export const TUNEIN_MENU_ROOT_ID = "tunein:menu-root";
+export const TUNEIN_MENU_ROOT_TYPE = "tunein://menu";
 export const TIDAL_ROOT_ID = "tidal:root";
 export const TIDAL_ROOT_TYPE = "tidal://menu";
 export const TIDAL_MAIN_MENU_ID = "tidal:main-menu";
@@ -69,6 +72,51 @@ export function ingestTuneInListEntry(entityId: string, entry: string): void {
   }
 
   addTuneInPreset(entityId, title, extractTuneInStationKey(rawTitle), rawTitle, getOrCreateTuneInThumbnail);
+}
+
+export function ingestTuneInMenuListEntry(entityId: string, entry: string): void {
+  const match = entry.match(/^U(\d+)-(.*)$/);
+  if (!match) {
+    return;
+  }
+
+  const parsedIndex = parseInt(match[1], 10);
+  if (isNaN(parsedIndex) || parsedIndex < 0) {
+    return;
+  }
+
+  const rawTitle = match[2].trim().replace(/\s+%s$/i, "");
+  const title = normalizeTuneInLabel(rawTitle);
+  if (!title) {
+    return;
+  }
+
+  const cursorOffset = getTuneInMenuBrowseState(entityId)?.nlsCursorOffset ?? 0;
+  const windowStart = Math.max(0, cursorOffset - 9);
+  const absoluteMenuIndex = windowStart + parsedIndex + 1;
+
+  const isStationLike = title.includes("|") || /\(.+\)/.test(title);
+  const isBrowsable = looksLikeTuneInDirectory(title) || !isStationLike;
+  addTuneInMenuOption(entityId, absoluteMenuIndex, title, isBrowsable, getOrCreateTuneInThumbnail);
+}
+
+export function ingestTuneInMenuXmlEntries(entityId: string, xmlPayload: string): void {
+  if (!xmlPayload) {
+    return;
+  }
+
+  const offsetMatch = xmlPayload.match(/<items\b[^>]*\boffset="(\d+)"/i);
+  const xmlOffset = offsetMatch ? parseInt(offsetMatch[1], 10) : 0;
+  const xmlItems = parseTuneInXmlItems(xmlPayload);
+  for (let i = 0; i < xmlItems.length; i++) {
+    const item = xmlItems[i];
+    if (!item.title) continue;
+
+    const menuIndex = xmlOffset + i + 1;
+    const isStationLike = item.title.includes("|") || /\(.+\)/.test(item.title);
+    const isBrowsable = looksLikeTuneInDirectory(item.title, item.iconId) || !isStationLike;
+    addTuneInMenuOption(entityId, menuIndex, item.title, isBrowsable, getOrCreateTuneInThumbnail);
+  }
 }
 
 export function ingestTuneInXmlEntries(entityId: string, xmlPayload: string): void {
@@ -311,6 +359,9 @@ export async function browseMedia(entityId: string, options: uc.BrowseOptions): 
   if (isMediaBrowsingAvailable(entityId, subSource)) {
     switch (subSource) {
       case "tunein":
+        if (options.media_type === TUNEIN_MENU_ROOT_TYPE) {
+          return await browseTuneInMenuMedia(entityId, withPaging(options));
+        }
         return await browseTuneInMedia(entityId, withPaging(options));
       case "tidal":
         return await browseTidalMedia(entityId, withPaging(options));
@@ -337,6 +388,108 @@ export async function browseTuneInMedia(entityId: string, options: uc.BrowseOpti
   }
 
   return new uc.BrowseResult(createTuneInPresetItem(preset, ""), uc.Pagination.fromPaging(options.paging));
+}
+
+function getTuneInMenuRootItemCount(menuCount: number, showMainMenuShortcut: boolean): number {
+  return menuCount + (showMainMenuShortcut ? 1 : 0);
+}
+
+function createTuneInMenuItem(option: TuneInMenuOption, nowPlayingStation: string): uc.BrowseMediaItem {
+  const lower = nowPlayingStation.toLowerCase();
+  const isNowPlaying =
+    lower.length > 0 &&
+    option.title.toLowerCase() === lower;
+
+  return new uc.BrowseMediaItem(option.mediaId, option.title, {
+    can_browse: option.isBrowsable,
+    can_play: !option.isBrowsable,
+    media_class: option.isBrowsable ? uc.KnownMediaClass.Directory : uc.KnownMediaClass.Radio,
+    media_type: TUNEIN_MENU_ROOT_TYPE,
+    thumbnail: option.thumbnail || createTuneInBackdrop(),
+    subtitle: isNowPlaying ? NOW_PLAYING_LABEL : undefined
+  });
+}
+
+function createTuneInMenuRootItem(entityId: string, paging: uc.Paging): uc.BrowseMediaItem {
+  const options = listTuneInMenuOptions(entityId);
+  const nowPlayingStation = getTuneInMenuBrowseState(entityId)?.nowPlayingStation ?? "";
+  const showMainMenuShortcut = getTuneInMenuBrowseState(entityId)?.showMainMenuShortcut ?? false;
+  const rootItems: TuneInMenuOption[] = showMainMenuShortcut
+    ? [{ menuIndex: 0, title: "TuneIn Main Menu", mediaId: TUNEIN_MENU_ROOT_ID, thumbnail: createTuneInBackdrop(), isBrowsable: true }, ...options]
+    : options;
+
+  const items = rootItems.slice(paging.offset, paging.offset + paging.limit).map((option) =>
+    option.menuIndex === 0
+      ? new uc.BrowseMediaItem(option.mediaId, option.title, {
+          can_browse: true,
+          media_class: uc.KnownMediaClass.Directory,
+          media_type: TUNEIN_MENU_ROOT_TYPE,
+          thumbnail: option.thumbnail || createTuneInBackdrop()
+        })
+      : createTuneInMenuItem(option, nowPlayingStation)
+  );
+
+  return new uc.BrowseMediaItem(TUNEIN_MENU_ROOT_ID, "TuneIn", {
+    can_browse: true,
+    media_class: uc.KnownMediaClass.Directory,
+    media_type: TUNEIN_MENU_ROOT_TYPE,
+    thumbnail: createTuneInBackdrop(),
+    items
+  });
+}
+
+export async function browseTuneInMenuMedia(entityId: string, options: uc.BrowseOptions): Promise<uc.StatusCodes | uc.BrowseResult> {
+  const menuOptions = listTuneInMenuOptions(entityId);
+  const showMainMenuShortcut = getTuneInMenuBrowseState(entityId)?.showMainMenuShortcut ?? false;
+  const totalCount = getTuneInMenuRootItemCount(menuOptions.length, showMainMenuShortcut);
+
+  if (!options.media_id || options.media_id === TUNEIN_MENU_ROOT_ID) {
+    // log.info("%s [%s] browsable TuneIn full menu options: %d", integrationName, entityId, menuOptions.length);
+    return uc.BrowseResult.fromPaging(createTuneInMenuRootItem(entityId, options.paging), options.paging, totalCount);
+  }
+
+  if (options.media_id === TUNEIN_MENU_ROOT_ID) {
+    return uc.BrowseResult.fromPaging(createTuneInMenuRootItem(entityId, options.paging), options.paging, totalCount);
+  }
+
+  const selection = resolveTuneInMenuOption(entityId, options.media_id, options.media_type);
+  if (!selection) {
+    return uc.StatusCodes.NotFound;
+  }
+
+  return uc.BrowseResult.fromPaging(createTuneInMenuRootItem(entityId, options.paging), options.paging, totalCount);
+}
+
+export function isTuneInMenuRootRequest(mediaId?: string, mediaType?: string): boolean {
+  if (!mediaId) {
+    return false;
+  }
+
+  if (mediaType !== undefined && mediaType !== TUNEIN_MENU_ROOT_TYPE) {
+    return false;
+  }
+
+  return mediaId === TUNEIN_MENU_ROOT_ID;
+}
+
+export function resolveTuneInMenuOption(entityId: string, mediaId?: string, mediaType?: string): TuneInMenuOption | undefined {
+  if (!mediaId) return undefined;
+  if (mediaType !== TUNEIN_MENU_ROOT_TYPE) return undefined;
+
+  const match = mediaId.match(/^tunein:menu:(\d+):(.+)$/);
+  if (!match) return undefined;
+
+  const menuIndex = parseInt(match[1], 10);
+  if (isNaN(menuIndex) || menuIndex < 1) return undefined;
+
+  const title = decodeURIComponent(match[2]);
+  const option = listTuneInMenuOptions(entityId).find((item) => item.menuIndex === menuIndex);
+  return {
+    menuIndex,
+    title,
+    mediaId,
+    isBrowsable: option?.isBrowsable ?? looksLikeTuneInDirectory(title)
+  };
 }
 
 export async function browseTidalMedia(entityId: string, options: uc.BrowseOptions): Promise<uc.StatusCodes | uc.BrowseResult> {

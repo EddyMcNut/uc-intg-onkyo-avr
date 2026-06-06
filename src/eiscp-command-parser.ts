@@ -2,6 +2,7 @@ import { eiscpCommands } from "./eiscp-commands.js";
 import { eiscpMappings } from "./eiscp-mappings.js";
 import { NETWORK_SERVICES, NO_TITLE } from "./constants.js";
 import type { TidalBrowseState } from "./tidalBrowserStore.js";
+import type { TuneInMenuBrowseState } from "./tuneInMenuStore.js";
 
 const COMMANDS = eiscpCommands.commands;
 const VALUE_MAPPINGS = eiscpMappings.value_mappings;
@@ -18,6 +19,10 @@ export interface AvrStateReader {
 
 export interface TidalStoreApi {
   getBrowseState(entityId: string): TidalBrowseState | null;
+}
+
+export interface TuneInMenuStoreApi {
+  getBrowseState(entityId: string): TuneInMenuBrowseState | null;
 }
 
 export interface Metadata {
@@ -43,7 +48,8 @@ export class IscpCommandParser {
   constructor(
     private readonly getEntityId: (zone: string) => string,
     private readonly stateReader: AvrStateReader,
-    private readonly tidalStore: TidalStoreApi
+    private readonly tidalStore: TidalStoreApi,
+    private readonly tuneInMenuStore: TuneInMenuStoreApi
   ) {
     this.commandHandlers = {
       NTM: (value, _cmd, result) => this.handleNTM(value, result),
@@ -366,6 +372,15 @@ export class IscpCommandParser {
             if (!tidalState.harvestMode) tidalState.nlsCursorOffset = cursorOffset;
             tidalState.totalListItemCount = totalCount;
             if (layerNumber > 0) tidalState.nlsLayerNumber = layerNumber;
+          }
+        }
+
+        if (this.stateReader.getSubSource(entityId) === "tunein") {
+          const tuneInMenuState = this.tuneInMenuStore.getBrowseState(entityId);
+          if (tuneInMenuState) {
+            if (!tuneInMenuState.harvestMode) tuneInMenuState.nlsCursorOffset = cursorOffset;
+            tuneInMenuState.totalListItemCount = totalCount;
+            if (layerNumber > 0) tuneInMenuState.nlsLayerNumber = layerNumber;
           }
         }
       }

@@ -63,7 +63,7 @@ export default class OnkyoDriver {
       const driverJson = JSON.parse(driverJsonRaw);
       this.driverVersion = driverJson.version || "unknown";
     } catch (err) {
-      log.warn("%s Could not read driver version in constructor:", integrationName, err);
+      // log.warn("%s Could not read driver version in constructor:", integrationName, err);
     }
 
     // Ensure ConfigManager uses the Integration API config dir so the Integration Manager can back up and restore the same files
@@ -71,7 +71,7 @@ export default class OnkyoDriver {
       const configDir = this.driver.getConfigDirPath();
       setConfigDir(configDir);
     } catch (err) {
-      log.warn("%s Could not determine driver config directory, falling back to environment or CWD", integrationName, err);
+      // log.warn("%s Could not determine driver config directory, falling back to environment or CWD", integrationName, err);
     }
 
     // Now load config from the correct path and continue setup
@@ -229,7 +229,7 @@ export default class OnkyoDriver {
         this.driverVersion = driverJson.version || "unknown";
         // log.info(`${integrationName} Driver version: ${this.driverVersion}`);
       } catch (err) {
-        log.warn(`${integrationName} Could not read driver version from driver.json:`, err);
+        // log.warn(`${integrationName} Could not read driver version from driver.json:`, err);
       }
       await this.handleConnect();
     });
@@ -253,7 +253,7 @@ export default class OnkyoDriver {
 
   private async queryAvrState(avrEntry: string, eiscp: EiscpDriver, context: string): Promise<void> {
     if (!eiscp.connected) {
-      log.warn(`${integrationName} [${avrEntry}] Cannot query AVR state (${context}), not connected`);
+      // log.warn(`${integrationName} [${avrEntry}] Cannot query AVR state (${context}), not connected`);
       return;
     }
 
@@ -361,7 +361,7 @@ export default class OnkyoDriver {
     // Get the AVR instance for this entity
     const instance = this.avrInstances.get(entity.id);
     if (!instance) {
-      log.error("%s [%s] No AVR instance found for entity", integrationName, entity.id);
+      // log.error("%s [%s] No AVR instance found for entity", integrationName, entity.id);
       return uc.StatusCodes.NotFound;
     }
     return instance.commandSender.sharedCmdHandler(entity, cmdId, params);

@@ -42,6 +42,7 @@ export class ConfigManager {
       createSensors: avr.createSensors ?? AVR_DEFAULTS.createSensors,
       netMenuDelay: avr.netMenuDelay ?? AVR_DEFAULTS.netMenuDelay,
       tuneinPresetPosition: avr.tuneinPresetPosition ?? AVR_DEFAULTS.tuneinPresetPosition,
+      tuneinMenuStyle: avr.tuneinMenuStyle ?? AVR_DEFAULTS.tuneinMenuStyle,
       listeningModeOptions: avr.listeningModeOptions,
       inputSelectorOptions: avr.inputSelectorOptions
     };
@@ -106,7 +107,7 @@ export class ConfigManager {
         }
       }
     } catch (err) {
-      log.error(`${integrationName} Failed to load config:`, err);
+      // log.error(`${integrationName} Failed to load config:`, err);
       this.config = {};
     }
     return this.config;
@@ -117,7 +118,7 @@ export class ConfigManager {
     try {
       fs.writeFileSync(CONFIG_PATH, JSON.stringify(this.config, null, 2), "utf-8");
     } catch (err) {
-      log.error(`${integrationName} Failed to save config:`, err);
+      // log.error(`${integrationName} Failed to save config:`, err);
     }
   }
 
@@ -153,7 +154,7 @@ export class ConfigManager {
       fs.writeFileSync(CONFIG_PATH, JSON.stringify(this.config, null, 2), "utf-8");
       // log.info(`${integrationName} Cleared configuration and persisted empty config file`);
     } catch (err) {
-      log.error(`${integrationName} Failed to clear config:`, err);
+      // log.error(`${integrationName} Failed to clear config:`, err);
     }
   }
 
@@ -275,6 +276,14 @@ export class ConfigManager {
       }
     }
 
+    // tuneinMenuStyle
+    if (avr.tuneinMenuStyle !== undefined) {
+      const style = String(avr.tuneinMenuStyle).toLowerCase();
+      if (style !== "mypresets" && style !== "full") {
+        errors.push('tuneinMenuStyle must be "mypresets" or "full"');
+      }
+    }
+
     // Validate a select-options field (listeningModeOptions / inputSelectorOptions)
     const validateSelectOptions = (raw: unknown, fieldName: string): string[] | null | undefined => {
       if (raw === undefined) return undefined;
@@ -319,6 +328,7 @@ export class ConfigManager {
       createSensors: parseBoolean(avr.createSensors, AVR_DEFAULTS.createSensors),
       netMenuDelay: typeof avr.netMenuDelay === "string" ? parseInt(avr.netMenuDelay, 10) : avr.netMenuDelay,
       tuneinPresetPosition: typeof avr.tuneinPresetPosition === "string" ? parseInt(avr.tuneinPresetPosition, 10) : avr.tuneinPresetPosition,
+      tuneinMenuStyle: String(avr.tuneinMenuStyle ?? AVR_DEFAULTS.tuneinMenuStyle).toLowerCase() === "full" ? "full" : "mypresets",
       listeningModeOptions: lmoParsed,
       inputSelectorOptions: isoParsed
     });

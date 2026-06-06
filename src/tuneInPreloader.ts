@@ -57,7 +57,7 @@ export class TuneInPreloader {
         // log.info("%s [%s] harvested %d TuneIn preset(s) from NLAL", integrationName, entityId, lastCount);
       }
     } catch (err) {
-      log.warn("%s [%s] failed to preload TuneIn My Presets: %s", integrationName, entityId, err);
+      // log.warn("%s [%s] failed to preload TuneIn My Presets: %s", integrationName, entityId, err);
     } finally {
       this.tuneInPreloadInFlight.delete(physicalAvrId);
     }

@@ -1,11 +1,12 @@
 import * as uc from "@unfoldedcircle/integration-api";
-import { OnkyoConfig } from "./configManager.js";
+import { ConfigManager, OnkyoConfig, buildEntityId } from "./configManager.js";
 import { EiscpDriver } from "./eiscp.js";
 import log from "./loggers.js";
 import { NETWORK_SERVICES, SONG_INFO } from "./constants.js";
-import { hasTuneInPresets, ingestTidalListEntry, ingestTidalXmlEntries, ingestTuneInListEntry, ingestTuneInXmlEntries, setTuneInBrowseContext } from "./mediaBrowser.js";
+import { hasTuneInPresets, ingestTidalListEntry, ingestTidalXmlEntries, ingestTuneInListEntry, ingestTuneInMenuListEntry, ingestTuneInXmlEntries, ingestTuneInMenuXmlEntries, setTuneInBrowseContext } from "./mediaBrowser.js";
 import { resetTidalBrowseState, getTidalBrowseState } from "./tidalBrowserStore.js";
 import { updateNowPlayingStation } from "./tuneInBrowserStore.js";
+import { resetTuneInMenuBrowseState, updateTuneInMenuNowPlayingStation } from "./tuneInMenuStore.js";
 import { TuneInPreloader } from "./tuneInPreloader.js";
 import { ZoneAgnosticMediaStateStore } from "./zoneAgnosticMediaState.js";
 import { ZoneMediaRenderer } from "./zoneMediaRenderer.js";
@@ -83,12 +84,6 @@ export class ZoneAgnosticUpdateProcessor {
     }
   }
 
-  private async maybePreloadTuneIn(sourceEntityId: string, zoneEntityIds: string[]): Promise<void> {
-    if (zoneEntityIds.some((zoneEntityId) => !hasTuneInPresets(zoneEntityId))) {
-      await this.preloadTuneInPresets(sourceEntityId);
-    }
-  }
-
   private async maybeRequestSongInfo(serviceName: string, zoneCount: number): Promise<void> {
     if (zoneCount === 0) {
       return;
@@ -110,6 +105,22 @@ export class ZoneAgnosticUpdateProcessor {
 
   async maybeUpdateImage(entityId: string, _force: boolean = false): Promise<void> {
     await this.mediaRenderer.maybeUpdateImage(entityId);
+  }
+
+  private async isTuneInFullMenu(zoneEntityId: string): Promise<boolean> {
+    const cfg = ConfigManager.get();
+    const avr = cfg?.avrs?.find((a) => buildEntityId(a.model, a.ip, a.zone) === zoneEntityId);
+    return avr?.tuneinMenuStyle === "full";
+  }
+
+  private async maybePreloadTuneIn(sourceEntityId: string, zoneEntityIds: string[]): Promise<void> {
+    const hasMyPresetsZone = await Promise.all(zoneEntityIds.map((zoneEntityId) => this.isTuneInFullMenu(zoneEntityId))).then((results) => results.some((isFull) => !isFull));
+    const needsPreload = hasMyPresetsZone && zoneEntityIds.some((zoneEntityId) => !hasTuneInPresets(zoneEntityId));
+    if (!needsPreload) {
+      return;
+    }
+
+    await this.preloadTuneInPresets(sourceEntityId);
   }
 
   private async preloadTuneInPresets(entityId: string): Promise<void> {
@@ -152,7 +163,7 @@ export class ZoneAgnosticUpdateProcessor {
         });
       }
 
-      // log.debug("%s IFA sync for [%s] (event zone %s)", integrationName, zoneEntityId, eventZone);
+      // log.debug("%s IFA sync for [%s] (event zone %s)", integrationName, zoneEntityId, _eventZone);
     }
   }
 
@@ -176,6 +187,7 @@ export class ZoneAgnosticUpdateProcessor {
     const affectedZones = netZones.length > 0 ? netZones : [sourceEntityId];
     const normalizedService = serviceName.toLowerCase();
     const enteringTidalZones = new Set<string>();
+    const enteringTuneInZones = new Set<string>();
 
     for (const zoneEntityId of affectedZones) {
       const previousSubSource = this.state.getSubSource(zoneEntityId);
@@ -183,10 +195,16 @@ export class ZoneAgnosticUpdateProcessor {
       if (normalizedService === "tidal" && previousSubSource !== "tidal") {
         enteringTidalZones.add(zoneEntityId);
       }
+      if (normalizedService === "tunein" && previousSubSource !== "tunein") {
+        enteringTuneInZones.add(zoneEntityId);
+      }
     }
     this.updateFrontPanelDisplay(affectedZones, serviceName);
 
     if (normalizedService === "tunein") {
+      for (const zoneEntityId of enteringTuneInZones) {
+        resetTuneInMenuBrowseState(zoneEntityId);
+      }
       await this.maybePreloadTuneIn(sourceEntityId, affectedZones);
     }
 
@@ -214,6 +232,7 @@ export class ZoneAgnosticUpdateProcessor {
   async handleNls(sourceEntityId: string, entry: string): Promise<void> {
     for (const zoneEntityId of this.getTuneInZones(sourceEntityId)) {
       ingestTuneInListEntry(zoneEntityId, entry);
+      ingestTuneInMenuListEntry(zoneEntityId, entry);
     }
 
     for (const zoneEntityId of this.getTidalZones(sourceEntityId)) {
@@ -224,6 +243,7 @@ export class ZoneAgnosticUpdateProcessor {
   async handleNla(sourceEntityId: string, xmlPayload: string): Promise<void> {
     for (const zoneEntityId of this.getTuneInZones(sourceEntityId)) {
       ingestTuneInXmlEntries(zoneEntityId, xmlPayload);
+      ingestTuneInMenuXmlEntries(zoneEntityId, xmlPayload);
     }
     for (const zoneEntityId of this.getTidalZones(sourceEntityId)) {
       ingestTidalXmlEntries(zoneEntityId, xmlPayload);
@@ -313,6 +333,7 @@ export class ZoneAgnosticUpdateProcessor {
         // Only keep the station name when NTI returns a value that matches a known preset.
         // NTI also sends track/show titles (which would overwrite the station name).
         updateNowPlayingStation(zoneEntityId, artist);
+        updateTuneInMenuNowPlayingStation(zoneEntityId, artist);
       }
     }
 

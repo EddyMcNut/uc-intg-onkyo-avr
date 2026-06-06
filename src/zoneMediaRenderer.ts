@@ -117,7 +117,7 @@ export class ZoneMediaRenderer {
       const buffer = Buffer.from(arrayBuffer);
       return crypto.createHash("md5").update(buffer).digest("hex");
     } catch (err) {
-      log.warn("%s failed to fetch/hash image: %s", integrationName, err);
+      // log.warn("%s failed to fetch/hash image: %s", integrationName, err);
       return "";
     }
   }

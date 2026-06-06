@@ -33,7 +33,7 @@ export async function ensureZoneInstances(
 
     const physicalConnection = getPhysicalConnection(physicalAVR);
     if (!physicalConnection) {
-      log.warn("%s [%s] Cannot create zone instance - no physical connection object exists", integrationName, avrEntry);
+      // log.warn("%s [%s] Cannot create zone instance - no physical connection object exists", integrationName, avrEntry);
       continue;
     }
 

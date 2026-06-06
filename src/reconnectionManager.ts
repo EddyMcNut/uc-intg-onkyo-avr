@@ -63,11 +63,11 @@ export class ReconnectionManager {
         // log.info("%s [%s] Successfully reconnected to AVR (%s)", integrationName, physicalAVR, context);
         return { success: true, attempts: attempt + 1 };
       } catch (err) {
-        log.warn("%s [%s] %s attempt %d/%d failed: %s", integrationName, physicalAVR, context, attempt + 1, this.config.timeouts.length, err);
+        // log.warn("%s [%s] %s attempt %d/%d failed: %s", integrationName, physicalAVR, context, attempt + 1, this.config.timeouts.length, err);
       }
     }
 
-    log.error("%s [%s] Failed to reconnect after all attempts (%s)", integrationName, physicalAVR, context);
+    // log.error("%s [%s] Failed to reconnect after all attempts (%s)", integrationName, physicalAVR, context);
     return { success: false, attempts: this.config.timeouts.length };
   }
 

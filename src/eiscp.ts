@@ -11,6 +11,7 @@ import { createEiscpPacket, extractIscpMessage, extractAllIscpMessages } from ".
 import { buildMultiZoneVolumeCommands, buildMultiZoneMuteCommands } from "./eiscp-multi-zone.js";
 import { avrStateManager } from "./avrState.js";
 import { getTidalBrowseState } from "./tidalBrowserStore.js";
+import { getTuneInMenuBrowseState } from "./tuneInMenuStore.js";
 
 export interface EiscpConfig {
   host?: string;
@@ -122,12 +123,19 @@ export class EiscpDriver extends EventEmitter {
       tuneinPresetPosition: config?.tuneinPresetPosition ?? 1,
       configuredZones: config?.configuredZones
     };
-    this.commandParser = new IscpCommandParser((zone) => buildEntityId(this.config.model!, this.config.host!, zone), avrStateManager, {
-      getBrowseState: getTidalBrowseState
-    });
+    this.commandParser = new IscpCommandParser(
+      (zone) => buildEntityId(this.config.model!, this.config.host!, zone),
+      avrStateManager,
+      {
+        getBrowseState: getTidalBrowseState
+      },
+      {
+        getBrowseState: getTuneInMenuBrowseState
+      }
+    );
     if (this.listenerCount("error") === 0) {
       this.on("error", (err: Error) => {
-        log.error("%s eiscp error (unhandled):", integrationName, err);
+        // log.error("%s eiscp error (unhandled):", integrationName, err);
       });
     }
   }
@@ -158,7 +166,7 @@ export class EiscpDriver extends EventEmitter {
       }
       client
         .on("error", (err: Error) => {
-          log.error("%s UDP error:", integrationName, err);
+          // log.error("%s UDP error:", integrationName, err);
           try {
             client.close();
           } catch {}
@@ -191,7 +199,7 @@ export class EiscpDriver extends EventEmitter {
           client.send(buffer, 0, buffer.length, opts.port, opts.address, (err) => {
             if (err) {
               // Log but don't fail - network might not be ready yet (ENETUNREACH)
-              log.error("%s UDP send error (network may not be ready):", integrationName, err);
+              // log.error("%s UDP send error (network may not be ready):", integrationName, err);
               // Close client and resolve with empty result - configured AVRs will still be tried
               clearTimeout(timeoutTimer);
               close();
@@ -220,7 +228,7 @@ export class EiscpDriver extends EventEmitter {
         this.config.port = Number(h.port);
         this.config.model = h.model;
       } else {
-        log.error("%s No AVR found during discovery.", integrationName);
+        // log.error("%s No AVR found during discovery.", integrationName);
         return null;
       }
     }
@@ -248,7 +256,7 @@ export class EiscpDriver extends EventEmitter {
         const wasConnected = this.isConnected;
         this.isConnected = false;
         if (wasConnected) {
-          log.warn("%s Connection closed for %s at %s:%d", integrationName, this.config.model, this.config.host, this.config.port || 60128);
+          // log.warn("%s Connection closed for %s at %s:%d", integrationName, this.config.model, this.config.host, this.config.port || 60128);
         }
         if (this.config.reconnect) {
           // log.info("%s Scheduling reconnection in %ds", integrationName, this.config.reconnectSleep);
@@ -256,7 +264,7 @@ export class EiscpDriver extends EventEmitter {
         }
       })
       .on("error", (err) => {
-        log.error("%s Socket error for %s at %s:%d - %s", integrationName, this.config.model, this.config.host, this.config.port || 60128, err.message);
+        // log.error("%s Socket error for %s at %s:%d - %s", integrationName, this.config.model, this.config.host, this.config.port || 60128, err.message);
         this.isConnected = false;
         this.eiscp?.destroy();
       })
@@ -370,7 +378,7 @@ export class EiscpDriver extends EventEmitter {
         this.emit("data", data);
       })
       .catch((err) => {
-        log.error("%s Error processing queued incoming message:", integrationName, err);
+        // log.error("%s Error processing queued incoming message:", integrationName, err);
       });
   }
 
@@ -529,7 +537,7 @@ export class EiscpDriver extends EventEmitter {
       .filter((item) => item !== "");
 
     if (parts.length !== 2) {
-      log.warn("%s Invalid multi-zone-volume command format: %s", integrationName, data);
+      // log.warn("%s Invalid multi-zone-volume command format: %s", integrationName, data);
       return;
     }
 
@@ -538,7 +546,7 @@ export class EiscpDriver extends EventEmitter {
     const commands = buildMultiZoneVolumeCommands(action, configuredZones);
 
     if (commands.length === 0) {
-      log.warn("%s No zones configured for multi-zone-volume action: %s (configured zones: %s)", integrationName, action, configuredZones.join(", "));
+      // log.warn("%s No zones configured for multi-zone-volume action: %s (configured zones: %s)", integrationName, action, configuredZones.join(", "));
       return;
     }
 
@@ -553,7 +561,7 @@ export class EiscpDriver extends EventEmitter {
       .filter((item) => item !== "");
 
     if (parts.length !== 2) {
-      log.warn("%s Invalid multi-zone-muting command format: %s", integrationName, data);
+      // log.warn("%s Invalid multi-zone-muting command format: %s", integrationName, data);
       return;
     }
 
@@ -562,7 +570,7 @@ export class EiscpDriver extends EventEmitter {
     const commands = buildMultiZoneMuteCommands(action, configuredZones);
 
     if (commands.length === 0) {
-      log.warn("%s No zones configured for multi-zone-muting action: %s (configured zones: %s)", integrationName, action, configuredZones.join(", "));
+      // log.warn("%s No zones configured for multi-zone-muting action: %s (configured zones: %s)", integrationName, action, configuredZones.join(", "));
       return;
     }
 
@@ -579,7 +587,7 @@ export class EiscpDriver extends EventEmitter {
     } else if (valueMap && Object.prototype.hasOwnProperty.call(valueMap, "intgrRange")) {
       value = (+args!).toString(16).toUpperCase().padStart(2, "0");
     } else {
-      log.warn("%s not found in JSON: %s %s", integrationName, command, args);
+      // log.warn("%s not found in JSON: %s %s", integrationName, command, args);
       value = String(args ?? "");
     }
 

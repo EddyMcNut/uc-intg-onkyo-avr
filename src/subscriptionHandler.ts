@@ -57,7 +57,7 @@ export default class SubscriptionHandler {
 
       await avrStateQueryService.queryAvrState(baseEntityId, physicalConnection.eiscp, instance.config.zone, "after subscription reconnection", instance.config.queueThreshold ?? 0);
     } catch (err) {
-      log.warn("%s [%s] Failed to reconnect on subscription: %s", integrationName, physicalAVR, err);
+      // log.warn("%s [%s] Failed to reconnect on subscription: %s", integrationName, physicalAVR, err);
       this.connectionManager.scheduleReconnect(physicalAVR, physicalConnection, instance.config);
     }
   }

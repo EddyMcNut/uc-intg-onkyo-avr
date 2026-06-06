@@ -5,8 +5,9 @@ import { avrStateManager } from "./avrState.js";
 import { ICommandReceiver } from "./types.js";
 import log from "./loggers.js";
 import { delay, toHex, ensureEiscpConnected } from "./utils.js";
-import { browseMedia, isMediaBrowsingAvailable, isTidalMainMenuRequest, resolveTidalMenuOption, resolveTuneInPreset } from "./mediaBrowser.js";
+import { browseMedia, isMediaBrowsingAvailable, isTidalMainMenuRequest, isTuneInMenuRootRequest, resolveTidalMenuOption, resolveTuneInMenuOption, resolveTuneInPreset } from "./mediaBrowser.js";
 import { consumeTidalListModeActive, consumeTraceNextTidalSelectionAfterMainMenu, listTidalMenuOptions, getTidalBrowseState } from "./tidalBrowserStore.js";
+import { consumeTuneInListModeActive, setTuneInMenuBrowseFrozen } from "./tuneInMenuStore.js";
 
 const integrationName = "commandSender:";
 
@@ -31,7 +32,7 @@ export class CommandSender {
   async sharedCmdHandler(entity: uc.Entity, cmdId: string, params?: { [key: string]: string | number | boolean }): Promise<uc.StatusCodes> {
     const entityParts = entity.id.split(" ");
     if (entityParts.length < 3) {
-      log.error("%s [%s] Cannot route command: entity id does not contain model, host, and zone", integrationName, entity.id);
+      // log.error("%s [%s] Cannot route command: entity id does not contain model, host, and zone", integrationName, entity.id);
       return uc.StatusCodes.BadRequest;
     }
 
@@ -41,7 +42,7 @@ export class CommandSender {
     const targetAvr = this.config.avrs?.find((avr) => buildEntityId(avr.model, avr.ip, avr.zone) === entity.id) ?? this.config.avrs?.find((avr) => avr.model === model && avr.ip === host) ?? null;
 
     if (!targetAvr) {
-      log.error("%s [%s] Cannot route command: no configured AVR matches model='%s' host='%s' zone='%s'", integrationName, entity.id, model, host, zone);
+      // log.error("%s [%s] Cannot route command: no configured AVR matches model='%s' host='%s' zone='%s'", integrationName, entity.id, model, host, zone);
       return uc.StatusCodes.BadRequest;
     }
 
@@ -132,13 +133,13 @@ export class CommandSender {
 
               // Security: Validate user command length
               if (userCmd.length > MAX_LENGTHS.USER_COMMAND) {
-                log.error("%s [%s] Command too long (%d chars), rejecting", integrationName, entity.id, userCmd.length);
+                // log.error("%s [%s] Command too long (%d chars), rejecting", integrationName, entity.id, userCmd.length);
                 return uc.StatusCodes.BadRequest;
               }
 
               // Security: Validate user command characters
               if (!PATTERNS.USER_COMMAND.test(userCmd)) {
-                log.error("%s [%s] Command contains invalid characters, rejecting", integrationName, entity.id);
+                // log.error("%s [%s] Command contains invalid characters, rejecting", integrationName, entity.id);
                 return uc.StatusCodes.BadRequest;
               }
 
@@ -155,13 +156,13 @@ export class CommandSender {
 
               // Security: Validate raw command length
               if (rawCmd.length > MAX_LENGTHS.RAW_COMMAND) {
-                log.error("%s [%s] Raw command too long (%d chars), rejecting", integrationName, entity.id, rawCmd.length);
+                // log.error("%s [%s] Raw command too long (%d chars), rejecting", integrationName, entity.id, rawCmd.length);
                 return uc.StatusCodes.BadRequest;
               }
 
               // Security: Validate raw command characters (alphanumeric only)
               if (!PATTERNS.RAW_COMMAND.test(rawCmd)) {
-                log.error("%s [%s] Raw command contains invalid characters, rejecting", integrationName, entity.id);
+                // log.error("%s [%s] Raw command contains invalid characters, rejecting", integrationName, entity.id);
                 return uc.StatusCodes.BadRequest;
               }
 
@@ -189,10 +190,12 @@ export class CommandSender {
           const mediaId = typeof params?.media_id === "string" ? params.media_id : undefined;
           const mediaType = typeof params?.media_type === "string" ? params.media_type : undefined;
           const preset = resolveTuneInPreset(mediaId, mediaType);
+          const tuneInMenuOption = resolveTuneInMenuOption(entity.id, mediaId, mediaType);
+          const tuneInRootRequest = isTuneInMenuRootRequest(mediaId, mediaType);
           const tidalMainMenu = isTidalMainMenuRequest(mediaId, mediaType);
           const tidalOption = resolveTidalMenuOption(mediaId, mediaType);
 
-          if (!preset && !tidalMainMenu && !tidalOption) {
+          if (!preset && !tuneInRootRequest && !tuneInMenuOption && !tidalMainMenu && !tidalOption) {
             return uc.StatusCodes.NotFound;
           }
 
@@ -209,6 +212,38 @@ export class CommandSender {
             break;
           }
 
+          if (tuneInRootRequest) {
+            await this.eiscp.command(setZonePrefix("input-selector tunein"));
+            await delay(targetAvr.netMenuDelay ?? DEFAULT_QUEUE_THRESHOLD);
+            break;
+          }
+
+          if (tuneInMenuOption) {
+            const currentSource = avrStateManager.getSource(entity.id);
+            const currentSubSource = avrStateManager.getSubSource(entity.id);
+            if (currentSource !== "net" || currentSubSource !== "tunein") {
+              await this.eiscp.command(setZonePrefix("input-selector tunein"));
+              await delay(targetAvr.netMenuDelay ?? DEFAULT_QUEUE_THRESHOLD);
+            }
+
+            if (!tuneInMenuOption.isBrowsable) {
+              setTuneInMenuBrowseFrozen(entity.id, true);
+              const alreadyInListMode = consumeTuneInListModeActive(entity.id);
+              if (!alreadyInListMode) {
+                const playbackStatus = avrStateManager.getPlaybackStatus(entity.id);
+                if (playbackStatus === "playing" || playbackStatus === "paused" || playbackStatus === "ff" || playbackStatus === "fr") {
+                  await this.eiscp.command(setZonePrefix("network-usb list"));
+                  await delay(targetAvr.netMenuDelay ?? DEFAULT_QUEUE_THRESHOLD);
+                }
+              }
+            } else {
+              setTuneInMenuBrowseFrozen(entity.id, false);
+            }
+
+            await this.eiscp.raw(`NLSI${String(tuneInMenuOption.menuIndex).padStart(5, "0")}`);
+            break;
+          }
+
           if (tidalMainMenu) {
             await this.eiscp.command(setZonePrefix("input-selector tidal"));
             await delay(targetAvr.netMenuDelay ?? DEFAULT_QUEUE_THRESHOLD);
@@ -221,7 +256,7 @@ export class CommandSender {
 
           const shouldTraceSelection = consumeTraceNextTidalSelectionAfterMainMenu(entity.id);
           // if (shouldTraceSelection) {
-          //    log.info("%s [%s] TRACE first Tidal selection after Main Tidal Menu: media_id='%s' media_type='%s' parsedIndex=%d parsedTitle='%s'",integrationName,entity.id,String(mediaId),String(mediaType),tidalOption.menuIndex,tidalOption.title);
+          //    // log.info("%s [%s] TRACE first Tidal selection after Main Tidal Menu: media_id='%s' media_type='%s' parsedIndex=%d parsedTitle='%s'",integrationName,entity.id,String(mediaId),String(mediaType),tidalOption.menuIndex,tidalOption.title);
           // }
 
           // Capture the selected title from the cached list; we'll use it to remap to the freshest AVR list index right before selecting, avoiding stale-index mismatches.

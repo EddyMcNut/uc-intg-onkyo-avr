@@ -7,9 +7,11 @@ import { getCompatibleListeningModes } from "./listeningModeFilters.js";
 import { ConfigManager, buildEntityId } from "./configManager.js";
 import { browseMedia } from "./mediaBrowser.js";
 import { TidalBrowseHandler } from "./tidalBrowseHandler.js";
+import { TuneInBrowseHandler } from "./tuneInBrowseHandler.js";
 
 export default class EntityRegistrar {
   private readonly tidalBrowseHandler = new TidalBrowseHandler();
+  private readonly tuneInBrowseHandler = new TuneInBrowseHandler();
 
   // Build a user-facing base name from an AVR entry id. Input format is typically: "MODEL HOST ZONE". Long style keeps the full entry, short style omits HOST (IP/hostname).
   private getDisplayBaseName(avrEntry: string): string {
@@ -116,8 +118,12 @@ export default class EntityRegistrar {
     );
     if (cmdHandler) mediaPlayerEntity.setCmdHandler(cmdHandler);
     mediaPlayerEntity.browse = async (options: uc.BrowseOptions) => {
+      const tuneInResult = await this.tuneInBrowseHandler.browse(avrEntry, options, mediaPlayerEntity, cmdHandler, rawSend);
+      if (tuneInResult !== undefined) return tuneInResult;
+
       const tidalResult = await this.tidalBrowseHandler.browse(avrEntry, options, mediaPlayerEntity, cmdHandler, rawSend);
       if (tidalResult !== undefined) return tidalResult;
+
       return browseMedia(avrEntry, options);
     };
     return mediaPlayerEntity;

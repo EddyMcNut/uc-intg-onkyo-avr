@@ -124,12 +124,12 @@ export function createServiceThumbnails(config: ServiceThumbnailConfig) {
           return cachedAsset;
         }
       } catch (err) {
-        log.warn("%s failed to load background asset %s: %s", integrationName, candidate, err);
+        // log.warn("%s failed to load background asset %s: %s", integrationName, candidate, err);
       }
     }
 
     if (cachedAsset?.signature !== "missing") {
-      log.warn("%s background asset not found; falling back to default icon", integrationName);
+      // log.warn("%s background asset not found; falling back to default icon", integrationName);
     }
 
     cachedAsset = { dataUri: null, signature: "missing", inlineSafe: false, logoMarkup: null };

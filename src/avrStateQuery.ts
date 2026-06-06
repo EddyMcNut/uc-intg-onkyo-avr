@@ -55,7 +55,7 @@ class AvrStateQueryService {
       await delay(threshold * 3);
       await eiscpInstance.command({ zone, command: "fp-display", args: "query" });
     } catch (err) {
-      log.warn(`${integrationName} [%s] Failed to query AVR state (%s):`, entityId, context, err);
+      // log.warn(`${integrationName} [%s] Failed to query AVR state (%s):`, entityId, context, err);
     }
   }
 }

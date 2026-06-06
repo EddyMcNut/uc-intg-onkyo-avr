@@ -68,11 +68,11 @@ export default class ConnectionManager {
     this.setPhysicalConnection(physicalAVR, physicalConnection);
 
     eiscpInstance.on("error", (err: Error) => {
-      log.error(`${integrationName} [${physicalAVR}] EiscpDriver error:`, err);
+      // log.error(`${integrationName} [${physicalAVR}] EiscpDriver error:`, err);
     });
 
     eiscpInstance.on("close", () => {
-      log.warn(`${integrationName} [${physicalAVR}] Connection to AVR lost`);
+      // log.warn(`${integrationName} [${physicalAVR}] Connection to AVR lost`);
     });
 
     try {
@@ -85,7 +85,7 @@ export default class ConnectionManager {
       // log.info(`${integrationName} [${physicalAVR}] Connected to AVR`);
       return physicalConnection;
     } catch (err) {
-      log.error(`${integrationName} [${physicalAVR}] Failed to connect to AVR:`, err);
+      // log.error(`${integrationName} [${physicalAVR}] Failed to connect to AVR:`, err);
       // log.info(`${integrationName} [${physicalAVR}] Zone instances will be created but unavailable until connection succeeds`);
       // schedule reconnect
       this.scheduleReconnect(physicalAVR, physicalConnection, avrConfig);
@@ -117,7 +117,7 @@ export default class ConnectionManager {
       }
       return result;
     } catch (err) {
-      log.warn(`${integrationName} [${physicalAVR}] Reconnection attempt failed:`, err);
+      // log.warn(`${integrationName} [${physicalAVR}] Reconnection attempt failed:`, err);
       return { success: false };
     }
   }
@@ -138,7 +138,7 @@ export default class ConnectionManager {
           connection.eiscp.disconnect();
         }
       } catch (err) {
-        log.warn(`${integrationName} [${physicalAVR}] Error disconnecting AVR:`, err);
+        // log.warn(`${integrationName} [${physicalAVR}] Error disconnecting AVR:`, err);
       }
     }
   }

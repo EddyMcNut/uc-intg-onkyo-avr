@@ -141,6 +141,41 @@ test.serial("TuneIn browse root exposes all presets when the list is longer than
   );
 });
 
+test.serial("Media player browse returns TuneIn full menu items from NET TuneIn", async (t) => {
+  const registrarModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/entityRegistrar.js")).href);
+  const avrStateModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/avrState.js")).href);
+  const mediaBrowserModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/mediaBrowser.js")).href);
+
+  const EntityRegistrar = registrarModule.default as any;
+  const { avrStateManager } = avrStateModule as any;
+  const { ingestTuneInMenuListEntry, ingestTuneInMenuXmlEntries } = mediaBrowserModule as any;
+
+  const registrar = new EntityRegistrar();
+  const entityId = "TX-RZ50 192.168.1.30 main";
+  const player = registrar.createMediaPlayerEntity(entityId, 100, async () => uc.StatusCodes.Ok);
+
+  avrStateManager.setSource(entityId, "net");
+  avrStateManager.setSubSource(entityId, "tunein");
+
+  ingestTuneInMenuListEntry(entityId, "U0-Browse");
+  ingestTuneInMenuListEntry(entityId, "U1-Stations");
+  ingestTuneInMenuListEntry(entityId, "U2-Station A");
+  ingestTuneInMenuXmlEntries(
+    entityId,
+    '<?xml version="1.0" encoding="UTF-8"?><response status="ok"><items offset="0003"><item iconid="2F" title="Station B" url="0"/></items></response>'
+  );
+
+  const result = await player.browse({
+    media_id: "tunein:menu-root",
+    media_type: "tunein://menu",
+    paging: new uc.Paging(1, 10)
+  });
+
+  t.true(result instanceof uc.BrowseResult);
+  t.deepEqual((result as uc.BrowseResult).media?.items?.map((item) => item.title), ["Browse", "Stations", "Station A", "Station B"]);
+  t.is((result as uc.BrowseResult).pagination.count, 4);
+});
+
 test.serial("TuneIn selection keeps subsource and state so browse can be repeated", async (t) => {
   const avrStateModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/avrState.js")).href);
   const mediaBrowserModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/mediaBrowser.js")).href);
@@ -752,4 +787,39 @@ test.serial("CommandSender play_media routes Main Tidal Menu to input-selector t
 
   t.is(result, uc.StatusCodes.Ok);
   t.deepEqual(commandCalls, ["input-selector tidal"]);
+});
+
+test.serial("CommandSender play_media routes TuneIn main menu to input-selector tunein", async (t) => {
+  const senderModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/commandSender.js")).href);
+  const avrStateModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/avrState.js")).href);
+
+  const CommandSender = senderModule.CommandSender as any;
+  const { avrStateManager } = avrStateModule as any;
+
+  const commandCalls: string[] = [];
+
+  class MockEiscp {
+    public connected = true;
+    async connect() {}
+    async waitForConnect() {}
+    async command(cmd: string) {
+      commandCalls.push(cmd);
+    }
+    async raw() {}
+  }
+
+  const entityId = "M 1.2.3.6 main";
+  const mockDriver = { updateEntityAttributes: () => true } as any;
+  const mockReceiver = {} as any;
+  const sender = new CommandSender(mockDriver, { avrs: [{ model: "M", ip: "1.2.3.6", zone: "main", netMenuDelay: 0 }] } as any, new MockEiscp(), mockReceiver);
+
+  avrStateManager.setSource(entityId, "net");
+  avrStateManager.setSubSource(entityId, "tunein");
+
+  const result = await sender.sharedCmdHandler({ id: entityId } as any, uc.MediaPlayerCommands.PlayMedia, {
+    media_id: "tunein:menu-root"
+  } as any);
+
+  t.is(result, uc.StatusCodes.Ok);
+  t.deepEqual(commandCalls, ["input-selector tunein"]);
 });
