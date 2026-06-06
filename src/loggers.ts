@@ -7,7 +7,11 @@ const LEVEL_RANK: Record<LogLevel, number> = { debug: 0, info: 1, warn: 2, error
 let currentLevel: LogLevel = "warn";
 
 export function setLogLevel(level: LogLevel): void {
+  const previous = currentLevel;
   currentLevel = level;
+  if (previous !== level) {
+    console.log("[WARN]", `loggers: log level changed from '${previous}' to '${level}'`);
+  }
 }
 
 export function getLogLevel(): LogLevel {

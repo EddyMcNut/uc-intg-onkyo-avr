@@ -5,7 +5,7 @@ import { OnkyoConfig, buildEntityId } from "./configManager.js";
 import { EiscpDriver } from "./eiscp.js";
 import { getCompatibleListeningModes, detectAudioFormatType } from "./listeningModeFilters.js";
 import { eiscpMappings } from "./eiscp-mappings.js";
-import log from "./loggers.js";
+import log, { getLogLevel } from "./loggers.js";
 import { ZoneAgnosticUpdateProcessor } from "./zoneAgnosticUpdateProcessor.js";
 
 const integrationName = "commandReceiver:";
@@ -197,7 +197,7 @@ export class CommandReceiver {
         case "system-power": {
           const powerState = avrUpdates.argument === "on" ? uc.MediaPlayerStates.On : uc.MediaPlayerStates.Standby;
           console.log("** Onkyo AVR custom integration version %s **", this.driverVersion);
-          console.log("[INFO]", `${integrationName} [${entityId}] power set to: ${powerState}`);
+          console.log("[INFO]", `${integrationName} [${entityId}] power set to: ${powerState} (log level: ${getLogLevel()})`);
 
           // Track power state in state manager
           avrStateManager.setPowerState(entityId, avrUpdates.argument as string, this.driver);
