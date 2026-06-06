@@ -170,7 +170,7 @@ export const eiscpMappings = {
     "dab-station-name": "UDS",
     "dab-display-info": "UDD",
     "av-direct-mode-operation": "ADM",
-    "accueq": "AEQ",
+    accueq: "AEQ",
     "auto-power-down": "APD",
     "air-play-setting": "APS",
     "audio-return-channel": "ARC",
@@ -179,13 +179,13 @@ export const eiscpMappings = {
     "battery-charge": "BCS",
     "hdmi-cec-control-monitor": "CCM",
     "hdmi-cec": "CEC",
-    "dirac": "DSS",
+    dirac: "DSS",
     "pcm-fixed-mode": "FXP",
     "hi-bit": "HBT",
     "hdmi-signal-format": "HSF",
     "loudness-management": "LDM",
     "lfe-level": "LFE",
-    "lip-sync": "LPS",
+    "lip-sync": "LPS"
   },
   value_mappings: {
     PWR: {
@@ -1097,7 +1097,7 @@ export const eiscpMappings = {
       query: { value: "QSTN" }
     },
     AEQ: {
-      "off": { value: "00" },
+      off: { value: "00" },
       "on-on-all-ch": { value: "01" },
       "on-ex-front-l-r": { value: "02" },
       "on-front-matching-eq": { value: "03" },
@@ -1105,8 +1105,8 @@ export const eiscpMappings = {
       query: { value: "QSTN" }
     },
     APD: {
-      "off": { value: "00" },
-      "on": { value: "01" },
+      off: { value: "00" },
+      on: { value: "01" },
       up: { value: "UP" },
       query: { value: "QSTN" }
     },
@@ -1117,28 +1117,28 @@ export const eiscpMappings = {
       query: { value: "QSTN" }
     },
     ARC: {
-      "off": { value: "00" },
-      "auto": { value: "01" },
+      off: { value: "00" },
+      auto: { value: "01" },
       up: { value: "UP" },
       query: { value: "QSTN" }
     },
     ASC: {
-      "auto": { value: "00" },
-      "manual": { value: "01" },
+      auto: { value: "00" },
+      manual: { value: "01" },
       up: { value: "UP" },
       query: { value: "QSTN" }
     },
     AVS: {
-      "up": { value: "UP" },
-      "down": { value: "DOWN" },
+      up: { value: "UP" },
+      down: { value: "DOWN" },
       query: { value: "QSTN" }
     },
     BCS: {
-      "charging": { value: "00" },
-      "completed": { value: "01" },
-      "low": { value: "10" },
-      "middle": { value: "11" },
-      "high": { value: "12" },
+      charging: { value: "00" },
+      completed: { value: "01" },
+      low: { value: "10" },
+      middle: { value: "11" },
+      high: { value: "12" },
       query: { value: "QSTN" }
     },
     CCM: {
@@ -1155,21 +1155,21 @@ export const eiscpMappings = {
       query: { value: "QSTN" }
     },
     DSS: {
-      "off": { value: "C00" },
-      "slot1": { value: "C01" },
-      "slot2": { value: "C02" },
-      "slot3": { value: "C03" },
+      off: { value: "C00" },
+      slot1: { value: "C01" },
+      slot2: { value: "C02" },
+      slot3: { value: "C03" },
       query: { value: "QSTN" }
     },
     FXP: {
-      "off": { value: "00" },
-      "on": { value: "01" },
+      off: { value: "00" },
+      on: { value: "01" },
       up: { value: "UP" },
       query: { value: "QSTN" }
     },
     HBT: {
-      "off": { value: "00" },
-      "on": { value: "01" },
+      off: { value: "00" },
+      on: { value: "01" },
       up: { value: "UP" },
       query: { value: "QSTN" }
     },
@@ -1182,8 +1182,8 @@ export const eiscpMappings = {
       query: { value: "QSTN" }
     },
     LDM: {
-      "off": { value: "00" },
-      "on": { value: "01" },
+      off: { value: "00" },
+      on: { value: "01" },
       up: { value: "UP" },
       query: { value: "QSTN" }
     },
@@ -1198,13 +1198,13 @@ export const eiscpMappings = {
       "-15dB": { value: "0F" },
       "-20dB": { value: "14" },
       "-oodB": { value: "FF" },
-      "up": { value: "UP" },
-      "down": { value: "DOWN" },
+      up: { value: "UP" },
+      down: { value: "DOWN" },
       query: { value: "QSTN" }
     },
     LPS: {
-      "off": { value: "00" },
-      "on": { value: "01" },
+      off: { value: "00" },
+      on: { value: "01" },
       up: { value: "UP" },
       query: { value: "QSTN" }
     }

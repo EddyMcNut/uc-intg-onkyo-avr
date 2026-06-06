@@ -2,9 +2,9 @@
 "use strict";
 import log from "./loggers.js";
 import { ReconnectionManager } from "./reconnectionManager.js";
-import { AvrConfig, OnkyoConfig } from "./configManager.js";
+import { AvrConfig, OnkyoConfig, DEFAULT_QUEUE_THRESHOLD } from "./configManager.js";
 import EiscpDriver from "./eiscp.js";
-import { PhysicalConnection, CreateCommandReceiverFn, QueryAllZonesStateFn } from "./types.js";
+import { PhysicalConnection, CreateCommandReceiverFn, QueryAllZonesStateFn, EiscpDriverFactory } from "./types.js";
 
 const integrationName = "connectionManager:";
 
@@ -12,12 +12,13 @@ export default class ConnectionManager {
   private reconnectionManager: ReconnectionManager;
   private queryAllZonesState: QueryAllZonesStateFn;
   private physicalConnections: Map<string, PhysicalConnection> = new Map();
-  private getDriverVersion?: () => string;
+  private readonly createEiscpDriver: EiscpDriverFactory;
 
-  constructor(reconnectionManager: ReconnectionManager, queryAllZonesState: (physicalAvr: string, eiscp: EiscpDriver, context: string) => Promise<void>, getDriverVersion?: () => string) {
+  constructor(reconnectionManager: ReconnectionManager, queryAllZonesState: (physicalAvr: string, eiscp: EiscpDriver, context: string) => Promise<void>, createEiscpDriver?: EiscpDriverFactory) {
     this.reconnectionManager = reconnectionManager;
     this.queryAllZonesState = queryAllZonesState;
-    this.getDriverVersion = getDriverVersion;
+    // Default to the concrete EiscpDriver so production callers need no change. Tests can inject a fake factory to avoid opening real TCP sockets.
+    this.createEiscpDriver = createEiscpDriver ?? ((config) => new EiscpDriver(config));
   }
 
   getPhysicalConnection(physicalAVR: string): PhysicalConnection | undefined {
@@ -34,15 +35,14 @@ export default class ConnectionManager {
       // Update the stored config
       connection.avrConfig = avrConfig;
       // Update the EISCP driver's config for runtime settings like tuneinPresetPosition
-      connection.eiscp["config"] = {
-        ...connection.eiscp["config"],
+      connection.eiscp.updateConfig({
         netMenuDelay: avrConfig.netMenuDelay,
         tuneinPresetPosition: avrConfig.tuneinPresetPosition,
-        send_delay: avrConfig.queueThreshold || 100,
+        sendDelay: avrConfig.queueThreshold ?? DEFAULT_QUEUE_THRESHOLD,
         configuredZones: configuredZones
-      };
-      if (runtimeConfig && typeof (connection.commandReceiver as any).updateConfig === "function") {
-        (connection.commandReceiver as any).updateConfig(runtimeConfig);
+      });
+      if (runtimeConfig) {
+        connection.commandReceiver.updateConfig(runtimeConfig);
       }
       log.info(
         `${integrationName} [${physicalAVR}] Updated connection config (netMenuDelay: ${avrConfig.netMenuDelay}, tuneinPresetPosition: ${avrConfig.tuneinPresetPosition}, zones: ${configuredZones?.join(", ") || "default"})`
@@ -53,11 +53,11 @@ export default class ConnectionManager {
   async createAndConnect(physicalAVR: string, avrConfig: AvrConfig, createCommandReceiver: CreateCommandReceiverFn, configuredZones?: string[]): Promise<PhysicalConnection> {
     log.info(`${integrationName} [${physicalAVR}] Connecting to AVR at ${avrConfig.ip}:${avrConfig.port}`);
 
-    const eiscpInstance = new EiscpDriver({
+    const eiscpInstance = this.createEiscpDriver({
       host: avrConfig.ip,
       port: avrConfig.port,
       model: avrConfig.model,
-      send_delay: avrConfig.queueThreshold || 100,
+      sendDelay: avrConfig.queueThreshold ?? DEFAULT_QUEUE_THRESHOLD,
       netMenuDelay: avrConfig.netMenuDelay,
       tuneinPresetPosition: avrConfig.tuneinPresetPosition,
       configuredZones: configuredZones

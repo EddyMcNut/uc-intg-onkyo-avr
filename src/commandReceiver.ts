@@ -5,7 +5,7 @@ import { OnkyoConfig, buildEntityId } from "./configManager.js";
 import { EiscpDriver } from "./eiscp.js";
 import { getCompatibleListeningModes, detectAudioFormatType } from "./listeningModeFilters.js";
 import { eiscpMappings } from "./eiscp-mappings.js";
-import log from "./loggers.js";
+import log, { getLogLevel } from "./loggers.js";
 import { ZoneAgnosticUpdateProcessor } from "./zoneAgnosticUpdateProcessor.js";
 
 const integrationName = "commandReceiver:";
@@ -39,7 +39,6 @@ export class CommandReceiver {
   private config: OnkyoConfig;
   private eiscpInstance: EiscpDriver;
   private avrPreset: string = "unknown";
-  private zone: string = "";
   private driverVersion: string;
   private zoneAgnosticProcessor: ZoneAgnosticUpdateProcessor;
   private zoneAgnosticHandlers: Record<string, ZoneAgnosticHandler>;
@@ -49,9 +48,8 @@ export class CommandReceiver {
     this.driver = driver;
     this.config = config;
     this.eiscpInstance = eiscpInstance;
-    this.zone = this.config.avrs && this.config.avrs.length > 0 ? this.config.avrs[0].zone || "main" : "main";
     this.driverVersion = driverVersion;
-    this.zoneAgnosticProcessor = new ZoneAgnosticUpdateProcessor(driver, config, eiscpInstance);
+    this.zoneAgnosticProcessor = new ZoneAgnosticUpdateProcessor(driver, config, eiscpInstance, avrStateManager);
     this.zoneAgnosticHandlers = {
       IFA: async (avrUpdates, entityId, eventZone) => {
         await this.zoneAgnosticProcessor.handleIfa(entityId, eventZone, avrUpdates.argument as Record<string, string> | undefined, async (zoneEntityId, audioInputValue) => {
@@ -93,7 +91,6 @@ export class CommandReceiver {
 
   public updateConfig(config: OnkyoConfig): void {
     this.config = config;
-    this.zone = this.config.avrs && this.config.avrs.length > 0 ? this.config.avrs[0].zone || "main" : "main";
     this.zoneAgnosticProcessor.updateConfig(config);
   }
 
@@ -135,12 +132,7 @@ export class CommandReceiver {
     });
   }
 
-  /**
-   * When IFA arrives with a transient format (UNKNOWN / N/A / ---), the AVR often stabilises
-   * to the real format a few seconds later without sending another IFA.  Schedule a delayed
-   * re-query so the sensor reflects the final stable value instead of staying stuck at UNKNOWN.
-   * Cancels the timer if a known format arrives before it fires.
-   */
+  // Schedule a delayed re-query so the sensor reflects the final stable value instead of staying stuck at UNKNOWN. Cancels the timer if a known format arrives before it fires.
   private maybeScheduleAvInfoRequery(audioInputValue: string, zone: string): void {
     const lower = audioInputValue.toLowerCase();
     const isTransient = lower === "unknown" || lower === "n/a" || lower === "---" || lower === "";
@@ -184,11 +176,6 @@ export class CommandReceiver {
     return false;
   }
 
-  /** Get config for external access (e.g., from avrState) */
-  public getConfig(): OnkyoConfig {
-    return this.config;
-  }
-
   async maybeUpdateImage(entityId: string, force: boolean = false) {
     await this.zoneAgnosticProcessor.maybeUpdateImage(entityId, force);
   }
@@ -209,8 +196,8 @@ export class CommandReceiver {
       switch (avrUpdates.command) {
         case "system-power": {
           const powerState = avrUpdates.argument === "on" ? uc.MediaPlayerStates.On : uc.MediaPlayerStates.Standby;
-          log.info("** Onkyo AVR custom integration version %s **", this.driverVersion);
-          log.info("%s [%s] power set to: %s", integrationName, entityId, powerState);
+          console.log("** Onkyo AVR custom integration version %s **", this.driverVersion);
+          console.log("[INFO]", `${integrationName} [${entityId}] power set to: ${powerState} (log level: ${getLogLevel()})`);
 
           // Track power state in state manager
           avrStateManager.setPowerState(entityId, avrUpdates.argument as string, this.driver);
@@ -227,7 +214,7 @@ export class CommandReceiver {
         }
         case "audio-muting": {
           this.driver.updateEntityAttributes(entityId, {
-            [uc.MediaPlayerAttributes.Muted]: avrUpdates.argument === "on" ? true : false
+            [uc.MediaPlayerAttributes.Muted]: avrUpdates.argument === "on"
           });
           const muteSensorId = `${entityId}_mute_sensor`;
           const muteState = avrUpdates.argument === "on" ? "ON" : "OFF";
@@ -241,21 +228,19 @@ export class CommandReceiver {
         case "volume": {
           // EISCP protocol: 0-200 or 0-100 depending on model, AVR display: 0-volumeScale, Remote slider: 0-100
           const eiscpValue = Number(avrUpdates.argument);
-          const volumeScale = this.config.volumeScale || 100;
+          const volumeScale = this.config.volumeScale ?? 100;
           const adjustVolumeDispl = this.config.adjustVolumeDispl ?? true;
           const volumeDisplay = String(this.config.volumeDisplay ?? "absolute").toLowerCase() === "relative" ? "relative" : "absolute";
 
           // Convert: EISCP → AVR display scale (÷2 for 0.5 dB steps if enabled) → slider
           const avrDisplayValue = adjustVolumeDispl ? Math.round(eiscpValue / 2) : eiscpValue;
-          // const sliderValue = Math.round((avrDisplayValue * 100) / volumeScale);
           const scaledValue = Math.round((avrDisplayValue * 100) / volumeScale);
           const volumeSensorValue = volumeDisplay === "relative" ? scaledValue - 82 : scaledValue;
 
           this.driver.updateEntityAttributes(entityId, {
-            [uc.MediaPlayerAttributes.Volume]: volumeSensorValue// sliderValue //volumeDisplay === "relative" ? volumeSensorValue : sliderValue
+            [uc.MediaPlayerAttributes.Volume]: volumeSensorValue
           });
-          avrStateManager.setVolume(entityId, eiscpValue); //eiscpValue
-          // log.info("%s [%s] volume set to: %s", integrationName, entityId, sliderValue);
+          avrStateManager.setVolume(entityId, eiscpValue);
 
           // Update volume sensor
           const volumeSensorId = `${entityId}_volume_sensor`;
@@ -268,11 +253,10 @@ export class CommandReceiver {
         case "preset": {
           this.avrPreset = avrUpdates.argument.toString();
           log.info("%s [%s] preset set to: %s", integrationName, entityId, this.avrPreset);
-          // this.eiscpInstance.command("input-selector query");
           break;
         }
         case "input-selector": {
-          let source = avrUpdates.argument.toString().split(",")[0];
+          const source = avrUpdates.argument.toString().split(",")[0];
           avrStateManager.setSource(entityId, source, this.eiscpInstance, eventZone, this.driver);
           this.driver.updateEntityAttributes(entityId, {
             [uc.MediaPlayerAttributes.Source]: source
@@ -293,7 +277,8 @@ export class CommandReceiver {
               this.eiscpInstance.raw("DSNQSTN");
               break;
             case "fm":
-              this.eiscpInstance.raw("RDS01");
+              // FLDQSTN immediately queries the display so the sensor shows the PS name without waiting for the AVR to emit a spontaneous FLD event
+              this.eiscpInstance.raw("FLDQSTN");
               break;
             default:
               break;
@@ -318,6 +303,10 @@ export class CommandReceiver {
             this.driver.updateEntityAttributes(selectEntityId, {
               [SelectAttributes.CurrentOption]: listeningMode
             });
+            // Query AV info on every valid listening-mode update — this catches content changes on the same source (e.g. switching tracks on Apple TV) where the AVR doesn't push IFA/IFV spontaneously.
+            log.info("%s [%s] querying AV info after listening-mode update", integrationName, entityId);
+            this.eiscpInstance.command({ zone: eventZone, command: "audio-information", args: "query" }).catch(() => {});
+            this.eiscpInstance.command({ zone: eventZone, command: "video-information", args: "query" }).catch(() => {});
           }
           break;
         }

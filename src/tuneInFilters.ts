@@ -8,6 +8,13 @@ export function normalizeTuneInLabel(label: string): string {
   return label.substring(pipeIndex + 1).trim();
 }
 
+/** Returns the part before the first "|", or the full string if there is no pipe. Used to match NTI station names against preset entries. */
+export function extractTuneInStationKey(label: string): string {
+  const pipeIndex = label.indexOf("|");
+  if (pipeIndex === -1) return label.trim();
+  return label.substring(0, pipeIndex).trim();
+}
+
 export function looksLikeTuneInDirectory(title: string, iconId?: string): boolean {
   const normalized = title.trim().toLowerCase();
   const normalizedIconId = (iconId || "").trim().toUpperCase();
@@ -62,7 +69,7 @@ export function unescapeXml(value: string): string {
     .replace(/&apos;/g, "'");
 }
 
-export function parseTuneInXmlItems(xmlPayload: string): Array<{ title: string; iconId: string }> {
+export function parseTuneInXmlItems(xmlPayload: string): Array<{ title: string; stationKey: string; rawLabel: string; iconId: string }> {
   const itemMatches = [...xmlPayload.matchAll(/<item\b([^>]*)\/?>/gi)];
 
   return itemMatches.map((match) => {
@@ -72,6 +79,8 @@ export function parseTuneInXmlItems(xmlPayload: string): Array<{ title: string; 
 
     return {
       title: normalizeTuneInLabel(rawTitle),
+      stationKey: extractTuneInStationKey(rawTitle),
+      rawLabel: rawTitle,
       iconId
     };
   });

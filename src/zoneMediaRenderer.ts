@@ -6,7 +6,7 @@ import log from "./loggers.js";
 import { delay } from "./utils.js";
 import { ZoneAgnosticMediaStateStore } from "./zoneAgnosticMediaState.js";
 
-const integrationName = "zoneAgnosticUpdateProcessor:";
+const integrationName = "zoneMediaRenderer:";
 
 export class ZoneMediaRenderer {
   constructor(

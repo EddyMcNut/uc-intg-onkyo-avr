@@ -3,10 +3,10 @@ import { pathToFileURL } from "url";
 import path from "path";
 
 test.serial("ensureZoneInstances creates zone instances when physical connection present", async (t) => {
-  const mod = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/avrInstanceManager.js")).href);
-  const AvrInstanceManager = mod.default as any;
+  const mod = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/connectCoordinator.js")).href);
+  const ensureZoneInstances = mod.ensureZoneInstances as (...args: any[]) => Promise<void>;
 
-  const manager = new AvrInstanceManager();
+  const instances = new Map<string, any>();
 
   // Fake AVR config
   const avrs = [{ model: "M", ip: "1.2.3.4", port: 60128, zone: "main" }];
@@ -20,23 +20,22 @@ test.serial("ensureZoneInstances creates zone instances when physical connection
   // createCommandSender returns a dummy object referencing eiscp
   const createCommandSender = (_cfg: any, eiscp: any, _commandReceiver: any) => ({ eiscp });
 
-  await manager.ensureZoneInstances(avrs, getPhysicalConnection, createAvrSpecificConfig, createCommandSender);
+  await ensureZoneInstances(instances, avrs, getPhysicalConnection, createAvrSpecificConfig, createCommandSender);
 
-  const entries = Array.from(manager.entries());
+  const entries = Array.from(instances.entries());
   t.is(entries.length, 1);
-  const first = entries[0] as any;
-  const [entryId, instance] = first;
+  const [entryId, instance] = entries[0] as any;
   t.truthy(String(entryId).includes("M"));
   t.truthy(instance);
-  t.truthy((instance as any).commandSender);
-  t.truthy((instance as any).commandSender.eiscp.connected);
+  t.truthy(instance.commandSender);
+  t.truthy(instance.commandSender.eiscp.connected);
 });
 
 test.serial("ensureZoneInstances skips when no physical connection present", async (t) => {
-  const mod = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/avrInstanceManager.js")).href);
-  const AvrInstanceManager = mod.default as any;
+  const mod = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/connectCoordinator.js")).href);
+  const ensureZoneInstances = mod.ensureZoneInstances as (...args: any[]) => Promise<void>;
 
-  const manager = new AvrInstanceManager();
+  const instances = new Map<string, any>();
 
   const avrs = [{ model: "M2", ip: "2.2.2.2", port: 60128, zone: "main" }];
 
@@ -44,31 +43,35 @@ test.serial("ensureZoneInstances skips when no physical connection present", asy
   const createAvrSpecificConfig = (cfg: any) => ({ ...cfg });
   const createCommandSender = (_cfg: any, eiscp: any, _commandReceiver: any) => ({ eiscp });
 
-  await manager.ensureZoneInstances(avrs, getPhysicalConnection, createAvrSpecificConfig, createCommandSender);
+  await ensureZoneInstances(instances, avrs, getPhysicalConnection, createAvrSpecificConfig, createCommandSender);
 
-  const entries = Array.from(manager.entries());
-  t.is(entries.length, 0);
+  t.is(instances.size, 0);
 });
 
-test.serial("set/get/has/remove/clear operations work", async (t) => {
-  const mod = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/avrInstanceManager.js")).href);
-  const AvrInstanceManager = mod.default as any;
+test.serial("ensureZoneInstances refreshes config of existing instance", async (t) => {
+  const mod = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/connectCoordinator.js")).href);
+  const ensureZoneInstances = mod.ensureZoneInstances as (...args: any[]) => Promise<void>;
 
-  const manager = new AvrInstanceManager();
+  const instances = new Map<string, any>();
 
-  const id = "X_1.2.3.4_main";
-  const inst = { config: { model: "X" }, commandSender: {} };
+  const avrs = [{ model: "M3", ip: "3.3.3.3", port: 60128, zone: "main" }];
+  const getPhysicalConnection = (_physicalAvr: string) => ({ eiscp: { connected: true }, commandReceiver: {} });
+  const createAvrSpecificConfig = (cfg: any) => ({ ...cfg });
+  const updateConfigCalls: any[] = [];
+  const createCommandSender = (_cfg: any, eiscp: any, _commandReceiver: any) => ({
+    eiscp,
+    updateConfig: (c: any) => updateConfigCalls.push(c)
+  });
 
-  manager.setInstance(id, inst);
-  t.true(manager.hasInstance(id));
-  t.deepEqual(manager.getInstance(id), inst);
-  manager.removeInstance(id);
-  t.false(manager.hasInstance(id));
+  // First call creates the instance
+  await ensureZoneInstances(instances, avrs, getPhysicalConnection, createAvrSpecificConfig, createCommandSender);
+  t.is(instances.size, 1);
 
-  // clear
-  manager.setInstance("a", inst);
-  manager.setInstance("b", inst);
-  t.true(Array.from(manager.entries()).length === 2);
-  manager.clearInstances();
-  t.true(Array.from(manager.entries()).length === 0);
+  // Second call with updated config should refresh without creating a new instance
+  const updatedAvrs = [{ model: "M3", ip: "3.3.3.3", port: 60128, zone: "main", queueThreshold: 999 }];
+  await ensureZoneInstances(instances, updatedAvrs, getPhysicalConnection, createAvrSpecificConfig, createCommandSender);
+  t.is(instances.size, 1);
+  t.is(updateConfigCalls.length, 1);
+  const entry = instances.values().next().value;
+  t.is(entry.config.queueThreshold, 999);
 });

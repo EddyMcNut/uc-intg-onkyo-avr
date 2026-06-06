@@ -1,0 +1,104 @@
+graph TB
+    subgraph UC["Unfolded Circle Remote"]
+        UCAPI["IntegrationAPI\n(UC SDK)"]
+    end
+
+    subgraph Driver["OnkyoDriver  ·  src/driver.ts"]
+        direction TB
+        SetupH["SetupHandler\nsrc/setupHandler.ts"]
+        CC["ConnectCoordinator\nsrc/connectCoordinator.ts"]
+        ER["EntityRegistrar\nsrc/entityRegistrar.ts"]
+        SEH["SelectEntityHandler\nsrc/selectEntityHandler.ts"]
+        SubH["SubscriptionHandler"]
+    end
+
+    subgraph ConnLayer["Connection Layer"]
+        CM["ConnectionManager\nsrc/connectionManager.ts"]
+        RM["ReconnectionManager\nsrc/reconnectionManager.ts"]
+        INSTANCES["avrInstances\nMap&lt;string, AvrInstance&gt;\n(plain Map, owned by OnkyoDriver)"]
+    end
+
+    subgraph PerAVR["Per Physical AVR  (one set per unique IP)"]
+        EISCP["EiscpDriver\nsrc/eiscp.ts\nTCP socket · send queue\nreceive queue"]
+        PKT["eiscp-packet.ts\npacket encode / decode"]
+        PARSER["IscpCommandParser\neiscp-command-parser.ts\nISCP → CommandResult"]
+        MZONE["eiscp-multi-zone.ts\nmulti-zone command builders"]
+        CR["CommandReceiver\nsrc/commandReceiver.ts\nISCP → UC attributes"]
+        ZAUP["ZoneAgnosticUpdateProcessor\nsrc/zoneAgnosticUpdateProcessor.ts\nFLD / NLT / metadata fanout"]
+        ZAMSS["ZoneAgnosticMediaStateStore\nsrc/zoneAgnosticMediaState.ts\nnow-playing · image cache"]
+        ZMR["ZoneMediaRenderer\nsrc/zoneMediaRenderer.ts\nalbum-art fetch + push"]
+    end
+
+    subgraph PerZone["Per Zone  (main / zone2 / zone3)"]
+        CS["CommandSender\nsrc/commandSender.ts\nUC command → eISCP"]
+    end
+
+    subgraph State["State & Config"]
+        ASM["AvrStateManager\nsrc/avrState.ts\nper-zone state cache"]
+        ASQ["AvrStateQueryService\nsrc/avrStateQuery.ts\ndebounced query send"]
+        CFG["ConfigManager\nsrc/configManager.ts\nconfig.json"]
+        MAPS["Command maps\neiscp-commands.ts\neiscp-mappings.ts"]
+    end
+
+    subgraph AVR["Physical AVR(s)"]
+        AVRBox["Onkyo / Pioneer / Integra AVR\nTCP port 60128"]
+    end
+
+    %% UC ↔ Driver
+    UCAPI -- "Connect / Standby events\nentity commands" --> Driver
+    Driver -- "entity attribute updates\ndevice state" --> UCAPI
+
+    %% Driver internals
+    UCAPI --> SetupH
+    UCAPI --> CC
+    CC --> CM
+    CC -- "ensureZoneInstances()" --> INSTANCES
+    Driver -- "queryAvrState /\nqueryAllZonesState" --> ASQ
+
+    %% Connection layer
+    CM --> EISCP
+    CM --> CR
+    CM --> RM
+    INSTANCES --> CS
+
+    %% EiscpDriver sub-modules
+    EISCP --> PKT
+    EISCP --> PARSER
+    EISCP --> MZONE
+
+    %% Per-AVR: receive path
+    EISCP -- "raw 'data' events" --> CR
+    CR -- "zone-agnostic commands" --> ZAUP
+    CR -- "write state" --> ASM
+    ZAUP -- "read: resolve zones\nwrite: setSource (DAB)" --> ASM
+    ZAUP --> ZAMSS
+    ZAUP --> ZMR
+
+    %% EiscpDriver reads state for FM/NET routing
+    EISCP -- "read: source / sub-source\nfor FLD routing" --> ASM
+
+    %% Per-zone: send path
+    CS --> EISCP
+
+    %% SubscriptionHandler queries AVR on subscribe
+    SubH --> ASQ
+
+    %% State & Config
+    CFG --> Driver
+    MAPS --> CR
+    MAPS --> CS
+
+    %% AVR TCP
+    EISCP <-- "eISCP TCP" --> AVRBox
+
+    %% Style
+    classDef entry fill:#4a6fa5,color:#fff,stroke:#2d4e7a
+    classDef conn fill:#2d7a4a,color:#fff,stroke:#1a5c34
+    classDef data fill:#7a4a2d,color:#fff,stroke:#5c3419
+    classDef avr fill:#5c2d7a,color:#fff,stroke:#3e1a5c
+    class CC,CM,RM,INSTANCES conn
+    class ASM,ASQ,CFG,MAPS data
+    class EISCP,AVRBox avr
+    class PKT,PARSER,MZONE util
+    class SetupH,ER,SEH,SubH entry
+    classDef util fill:#6a5a2d,color:#fff,stroke:#4e4219

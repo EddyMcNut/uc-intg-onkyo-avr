@@ -1,16 +1,15 @@
 import { EiscpDriver } from "./eiscp.js";
 import log from "./loggers.js";
-import { delay } from "./utils.js";
+import { delay, toHex } from "./utils.js";
 import { getTuneInPresetCount, hasTuneInPresets, setTuneInBrowseContext } from "./mediaBrowser.js";
 
-const integrationName = "zoneAgnosticUpdateProcessor:";
+const integrationName = "tuneInPreloader:";
 
 type PhysicalAvrIdResolver = (entityId: string) => string;
 
 export class TuneInPreloader {
   private readonly tuneInPreloadInFlight = new Set<string>();
   private tuneInListSequence = 0;
-  private abortRequested = false;
 
   constructor(
     private readonly eiscpInstance: EiscpDriver,
@@ -20,7 +19,7 @@ export class TuneInPreloader {
   private nextTuneInListSequence(): string {
     const sequence = this.tuneInListSequence & 0xffff;
     this.tuneInListSequence = (this.tuneInListSequence + 1) & 0xffff;
-    return sequence.toString(16).toUpperCase().padStart(4, "0");
+    return toHex(sequence, 4);
   }
 
   private async requestTuneInPresetXml(): Promise<void> {
@@ -37,9 +36,8 @@ export class TuneInPreloader {
     }
 
     this.tuneInPreloadInFlight.add(physicalAvrId);
-    const menuDelay = this.eiscpInstance["config"]?.netMenuDelay ?? 2500;
-      this.abortRequested = false;
-    const myPresetsPosition = String(this.eiscpInstance["config"]?.tuneinPresetPosition ?? 1).padStart(5, "0");
+    const menuDelay = this.eiscpInstance.eiscpConfig?.netMenuDelay ?? 2500;
+    const myPresetsPosition = String(this.eiscpInstance.eiscpConfig?.tuneinPresetPosition ?? 1).padStart(5, "0");
     const scanDelay = Math.max(200, Math.min(menuDelay || 0, 1000));
 
     try {
@@ -65,14 +63,10 @@ export class TuneInPreloader {
     }
   }
 
-  /**
-   * Aborts an in-flight preload for this AVR. Returns true if a preload was actually
-   * running (and has been flagged to stop), false if nothing was in flight.
-   */
+  // Aborts an in-flight preload for this AVR. Returns true if a preload was actually running (and has been flagged to stop), false if nothing was in flight.
   abortPreload(entityId: string): boolean {
     const physicalAvrId = this.resolvePhysicalAvrId(entityId);
     if (this.tuneInPreloadInFlight.has(physicalAvrId)) {
-      this.abortRequested = true;
       return true;
     }
     return false;

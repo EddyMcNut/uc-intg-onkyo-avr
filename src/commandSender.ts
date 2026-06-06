@@ -2,10 +2,24 @@ import * as uc from "@unfoldedcircle/integration-api";
 import { EiscpDriver } from "./eiscp.js";
 import { buildEntityId, DEFAULT_QUEUE_THRESHOLD, MAX_LENGTHS, PATTERNS, OnkyoConfig } from "./configManager.js";
 import { avrStateManager } from "./avrState.js";
+import { ICommandReceiver } from "./types.js";
 import log from "./loggers.js";
-import { delay } from "./utils.js";
-import { browseMedia, isMediaBrowsingAvailable, isTidalMainMenuRequest, resolveTidalMenuOption, resolveTuneInPreset } from "./mediaBrowser.js";
-import { consumeTidalListModeActive, consumeTraceNextTidalSelectionAfterMainMenu, listTidalMenuOptions, markTidalBrowseListFrozen } from "./tidalBrowserStore.js";
+import { delay, toHex, ensureEiscpConnected } from "./utils.js";
+import {
+  browseMedia,
+  isMediaBrowsingAvailable,
+  isTidalMainMenuRequest,
+  isTuneInMenuRootRequest,
+  resolveTidalMenuOption,
+  resolveTuneInMenuOption,
+  resolveTuneInPreset,
+  TIDAL_BACK_ID,
+  TUNEIN_MENU_BACK_ID,
+  TUNEIN_MENU_ROOT_TYPE,
+  TIDAL_ROOT_TYPE
+} from "./mediaBrowser.js";
+import { consumeTidalListModeActive, consumeTraceNextTidalSelectionAfterMainMenu, listTidalMenuOptions, getTidalBrowseState } from "./tidalBrowserStore.js";
+import { consumeTuneInListModeActive, setTuneInMenuBrowseFrozen, setTuneInMenuNowPlayingStation } from "./tuneInMenuStore.js";
 
 const integrationName = "commandSender:";
 
@@ -14,9 +28,9 @@ export class CommandSender {
   private config: OnkyoConfig;
   private eiscp: EiscpDriver;
   private lastCommandTime: number = 0;
-  private commandReceiver: any; // CommandReceiver type to avoid circular dependency
+  private commandReceiver: ICommandReceiver | undefined;
 
-  constructor(driver: uc.IntegrationAPI, config: OnkyoConfig, eiscp: EiscpDriver, commandReceiver: any) {
+  constructor(driver: uc.IntegrationAPI, config: OnkyoConfig, eiscp: EiscpDriver, commandReceiver: ICommandReceiver | undefined) {
     this.driver = driver;
     this.config = config;
     this.eiscp = eiscp;
@@ -47,41 +61,8 @@ export class CommandSender {
     // Check if connected, and trigger reconnection if needed
     // This handles the case where user sends a command after wake-up from standby
     // and the driver reconnection hasn't been triggered yet
-    if (!this.eiscp.connected) {
-      log.info("%s [%s] Command received while disconnected, triggering reconnection...", integrationName, entity.id);
-      try {
-        const avrConfig = targetAvr;
-        if (avrConfig) {
-          await this.eiscp.connect({
-            model: avrConfig.model,
-            host: avrConfig.ip,
-            port: avrConfig.port
-          });
-          await this.eiscp.waitForConnect(3000);
-          log.info("%s [%s] Reconnected on command", integrationName, entity.id);
-        }
-      } catch (connectErr) {
-        log.warn("%s [%s] Failed to reconnect on command: %s", integrationName, entity.id, connectErr);
-        // Fall through to retry logic below
-      }
-    }
-
-    try {
-      await this.eiscp.waitForConnect();
-    } catch (err) {
-      log.warn("%s [%s] Could not send command, AVR not connected: %s", integrationName, entity.id, err);
-      for (let attempt = 1; attempt <= 5; attempt++) {
-        await delay(1000);
-        try {
-          await this.eiscp.waitForConnect();
-          break;
-        } catch (retryErr) {
-          if (attempt === 5) {
-            log.warn("%s [%s] Could not connect to AVR after 5 attempts: %s", integrationName, entity.id, retryErr);
-            return uc.StatusCodes.Timeout;
-          }
-        }
-      }
+    if (!(await ensureEiscpConnected(this.eiscp, { model: targetAvr.model, host: targetAvr.ip, port: targetAvr.port }, entity.id, integrationName))) {
+      return uc.StatusCodes.Timeout;
     }
 
     log.info("%s [%s] media-player command request: %s", integrationName, entity.id, cmdId, params || "");
@@ -93,7 +74,7 @@ export class CommandSender {
 
     const now = Date.now();
     // Determine queue threshold: prefer explicit config, then eISCP driver's send_delay, else default
-    const queueThreshold = this.config.queueThreshold ?? (typeof this.eiscp["config"]?.send_delay === "number" ? this.eiscp["config"].send_delay : DEFAULT_QUEUE_THRESHOLD);
+    const queueThreshold = this.config.queueThreshold ?? (typeof this.eiscp.eiscpConfig?.sendDelay === "number" ? this.eiscp.eiscpConfig.sendDelay : DEFAULT_QUEUE_THRESHOLD);
 
     if (now - this.lastCommandTime > queueThreshold) {
       switch (cmdId) {
@@ -110,20 +91,15 @@ export class CommandSender {
           await this.eiscp.command(setZonePrefix("audio-muting toggle"));
           break;
         case uc.MediaPlayerCommands.VolumeUp:
-          // if (now - this.lastCommandTime > queueThreshold) {
           this.lastCommandTime = now;
-          await this.eiscp.command(setZonePrefix("volume level-up-1db-step"));
-          // }
+          await this.eiscp.raw(zone === "main" ? "MVLUP1" : zone === "zone2" ? "ZVLUP1" : zone === "zone3" ? "VL3UP1" : "VL4UP1");
           break;
         case uc.MediaPlayerCommands.VolumeDown:
-          // if (now - this.lastCommandTime > queueThreshold) {
           this.lastCommandTime = now;
-          await this.eiscp.command(setZonePrefix("volume level-down-1db-step"));
-          // }
+          await this.eiscp.raw(zone === "main" ? "MVLDOWN1" : zone === "zone2" ? "ZVLDOWN1" : zone === "zone3" ? "VL3DOWN1" : "VL4DOWN1");
           break;
         case uc.MediaPlayerCommands.Volume:
           if (params?.volume !== undefined) {
-            log.debug("************* %s", params.volume);
             const volumeDisplay = String(this.config.volumeDisplay ?? "absolute").toLowerCase() === "relative" ? "relative" : "absolute";
             if (volumeDisplay !== "absolute") {
               log.debug("%s [%s] volume set to relative so slider is ignored.", integrationName, entity.id);
@@ -140,20 +116,7 @@ export class CommandSender {
 
             // Convert to EISCP: some models use 0.5 dB steps (×2), others show EISCP value directly
             const eiscpValue = adjustVolumeDispl ? avrDisplayValue * 2 : avrDisplayValue;
-            const hexVolume = eiscpValue.toString(16).toUpperCase().padStart(2, "0");
-
-            // // Debug logging for volume conversion
-            // log.info(
-            //   "%s [%s] volume conversion: slider=%d volumeScale=%d adjustVolumeDispl=%s avrDisplay=%d eiscpValue=%d hex=%s",
-            //   integrationName,
-            //   entity.id,
-            //   sliderValue,
-            //   volumeScale,
-            //   String(adjustVolumeDispl),
-            //   avrDisplayValue,
-            //   eiscpValue,
-            //   hexVolume
-            // );
+            const hexVolume = toHex(eiscpValue, 2);
 
             // Use zone-specific volume command prefix
             let volumePrefix = "MVL"; // main zone
@@ -239,29 +202,73 @@ export class CommandSender {
           const mediaId = typeof params?.media_id === "string" ? params.media_id : undefined;
           const mediaType = typeof params?.media_type === "string" ? params.media_type : undefined;
           const preset = resolveTuneInPreset(mediaId, mediaType);
+          const tuneInMenuOption = resolveTuneInMenuOption(entity.id, mediaId, mediaType);
+          const tuneInRootRequest = isTuneInMenuRootRequest(mediaId, mediaType);
           const tidalMainMenu = isTidalMainMenuRequest(mediaId, mediaType);
           const tidalOption = resolveTidalMenuOption(mediaId, mediaType);
+          const tuneInBackRequest = mediaId === TUNEIN_MENU_BACK_ID && (mediaType === undefined || mediaType === TUNEIN_MENU_ROOT_TYPE);
+          const tidalBackRequest = mediaId === TIDAL_BACK_ID && (mediaType === undefined || mediaType === TIDAL_ROOT_TYPE);
 
-          if (!preset && !tidalMainMenu && !tidalOption) {
+          if (!preset && !tuneInRootRequest && !tuneInMenuOption && !tidalMainMenu && !tidalOption && !tuneInBackRequest && !tidalBackRequest) {
             return uc.StatusCodes.NotFound;
           }
 
+          if (tuneInBackRequest || tidalBackRequest) {
+            await this.eiscp.raw("NTCRETURN");
+            break;
+          }
+
           if (preset) {
-            const wasPreloading = (this.commandReceiver as any)?.abortTuneInPreload?.(entity.id) ?? false;
+            const wasPreloading = this.commandReceiver?.abortTuneInPreload?.(entity.id) ?? false;
             const currentSource = avrStateManager.getSource(entity.id);
             const currentSubSource = avrStateManager.getSubSource(entity.id);
             if (wasPreloading || currentSource !== "net" || currentSubSource !== "tunein") {
               await this.eiscp.command(setZonePrefix("input-selector tunein"));
-              await delay(targetAvr.netMenuDelay ?? DEFAULT_QUEUE_THRESHOLD);
+              // await this.eiscp.raw("NTCTOP");
+              // await delay(targetAvr.netMenuDelay ?? DEFAULT_QUEUE_THRESHOLD);
             }
 
             await this.eiscp.command(setZonePrefix(`tunein-preset ${preset.presetIndex}`));
             break;
           }
 
+          if (tuneInRootRequest) {
+            await this.eiscp.command(setZonePrefix("input-selector tunein"));
+            await delay(targetAvr.netMenuDelay ?? DEFAULT_QUEUE_THRESHOLD);
+            break;
+          }
+
+          if (tuneInMenuOption) {
+            const currentSource = avrStateManager.getSource(entity.id);
+            const currentSubSource = avrStateManager.getSubSource(entity.id);
+            if (currentSource !== "net" || currentSubSource !== "tunein") {
+              await this.eiscp.command(setZonePrefix("input-selector tunein"));
+              await delay(targetAvr.netMenuDelay ?? DEFAULT_QUEUE_THRESHOLD);
+            }
+
+            if (!tuneInMenuOption.isBrowsable) {
+              setTuneInMenuBrowseFrozen(entity.id, true);
+              setTuneInMenuNowPlayingStation(entity.id, tuneInMenuOption.title);
+              const alreadyInListMode = consumeTuneInListModeActive(entity.id);
+              if (!alreadyInListMode) {
+                const playbackStatus = avrStateManager.getPlaybackStatus(entity.id);
+                if (playbackStatus === "playing" || playbackStatus === "paused" || playbackStatus === "ff" || playbackStatus === "fr") {
+                  await this.eiscp.command(setZonePrefix("network-usb list"));
+                  await delay(targetAvr.netMenuDelay ?? DEFAULT_QUEUE_THRESHOLD);
+                }
+              }
+            } else {
+              setTuneInMenuBrowseFrozen(entity.id, false);
+            }
+
+            await this.eiscp.raw(`NLSI${String(tuneInMenuOption.menuIndex).padStart(5, "0")}`);
+            break;
+          }
+
           if (tidalMainMenu) {
             await this.eiscp.command(setZonePrefix("input-selector tidal"));
-            await delay(targetAvr.netMenuDelay ?? DEFAULT_QUEUE_THRESHOLD);
+            // await this.eiscp.raw("NTCMENU");
+            // await delay(targetAvr.netMenuDelay ?? DEFAULT_QUEUE_THRESHOLD);
             break;
           }
 
@@ -270,35 +277,18 @@ export class CommandSender {
           }
 
           const shouldTraceSelection = consumeTraceNextTidalSelectionAfterMainMenu(entity.id);
-          if (shouldTraceSelection) {
-            log.info(
-              "%s [%s] TRACE first Tidal selection after Main Tidal Menu: media_id='%s' media_type='%s' parsedIndex=%d parsedTitle='%s'",
-              integrationName,
-              entity.id,
-              String(mediaId),
-              String(mediaType),
-              tidalOption.menuIndex,
-              tidalOption.title
-            );
-          }
+          // if (shouldTraceSelection) {
+          //    log.info("%s [%s] TRACE first Tidal selection after Main Tidal Menu: media_id='%s' media_type='%s' parsedIndex=%d parsedTitle='%s'",integrationName,entity.id,String(mediaId),String(mediaType),tidalOption.menuIndex,tidalOption.title);
+          // }
 
-          // Capture the selected title from the cached list; we'll use it to remap to the
-          // freshest AVR list index right before selecting, avoiding stale-index mismatches.
-          const requestedTitle = /^Menu \d+$/.test(tidalOption.title)
-            ? listTidalMenuOptions(entity.id).find((item) => item.menuIndex === tidalOption.menuIndex)?.title
-            : tidalOption.title;
+          // Capture the selected title from the cached list; we'll use it to remap to the freshest AVR list index right before selecting, avoiding stale-index mismatches.
+          const requestedTitle = /^Menu \d+$/.test(tidalOption.title) ? listTidalMenuOptions(entity.id).find((item) => item.menuIndex === tidalOption.menuIndex)?.title : tidalOption.title;
           if (shouldTraceSelection) {
             const cached = listTidalMenuOptions(entity.id)
               .slice(0, 12)
               .map((item) => `${item.menuIndex}:${item.title}`)
               .join(", ");
-            log.info(
-              "%s [%s] TRACE cached Tidal menu before command: [%s] requestedTitle='%s'",
-              integrationName,
-              entity.id,
-              cached,
-              requestedTitle ?? ""
-            );
+            log.info("%s [%s] TRACE cached Tidal menu before command: [%s] requestedTitle='%s'", integrationName, entity.id, cached, requestedTitle ?? "");
           }
 
           const currentSource = avrStateManager.getSource(entity.id);
@@ -307,11 +297,7 @@ export class CommandSender {
             await this.eiscp.command(setZonePrefix("input-selector tidal"));
             await delay(targetAvr.netMenuDelay ?? DEFAULT_QUEUE_THRESHOLD);
           } else if (!tidalOption.isBrowsable) {
-            // Track selection: send network-usb list only when the AVR is in now-playing mode.
-            // If the browse callback just finished streaming an NLS list, the AVR is already in
-            // list mode (listModeActive flag is set) — skip pre-list to avoid an NLT bounce that
-            // would swallow the NLSI. If the flag is not set (user re-opened cached browser while
-            // a song was playing), send pre-list to return AVR to list mode before selecting.
+            // Track selection: send network-usb list only when the AVR is in now-playing mode. If the browse callback just finished streaming an NLS list, the AVR is already in list mode (listModeActive flag is set) — skip pre-list to avoid an NLT bounce that would swallow the NLSI.
             const alreadyInListMode = consumeTidalListModeActive(entity.id);
             if (!alreadyInListMode) {
               const playbackStatus = avrStateManager.getPlaybackStatus(entity.id);
@@ -326,33 +312,18 @@ export class CommandSender {
           if (requestedTitle) {
             const remapped = listTidalMenuOptions(entity.id).find((item) => item.title === requestedTitle);
             if (remapped && remapped.menuIndex !== tidalOption.menuIndex) {
-              log.debug(
-                "%s [%s] remapped Tidal selection '%s' from index %d to %d",
-                integrationName,
-                entity.id,
-                requestedTitle,
-                tidalOption.menuIndex,
-                remapped.menuIndex
-              );
+              log.debug("%s [%s] remapped Tidal selection '%s' from index %d to %d", integrationName, entity.id, requestedTitle, tidalOption.menuIndex, remapped.menuIndex);
               menuIndexToSelect = remapped.menuIndex;
             }
           }
 
           if (shouldTraceSelection) {
-            log.info(
-              "%s [%s] TRACE final Tidal selection index=%d source=%s subsource=%s",
-              integrationName,
-              entity.id,
-              menuIndexToSelect,
-              currentSource,
-              currentSubSource
-            );
+            log.info("%s [%s] TRACE final Tidal selection index=%d source=%s subsource=%s", integrationName, entity.id, menuIndexToSelect, currentSource, currentSubSource);
           }
 
-          // Freeze the browse list when selecting a song so the spontaneous post-playback
-          // NLS the AVR sends (U0 → index 1) cannot wipe the harvested item list.
-          // Unfreeze for directory selections so the incoming directory NLS can replace the list.
-          markTidalBrowseListFrozen(entity.id, !tidalOption.isBrowsable);
+          // Freeze the browse list when selecting a song so the spontaneous post-playback NLS the AVR sends (U0 → index 1) cannot wipe the harvested item list. Unfreeze for directory selections so the incoming directory NLS can replace the list.
+          const tidalState = getTidalBrowseState(entity.id);
+          if (tidalState) tidalState.browseListFrozen = !tidalOption.isBrowsable;
           await this.eiscp.raw(`NLSI${String(menuIndexToSelect).padStart(5, "0")}`);
           break;
         }

@@ -1,173 +1,26 @@
 import path from "path";
 import fs from "fs";
-import log from "./loggers.js";
+import log, { setLogLevel } from "./loggers.js";
+
+// Re-export everything from configConstants so existing imports via configManager continue to work.
+export * from "./configConstants.js";
+import { MAX_LENGTHS, PATTERNS, parseSelectOptions, parseBoolean, AvrZone, AvrConfig, OnkyoConfig, AVR_DEFAULTS, EntityNameStyle, LogLevel } from "./configConstants.js";
 
 const integrationName = "configManager:";
-
-export const DEFAULT_QUEUE_THRESHOLD = 100;
 
 // Config directory is configurable at runtime to support integration manager backups/restores
 let CONFIG_DIR = process.env.UC_CONFIG_HOME || process.cwd();
 let CONFIG_PATH = path.resolve(CONFIG_DIR, "config.json");
 
-/**
- * Set the configuration directory explicitly (used by the driver when the
- * Integration API exposes the proper config dir). This ensures the
- * integration reads/writes the same files the Integration Manager will back up.
- */
+// Set the config directory to match the Integration API's path so backups/restores work correctly.
 export function setConfigDir(dir: string) {
   CONFIG_DIR = dir || process.env.UC_CONFIG_HOME || process.cwd();
   CONFIG_PATH = path.resolve(CONFIG_DIR, "config.json");
 }
 
-/**
- * Helper to get current config path (useful for testing/manager compatibility)
- */
+// Returns the current config file path (useful for testing/manager compatibility).
 export function getConfigPath(): string {
   return CONFIG_PATH;
-}
-
-/** Security: Maximum input lengths for validation */
-export const MAX_LENGTHS = {
-  MODEL_NAME: 50,
-  IP_ADDRESS: 15,
-  ALBUM_ART_URL: 250,
-  PIN_CODE: 4,
-  USER_COMMAND: 250, // input-selector, listening-mode, etc.
-  RAW_COMMAND: 20 // raw MVL20, etc.
-} as const;
-
-/** Security: Validation patterns */
-export const PATTERNS = {
-  IP_ADDRESS: /^(\d{1,3}\.){3}\d{1,3}$/,
-  MODEL_NAME: /^[a-zA-Z0-9\-_.() ]+$/,
-  ALBUM_ART_URL: /^[a-zA-Z0-9._\-/]+$/,
-  PIN_CODE: /^\d{4}$/,
-  USER_COMMAND: /^[a-z0-9\-\s.:=]+$/i, // Letters, numbers, hyphens, spaces, delimiters
-  SELECT_OPTION: /^[a-zA-Z0-9-]+$/, // Select-entity option entries: letters, numbers, hyphens only
-  RAW_COMMAND: /^[A-Z0-9]+$/ // Uppercase letters and numbers only
-} as const;
-
-/**
- * Parse a select-entity options field from user input.
- * - Returns `null` when the user typed 'none' (signal: don't create the entity).
- * - Returns an empty array when the input is blank / undefined (use driver defaults).
- * - Returns the trimmed, non-empty items otherwise.
- */
-export function parseSelectOptions(raw: unknown): string[] | null {
-  if (raw === null) return null;
-  if (raw === undefined || raw === "") return [];
-  if (typeof raw === "string") {
-    const trimmed = raw.trim();
-    if (trimmed.toLowerCase() === "none") return null;
-    return trimmed
-      .split(/[;,]/)
-      .map((s) => s.trim())
-      .filter((s) => s !== "");
-  }
-  if (Array.isArray(raw)) {
-    const arr = (raw as unknown[]).map((s) => String(s).trim()).filter(Boolean);
-    if (arr.length === 1 && arr[0].toLowerCase() === "none") return null;
-    return arr;
-  }
-  return [];
-}
-
-/** Parse a boolean-like value from string/boolean/undefined */
-export function parseBoolean(value: unknown, defaultValue: boolean): boolean {
-  if (value === undefined || value === null || value === "") {
-    return defaultValue;
-  }
-  if (typeof value === "boolean") {
-    return value;
-  }
-  if (typeof value === "string") {
-    return value.toLowerCase() === "true";
-  }
-  return defaultValue;
-}
-
-/** Valid zone identifiers */
-export type AvrZone = "main" | "zone2" | "zone3" | "zone4";
-
-/**
- * Construct an entity ID from model, host/ip, and zone.
- * Format: "MODEL IP ZONE" (e.g., "TX-RZ50 192.168.2.103 main")
- */
-export function buildEntityId(model: string, host: string, zone: string): string {
-  return `${model} ${host} ${zone}`;
-}
-
-/**
- * Construct a physical AVR identifier from model and host/ip.
- * Format: "MODEL IP" (e.g., "TX-RZ50 192.168.2.103")
- * Used to identify a physical AVR regardless of zone.
- */
-export function buildPhysicalAvrId(model: string, host: string): string {
-  return `${model} ${host}`;
-}
-
-/** Default values for AVR configuration */
-export const AVR_DEFAULTS = {
-  queueThreshold: DEFAULT_QUEUE_THRESHOLD,
-  albumArtURL: "album_art.cgi",
-  volumeScale: 100,
-  volumeDisplay: "absolute",
-  adjustVolumeDispl: true,
-  entityNameStyle: "long",
-  createSensors: true,
-  netMenuDelay: 500,
-  tuneinPresetPosition: 1,
-  port: 60128
-} as const;
-
-export type EntityNameStyle = "long" | "short";
-export type VolumeDisplay = "absolute" | "relative";
-
-export interface AvrConfig {
-  model: string;
-  ip: string;
-  port: number;
-  zone: AvrZone;
-  queueThreshold?: number;
-  albumArtURL?: string;
-  volumeScale?: number; // 80 or 100
-  volumeDisplay?: VolumeDisplay; // absolute = 1-100 style, relative = dB style
-  adjustVolumeDispl?: boolean; // true = use 0.5 dB steps (×2 / ÷2), false = direct EISCP value
-  entityNameStyle?: EntityNameStyle; // long = include host/ip in visible names, short = omit host/ip
-  createSensors?: boolean; // true = create sensor entities for this AVR
-  netMenuDelay?: number; // delay in ms for NET menu to load (default 2500)
-  tuneinPresetPosition?: number; // position of "My Presets" in TuneIn menu (1-9, default 1)
-  /**
-   * Optional user-configured listening mode options.
-   * - `undefined` / `[]`: show all/dynamic options.
-   * - Non-empty array: show exactly these options.
-   * - `null`: do not create the Listening Mode select entity.
-   */
-  listeningModeOptions?: string[] | null;
-  /**
-   * Optional user-configured input selector options.
-   * - `undefined` / `[]`: show all available inputs.
-   * - Non-empty array: show exactly these options.
-   * - `null`: do not create the Input Selector select entity.
-   */
-  inputSelectorOptions?: string[] | null;
-}
-
-export interface OnkyoConfig {
-  avrs?: AvrConfig[];
-  queueThreshold?: number;
-  albumArtURL?: string;
-  volumeScale?: number; // 80 or 100
-  volumeDisplay?: VolumeDisplay;
-  adjustVolumeDispl?: boolean; // true = use 0.5 dB steps (×2 / ÷2), false = direct EISCP value
-  entityNameStyle?: EntityNameStyle;
-  createSensors?: boolean; // true = create sensor entities
-  // Legacy fields for backward compatibility
-  model?: string;
-  ip?: string;
-  port?: number;
-  selectedAvr?: string;
 }
 
 export class ConfigManager {
@@ -189,6 +42,7 @@ export class ConfigManager {
       createSensors: avr.createSensors ?? AVR_DEFAULTS.createSensors,
       netMenuDelay: avr.netMenuDelay ?? AVR_DEFAULTS.netMenuDelay,
       tuneinPresetPosition: avr.tuneinPresetPosition ?? AVR_DEFAULTS.tuneinPresetPosition,
+      tuneinMenuStyle: avr.tuneinMenuStyle ?? AVR_DEFAULTS.tuneinMenuStyle,
       listeningModeOptions: avr.listeningModeOptions,
       inputSelectorOptions: avr.inputSelectorOptions
     };
@@ -256,6 +110,9 @@ export class ConfigManager {
       log.error(`${integrationName} Failed to load config:`, err);
       this.config = {};
     }
+    if (this.config.logLevel) {
+      setLogLevel(this.config.logLevel as LogLevel);
+    }
     return this.config;
   }
 
@@ -308,10 +165,7 @@ export class ConfigManager {
     return this.config;
   }
 
-  /**
-   * Validate a single AVR object from a restored payload.
-   * Returns an object with errors (if any) and a normalized AvrConfig when valid.
-   */
+  // Validate a single AVR object from a restored payload. Returns an object with errors (if any) and a normalized AvrConfig when valid.
   static validateAvrPayload(avr: any): { errors: string[]; normalized?: AvrConfig } {
     const errors: string[] = [];
 
@@ -425,6 +279,14 @@ export class ConfigManager {
       }
     }
 
+    // tuneinMenuStyle
+    if (avr.tuneinMenuStyle !== undefined) {
+      const style = String(avr.tuneinMenuStyle).toLowerCase();
+      if (style !== "mypresets" && style !== "full") {
+        errors.push('tuneinMenuStyle must be "mypresets" or "full"');
+      }
+    }
+
     // Validate a select-options field (listeningModeOptions / inputSelectorOptions)
     const validateSelectOptions = (raw: unknown, fieldName: string): string[] | null | undefined => {
       if (raw === undefined) return undefined;
@@ -469,6 +331,7 @@ export class ConfigManager {
       createSensors: parseBoolean(avr.createSensors, AVR_DEFAULTS.createSensors),
       netMenuDelay: typeof avr.netMenuDelay === "string" ? parseInt(avr.netMenuDelay, 10) : avr.netMenuDelay,
       tuneinPresetPosition: typeof avr.tuneinPresetPosition === "string" ? parseInt(avr.tuneinPresetPosition, 10) : avr.tuneinPresetPosition,
+      tuneinMenuStyle: String(avr.tuneinMenuStyle ?? AVR_DEFAULTS.tuneinMenuStyle).toLowerCase() === "full" ? "full" : "mypresets",
       listeningModeOptions: lmoParsed,
       inputSelectorOptions: isoParsed
     });
@@ -495,6 +358,15 @@ export class ConfigManager {
     }
 
     const normalizedConfig: OnkyoConfig = {};
+
+    // Preserve global logLevel if present
+    const validLogLevels = ["debug", "info", "warn", "error"];
+    if (cfg.logLevel !== undefined) {
+      const level = String(cfg.logLevel).toLowerCase();
+      if (validLogLevels.includes(level)) {
+        normalizedConfig.logLevel = level as LogLevel;
+      }
+    }
 
     if (Array.isArray(cfg.avrs)) {
       const normalizedAvrs: AvrConfig[] = [];

@@ -1,4 +1,4 @@
-import { buildPhysicalAvrId } from "./configManager.js";
+import { physicalAvrIdFromEntityId } from "./configManager.js";
 
 export interface NowPlayingState {
   station?: string;
@@ -18,14 +18,7 @@ export class ZoneAgnosticMediaStateStore {
   private readonly currentTrackId = new Map<string, string>();
 
   getPhysicalAvrId(entityId: string): string {
-    const parts = entityId.trim().split(/\s+/);
-    if (parts.length < 3) {
-      return entityId.trim();
-    }
-
-    const host = parts[parts.length - 2];
-    const model = parts.slice(0, -2).join(" ");
-    return buildPhysicalAvrId(model, host);
+    return physicalAvrIdFromEntityId(entityId) ?? entityId.trim();
   }
 
   getSharedAvrMediaState(entityId: string): SharedAvrMediaState {

@@ -52,4 +52,3 @@ Different models sometimes use different names for a single listening mode, You 
 | mono                                            |
 | pure-direct                                     |
 | stereo                                          |
-

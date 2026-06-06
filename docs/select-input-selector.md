@@ -24,4 +24,3 @@ As the list of all known options is very long, you can configure which options y
   - The configured list is saved, included in backups, and persists across reboots.
 
 [Input Selector](./input-selector.md)
-

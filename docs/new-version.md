@@ -5,6 +5,7 @@ As from v0.8.0 the integration offers the option to backup and restore the confi
 Version 0.8.0 is compatible with [Integration Manager](https://github.com/JackJPowell/uc-intg-manager). If you don't use that Integration Manager, continue reading here.
 
 ## Installing a new version directly within the web configurator running Unfolded Circle Firmware v.2.9.3+
+
 1. create a backup of the _remote_
 
    ![](../screenshots/backup.png)
@@ -13,7 +14,7 @@ Version 0.8.0 is compatible with [Integration Manager](https://github.com/JackJP
 
 3. configurator: Integrations > Add new > Install custom
 
-4. select `Update installed integration` 
+4. select `Update installed integration`
 
 5. click `Browse` and select the newly downloaded tar.gs of step 2
 
@@ -21,8 +22,8 @@ Version 0.8.0 is compatible with [Integration Manager](https://github.com/JackJP
 
 6. click `Upload`, wait a few seconds, done!
 
-
 ## Installing a new version directly within the web configurator running Unfolded Circle Firmware v.2.9.2-
+
 Installing a new version by using the web configurator is done by removing the current version. **As long as you make sure that during setup of the new version the selected AVR has the exact name and IP as in the current version, all your mappings in your activities will be preserved.**
 If your AVR was autodiscovered, the name will be the same when you let it be autodiscovered again, as long as the IP address stays the same.
 
@@ -44,4 +45,3 @@ If your AVR was autodiscovered, the name will be the same when you let it be aut
 7. done!
 
 [Migrate from pre-v.0.7.0 to v.0.7.0+](v070-migration.md)
-

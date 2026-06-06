@@ -23,4 +23,3 @@ Now you can add a specific AVR to an activity.
 For each AVR you can set specific [`Message queue Threshold`](./known-issues.md) and [album-art](./album-art.md) endpoint.
 
 There is a small bug in case you add multiple AVRs in one activity: in the button widget the commands can pop up as duplicates. Just select one, it's just a bug in displaying, not in registered entities.
-

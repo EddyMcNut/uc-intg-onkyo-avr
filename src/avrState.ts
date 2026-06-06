@@ -1,10 +1,10 @@
 import * as uc from "@unfoldedcircle/integration-api";
-import { buildPhysicalAvrId } from "./configManager.js";
+import { physicalAvrIdFromEntityId } from "./configManager.js";
 import { EiscpDriver } from "./eiscp.js";
 import log from "./loggers.js";
 import { delay } from "./utils.js";
 import { ALBUM_ART, SONG_INFO } from "./constants.js";
-import type { CommandReceiver } from "./commandReceiver.js";
+import type { ICommandReceiver } from "./types.js";
 import { resetTidalBrowseState } from "./tidalBrowserStore.js";
 
 const integrationName = "avrState:";
@@ -19,15 +19,9 @@ interface EntityState {
   volume: number;
 }
 
-/**
- * Manages per-entity state for AVR sources.
- * Each entity (AVR zone) has its own independent source tracking.
- */
+// Manages per-entity state (source, volume, power, etc.) — each AVR zone has independent state.
 class AvrStateManager {
   private states: Map<string, EntityState> = new Map();
-  // reuse the existing state map to also track last query timestamps
-  private lastQueries: Map<string, number> = new Map();
-  private readonly QUERY_TTL = 5000; // ms
 
   /** Get or create state for an entity */
   private getState(entityId: string): EntityState {
@@ -50,8 +44,7 @@ class AvrStateManager {
   }
 
   getVolume(entityId: string): number {
-    const avrDisplayValue = this.getState(entityId).volume;
-    return avrDisplayValue;
+    return this.getState(entityId).volume;
   }
 
   /** Get current audio format for an entity */
@@ -102,7 +95,7 @@ class AvrStateManager {
   setVolume(entityId: string, volume: number): boolean {
     const state = this.getState(entityId);
     if (state.volume !== volume) {
-      // log.info("%s [%s] volume changed from '%s' to '%s'", integrationName, entityId, state.volume, volume);
+      log.info("%s [%s] volume changed from '%s' to '%s'", integrationName, entityId, state.volume, volume);
       state.volume = volume;
       return true;
     }
@@ -150,12 +143,7 @@ class AvrStateManager {
     const entities: string[] = [];
 
     for (const [entityId, state] of this.states.entries()) {
-      const [model, host] = entityId.split(" ");
-      if (!model || !host) {
-        continue;
-      }
-
-      if (buildPhysicalAvrId(model, host) === physicalAvrId && state.source === normalizedSource && this.isEntityOn(entityId)) {
+      if (physicalAvrIdFromEntityId(entityId) === physicalAvrId && state.source === normalizedSource && this.isEntityOn(entityId)) {
         entities.push(entityId);
       }
     }
@@ -267,16 +255,17 @@ class AvrStateManager {
   }
 
   /** Query AVR state and clear media attributes on source change */
-  async refreshAvrState(entityId: string, eiscpInstance?: EiscpDriver, zone?: string, driver?: uc.IntegrationAPI, queueThreshold?: number, commandReceiver?: CommandReceiver): Promise<void> {
+  async refreshAvrState(entityId: string, eiscpInstance?: EiscpDriver, zone?: string, driver?: uc.IntegrationAPI, queueThreshold?: number, commandReceiver?: ICommandReceiver): Promise<void> {
     if (!eiscpInstance || !zone || !driver || !entityId) {
       return;
     }
 
     // Use provided queueThreshold or fallback to default
-    const threshold = queueThreshold ?? (typeof eiscpInstance["config"]?.send_delay === "number" ? eiscpInstance["config"].send_delay : 250);
+    const threshold = queueThreshold ?? (typeof eiscpInstance.eiscpConfig?.sendDelay === "number" ? eiscpInstance.eiscpConfig.sendDelay : 250);
 
     log.info("%s [%s] querying volume for zone '%s'", integrationName, entityId, zone);
     await eiscpInstance.command({ zone, command: "volume", args: "query" });
+    await eiscpInstance.command({ zone, command: "audio-muting", args: "query" });
 
     // Clear media attributes so they can be updated with new data
     // Prevents showing old data if new source does not deliver similar info
@@ -326,54 +315,6 @@ class AvrStateManager {
       resetTidalBrowseState(entityId);
       await eiscpInstance.raw("NTCTOP");
       await eiscpInstance.raw("NTCSELECT");
-    }
-  }
-
-  public shouldQuery(entityId: string): boolean {
-    const last = this.lastQueries.get(entityId) || 0;
-    return Date.now() - last > this.QUERY_TTL;
-  }
-
-  /** Record that we just queried the given entity. */
-  public recordQuery(entityId: string): void {
-    this.lastQueries.set(entityId, Date.now());
-  }
-
-  /** Record multiple queries at once (used by batch operations). */
-  public recordQueries(avrEntries: Iterable<string>): void {
-    const now = Date.now();
-    for (const e of avrEntries) {
-      this.lastQueries.set(e, now);
-    }
-  }
-
-  async queryAvrState(entityId: string, eiscpInstance: EiscpDriver, zone: string, context: string, queueThreshold?: number): Promise<void> {
-    if (!eiscpInstance || !zone || !entityId) return;
-
-    if (!this.shouldQuery(entityId)) {
-      log.debug(`${integrationName} [%s] skipping redundant query (%s)`, entityId, context);
-      return;
-    }
-    this.recordQuery(entityId);
-    if (!eiscpInstance || !zone || !entityId) return;
-
-    const threshold = queueThreshold ?? (typeof eiscpInstance["config"]?.send_delay === "number" ? eiscpInstance["config"].send_delay : 250);
-
-    log.info(`${integrationName} [%s] Querying AVR state for zone %s (%s)...`, entityId, zone, context);
-    try {
-      await eiscpInstance.command({ zone, command: "system-power", args: "query" });
-      await delay(threshold);
-      await eiscpInstance.command({ zone, command: "input-selector", args: "query" });
-      await delay(threshold);
-      await eiscpInstance.command({ zone, command: "volume", args: "query" });
-      await delay(threshold);
-      await eiscpInstance.command({ zone, command: "audio-muting", args: "query" });
-      await delay(threshold);
-      await eiscpInstance.command({ zone, command: "listening-mode", args: "query" });
-      await delay(threshold * 3);
-      await eiscpInstance.command({ zone, command: "fp-display", args: "query" });
-    } catch (err) {
-      log.warn(`${integrationName} [%s] Failed to query AVR state (%s):`, entityId, context, err);
     }
   }
 }

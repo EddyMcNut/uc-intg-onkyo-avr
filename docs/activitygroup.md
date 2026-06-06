@@ -5,4 +5,3 @@ Make sure that you add your Activities to an Activity Group so when you switch f
 ![](../screenshots/activitygroup-1.png)
 
 ![](../screenshots/activitygroup-2.png)
-

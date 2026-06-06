@@ -1,8 +1,12 @@
-import { buildPhysicalAvrId } from "./configManager.js";
+import { physicalAvrIdFromEntityId } from "./configManager.js";
 
 export type TuneInPreset = {
   presetIndex: number;
   title: string;
+  /** Part of the NLS label before the "|", matching the station name returned by NTI. Equals title when there is no pipe. */
+  stationKey: string;
+  /** Full raw NLS label before any normalization, used to match NTI values that themselves contain "|". */
+  rawLabel: string;
   mediaId: string;
   thumbnail?: string;
 };
@@ -14,36 +18,14 @@ export type TuneInBrowseState = {
   presetIndexByTitle: Map<string, number>;
   thumbnailByTitle: Map<string, string>;
   backgroundSignature: string;
+  /** Station name currently playing (from NTI), used to highlight it in the preset list. */
+  nowPlayingStation: string;
 };
 
 const tuneInBrowseStateByPhysicalAvr = new Map<string, TuneInBrowseState>();
 
-function parseEntityId(entityId: string): { model: string; host: string } | null {
-  const parts = entityId.trim().split(/\s+/);
-  if (parts.length < 3) {
-    return null;
-  }
-
-  const host = parts[parts.length - 2];
-  const model = parts.slice(0, -2).join(" ");
-  if (!host || !model) {
-    return null;
-  }
-
-  return { model, host };
-}
-
-function getPhysicalAvrId(entityId: string): string | null {
-  const parsed = parseEntityId(entityId);
-  if (!parsed) {
-    return null;
-  }
-
-  return buildPhysicalAvrId(parsed.model, parsed.host);
-}
-
 export function getTuneInBrowseState(entityId: string): TuneInBrowseState | null {
-  const physicalAvrId = getPhysicalAvrId(entityId);
+  const physicalAvrId = physicalAvrIdFromEntityId(entityId);
   if (!physicalAvrId) {
     return null;
   }
@@ -59,7 +41,8 @@ export function getTuneInBrowseState(entityId: string): TuneInBrowseState | null
     presetsByMenuIndex: new Map<number, TuneInPreset>(),
     presetIndexByTitle: new Map<string, number>(),
     thumbnailByTitle: new Map<string, string>(),
-    backgroundSignature: ""
+    backgroundSignature: "",
+    nowPlayingStation: ""
   };
   tuneInBrowseStateByPhysicalAvr.set(physicalAvrId, created);
   return created;
@@ -82,7 +65,7 @@ export function setTuneInBrowseContextState(entityId: string, title: string): vo
   }
 }
 
-export function addTuneInPreset(entityId: string, title: string, thumbnailResolver: (state: TuneInBrowseState, title: string) => string): void {
+export function addTuneInPreset(entityId: string, title: string, stationKey: string, rawLabel: string, thumbnailResolver: (state: TuneInBrowseState, title: string) => string): void {
   const state = getTuneInBrowseState(entityId);
   if (!state) {
     return;
@@ -98,9 +81,33 @@ export function addTuneInPreset(entityId: string, title: string, thumbnailResolv
   state.presetsByMenuIndex.set(presetIndex, {
     presetIndex,
     title,
+    stationKey,
+    rawLabel,
     mediaId: `tunein:preset:${presetIndex}`,
     thumbnail: thumbnailResolver(state, title)
   });
+}
+
+function matchesAnyPreset(state: TuneInBrowseState, candidate: string): boolean {
+  const lower = candidate.toLowerCase();
+  for (const preset of state.presetsByMenuIndex.values()) {
+    if (preset.rawLabel.toLowerCase() === lower || preset.stationKey.toLowerCase() === lower || preset.title.toLowerCase() === lower) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Update the nowPlayingStation only when the candidate matches a known preset.
+ * This prevents track/show titles (which NTI also sends) from overwriting the station name.
+ */
+export function updateNowPlayingStation(entityId: string, candidate: string): void {
+  const state = getTuneInBrowseState(entityId);
+  if (!state) return;
+  if (matchesAnyPreset(state, candidate)) {
+    state.nowPlayingStation = candidate;
+  }
 }
 
 export function listTuneInPresets(entityId: string): TuneInPreset[] {

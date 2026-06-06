@@ -23,11 +23,11 @@ This integration can calculate the dB value based on the absolute value, you can
 ![](../screenshots/volume-relative.png)
 
 - `Absolute (1-100)` (default): volume sensor values are shown as absolute numbers.
-- `Relative (dB)`: volume sensor values are shown as dB values computed from the absolute value 
+- `Relative (dB)`: volume sensor values are shown as dB values computed from the absolute value
 
-This setting only changes how volume is displayed; volume control commands still use eISCP absolute values. 
+This setting only changes how volume is displayed; volume control commands still use eISCP absolute values.
 
-There is a trade off: *when you configure the integration to work with dB, you cannot use the slider yet*.
+There is a trade off: _when you configure the integration to work with dB, you cannot use the slider yet_.
 
 ### Volume Encoding in eISCP:
 
@@ -94,4 +94,3 @@ Assign `multi-zone-muting all-toggle` to the muting button to mute all comfigure
 ![](../screenshots/muting-multi.png)
 
 Lookup `multi-zone-muting` in the [JSON](../src/eiscp-commands.ts) to see the available options, for example `zone2-zone3-toggle` to toggle zones2 and 3 but not the main zone.
-

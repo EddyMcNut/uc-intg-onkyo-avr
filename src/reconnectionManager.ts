@@ -36,10 +36,7 @@ export type OnReconnectedCallback = (physicalAVR: string) => Promise<void>;
 /** Callback to check if reconnection should be skipped */
 export type ShouldSkipCallback = () => boolean;
 
-/**
- * Manages reconnection logic for AVR connections.
- * Handles progressive timeouts, scheduled retries, and timer management.
- */
+// Manages reconnection logic: progressive timeouts, scheduled retries, and timer management.
 export class ReconnectionManager {
   private readonly config: ReconnectionConfig;
   private readonly timers: Map<string, NodeJS.Timeout> = new Map();
@@ -48,10 +45,7 @@ export class ReconnectionManager {
     this.config = config;
   }
 
-  /**
-   * Attempt to reconnect with progressive timeouts.
-   * @returns Result indicating success and number of attempts made
-   */
+  // Attempt to reconnect with progressive timeouts. returns Result indicating success and number of attempts made
   async attemptReconnection(physicalAVR: string, eiscp: EiscpDriver, connectionInfo: ConnectionInfo, context: string = "reconnection"): Promise<ReconnectionResult> {
     for (let attempt = 0; attempt < this.config.timeouts.length; attempt++) {
       const timeout = this.config.timeouts[attempt];
@@ -77,10 +71,7 @@ export class ReconnectionManager {
     return { success: false, attempts: this.config.timeouts.length };
   }
 
-  /**
-   * Schedule a reconnection attempt after the configured delay.
-   * Clears any existing scheduled attempt for this AVR.
-   */
+  // Schedule a reconnection attempt after the configured delay. Clears any existing scheduled attempt for this AVR.
   scheduleReconnection(physicalAVR: string, eiscp: EiscpDriver, connectionInfo: ConnectionInfo, shouldSkip: ShouldSkipCallback, onReconnected: OnReconnectedCallback): void {
     // Clear any existing timer
     this.cancelScheduledReconnection(physicalAVR);
@@ -112,9 +103,7 @@ export class ReconnectionManager {
     this.timers.set(physicalAVR, timer);
   }
 
-  /**
-   * Cancel a scheduled reconnection for a specific AVR.
-   */
+  // Cancel a scheduled reconnection for a specific AVR.
   cancelScheduledReconnection(physicalAVR: string): boolean {
     const timer = this.timers.get(physicalAVR);
     if (timer) {
@@ -126,9 +115,7 @@ export class ReconnectionManager {
     return false;
   }
 
-  /**
-   * Cancel all scheduled reconnections.
-   */
+  // Cancel all scheduled reconnections.
   cancelAllScheduledReconnections(): void {
     for (const [physicalAVR, timer] of this.timers) {
       log.info("%s [%s] Clearing reconnect timer", integrationName, physicalAVR);
@@ -137,9 +124,7 @@ export class ReconnectionManager {
     this.timers.clear();
   }
 
-  /**
-   * Check if a reconnection is currently scheduled for an AVR.
-   */
+  // Check if a reconnection is currently scheduled for an AVR.
   hasScheduledReconnection(physicalAVR: string): boolean {
     return this.timers.has(physicalAVR);
   }

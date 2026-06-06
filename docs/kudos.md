@@ -20,4 +20,3 @@ This integration has been made possible by:
 - [albaintor](https://github.com/albaintor): for letting me use a piece of the awesome toolkit for entity migrations in this integration and his Sony AVR code helped me improve this integration some more.
 - [mitchcapper](https://github.com/mitchcapper/onkyo-eiscp/blob/importer_rewrite_proto_upgrade/eiscp/commands.py) for collecting more eISCP commands
 - [tomoffel](https://github.com/EddyMcNut/uc-intg-onkyo-avr/tree/main/eiscpdocs) for collecting more eISCP commands
-
