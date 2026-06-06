@@ -115,7 +115,7 @@ export class TuneInBrowseHandler {
       await this.harvestNlalChunks(entityId, layersToTry, scanDelay, rawSend);
     } finally {
       state.harvestMode = false;
-      // log.info("%s [%s] TuneIn NLAL harvest complete: %d/%d items", integrationName, entityId, listTuneInMenuOptions(entityId).length, state.totalListItemCount);
+      log.info("%s [%s] TuneIn NLAL harvest complete: %d/%d items", integrationName, entityId, listTuneInMenuOptions(entityId).length, state.totalListItemCount);
     }
   }
 
@@ -188,7 +188,7 @@ export class TuneInBrowseHandler {
       }
 
       if (state && (state.optionsByMenuIndex.size === 0 || isExplicitMainMenuSelection)) {
-        // log.info("%s [%s] Loading TuneIn full menu root", integrationName, entityId);
+        log.info("%s [%s] Loading TuneIn full menu root", integrationName, entityId);
         await cmdHandler(mediaPlayerEntity, uc.MediaPlayerCommands.PlayMedia, {
           media_id: TUNEIN_MENU_ROOT_ID,
           media_type: TUNEIN_MENU_ROOT_TYPE

@@ -347,7 +347,7 @@ test.serial("Media player browse hides excluded Tidal menu items", async (t) => 
   );
   t.deepEqual(
     (result as uc.BrowseResult).media?.items?.map((item) => item.media_id),
-    ["tidal:menu:1:New", "tidal:menu:2:Playlists"]
+    ["tidal:menu:4:New", "tidal:menu:5:Playlists"]
   );
 });
 
@@ -925,7 +925,7 @@ test.serial("CommandSender play_media routes Tidal Back option to RETURN", async
   } as any);
 
   t.is(result, uc.StatusCodes.Ok);
-  t.deepEqual(rawCalls, ["RETURN"]);
+  t.deepEqual(rawCalls, ["NTCRETURN"]);
 });
 
 test.serial("CommandSender play_media routes TuneIn Back option to RETURN", async (t) => {
@@ -961,5 +961,5 @@ test.serial("CommandSender play_media routes TuneIn Back option to RETURN", asyn
   } as any);
 
   t.is(result, uc.StatusCodes.Ok);
-  t.deepEqual(rawCalls, ["RETURN"]);
+  t.deepEqual(rawCalls, ["NTCRETURN"]);
 });

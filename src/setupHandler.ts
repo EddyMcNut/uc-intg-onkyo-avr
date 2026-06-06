@@ -2,8 +2,8 @@
 "use strict";
 import * as uc from "@unfoldedcircle/integration-api";
 import EiscpDriver from "./eiscp.js";
-import { ConfigManager, parseBoolean, parseSelectOptions, OnkyoConfig, AvrConfig, AvrZone, AVR_DEFAULTS } from "./configManager.js";
-import log from "./loggers.js";
+import { ConfigManager, parseBoolean, parseSelectOptions, OnkyoConfig, AvrConfig, AvrZone, AVR_DEFAULTS, LogLevel } from "./configManager.js";
+import log, { setLogLevel } from "./loggers.js";
 
 const integrationName = "setupHandler:";
 
@@ -34,6 +34,7 @@ interface ManualConfigInput {
   tuneinPresetPosition?: unknown;
   tuneinMenuStyle?: unknown;
   entityNameStyle?: unknown;
+  logLevel?: unknown;
 }
 
 interface ManualConfigFormValues {
@@ -53,6 +54,7 @@ interface ManualConfigFormValues {
   netMenuDelayValue: number;
   tuneinPresetPositionValue: number;
   tuneinMenuStyleValue: "mypresets" | "full";
+  logLevelValue: LogLevel;
   errorMessage?: string;
 }
 
@@ -91,6 +93,7 @@ function parseManualInput(input: ManualConfigInput): ManualConfigFormValues {
       return parsed >= 1 && parsed <= 9 ? parsed : AVR_DEFAULTS.tuneinPresetPosition;
     })(),
     tuneinMenuStyleValue: String(input.tuneinMenuStyle ?? AVR_DEFAULTS.tuneinMenuStyle).toLowerCase() === "full" ? "full" : "mypresets",
+    logLevelValue: (["debug", "info", "warn", "error"].includes(String(input.logLevel ?? "").toLowerCase()) ? String(input.logLevel).toLowerCase() : ConfigManager.get().logLevel ?? "warn") as LogLevel,
     zoneCountValue: (() => {
       const parsed = parseInt(String(input.zoneCount), 10);
       if (isNaN(parsed)) return 1;
@@ -219,6 +222,22 @@ function buildManualConfigForm(values: ManualConfigFormValues): uc.RequestUserIn
           ]
         }
       }
+    },
+    {
+      id: "logLevel",
+      label: { en: "Log level" },
+      field: {
+        dropdown: {
+          value: String(values.logLevelValue),
+          items: [
+            { id: "error", label: { en: "Error only" } },
+            { id: "warn", label: { en: "Warn + Error (default)" } },
+            { id: "info", label: { en: "Info + Warn + Error" } },
+            { id: "debug", label: { en: "Debug (all)" } }
+          ]
+        }
+      },
+      description: { en: "Lower levels log more, which costs slightly more CPU. Warn is recommended for normal use." }
     }
   ]);
 }
@@ -356,7 +375,8 @@ export default class SetupHandler {
       input.netMenuDelay ||
       input.tuneinPresetPosition ||
       input.tuneinMenuStyle ||
-      input.entityNameStyle
+      input.entityNameStyle ||
+      input.logLevel
     );
 
     if (!action && hasManualFields) {
@@ -434,7 +454,8 @@ export default class SetupHandler {
         input.netMenuDelay ||
         input.tuneinPresetPosition ||
         input.tuneinMenuStyle ||
-        input.entityNameStyle
+        input.entityNameStyle ||
+        input.logLevel
       );
 
       if (!hasManualFields) {
@@ -472,7 +493,8 @@ export default class SetupHandler {
       createSensorsValue: currentAvr?.createSensors ?? AVR_DEFAULTS.createSensors,
       netMenuDelayValue: currentAvr?.netMenuDelay ?? AVR_DEFAULTS.netMenuDelay,
       tuneinPresetPositionValue: currentAvr?.tuneinPresetPosition ?? AVR_DEFAULTS.tuneinPresetPosition,
-      tuneinMenuStyleValue: currentAvr?.tuneinMenuStyle ?? AVR_DEFAULTS.tuneinMenuStyle
+      tuneinMenuStyleValue: currentAvr?.tuneinMenuStyle ?? AVR_DEFAULTS.tuneinMenuStyle,
+      logLevelValue: (cfg.logLevel ?? "warn") as LogLevel
     });
   }
 
@@ -665,6 +687,8 @@ export default class SetupHandler {
 
         // Save discovered AVR
         ConfigManager.addAvr(discoveredAvr);
+        ConfigManager.save({ logLevel: cfg.logLevelValue });
+        setLogLevel(cfg.logLevelValue);
         await this.host.onConfigSaved();
         // this.host.log.info("%s Auto-discovered AVR and saved configuration: %s", integrationName, JSON.stringify(discoveredAvr));
         return new uc.SetupComplete();
@@ -731,22 +755,11 @@ export default class SetupHandler {
     }
 
     for (const avrCfg of normalizedAvrs) {
-      // this.host.log.info(
-      //   "%s Adding AVR config for zone %s with volumeScale: %d, volumeDisplay: %s, adjustVolumeDispl: %s, entityNameStyle: %s, createSensors: %s, netMenuDelay: %d, tuneinPresetPosition: %d, tuneinMenuStyle: %s",
-      //   integrationName,
-      //   avrCfg.zone,
-      //   avrCfg.volumeScale,
-      //   avrCfg.volumeDisplay,
-      //   avrCfg.adjustVolumeDispl,
-      //   avrCfg.entityNameStyle,
-      //   avrCfg.createSensors,
-      //   avrCfg.netMenuDelay,
-      //   avrCfg.tuneinPresetPosition,
-      //   avrCfg.tuneinMenuStyle
-      // );
       ConfigManager.addAvr(avrCfg);
     }
 
+    ConfigManager.save({ logLevel: cfg.logLevelValue });
+    setLogLevel(cfg.logLevelValue);
     await this.host.onConfigSaved();
     return new uc.SetupComplete();
   }

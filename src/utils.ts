@@ -12,13 +12,13 @@ export function toHex(n: number, width: number): string {
 // Ensure eISCP connection is ready before sending a command. Triggers reconnect if disconnected, retries up to 5 times. Returns true when connected and ready, false when all attempts are exhausted (caller should return StatusCodes.Timeout).
 export async function ensureEiscpConnected(eiscp: EiscpDriver, connectOptions: { model?: string; host?: string; port?: number }, entityId: string, integrationName: string): Promise<boolean> {
   if (!eiscp.connected) {
-    // log.info("%s [%s] Command received while disconnected, triggering reconnection...", integrationName, entityId);
+    log.info("%s [%s] Command received while disconnected, triggering reconnection...", integrationName, entityId);
     try {
       await eiscp.connect(connectOptions);
       await eiscp.waitForConnect(3000);
-      // log.info("%s [%s] Reconnected on command", integrationName, entityId);
+      log.info("%s [%s] Reconnected on command", integrationName, entityId);
     } catch (connectErr) {
-      // log.warn("%s [%s] Failed to reconnect on command: %s", integrationName, entityId, connectErr);
+      log.warn("%s [%s] Failed to reconnect on command: %s", integrationName, entityId, connectErr);
     }
   }
 
@@ -30,9 +30,9 @@ export async function ensureEiscpConnected(eiscp: EiscpDriver, connectOptions: {
       return true;
     } catch (err) {
       if (attempt === 0) {
-        // log.warn("%s [%s] Could not send command, AVR not connected: %s", integrationName, entityId, err);
+        log.warn("%s [%s] Could not send command, AVR not connected: %s", integrationName, entityId, err);
       } else if (attempt === 5) {
-        // log.warn("%s [%s] Could not connect to AVR after 5 attempts: %s", integrationName, entityId, err);
+        log.warn("%s [%s] Could not connect to AVR after 5 attempts: %s", integrationName, entityId, err);
       }
     }
   }

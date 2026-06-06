@@ -163,7 +163,7 @@ export class ZoneAgnosticUpdateProcessor {
         });
       }
 
-      // log.debug("%s IFA sync for [%s] (event zone %s)", integrationName, zoneEntityId, _eventZone);
+      log.debug("%s IFA sync for [%s] (event zone %s)", integrationName, zoneEntityId, _eventZone);
     }
   }
 
@@ -179,7 +179,7 @@ export class ZoneAgnosticUpdateProcessor {
       await this.renderZoneMedia(zoneEntityId, true);
     }
 
-    // log.info("%s DAB station set to %s (updated %d zone(s))", integrationName, stationName, affectedZones.length);
+    log.info("%s DAB station set to %s (updated %d zone(s))", integrationName, stationName, affectedZones.length);
   }
 
   async handleNlt(sourceEntityId: string, serviceName: string, eventZone: string): Promise<void> {
@@ -338,7 +338,7 @@ export class ZoneAgnosticUpdateProcessor {
     }
 
     if (affectedZones.length > 0) {
-      // log.info("%s metadata updated: %s - %s (updated %d zone(s))", integrationName, artist, title, affectedZones.length);
+      log.info("%s metadata updated: %s - %s (updated %d zone(s))", integrationName, artist, title, affectedZones.length);
     }
   }
 

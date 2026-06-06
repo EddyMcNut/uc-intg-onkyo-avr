@@ -91,7 +91,7 @@ export const AVR_DEFAULTS = {
   volumeScale: 100,
   volumeDisplay: "absolute",
   adjustVolumeDispl: true,
-  entityNameStyle: "long",
+  entityNameStyle: "short",
   createSensors: true,
   netMenuDelay: 500,
   tuneinPresetPosition: 1,
@@ -102,6 +102,7 @@ export const AVR_DEFAULTS = {
 export type EntityNameStyle = "long" | "short";
 export type VolumeDisplay = "absolute" | "relative";
 export type TuneInMenuStyle = "mypresets" | "full";
+export type LogLevel = "debug" | "info" | "warn" | "error";
 
 export interface AvrConfig {
   model: string;
@@ -126,6 +127,7 @@ export interface AvrConfig {
 
 export interface OnkyoConfig {
   avrs?: AvrConfig[];
+  logLevel?: LogLevel;
   queueThreshold?: number;
   albumArtURL?: string;
   volumeScale?: number; // 80 or 100

@@ -440,11 +440,11 @@ export async function browseMedia(entityId: string, options: uc.BrowseOptions): 
       case "tidal":
         return await browseTidalMedia(entityId, withPaging(options));
       default:
-        // log.debug("%s [%s] unsupported media browsing for subSource [%s]", integrationName, entityId, subSource);
+        log.debug("%s [%s] unsupported media browsing for subSource [%s]", integrationName, entityId, subSource);
         return uc.StatusCodes.NotFound;
     }
   } else {
-    // log.debug("%s [%s] ignoring browse request outside browsable context", integrationName, entityId);
+    log.debug("%s [%s] ignoring browse request outside browsable context", integrationName, entityId);
     return uc.StatusCodes.NotFound;
   }
 }
@@ -452,7 +452,7 @@ export async function browseMedia(entityId: string, options: uc.BrowseOptions): 
 export async function browseTuneInMedia(entityId: string, options: uc.BrowseOptions): Promise<uc.StatusCodes | uc.BrowseResult> {
   const tuneInPresets = listTuneInPresets(entityId);
   if (!options.media_id || options.media_id === TUNEIN_ROOT_ID) {
-    // log.info("%s [%s] browsable TuneIn presets: %d", integrationName, entityId, tuneInPresets.length);
+    log.info("%s [%s] browsable TuneIn presets: %d", integrationName, entityId, tuneInPresets.length);
     return uc.BrowseResult.fromPaging(createRootItem(entityId, options.paging), options.paging, getTuneInRootItemCount(tuneInPresets.length));
   }
 
@@ -516,7 +516,7 @@ export async function browseTuneInMenuMedia(entityId: string, options: uc.Browse
   const menuOptions = listTuneInMenuOptions(entityId);
   const showMainMenuShortcut = getTuneInMenuBrowseState(entityId)?.showMainMenuShortcut ?? false;
   const totalCount = getTuneInMenuRootItemCount(menuOptions.length, showMainMenuShortcut);
-  // log.info("%s [%s] browsable TuneIn full menu options: %d", integrationName, entityId, menuOptions.length);
+  log.info("%s [%s] browsable TuneIn full menu options: %d", integrationName, entityId, menuOptions.length);
   return uc.BrowseResult.fromPaging(createTuneInMenuRootItem(entityId, options.paging), options.paging, totalCount);
 }
 
@@ -568,7 +568,7 @@ export async function browseTidalMedia(entityId: string, options: uc.BrowseOptio
   const tidalMenuOptions = listTidalMenuOptions(entityId);
   const totalCount = tidalMenuOptions.length + ((getTidalBrowseState(entityId)?.showMainMenuShortcut ?? false) ? 2 : 0);
   if (!options.media_id || options.media_id === TIDAL_ROOT_ID || isTidalMainMenuRequest(options.media_id, options.media_type) || isTidalBackRequest(options.media_id, options.media_type)) {
-    // log.info("%s [%s] browsable Tidal menu options: %d", integrationName, entityId, tidalMenuOptions.length);
+    log.info("%s [%s] browsable Tidal menu options: %d", integrationName, entityId, tidalMenuOptions.length);
     return uc.BrowseResult.fromPaging(createTidalRootItem(entityId, options.paging), options.paging, totalCount);
   }
 

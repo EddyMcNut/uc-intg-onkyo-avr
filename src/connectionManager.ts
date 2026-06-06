@@ -44,12 +44,12 @@ export default class ConnectionManager {
       if (runtimeConfig) {
         connection.commandReceiver.updateConfig(runtimeConfig);
       }
-      // log.info(`${integrationName} [${physicalAVR}] Updated connection config (netMenuDelay: ${avrConfig.netMenuDelay}, tuneinPresetPosition: ${avrConfig.tuneinPresetPosition}, zones: ${configuredZones?.join(", ") || "default"})`);
+      log.info(`${integrationName} [${physicalAVR}] Updated connection config (netMenuDelay: ${avrConfig.netMenuDelay}, tuneinPresetPosition: ${avrConfig.tuneinPresetPosition}, zones: ${configuredZones?.join(", ") || "default"})`);
     }
   }
 
   async createAndConnect(physicalAVR: string, avrConfig: AvrConfig, createCommandReceiver: CreateCommandReceiverFn, configuredZones?: string[]): Promise<PhysicalConnection> {
-    // log.info(`${integrationName} [${physicalAVR}] Connecting to AVR at ${avrConfig.ip}:${avrConfig.port}`);
+    log.info(`${integrationName} [${physicalAVR}] Connecting to AVR at ${avrConfig.ip}:${avrConfig.port}`);
 
     const eiscpInstance = this.createEiscpDriver({
       host: avrConfig.ip,
@@ -68,11 +68,11 @@ export default class ConnectionManager {
     this.setPhysicalConnection(physicalAVR, physicalConnection);
 
     eiscpInstance.on("error", (err: Error) => {
-      // log.error(`${integrationName} [${physicalAVR}] EiscpDriver error:`, err);
+      log.error(`${integrationName} [${physicalAVR}] EiscpDriver error:`, err);
     });
 
     eiscpInstance.on("close", () => {
-      // log.warn(`${integrationName} [${physicalAVR}] Connection to AVR lost`);
+      log.warn(`${integrationName} [${physicalAVR}] Connection to AVR lost`);
     });
 
     try {
@@ -82,11 +82,11 @@ export default class ConnectionManager {
       }
 
       await eiscpInstance.waitForConnect(3000);
-      // log.info(`${integrationName} [${physicalAVR}] Connected to AVR`);
+      log.info(`${integrationName} [${physicalAVR}] Connected to AVR`);
       return physicalConnection;
     } catch (err) {
-      // log.error(`${integrationName} [${physicalAVR}] Failed to connect to AVR:`, err);
-      // log.info(`${integrationName} [${physicalAVR}] Zone instances will be created but unavailable until connection succeeds`);
+      log.error(`${integrationName} [${physicalAVR}] Failed to connect to AVR:`, err);
+      log.info(`${integrationName} [${physicalAVR}] Zone instances will be created but unavailable until connection succeeds`);
       // schedule reconnect
       this.scheduleReconnect(physicalAVR, physicalConnection, avrConfig);
       return physicalConnection;
@@ -117,7 +117,7 @@ export default class ConnectionManager {
       }
       return result;
     } catch (err) {
-      // log.warn(`${integrationName} [${physicalAVR}] Reconnection attempt failed:`, err);
+      log.warn(`${integrationName} [${physicalAVR}] Reconnection attempt failed:`, err);
       return { success: false };
     }
   }
@@ -134,11 +134,11 @@ export default class ConnectionManager {
     for (const [physicalAVR, connection] of this.physicalConnections) {
       try {
         if (connection.eiscp.connected) {
-          // log.info(`${integrationName} [${physicalAVR}] Disconnecting AVR`);
+          log.info(`${integrationName} [${physicalAVR}] Disconnecting AVR`);
           connection.eiscp.disconnect();
         }
       } catch (err) {
-        // log.warn(`${integrationName} [${physicalAVR}] Error disconnecting AVR:`, err);
+        log.warn(`${integrationName} [${physicalAVR}] Error disconnecting AVR:`, err);
       }
     }
   }

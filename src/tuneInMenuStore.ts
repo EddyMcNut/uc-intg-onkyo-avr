@@ -177,3 +177,9 @@ export function updateTuneInMenuNowPlayingStation(entityId: string, candidate: s
     }
   }
 }
+
+export function setTuneInMenuNowPlayingStation(entityId: string, station: string): void {
+  const state = getTuneInMenuBrowseState(entityId);
+  if (!state) return;
+  state.nowPlayingStation = station;
+}

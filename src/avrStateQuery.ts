@@ -34,14 +34,14 @@ class AvrStateQueryService {
     if (!eiscpInstance || !zone || !entityId) return;
 
     if (!this.shouldQuery(entityId)) {
-      // log.debug(`${integrationName} [%s] skipping redundant query (%s)`, entityId, context);
+      log.debug(`${integrationName} [%s] skipping redundant query (%s)`, entityId, context);
       return;
     }
     this.recordQuery(entityId);
 
     const threshold = queueThreshold ?? (typeof eiscpInstance.eiscpConfig?.sendDelay === "number" ? eiscpInstance.eiscpConfig.sendDelay : 250);
 
-    // log.info(`${integrationName} [%s] Querying AVR state for zone %s (%s)...`, entityId, zone, context);
+    log.info(`${integrationName} [%s] Querying AVR state for zone %s (%s)...`, entityId, zone, context);
     try {
       await eiscpInstance.command({ zone, command: "system-power", args: "query" });
       await delay(threshold);
@@ -55,7 +55,7 @@ class AvrStateQueryService {
       await delay(threshold * 3);
       await eiscpInstance.command({ zone, command: "fp-display", args: "query" });
     } catch (err) {
-      // log.warn(`${integrationName} [%s] Failed to query AVR state (%s):`, entityId, context, err);
+      log.warn(`${integrationName} [%s] Failed to query AVR state (%s):`, entityId, context, err);
     }
   }
 }

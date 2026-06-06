@@ -79,7 +79,7 @@ export class TidalBrowseHandler {
     const knownLayer = state.nlsLayerNumber;
     const layersToTry = knownLayer > 0 ? [knownLayer, knownLayer - 1, knownLayer + 1].filter((l) => l > 0).map((l) => toHex(l, 2)) : ["02", "01", "03"];
 
-    // log.info("%s [%s] Tidal NLAL harvest: need %d items, have %d, trying layers %s", integrationName, entityId, state.totalListItemCount, currentCount, layersToTry.join(","));
+    log.info("%s [%s] Tidal NLAL harvest: need %d items, have %d, trying layers %s", integrationName, entityId, state.totalListItemCount, currentCount, layersToTry.join(","));
 
     state.harvestMode = true;
     try {
@@ -96,12 +96,12 @@ export class TidalBrowseHandler {
         await delay(scanDelay * 2);
         const collectedAfterPhase1 = listTidalMenuOptions(entityId).length;
         if (state.totalListItemCount > collectedAfterPhase1) {
-          // log.info("%s [%s] Tidal NLAL harvest phase 2: total updated to %d, have %d", integrationName, entityId, state.totalListItemCount, collectedAfterPhase1);
+          log.info("%s [%s] Tidal NLAL harvest phase 2: total updated to %d, have %d", integrationName, entityId, state.totalListItemCount, collectedAfterPhase1);
           await this.harvestNlalChunks(entityId, layersToTry, scanDelay, rawSend);
         }
       } finally {
         state.harvestMode = false;
-        // log.info("%s [%s] Tidal NLAL harvest complete: %d/%d items", integrationName, entityId, listTidalMenuOptions(entityId).length, state.totalListItemCount);
+        log.info("%s [%s] Tidal NLAL harvest complete: %d/%d items", integrationName, entityId, listTidalMenuOptions(entityId).length, state.totalListItemCount);
       }
     })();
   }
@@ -176,7 +176,7 @@ export class TidalBrowseHandler {
       resetTidalBrowseState(entityId);
       const browseState = getTidalBrowseState(entityId);
       if (browseState) browseState.traceNextSelectionAfterMainMenu = true;
-      // log.info("%s [%s] Main Tidal Menu selected; next Tidal selection will be traced", integrationName, entityId);
+      log.info("%s [%s] Main Tidal Menu selected; next Tidal selection will be traced", integrationName, entityId);
       await cmdHandler(mediaPlayerEntity, uc.MediaPlayerCommands.PlayMedia, {
         media_id: String(options.media_id),
         media_type: TIDAL_ROOT_TYPE

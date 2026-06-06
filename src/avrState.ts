@@ -68,7 +68,7 @@ class AvrStateManager {
     const normalizedFormat = audioFormat.toLowerCase();
 
     if (state.audioFormat !== normalizedFormat) {
-      // log.info("%s [%s] audio format changed from '%s' to '%s'", integrationName, entityId, state.audioFormat, audioFormat);
+      log.info("%s [%s] audio format changed from '%s' to '%s'", integrationName, entityId, state.audioFormat, audioFormat);
       state.audioFormat = normalizedFormat;
       return true;
     }
@@ -81,7 +81,7 @@ class AvrStateManager {
     const normalizedPowerState = powerState.toLowerCase();
 
     if (state.powerState !== normalizedPowerState) {
-      // log.info("%s [%s] power state changed from '%s' to '%s'", integrationName, entityId, state.powerState, powerState);
+      log.info("%s [%s] power state changed from '%s' to '%s'", integrationName, entityId, state.powerState, powerState);
       state.powerState = normalizedPowerState;
       this.applyMediaPlayerState(entityId, driver);
       return true;
@@ -95,7 +95,7 @@ class AvrStateManager {
   setVolume(entityId: string, volume: number): boolean {
     const state = this.getState(entityId);
     if (state.volume !== volume) {
-      // log.info("%s [%s] volume changed from '%s' to '%s'", integrationName, entityId, state.volume, volume);
+      log.info("%s [%s] volume changed from '%s' to '%s'", integrationName, entityId, state.volume, volume);
       state.volume = volume;
       return true;
     }
@@ -157,7 +157,7 @@ class AvrStateManager {
     const normalizedSource = source.toLowerCase();
 
     if (state.source !== normalizedSource) {
-      // log.info("%s [%s] source changed from '%s' to '%s'", integrationName, entityId, state.source, source);
+      log.info("%s [%s] source changed from '%s' to '%s'", integrationName, entityId, state.source, source);
       state.source = normalizedSource;
       state.playbackStatus = "unknown";
       this.applyMediaPlayerState(entityId, _driver);
@@ -176,7 +176,7 @@ class AvrStateManager {
     const normalizedSubSource = subSource.toLowerCase();
 
     if (state.subSource !== normalizedSubSource) {
-      // log.info("%s [%s] sub-source changed from '%s' to '%s'", integrationName, entityId, state.subSource, subSource);
+      log.info("%s [%s] sub-source changed from '%s' to '%s'", integrationName, entityId, state.subSource, subSource);
       state.subSource = normalizedSubSource;
       state.playbackStatus = "unknown";
       this.applyMediaPlayerState(entityId, _driver);
@@ -263,7 +263,7 @@ class AvrStateManager {
     // Use provided queueThreshold or fallback to default
     const threshold = queueThreshold ?? (typeof eiscpInstance.eiscpConfig?.sendDelay === "number" ? eiscpInstance.eiscpConfig.sendDelay : 250);
 
-    // log.info("%s [%s] querying volume for zone '%s'", integrationName, entityId, zone);
+    log.info("%s [%s] querying volume for zone '%s'", integrationName, entityId, zone);
     await eiscpInstance.command({ zone, command: "volume", args: "query" });
     await eiscpInstance.command({ zone, command: "audio-muting", args: "query" });
 
@@ -279,7 +279,7 @@ class AvrStateManager {
     });
 
     // Reset Audio/Video sensors
-    // log.info("%s [%s] querying AV-info for zone '%s'", integrationName, entityId, zone);
+    log.info("%s [%s] querying AV-info for zone '%s'", integrationName, entityId, zone);
     await eiscpInstance.command({ zone, command: "audio-information", args: "query" });
     await eiscpInstance.command({ zone, command: "video-information", args: "query" });
 
@@ -295,14 +295,14 @@ class AvrStateManager {
     const hasAlbumArt = currentSource === "net";
     // const hasAlbumArt = ALBUM_ART.some((name) => currentSubSource.toLowerCase().includes(name));
     if (hasAlbumArt && commandReceiver) {
-      // log.info("%s [%s] forcing album art refresh for subsource '%s'", integrationName, entityId, currentSubSource);
+      log.info("%s [%s] forcing album art refresh for subsource '%s'", integrationName, entityId, currentSubSource);
       await commandReceiver.maybeUpdateImage(entityId, true);
     }
 
     // Requery metadata for network services that support it
     const hasSongInfo = SONG_INFO.some((name) => currentSubSource.toLowerCase().includes(name));
     if (hasSongInfo) {
-      // log.debug("%s [%s] requerying metadata for subsource '%s'", integrationName, entityId, currentSubSource);
+      log.debug("%s [%s] requerying metadata for subsource '%s'", integrationName, entityId, currentSubSource);
       await eiscpInstance.raw("NATQSTN"); // Query artist
       await eiscpInstance.raw("NTIQSTN"); // Query title
       await eiscpInstance.raw("NALQSTN"); // Query album
@@ -311,7 +311,7 @@ class AvrStateManager {
 
     // For Tidal, reset the browse state and re-request the NLS list so the media browser stays fresh
     if (currentSubSource === "tidal") {
-      // log.info("%s [%s] refreshing Tidal browse state via NTCTOP + NTCSELECT", integrationName, entityId);
+      log.info("%s [%s] refreshing Tidal browse state via NTCTOP + NTCSELECT", integrationName, entityId);
       resetTidalBrowseState(entityId);
       await eiscpInstance.raw("NTCTOP");
       await eiscpInstance.raw("NTCSELECT");
