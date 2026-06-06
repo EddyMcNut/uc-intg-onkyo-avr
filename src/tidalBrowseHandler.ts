@@ -158,7 +158,10 @@ export class TidalBrowseHandler {
       await this.waitForMenuStable(entityId, beforeSignature, menuDelay);
       if (rawSend) {
         const browseState = getTidalBrowseState(entityId);
-        if (browseState) browseState.listModeActive = true;
+        if (browseState) {
+          browseState.browseListFrozen = false;
+          browseState.listModeActive = true;
+        }
         await this.harvestListItems(entityId, menuDelay, rawSend);
       }
       return browseMedia(entityId, {

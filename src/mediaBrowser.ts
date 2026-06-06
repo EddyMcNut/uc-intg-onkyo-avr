@@ -154,7 +154,9 @@ export function ingestTuneInMenuListEntry(entityId: string, entry: string): void
   addTuneInMenuOption(entityId, absoluteMenuIndex, title, isBrowsable, getOrCreateTuneInThumbnail);
 }
 
-const TUNEIN_EXCLUDED_MENU_TITLES = new Set([ "search", "login", "logout" ]);
+const BASE_EXCLUDED_MENU_TITLES = new Set(["search", "login", "logout", "all stations"]);
+const TUNEIN_EXCLUDED_MENU_TITLES = BASE_EXCLUDED_MENU_TITLES;
+const TIDAL_EXCLUDED_MENU_TITLES = BASE_EXCLUDED_MENU_TITLES;
 
 export function ingestTuneInMenuXmlEntries(entityId: string, xmlPayload: string): void {
   if (!xmlPayload) {
@@ -193,8 +195,6 @@ export function ingestTuneInXmlEntries(entityId: string, xmlPayload: string): vo
     addTuneInPreset(entityId, item.title, item.stationKey, item.rawLabel, getOrCreateTuneInThumbnail);
   }
 }
-
-const TIDAL_EXCLUDED_MENU_TITLES = new Set(["search", "login", "logout"]);
 
 export function ingestTidalXmlEntries(entityId: string, xmlPayload: string): void {
   if (!xmlPayload) return;
@@ -516,21 +516,7 @@ export async function browseTuneInMenuMedia(entityId: string, options: uc.Browse
   const menuOptions = listTuneInMenuOptions(entityId);
   const showMainMenuShortcut = getTuneInMenuBrowseState(entityId)?.showMainMenuShortcut ?? false;
   const totalCount = getTuneInMenuRootItemCount(menuOptions.length, showMainMenuShortcut);
-
-  if (!options.media_id || options.media_id === TUNEIN_MENU_ROOT_ID || isTuneInBackRequest(options.media_id, options.media_type)) {
-    // log.info("%s [%s] browsable TuneIn full menu options: %d", integrationName, entityId, menuOptions.length);
-    return uc.BrowseResult.fromPaging(createTuneInMenuRootItem(entityId, options.paging), options.paging, totalCount);
-  }
-
-  if (options.media_id === TUNEIN_MENU_ROOT_ID) {
-    return uc.BrowseResult.fromPaging(createTuneInMenuRootItem(entityId, options.paging), options.paging, totalCount);
-  }
-
-  const selection = resolveTuneInMenuOption(entityId, options.media_id, options.media_type);
-  if (!selection) {
-    return uc.StatusCodes.NotFound;
-  }
-
+  // log.info("%s [%s] browsable TuneIn full menu options: %d", integrationName, entityId, menuOptions.length);
   return uc.BrowseResult.fromPaging(createTuneInMenuRootItem(entityId, options.paging), options.paging, totalCount);
 }
 
@@ -562,7 +548,7 @@ export function resolveTuneInMenuOption(entityId: string, mediaId?: string, medi
     menuIndex,
     title,
     mediaId,
-    isBrowsable: option?.isBrowsable ?? looksLikeTuneInDirectory(title)
+    isBrowsable: option?.isBrowsable ?? looksLikeTuneInDirectory(title)  // consistent with handler fallback
   };
 }
 

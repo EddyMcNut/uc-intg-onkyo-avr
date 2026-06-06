@@ -3,6 +3,7 @@
 import * as uc from "@unfoldedcircle/integration-api";
 import { browseMedia, isTuneInBackRequest, TUNEIN_MENU_BACK_ID, TUNEIN_MENU_ROOT_ID, TUNEIN_MENU_ROOT_TYPE } from "./mediaBrowser.js";
 import { listTuneInMenuOptions, getContiguousTuneInMenuItemCount, resetTuneInMenuBrowseState, getTuneInMenuBrowseState, consumeTraceNextTuneInSelectionAfterMainMenu, getTuneInMenuThumbnailForTitle } from "./tuneInMenuStore.js";
+import { looksLikeTuneInDirectory } from "./tuneInFilters.js";
 import { ConfigManager, AVR_DEFAULTS, buildEntityId } from "./configManager.js";
 import { avrStateManager } from "./avrState.js";
 import log from "./loggers.js";
@@ -61,7 +62,7 @@ function resolveTuneInMenuSelection(entityId: string, mediaId?: string, mediaTyp
     menuIndex,
     title: decodedTitle,
     mediaId,
-    isBrowsable: option?.isBrowsable ?? false
+    isBrowsable: option?.isBrowsable ?? looksLikeTuneInDirectory(decodedTitle)
   };
 }
 
@@ -153,12 +154,12 @@ export class TuneInBrowseHandler {
     }
 
     const selection = resolveTuneInMenuSelection(entityId, options.media_id, options.media_type);
-    const isTuneInBackRequest = options.media_id === TUNEIN_MENU_BACK_ID && (options.media_type === undefined || options.media_type === TUNEIN_MENU_ROOT_TYPE);
+    const isBackRequest = options.media_id === TUNEIN_MENU_BACK_ID && (options.media_type === undefined || options.media_type === TUNEIN_MENU_ROOT_TYPE);
     const isExplicitMainMenuSelection = options.media_id === TUNEIN_MENU_ROOT_ID && options.media_type === TUNEIN_MENU_ROOT_TYPE;
     const isRootRequest = !options.media_id || isExplicitMainMenuSelection;
     const menuDelay = getMenuDelay(entityId);
 
-    if (isTuneInBackRequest && cmdHandler) {
+    if (isBackRequest && cmdHandler) {
       const beforeSignature = buildMenuSignature(entityId);
       const menuDelay = getMenuDelay(entityId);
       log.info("%s [%s] sending TuneIn Back command to AVR", integrationName, entityId);
