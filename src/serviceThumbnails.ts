@@ -35,6 +35,26 @@ function escapeXml(value: string): string {
   return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&apos;");
 }
 
+function polygonPointsToPath(points: string): string {
+  const coords = points
+    .trim()
+    .split(/[\s,]+/)
+    .map((n) => parseFloat(n))
+    .filter((n) => !Number.isNaN(n));
+  if (coords.length < 4 || coords.length % 2 !== 0) {
+    return "";
+  }
+  let path = "M";
+  for (let i = 0; i < coords.length; i += 2) {
+    path += `${coords[i]} ${coords[i + 1]} `;
+    if (i + 2 < coords.length) {
+      path += "L";
+    }
+  }
+  path += "Z";
+  return path;
+}
+
 function wrapTitle(title: string, maxCharsPerLine = 16, maxLines = 3): string[] {
   const words = title.replace(/\s+/g, " ").trim().split(" ").filter(Boolean);
   if (words.length === 0) {
@@ -117,8 +137,16 @@ export function createServiceThumbnails(config: ServiceThumbnailConfig) {
           const base64 = fileContents.toString("base64");
           const dataUri = `data:${mimeType};base64,${base64}`;
           const svgContent = extension === ".svg" ? fileContents.toString("utf8") : "";
-          const pathMatch = svgContent.match(/<path[^>]*d=(['"])([\s\S]*?)\1[^>]*>/i);
-          const logoMarkup = pathMatch ? `<g transform="${config.logoTransform}"><path ${config.logoPathAttrs} d="${pathMatch[2]}"/></g>` : null;
+const pathMatch = svgContent.match(/<(path|polygon)[^>]*(?:d|points)=(['"])([\s\S]*?)\2[^>]*>/i);
+  let logoMarkup = null;
+  if (pathMatch) {
+    const tag = pathMatch[1].toLowerCase();
+    const rawData = pathMatch[3];
+    const d = tag === "polygon" ? polygonPointsToPath(rawData) : rawData;
+    if (d) {
+      logoMarkup = `<g transform="${config.logoTransform}"><path ${config.logoPathAttrs} d="${escapeXml(d)}"/></g>`;
+    }
+  }
 
           cachedAsset = { dataUri, signature, inlineSafe: dataUri.length <= MAX_INLINE_BACKGROUND_DATA_LENGTH, logoMarkup };
           return cachedAsset;

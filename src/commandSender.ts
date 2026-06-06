@@ -5,7 +5,7 @@ import { avrStateManager } from "./avrState.js";
 import { ICommandReceiver } from "./types.js";
 import log from "./loggers.js";
 import { delay, toHex, ensureEiscpConnected } from "./utils.js";
-import { browseMedia, isMediaBrowsingAvailable, isTidalMainMenuRequest, isTuneInMenuRootRequest, resolveTidalMenuOption, resolveTuneInMenuOption, resolveTuneInPreset } from "./mediaBrowser.js";
+import { browseMedia, isMediaBrowsingAvailable, isTidalMainMenuRequest, isTuneInMenuRootRequest, resolveTidalMenuOption, resolveTuneInMenuOption, resolveTuneInPreset, TIDAL_BACK_ID, TUNEIN_MENU_BACK_ID, TUNEIN_MENU_ROOT_TYPE, TIDAL_ROOT_TYPE } from "./mediaBrowser.js";
 import { consumeTidalListModeActive, consumeTraceNextTidalSelectionAfterMainMenu, listTidalMenuOptions, getTidalBrowseState } from "./tidalBrowserStore.js";
 import { consumeTuneInListModeActive, setTuneInMenuBrowseFrozen } from "./tuneInMenuStore.js";
 
@@ -194,9 +194,16 @@ export class CommandSender {
           const tuneInRootRequest = isTuneInMenuRootRequest(mediaId, mediaType);
           const tidalMainMenu = isTidalMainMenuRequest(mediaId, mediaType);
           const tidalOption = resolveTidalMenuOption(mediaId, mediaType);
+          const tuneInBackRequest = mediaId === TUNEIN_MENU_BACK_ID && (mediaType === undefined || mediaType === TUNEIN_MENU_ROOT_TYPE);
+          const tidalBackRequest = mediaId === TIDAL_BACK_ID && (mediaType === undefined || mediaType === TIDAL_ROOT_TYPE);
 
-          if (!preset && !tuneInRootRequest && !tuneInMenuOption && !tidalMainMenu && !tidalOption) {
+          if (!preset && !tuneInRootRequest && !tuneInMenuOption && !tidalMainMenu && !tidalOption && !tuneInBackRequest && !tidalBackRequest) {
             return uc.StatusCodes.NotFound;
+          }
+
+          if (tuneInBackRequest || tidalBackRequest) {
+            await this.eiscp.raw("NTCRETURN");
+            break;
           }
 
           if (preset) {
@@ -205,7 +212,8 @@ export class CommandSender {
             const currentSubSource = avrStateManager.getSubSource(entity.id);
             if (wasPreloading || currentSource !== "net" || currentSubSource !== "tunein") {
               await this.eiscp.command(setZonePrefix("input-selector tunein"));
-              await delay(targetAvr.netMenuDelay ?? DEFAULT_QUEUE_THRESHOLD);
+              // await this.eiscp.raw("NTCTOP");
+              // await delay(targetAvr.netMenuDelay ?? DEFAULT_QUEUE_THRESHOLD);
             }
 
             await this.eiscp.command(setZonePrefix(`tunein-preset ${preset.presetIndex}`));
@@ -246,7 +254,8 @@ export class CommandSender {
 
           if (tidalMainMenu) {
             await this.eiscp.command(setZonePrefix("input-selector tidal"));
-            await delay(targetAvr.netMenuDelay ?? DEFAULT_QUEUE_THRESHOLD);
+            // await this.eiscp.raw("NTCMENU");
+            // await delay(targetAvr.netMenuDelay ?? DEFAULT_QUEUE_THRESHOLD);
             break;
           }
 

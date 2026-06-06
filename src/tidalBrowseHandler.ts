@@ -1,7 +1,7 @@
 /*jslint node:true nomen:true*/
 "use strict";
 import * as uc from "@unfoldedcircle/integration-api";
-import { browseMedia, isTidalMainMenuRequest, resolveTidalMenuOption, TIDAL_ROOT_ID, TIDAL_ROOT_TYPE } from "./mediaBrowser.js";
+import { browseMedia, isTidalMainMenuRequest, isTidalBackRequest, resolveTidalMenuOption, TIDAL_BACK_ID, TIDAL_ROOT_ID, TIDAL_ROOT_TYPE } from "./mediaBrowser.js";
 import { listTidalMenuOptions, getContiguousItemCount, resetTidalBrowseState, getTidalBrowseState } from "./tidalBrowserStore.js";
 import { ConfigManager, AVR_DEFAULTS, buildEntityId } from "./configManager.js";
 import log from "./loggers.js";
@@ -144,7 +144,29 @@ export class TidalBrowseHandler {
     rawSend: RawSendFn | undefined
   ): Promise<uc.StatusCodes | uc.BrowseResult | undefined> {
     const tidalMainMenu = isTidalMainMenuRequest(options.media_id, options.media_type);
+    const tidalBackRequest = isTidalBackRequest(options.media_id, options.media_type);
     const tidalSelection = resolveTidalMenuOption(options.media_id, options.media_type);
+
+    if (tidalBackRequest && cmdHandler) {
+      const beforeSignature = this.buildMenuSignature(entityId);
+      const menuDelay = this.getMenuDelay(entityId);
+      log.info("%s [%s] sending Tidal Back command to AVR", integrationName, entityId);
+      await cmdHandler(mediaPlayerEntity, uc.MediaPlayerCommands.PlayMedia, {
+        media_id: TIDAL_BACK_ID,
+        media_type: TIDAL_ROOT_TYPE
+      });
+      await this.waitForMenuStable(entityId, beforeSignature, menuDelay);
+      if (rawSend) {
+        const browseState = getTidalBrowseState(entityId);
+        if (browseState) browseState.listModeActive = true;
+        await this.harvestListItems(entityId, menuDelay, rawSend);
+      }
+      return browseMedia(entityId, {
+        ...options,
+        media_id: TIDAL_ROOT_ID,
+        media_type: TIDAL_ROOT_TYPE
+      });
+    }
 
     if (tidalMainMenu && cmdHandler) {
       // Main Tidal Menu selection

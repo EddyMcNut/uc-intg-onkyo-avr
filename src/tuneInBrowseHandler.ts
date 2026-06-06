@@ -1,7 +1,7 @@
 /*jslint node:true nomen:true*/
 "use strict";
 import * as uc from "@unfoldedcircle/integration-api";
-import { browseMedia, TUNEIN_MENU_ROOT_ID, TUNEIN_MENU_ROOT_TYPE } from "./mediaBrowser.js";
+import { browseMedia, isTuneInBackRequest, TUNEIN_MENU_BACK_ID, TUNEIN_MENU_ROOT_ID, TUNEIN_MENU_ROOT_TYPE } from "./mediaBrowser.js";
 import { listTuneInMenuOptions, getContiguousTuneInMenuItemCount, resetTuneInMenuBrowseState, getTuneInMenuBrowseState, consumeTraceNextTuneInSelectionAfterMainMenu, getTuneInMenuThumbnailForTitle } from "./tuneInMenuStore.js";
 import { ConfigManager, AVR_DEFAULTS, buildEntityId } from "./configManager.js";
 import { avrStateManager } from "./avrState.js";
@@ -153,9 +153,29 @@ export class TuneInBrowseHandler {
     }
 
     const selection = resolveTuneInMenuSelection(entityId, options.media_id, options.media_type);
+    const isTuneInBackRequest = options.media_id === TUNEIN_MENU_BACK_ID && (options.media_type === undefined || options.media_type === TUNEIN_MENU_ROOT_TYPE);
     const isExplicitMainMenuSelection = options.media_id === TUNEIN_MENU_ROOT_ID && options.media_type === TUNEIN_MENU_ROOT_TYPE;
     const isRootRequest = !options.media_id || isExplicitMainMenuSelection;
     const menuDelay = getMenuDelay(entityId);
+
+    if (isTuneInBackRequest && cmdHandler) {
+      const beforeSignature = buildMenuSignature(entityId);
+      const menuDelay = getMenuDelay(entityId);
+      log.info("%s [%s] sending TuneIn Back command to AVR", integrationName, entityId);
+      await cmdHandler(mediaPlayerEntity, uc.MediaPlayerCommands.PlayMedia, {
+        media_id: TUNEIN_MENU_BACK_ID,
+        media_type: TUNEIN_MENU_ROOT_TYPE
+      });
+      await this.waitForMenuStable(entityId, beforeSignature, menuDelay);
+      if (rawSend) {
+        await this.harvestListItems(entityId, menuDelay, rawSend);
+      }
+      return browseMedia(entityId, {
+        ...options,
+        media_id: TUNEIN_MENU_ROOT_ID,
+        media_type: TUNEIN_MENU_ROOT_TYPE
+      });
+    }
 
     if (isRootRequest) {
       const state = getTuneInMenuBrowseState(entityId);
