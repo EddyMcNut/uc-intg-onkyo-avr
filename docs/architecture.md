@@ -4,7 +4,7 @@ This generated document describes the generic architecture and operational model
 
 ## Overview
 
-This integration uses an **event-based bidirectional communication model** with your AVR. Commands are sent to the AVR, and the AVR responds with state updates that are processed asynchronously. The AVR also sends unsolicited state updates when changes occur locally (e.g., volume adjusted on the physical remote or front panel).
+This integration uses an **event-based bidirectional communication model** with your AVR. Commands are sent to the AVR, and the AVR responds with state updates that are processed asynchronously. The AVR also sends unsolicited state updates when changes occur locally (e.g., volume adjusted manually on AVR).
 
 ## Communication Protocol
 
