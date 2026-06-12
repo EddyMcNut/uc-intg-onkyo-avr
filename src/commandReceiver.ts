@@ -34,6 +34,11 @@ type AvrUpdateEvent = {
 
 type ZoneAgnosticHandler = (avrUpdates: AvrUpdateEvent, entityId: string, eventZone: string) => Promise<void>;
 
+// Extract metadata from union argument type for clarity; returns null if not an object
+function extractMetadataArgument(arg: string | number | Record<string, string>): Record<string, string> | null {
+  return typeof arg === "object" && arg !== null ? (arg as Record<string, string>) : null;
+}
+
 export class CommandReceiver {
   private driver: uc.IntegrationAPI;
   private config: OnkyoConfig;
@@ -52,6 +57,7 @@ export class CommandReceiver {
     this.zoneAgnosticProcessor = new ZoneAgnosticUpdateProcessor(driver, config, eiscpInstance, avrStateManager);
     this.zoneAgnosticHandlers = {
       IFA: async (avrUpdates, entityId, eventZone) => {
+        // IFA handler invokes audio format callback for listening mode updates when format changes
         await this.zoneAgnosticProcessor.handleIfa(entityId, eventZone, avrUpdates.argument as Record<string, string> | undefined, async (zoneEntityId, audioInputValue) => {
           await this.updateListeningModeOptionsForAudioFormat(zoneEntityId, audioInputValue);
         });
@@ -83,7 +89,7 @@ export class CommandReceiver {
         await this.zoneAgnosticProcessor.handleNtm(entityId, avrUpdates.argument.toString());
       },
       metadata: async (avrUpdates, entityId) => {
-        const metadata = typeof avrUpdates.argument === "object" && avrUpdates.argument !== null ? (avrUpdates.argument as Record<string, string>) : null;
+        const metadata = extractMetadataArgument(avrUpdates.argument);
         await this.zoneAgnosticProcessor.handleMetadata(entityId, metadata);
       }
     };
@@ -305,8 +311,12 @@ export class CommandReceiver {
             });
             // Query AV info on every valid listening-mode update — this catches content changes on the same source (e.g. switching tracks on Apple TV) where the AVR doesn't push IFA/IFV spontaneously.
             log.info("%s [%s] querying AV info after listening-mode update", integrationName, entityId);
-            this.eiscpInstance.command({ zone: eventZone, command: "audio-information", args: "query" }).catch(() => {});
-            this.eiscpInstance.command({ zone: eventZone, command: "video-information", args: "query" }).catch(() => {});
+            this.eiscpInstance.command({ zone: eventZone, command: "audio-information", args: "query" }).catch((err) => {
+              log.debug("%s [%s] audio-information query failed: %s", integrationName, entityId, err instanceof Error ? err.message : String(err));
+            });
+            this.eiscpInstance.command({ zone: eventZone, command: "video-information", args: "query" }).catch((err) => {
+              log.debug("%s [%s] video-information query failed: %s", integrationName, entityId, err instanceof Error ? err.message : String(err));
+            });
           }
           break;
         }

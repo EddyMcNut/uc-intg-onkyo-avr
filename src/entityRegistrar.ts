@@ -9,9 +9,21 @@ import { browseMedia } from "./mediaBrowser.js";
 import { TidalBrowseHandler } from "./tidalBrowseHandler.js";
 import { TuneInBrowseHandler } from "./tuneInBrowseHandler.js";
 
+type CmdHandlerFn = (entity: uc.Entity, cmdId: string, params?: { [key: string]: string | number | boolean }) => Promise<uc.StatusCodes>;
+type RawSendFn = (cmd: string) => Promise<void>;
+
+type EntityBrowseHandler = {
+  browse(
+    entityId: string,
+    options: uc.BrowseOptions,
+    mediaPlayerEntity: uc.MediaPlayer,
+    cmdHandler: CmdHandlerFn | undefined,
+    rawSend: RawSendFn | undefined
+  ): Promise<uc.StatusCodes | uc.BrowseResult | undefined>;
+};
+
 export default class EntityRegistrar {
-  private readonly tidalBrowseHandler = new TidalBrowseHandler();
-  private readonly tuneInBrowseHandler = new TuneInBrowseHandler();
+  private readonly browseHandlers: EntityBrowseHandler[] = [new TuneInBrowseHandler(), new TidalBrowseHandler()];
 
   // Build a user-facing base name from an AVR entry id. Input format is typically: "MODEL HOST ZONE". Long style keeps the full entry, short style omits HOST (IP/hostname).
   private getDisplayBaseName(avrEntry: string): string {
@@ -71,8 +83,8 @@ export default class EntityRegistrar {
   createMediaPlayerEntity(
     avrEntry: string,
     volumeScale: number,
-    cmdHandler?: (entity: uc.Entity, cmdId: string, params?: { [key: string]: string | number | boolean }) => Promise<uc.StatusCodes>,
-    rawSend?: (cmd: string) => Promise<void>
+    cmdHandler?: CmdHandlerFn,
+    rawSend?: RawSendFn
   ): uc.MediaPlayer {
     const displayBaseName = this.getDisplayBaseName(avrEntry);
     const mediaPlayerEntity = new uc.MediaPlayer(
@@ -118,11 +130,12 @@ export default class EntityRegistrar {
     );
     if (cmdHandler) mediaPlayerEntity.setCmdHandler(cmdHandler);
     mediaPlayerEntity.browse = async (options: uc.BrowseOptions) => {
-      const tuneInResult = await this.tuneInBrowseHandler.browse(avrEntry, options, mediaPlayerEntity, cmdHandler, rawSend);
-      if (tuneInResult !== undefined) return tuneInResult;
-
-      const tidalResult = await this.tidalBrowseHandler.browse(avrEntry, options, mediaPlayerEntity, cmdHandler, rawSend);
-      if (tidalResult !== undefined) return tidalResult;
+      for (const handler of this.browseHandlers) {
+        const result = await handler.browse(avrEntry, options, mediaPlayerEntity, cmdHandler, rawSend);
+        if (result !== undefined) {
+          return result;
+        }
+      }
 
       return browseMedia(avrEntry, options);
     };
