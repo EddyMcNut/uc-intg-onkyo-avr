@@ -1,8 +1,7 @@
 import * as uc from "@unfoldedcircle/integration-api";
 import { EiscpDriver } from "./eiscp.js";
 import { buildEntityId, DEFAULT_QUEUE_THRESHOLD, MAX_LENGTHS, PATTERNS, OnkyoConfig } from "./configManager.js";
-import { avrStateManager } from "./avrState.js";
-import { ICommandReceiver } from "./types.js";
+import { ICommandReceiver, AvrStateApi } from "./types.js";
 import log from "./loggers.js";
 import { delay, toHex, ensureEiscpConnected } from "./utils.js";
 import { browseMedia, isMediaBrowsingAvailable } from "./mediaBrowser.js";
@@ -14,16 +13,18 @@ export class CommandSender {
   private driver: uc.IntegrationAPI;
   private config: OnkyoConfig;
   private eiscp: EiscpDriver;
+  private avrStateApi: AvrStateApi;
   private lastCommandTime: number = 0;
   private commandReceiver: ICommandReceiver | undefined;
   private playMediaCommandHandler: PlayMediaCommandHandler;
 
-  constructor(driver: uc.IntegrationAPI, config: OnkyoConfig, eiscp: EiscpDriver, commandReceiver: ICommandReceiver | undefined) {
+  constructor(driver: uc.IntegrationAPI, config: OnkyoConfig, eiscp: EiscpDriver, avrStateApi: AvrStateApi, commandReceiver: ICommandReceiver | undefined) {
     this.driver = driver;
     this.config = config;
     this.eiscp = eiscp;
+    this.avrStateApi = avrStateApi;
     this.commandReceiver = commandReceiver;
-    this.playMediaCommandHandler = new PlayMediaCommandHandler(this.eiscp, this.commandReceiver);
+    this.playMediaCommandHandler = new PlayMediaCommandHandler(this.eiscp, this.avrStateApi, this.commandReceiver);
   }
 
   public updateConfig(config: OnkyoConfig): void {
@@ -180,7 +181,7 @@ export class CommandSender {
           log.debug("%s [%s] ignoring unsupported media-player command '%s' to avoid user-facing errors", integrationName, entity.id, cmdId);
           break;
         case "browse":
-          const subSource = avrStateManager.getSubSource(entity.id);
+          const subSource = this.avrStateApi.getSubSource(entity.id);
           if (isMediaBrowsingAvailable(entity.id, subSource)) {
             await browseMedia(entity.id, { paging: new uc.Paging(1, 50) } as uc.BrowseOptions);
           } else {
@@ -229,7 +230,7 @@ export class CommandSender {
           await this.eiscp.command(setZonePrefix("setup right"));
           break;
         case uc.MediaPlayerCommands.Info:
-          await avrStateManager.refreshAvrState(entity.id, this.eiscp, zone, this.driver, queueThreshold, this.commandReceiver);
+          await this.avrStateApi.refreshAvrState(entity.id, this.eiscp, zone, this.driver, queueThreshold, this.commandReceiver);
           break;
         default:
           return uc.StatusCodes.NotImplemented;

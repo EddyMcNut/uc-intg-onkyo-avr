@@ -47,3 +47,32 @@ export interface ICommandReceiver {
   abortTuneInPreload(entityId: string): boolean;
   maybeUpdateImage(entityId: string, force?: boolean): Promise<void>;
 }
+
+/** DIP: AvrStateApi interface for per-entity state management. Injected instead of using avrStateManager singleton. */
+export interface AvrStateApi {
+  // Query methods
+  getSource(entityId: string): string;
+  getSubSource(entityId: string): string;
+  getVolume(entityId: string): number;
+  getAudioFormat(entityId: string): string;
+  getPowerState(entityId: string): string;
+  getPlaybackStatus(entityId: string): string;
+  isEntityOn(entityId: string): boolean;
+  getEntitiesBySource(source: string): string[];
+  getEntitiesBySourceAndSubSource(source: string, subSource: string): string[];
+  getEntitiesByPhysicalAvrAndSource(physicalAvrId: string, source: string): string[];
+
+  // State mutation methods
+  setAudioFormat(entityId: string, audioFormat: string): boolean;
+  setPowerState(entityId: string, powerState: string, driver?: any): boolean;
+  setVolume(entityId: string, volume: number): boolean;
+  setSource(entityId: string, source: string, eiscpInstance?: any, zone?: string, _driver?: any): boolean;
+  setSubSource(entityId: string, subSource: string, eiscpInstance?: any, zone?: string, _driver?: any): boolean;
+  setPlaybackStatus(entityId: string, playbackStatus: string, driver?: any): boolean;
+
+  // Utility methods
+  clearState(entityId: string): void;
+  clearAllState(): void;
+  applyMediaPlayerState(entityId: string, driver?: any): void;
+  refreshAvrState(entityId: string, eiscpInstance?: any, zone?: string, driver?: any, queueThreshold?: number, commandReceiver?: ICommandReceiver): Promise<void>;
+}

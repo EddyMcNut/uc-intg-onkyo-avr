@@ -1,7 +1,7 @@
 import * as uc from "@unfoldedcircle/integration-api";
 import crypto from "crypto";
-import { avrStateManager } from "./avrState.js";
 import { OnkyoConfig } from "./configManager.js";
+import type { AvrStateApi } from "./types.js";
 import log from "./loggers.js";
 import { delay } from "./utils.js";
 import { ZoneAgnosticMediaStateStore } from "./zoneAgnosticMediaState.js";
@@ -12,7 +12,8 @@ export class ZoneMediaRenderer {
   constructor(
     private readonly driver: uc.IntegrationAPI,
     private config: OnkyoConfig,
-    private readonly mediaStateStore: ZoneAgnosticMediaStateStore
+    private readonly mediaStateStore: ZoneAgnosticMediaStateStore,
+    private readonly avrStateApi: AvrStateApi
   ) {}
 
   public updateConfig(config: OnkyoConfig): void {
@@ -44,7 +45,7 @@ export class ZoneMediaRenderer {
     }
 
     if (sharedState.currentImageUrl) {
-      const netZones = avrStateManager.getEntitiesByPhysicalAvrAndSource(physicalAvrId, "net");
+      const netZones = this.avrStateApi.getEntitiesByPhysicalAvrAndSource(physicalAvrId, "net");
       for (const zoneEntityId of netZones) {
         this.driver.updateEntityAttributes(zoneEntityId, {
           [uc.MediaPlayerAttributes.MediaImageUrl]: sharedState.currentImageUrl
@@ -54,7 +55,7 @@ export class ZoneMediaRenderer {
   }
 
   async renderZoneMedia(entityId: string, forceUpdate: boolean): Promise<void> {
-    const entitySource = avrStateManager.getSource(entityId);
+    const entitySource = this.avrStateApi.getSource(entityId);
     const zoneNowPlaying = this.mediaStateStore.getNowPlaying(entityId, entitySource);
     const sharedState = this.mediaStateStore.getSharedAvrMediaState(entityId);
 

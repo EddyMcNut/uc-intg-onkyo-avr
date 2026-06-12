@@ -1,6 +1,6 @@
 import * as uc from "@unfoldedcircle/integration-api";
 import { EiscpDriver } from "./eiscp.js";
-import { ICommandReceiver } from "./types.js";
+import { ICommandReceiver, AvrStateApi } from "./types.js";
 import log from "./loggers.js";
 import { delay } from "./utils.js";
 import {
@@ -14,7 +14,6 @@ import {
   TUNEIN_MENU_BACK_ID,
   TUNEIN_MENU_ROOT_TYPE
 } from "./mediaBrowser.js";
-import { avrStateManager } from "./avrState.js";
 import { consumeTidalListModeActive, consumeTraceNextTidalSelectionAfterMainMenu, getTidalBrowseState, listTidalMenuOptions } from "./tidalBrowserStore.js";
 import { consumeTuneInListModeActive, setTuneInMenuBrowseFrozen, setTuneInMenuNowPlayingStation } from "./tuneInMenuStore.js";
 import { DEFAULT_QUEUE_THRESHOLD } from "./configManager.js";
@@ -58,6 +57,7 @@ function isValidPlayMediaRequest(
 export class PlayMediaCommandHandler {
   constructor(
     private readonly eiscp: EiscpDriver,
+    private readonly avrStateApi: AvrStateApi,
     private readonly commandReceiver: ICommandReceiver | undefined
   ) {}
 
@@ -68,8 +68,8 @@ export class PlayMediaCommandHandler {
     netMenuDelay: number,
     options?: { force?: boolean; delayAfterSelect?: boolean }
   ): Promise<void> {
-    const currentSource = avrStateManager.getSource(entityId);
-    const currentSubSource = avrStateManager.getSubSource(entityId);
+    const currentSource = this.avrStateApi.getSource(entityId);
+    const currentSubSource = this.avrStateApi.getSubSource(entityId);
     const mustSelect = options?.force ?? !isBrowseServiceActive(currentSource, currentSubSource, serviceId);
     if (!mustSelect) {
       return;
@@ -125,7 +125,7 @@ export class PlayMediaCommandHandler {
         setTuneInMenuNowPlayingStation(entityId, tuneInMenuOption.title);
         const alreadyInListMode = consumeTuneInListModeActive(entityId);
         if (!alreadyInListMode) {
-          const playbackStatus = avrStateManager.getPlaybackStatus(entityId);
+          const playbackStatus = this.avrStateApi.getPlaybackStatus(entityId);
           if (playbackStatus === "playing" || playbackStatus === "paused" || playbackStatus === "ff" || playbackStatus === "fr") {
             await this.eiscp.command(setZonePrefix("network-usb list"));
             await delay(netMenuDelay);
@@ -159,14 +159,14 @@ export class PlayMediaCommandHandler {
       log.info("%s [%s] TRACE cached Tidal menu before command: [%s] requestedTitle='%s'", integrationName, entityId, cached, requestedTitle ?? "");
     }
 
-    const currentSource = avrStateManager.getSource(entityId);
-    const currentSubSource = avrStateManager.getSubSource(entityId);
+    const currentSource = this.avrStateApi.getSource(entityId);
+    const currentSubSource = this.avrStateApi.getSubSource(entityId);
     if (!isBrowseServiceActive(currentSource, currentSubSource, TIDAL_SERVICE_ID)) {
       await this.selectBrowseService(entityId, TIDAL_SERVICE_ID, setZonePrefix, netMenuDelay, { delayAfterSelect: true });
     } else if (!tidalOption.isBrowsable) {
       const alreadyInListMode = consumeTidalListModeActive(entityId);
       if (!alreadyInListMode) {
-        const playbackStatus = avrStateManager.getPlaybackStatus(entityId);
+        const playbackStatus = this.avrStateApi.getPlaybackStatus(entityId);
         if (playbackStatus === "playing" || playbackStatus === "paused" || playbackStatus === "ff" || playbackStatus === "fr") {
           await this.eiscp.command(setZonePrefix("network-usb list"));
           await delay(netMenuDelay);

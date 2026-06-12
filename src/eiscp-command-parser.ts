@@ -1,6 +1,7 @@
 import { eiscpCommands } from "./eiscp-commands.js";
 import { eiscpMappings } from "./eiscp-mappings.js";
-import { NETWORK_SERVICES, NO_TITLE } from "./constants.js";
+import { NO_TITLE } from "./constants.js";
+import { detectServiceFromText, detectServiceFromAsciiPrefix, getCanonicalServiceName } from "./serviceDetector.js";
 import type { TidalBrowseState } from "./tidalBrowserStore.js";
 import type { TuneInMenuBrowseState } from "./tuneInMenuStore.js";
 
@@ -284,8 +285,8 @@ export class IscpCommandParser {
         if (type === "NAT") {
           // Override artist with service name for configured streaming services
           if (NO_TITLE.map((s) => s.toLowerCase()).includes(currentSubSource)) {
-            // Find matching service name from NETWORK_SERVICES (case-insensitive)
-            const serviceName = NETWORK_SERVICES.find((s) => s.toLowerCase() === currentSubSource);
+            // Find matching service name (e.g., "Spotify" for "spotify")
+            const serviceName = getCanonicalServiceName(currentSubSource);
             this.currentMetadata.title = serviceName || val;
           } else {
             this.currentMetadata.title = val;
@@ -300,8 +301,8 @@ export class IscpCommandParser {
       if (command === "NAT") {
         // Override artist with service name for configured streaming services
         if (NO_TITLE.map((s) => s.toLowerCase()).includes(currentSubSource)) {
-          // Find matching service name from NETWORK_SERVICES (case-insensitive)
-          const serviceName = NETWORK_SERVICES.find((s) => s.toLowerCase() === currentSubSource);
+          // Find matching service name (e.g., "Spotify" for "spotify")
+          const serviceName = getCanonicalServiceName(currentSubSource);
           this.currentMetadata.title = serviceName || originalValue;
         } else {
           this.currentMetadata.title = originalValue;
@@ -406,18 +407,17 @@ export class IscpCommandParser {
     const currentSource = this.stateReader.getSource(entityId);
 
     // Check if the title contains a known network service name
-    const normalizedText = text.toLowerCase();
-    const detectedService = NETWORK_SERVICES.find((service) => normalizedText.includes(service.toLowerCase()));
+    const detectedService = detectServiceFromText(text);
     if (detectedService) {
       const currentSubSource = this.stateReader.getSubSource(entityId);
-      if (currentSubSource !== detectedService.toLowerCase()) {
+      if (currentSubSource !== detectedService) {
         result.command = "NLT";
-        result.argument = detectedService;
+        result.argument = getCanonicalServiceName(detectedService) || detectedService;
         return result;
       }
     }
 
-    if (currentSource === "net" && normalizedText === "my presets") {
+    if (currentSource === "net" && text.toLowerCase() === "my presets") {
       result.command = "NLT_CONTEXT";
       result.argument = "My Presets";
       return result;
@@ -460,7 +460,7 @@ export class IscpCommandParser {
     const currentSource = this.stateReader.getSource(entityId);
 
     // Check if FLD content matches a network service (regardless of current source)
-    const detectedService = NETWORK_SERVICES.find((service) => ascii.startsWith(service));
+    const detectedService = detectServiceFromAsciiPrefix(ascii);
 
     switch (currentSource) {
       case "net": {

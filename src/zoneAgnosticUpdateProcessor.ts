@@ -2,23 +2,17 @@ import * as uc from "@unfoldedcircle/integration-api";
 import { ConfigManager, OnkyoConfig, buildEntityId } from "./configManager.js";
 import { EiscpDriver } from "./eiscp.js";
 import log from "./loggers.js";
-import { NETWORK_SERVICES, SONG_INFO } from "./constants.js";
+import { SONG_INFO } from "./constants.js";
 import { TuneInPreloader } from "./tuneInPreloader.js";
 import { ZoneAgnosticMediaStateStore } from "./zoneAgnosticMediaState.js";
 import { ZoneMediaRenderer } from "./zoneMediaRenderer.js";
 import { TidalZoneAgnosticAdapter, TuneInZoneAgnosticAdapter, type ZoneAgnosticServiceAdapter } from "./zoneAgnosticServiceAdapters.js";
+import { ZoneAgnosticServiceCommandRouter } from "./zoneAgnosticServiceCommandRouter.js";
+import { ZoneAgnosticFrontPanelRouter } from "./zoneAgnosticFrontPanelRouter.js";
+import { detectServiceFromAsciiPrefix } from "./serviceDetector.js";
+import type { AvrStateApi } from "./types.js";
 
 const integrationName = "zoneAgnosticUpdateProcessor:";
-
-export interface AvrStateApi {
-  getSource(entityId: string): string;
-  getSubSource(entityId: string): string;
-  getEntitiesBySource(source: string): string[];
-  getEntitiesByPhysicalAvrAndSource(physicalAvrId: string, source: string): string[];
-  setSource(entityId: string, source: string, eiscpInstance?: EiscpDriver, zone?: string, driver?: uc.IntegrationAPI): boolean;
-  setSubSource(entityId: string, subSource: string, eiscpInstance?: EiscpDriver, zone?: string, driver?: uc.IntegrationAPI): boolean;
-  setPlaybackStatus(entityId: string, playbackStatus: string, driver?: uc.IntegrationAPI): boolean;
-}
 
 export class ZoneAgnosticUpdateProcessor {
   public static readonly ZONE_AGNOSTIC_COMMANDS = new Set<string>(["IFA", "DSN", "NST", "NLT", "NLT_CONTEXT", "NLS", "NLA", "FLD", "NTM", "metadata"]);
@@ -27,6 +21,8 @@ export class ZoneAgnosticUpdateProcessor {
   private readonly tuneInPreloader: TuneInPreloader;
   private readonly mediaRenderer: ZoneMediaRenderer;
   private readonly serviceAdapters: ZoneAgnosticServiceAdapter[];
+  private readonly serviceCommandRouter: ZoneAgnosticServiceCommandRouter;
+  private readonly frontPanelRouter: ZoneAgnosticFrontPanelRouter;
 
   constructor(
     private readonly driver: uc.IntegrationAPI,
@@ -35,7 +31,7 @@ export class ZoneAgnosticUpdateProcessor {
     private readonly state: AvrStateApi
   ) {
     this.tuneInPreloader = new TuneInPreloader(eiscpInstance, (entityId) => this.mediaStateStore.getPhysicalAvrId(entityId));
-    this.mediaRenderer = new ZoneMediaRenderer(driver, config, this.mediaStateStore);
+    this.mediaRenderer = new ZoneMediaRenderer(driver, config, this.mediaStateStore, this.state);
     this.serviceAdapters = [
       new TuneInZoneAgnosticAdapter({
         state: this.state,
@@ -48,6 +44,20 @@ export class ZoneAgnosticUpdateProcessor {
         getPhysicalAvrId: (entityId) => this.getPhysicalAvrId(entityId)
       })
     ];
+    this.serviceCommandRouter = new ZoneAgnosticServiceCommandRouter(this.serviceAdapters);
+    this.frontPanelRouter = new ZoneAgnosticFrontPanelRouter({
+      driver,
+      eiscpInstance,
+      state: this.state,
+      mediaStateStore: this.mediaStateStore,
+      getPhysicalAvrId: (entityId) => this.getPhysicalAvrId(entityId),
+      getNetZones: (sourceEntityId) => this.getNetZones(sourceEntityId),
+      getServiceAdapter: (service) => this.getServiceAdapter(service),
+      renderZoneMedia: (entityId, forceUpdate) => this.renderZoneMedia(entityId, forceUpdate),
+      updateFrontPanelDisplay: (zoneEntityIds, text) => this.updateFrontPanelDisplay(zoneEntityIds, text),
+      isNowPlayingDisplay: (displayText, serviceName) => this.isNowPlayingDisplay(displayText, serviceName),
+      maybeRequestSongInfo: (serviceName, zoneCount) => this.maybeRequestSongInfo(serviceName, zoneCount)
+    });
   }
 
   public updateConfig(config: OnkyoConfig): void {
@@ -209,68 +219,19 @@ export class ZoneAgnosticUpdateProcessor {
   }
 
   async handleNltContext(sourceEntityId: string, title: string): Promise<void> {
-    for (const adapter of this.serviceAdapters) {
-      adapter.handleNltContext?.(sourceEntityId, title);
-    }
+    this.serviceCommandRouter.dispatchNltContext(sourceEntityId, title);
   }
 
   async handleNls(sourceEntityId: string, entry: string): Promise<void> {
-    for (const adapter of this.serviceAdapters) {
-      adapter.handleNls(sourceEntityId, entry);
-    }
+    this.serviceCommandRouter.dispatchNls(sourceEntityId, entry);
   }
 
   async handleNla(sourceEntityId: string, xmlPayload: string): Promise<void> {
-    for (const adapter of this.serviceAdapters) {
-      adapter.handleNla(sourceEntityId, xmlPayload);
-    }
+    this.serviceCommandRouter.dispatchNla(sourceEntityId, xmlPayload);
   }
 
   async handleFld(sourceEntityId: string, frontPanelText: string, eventZone: string): Promise<void> {
-    const physicalAvrId = this.getPhysicalAvrId(sourceEntityId);
-    const fmZones = this.state.getEntitiesByPhysicalAvrAndSource(physicalAvrId, "fm");
-    for (const zoneEntityId of fmZones) {
-      this.mediaStateStore.updateNowPlaying(zoneEntityId, "fm", {
-        station: frontPanelText,
-        artist: "FM Radio"
-      });
-      await this.renderZoneMedia(zoneEntityId, true);
-    }
-    if (fmZones.length > 0) {
-      this.updateFrontPanelDisplay(fmZones, frontPanelText);
-    }
-
-    const netZones = this.getNetZones(sourceEntityId);
-    if (netZones.length > 0) {
-      const normalizedText = frontPanelText.toLowerCase();
-      const detectedService = NETWORK_SERVICES.find((service) => normalizedText.includes(service.toLowerCase()));
-
-      this.updateFrontPanelDisplay(netZones, frontPanelText);
-
-      if (detectedService) {
-        const nextSubSource = detectedService.toLowerCase();
-        if (!this.isNowPlayingDisplay(frontPanelText, detectedService)) {
-          const needsUpdate = netZones.some((zoneEntityId) => this.state.getSubSource(zoneEntityId) !== nextSubSource);
-          if (needsUpdate) {
-            for (const zoneEntityId of netZones) {
-              this.state.setSubSource(zoneEntityId, nextSubSource, this.eiscpInstance, eventZone, this.driver);
-            }
-          }
-
-          const serviceAdapter = this.getServiceAdapter(nextSubSource);
-          if (serviceAdapter?.onServiceDetectedFromFld) {
-            await serviceAdapter.onServiceDetectedFromFld(sourceEntityId, netZones);
-          }
-        }
-        await this.maybeRequestSongInfo(nextSubSource, netZones.length);
-      }
-
-      return;
-    }
-
-    if (fmZones.length === 0) {
-      this.updateFrontPanelDisplay([sourceEntityId], frontPanelText);
-    }
+    await this.frontPanelRouter.handleFld(sourceEntityId, frontPanelText, eventZone);
   }
 
   async handleNtm(sourceEntityId: string, argument: string): Promise<void> {
@@ -286,23 +247,11 @@ export class ZoneAgnosticUpdateProcessor {
   }
 
   async handleMetadata(sourceEntityId: string, argument: Record<string, string> | null): Promise<void> {
-    if (!argument) {
-      return;
-    }
+    await this.frontPanelRouter.handleMetadata(sourceEntityId, argument);
 
-    const title = argument.title || "unknown";
-    const album = argument.album || "unknown";
-    const artist = argument.artist || "unknown";
-
-    const affectedZones = this.getNetZones(sourceEntityId);
-    for (const zoneEntityId of affectedZones) {
-      this.mediaStateStore.updateNowPlaying(zoneEntityId, "net", { title, album, artist });
-      await this.renderZoneMedia(zoneEntityId, true);
-
-      const serviceAdapter = this.getServiceAdapter(this.state.getSubSource(zoneEntityId));
-      serviceAdapter?.handleMetadata(zoneEntityId, artist);
-    }
-
+    const title = argument?.title || "unknown";
+    const artist = argument?.artist || "unknown";
+    const affectedZones = argument ? this.getNetZones(sourceEntityId) : [];
     if (affectedZones.length > 0) {
       log.info("%s metadata updated: %s - %s (updated %d zone(s))", integrationName, artist, title, affectedZones.length);
     }

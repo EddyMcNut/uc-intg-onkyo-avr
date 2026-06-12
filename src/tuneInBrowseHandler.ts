@@ -5,7 +5,7 @@ import { browseMedia, TUNEIN_MENU_BACK_ID, TUNEIN_MENU_ROOT_ID, TUNEIN_MENU_ROOT
 import { listTuneInMenuOptions, getTuneInMenuBrowseState } from "./tuneInMenuStore.js";
 import { looksLikeTuneInDirectory } from "./tuneInFilters.js";
 import { ConfigManager, AVR_DEFAULTS, buildEntityId } from "./configManager.js";
-import { avrStateManager } from "./avrState.js";
+import type { AvrStateApi } from "./types.js";
 import log from "./loggers.js";
 import { MenuBrowseHandlerBase } from "./menuBrowseHandlerBase.js";
 
@@ -69,6 +69,10 @@ export class TuneInBrowseHandler extends MenuBrowseHandlerBase {
 
   private tuneInListSequence = 0;
 
+  constructor(private readonly avrStateApi: AvrStateApi) {
+    super();
+  }
+
   protected nextListSequence(): string {
     const seq = this.tuneInListSequence & 0xffff;
     this.tuneInListSequence = (this.tuneInListSequence + 1) & 0xffff;
@@ -109,7 +113,7 @@ export class TuneInBrowseHandler extends MenuBrowseHandlerBase {
   ): Promise<uc.StatusCodes | uc.BrowseResult | undefined> {
     if (!cmdHandler) return undefined;
 
-    if (!isTuneInFullMenuEntity(entityId) || avrStateManager.getSubSource(entityId) !== "tunein") {
+    if (!isTuneInFullMenuEntity(entityId) || this.avrStateApi.getSubSource(entityId) !== "tunein") {
       return undefined;
     }
 

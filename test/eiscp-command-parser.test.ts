@@ -114,3 +114,36 @@ test.serial("IscpCommandParser handles edge case times", async (t) => {
   t.is(pos, String(1 * 3600 + 23 * 60 + 45), "Valid position should convert to seconds (5025)");
   t.is(dur, String(2 * 3600 + 34 * 60 + 56), "Valid duration should convert to seconds (9296)");
 });
+
+test.serial("IscpCommandParser returns null for unknown commands", async (t) => {
+  const parserModule = await importDist("dist/src/eiscp-command-parser.js");
+  const { IscpCommandParser } = parserModule as { IscpCommandParser: new (...deps: any) => any };
+
+  const mockStateReader = { getSource: () => "net", getSubSource: () => "tidal" };
+  const mockTidalStoreApi = { getBrowseState: () => null };
+  const mockTuneInStoreApi = { getBrowseState: () => null };
+  const getEntityId = () => "entity1";
+
+  const parser = new IscpCommandParser(getEntityId, mockStateReader, mockTidalStoreApi, mockTuneInStoreApi);
+
+  const result = parser.parse("ZZZ", "1234");
+  t.is(result, null);
+});
+
+test.serial("IscpCommandParser remaps zone-specific volume commands", async (t) => {
+  const parserModule = await importDist("dist/src/eiscp-command-parser.js");
+  const { IscpCommandParser } = parserModule as { IscpCommandParser: new (...deps: any) => any };
+
+  const mockStateReader = { getSource: () => "net", getSubSource: () => "spotify" };
+  const mockTidalStoreApi = { getBrowseState: () => null };
+  const mockTuneInStoreApi = { getBrowseState: () => null };
+  const getEntityId = () => "entity1";
+
+  const parser = new IscpCommandParser(getEntityId, mockStateReader, mockTidalStoreApi, mockTuneInStoreApi);
+
+  const result = parser.parse("ZVL", "2A");
+  t.truthy(result);
+  t.is(result?.zone, "zone2");
+  t.is(result?.command, "volume");
+  t.is(result?.argument, 42);
+});

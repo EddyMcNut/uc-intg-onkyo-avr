@@ -53,7 +53,9 @@ class MockEiscp {
 import * as uc from "@unfoldedcircle/integration-api";
 test.serial("CommandSender volume conversion respects adjustVolumeDispl", async (t) => {
   const senderModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/commandSender.js")).href);
+  const avrStateModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/avrState.js")).href);
   const CommandSender = senderModule.CommandSender as any;
+  const { avrStateManager } = avrStateModule as any;
 
   const eiscp = new MockEiscp();
   // mock driver only needs updateEntityAttributes; use IntegrationAPI type for clarity
@@ -63,12 +65,12 @@ test.serial("CommandSender volume conversion respects adjustVolumeDispl", async 
   const configAdjTrue = { avrs: baseAvrConfig, volumeScale: 100, adjustVolumeDispl: true };
   const configAdjFalse = { avrs: baseAvrConfig, volumeScale: 100, adjustVolumeDispl: false };
 
-  const senderTrue = new CommandSender(drv as any, configAdjTrue, eiscp as any, null);
+  const senderTrue = new CommandSender(drv as any, configAdjTrue, eiscp as any, avrStateManager, null);
   await senderTrue.sharedCmdHandler(new uc.MediaPlayer(entityId, { en: entityId }, {}), uc.MediaPlayerCommands.Volume, { volume: 50 });
   t.is(eiscp.lastRaw, "MVL64"); // 50 -> 50 *2 = 100 -> 0x64
 
   const eiscp2 = new MockEiscp();
-  const senderFalse = new CommandSender(drv as any, configAdjFalse, eiscp2 as any, null);
+  const senderFalse = new CommandSender(drv as any, configAdjFalse, eiscp2 as any, avrStateManager, null);
   await senderFalse.sharedCmdHandler(new uc.MediaPlayer(entityId, { en: entityId }, {}), uc.MediaPlayerCommands.Volume, { volume: 50 });
   t.is(eiscp2.lastRaw, "MVL32"); // 50 -> 50 -> 0x32
 });

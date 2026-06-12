@@ -8,6 +8,7 @@ import { ConfigManager, buildEntityId } from "./configManager.js";
 import { browseMedia } from "./mediaBrowser.js";
 import { TidalBrowseHandler } from "./tidalBrowseHandler.js";
 import { TuneInBrowseHandler } from "./tuneInBrowseHandler.js";
+import type { AvrStateApi } from "./types.js";
 
 type CmdHandlerFn = (entity: uc.Entity, cmdId: string, params?: { [key: string]: string | number | boolean }) => Promise<uc.StatusCodes>;
 type RawSendFn = (cmd: string) => Promise<void>;
@@ -23,7 +24,11 @@ type EntityBrowseHandler = {
 };
 
 export default class EntityRegistrar {
-  private readonly browseHandlers: EntityBrowseHandler[] = [new TuneInBrowseHandler(), new TidalBrowseHandler()];
+  private readonly browseHandlers: EntityBrowseHandler[];
+
+  constructor(avrStateApi: AvrStateApi) {
+    this.browseHandlers = [new TuneInBrowseHandler(avrStateApi), new TidalBrowseHandler()];
+  }
 
   // Build a user-facing base name from an AVR entry id. Input format is typically: "MODEL HOST ZONE". Long style keeps the full entry, short style omits HOST (IP/hostname).
   private getDisplayBaseName(avrEntry: string): string {

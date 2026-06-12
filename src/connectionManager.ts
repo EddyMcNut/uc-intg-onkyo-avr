@@ -4,7 +4,7 @@ import log from "./loggers.js";
 import { ReconnectionManager } from "./reconnectionManager.js";
 import { AvrConfig, OnkyoConfig, DEFAULT_QUEUE_THRESHOLD } from "./configManager.js";
 import EiscpDriver from "./eiscp.js";
-import { PhysicalConnection, CreateCommandReceiverFn, QueryAllZonesStateFn, EiscpDriverFactory } from "./types.js";
+import { PhysicalConnection, CreateCommandReceiverFn, QueryAllZonesStateFn, EiscpDriverFactory, type AvrStateApi } from "./types.js";
 
 const integrationName = "connectionManager:";
 
@@ -13,12 +13,19 @@ export default class ConnectionManager {
   private queryAllZonesState: QueryAllZonesStateFn;
   private physicalConnections: Map<string, PhysicalConnection> = new Map();
   private readonly createEiscpDriver: EiscpDriverFactory;
+  private readonly stateReader?: AvrStateApi;
 
-  constructor(reconnectionManager: ReconnectionManager, queryAllZonesState: (physicalAvr: string, eiscp: EiscpDriver, context: string) => Promise<void>, createEiscpDriver?: EiscpDriverFactory) {
+  constructor(
+    reconnectionManager: ReconnectionManager,
+    queryAllZonesState: (physicalAvr: string, eiscp: EiscpDriver, context: string) => Promise<void>,
+    createEiscpDriver?: EiscpDriverFactory,
+    stateReader?: AvrStateApi
+  ) {
     this.reconnectionManager = reconnectionManager;
     this.queryAllZonesState = queryAllZonesState;
+    this.stateReader = stateReader;
     // Default to the concrete EiscpDriver so production callers need no change. Tests can inject a fake factory to avoid opening real TCP sockets.
-    this.createEiscpDriver = createEiscpDriver ?? ((config) => new EiscpDriver(config));
+    this.createEiscpDriver = createEiscpDriver ?? ((config) => new EiscpDriver(config, this.stateReader));
   }
 
   getPhysicalConnection(physicalAVR: string): PhysicalConnection | undefined {

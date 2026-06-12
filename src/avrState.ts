@@ -20,7 +20,7 @@ interface EntityState {
 }
 
 // Manages per-entity state (source, volume, power, etc.) — each AVR zone has independent state.
-class AvrStateManager {
+export class AvrStateManager {
   private states: Map<string, EntityState> = new Map();
 
   /** Get or create state for an entity */
