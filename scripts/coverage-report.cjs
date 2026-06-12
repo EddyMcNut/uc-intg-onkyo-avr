@@ -1,3 +1,5 @@
+// Uses c8 internal report API intentionally due Node 26 CLI/yargs incompatibility in this workspace.
+// Keep c8 pinned in package.json and update this script together with c8 upgrades.
 const { outputReport } = require("c8/lib/commands/report");
 
 async function main() {

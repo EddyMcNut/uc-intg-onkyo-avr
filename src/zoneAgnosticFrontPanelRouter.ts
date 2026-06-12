@@ -1,5 +1,4 @@
 import * as uc from "@unfoldedcircle/integration-api";
-import { SONG_INFO } from "./constants.js";
 import { detectServiceFromText } from "./serviceDetector.js";
 import type { AvrStateApi } from "./types.js";
 import type { ZoneAgnosticServiceAdapter } from "./zoneAgnosticServiceAdapters.js";
@@ -90,9 +89,5 @@ export class ZoneAgnosticFrontPanelRouter {
     if (affectedZones.length > 0) {
       // Keep logging in the processor for now; this class handles routing only.
     }
-  }
-
-  static hasSongInfo(serviceName: string): boolean {
-    return SONG_INFO.some((name) => serviceName.includes(name));
   }
 }
