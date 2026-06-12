@@ -277,9 +277,6 @@ export class CommandSender {
           }
 
           const shouldTraceSelection = consumeTraceNextTidalSelectionAfterMainMenu(entity.id);
-          // if (shouldTraceSelection) {
-          //    log.info("%s [%s] TRACE first Tidal selection after Main Tidal Menu: media_id='%s' media_type='%s' parsedIndex=%d parsedTitle='%s'",integrationName,entity.id,String(mediaId),String(mediaType),tidalOption.menuIndex,tidalOption.title);
-          // }
 
           // Capture the selected title from the cached list; we'll use it to remap to the freshest AVR list index right before selecting, avoiding stale-index mismatches.
           const requestedTitle = /^Menu \d+$/.test(tidalOption.title) ? listTidalMenuOptions(entity.id).find((item) => item.menuIndex === tidalOption.menuIndex)?.title : tidalOption.title;

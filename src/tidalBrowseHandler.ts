@@ -172,11 +172,11 @@ export class TidalBrowseHandler {
     }
 
     if (tidalMainMenu && cmdHandler) {
-      // Main Tidal Menu selection
+      // Tidal Main Menu selection
       resetTidalBrowseState(entityId);
       const browseState = getTidalBrowseState(entityId);
       if (browseState) browseState.traceNextSelectionAfterMainMenu = true;
-      log.info("%s [%s] Main Tidal Menu selected; next Tidal selection will be traced", integrationName, entityId);
+      log.info("%s [%s] Tidal Main Menu selected; next Tidal selection will be traced", integrationName, entityId);
       await cmdHandler(mediaPlayerEntity, uc.MediaPlayerCommands.PlayMedia, {
         media_id: String(options.media_id),
         media_type: TIDAL_ROOT_TYPE

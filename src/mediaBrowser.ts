@@ -96,7 +96,7 @@ export const TUNEIN_MENU_ROOT_ID = "tunein:menu-root";
 export const TUNEIN_MENU_ROOT_TYPE = "tunein://menu";
 export const TIDAL_ROOT_ID = "tidal:root";
 export const TIDAL_ROOT_TYPE = "tidal://menu";
-export const TIDAL_MAIN_MENU_ID = "tidal:main-menu";
+export const TIDAL_MENU_ROOT_ID = "tidal:main-menu";
 export const TIDAL_BACK_ID = "tidal:menu-back";
 export const TUNEIN_MENU_BACK_ID = "tunein:menu-back";
 
@@ -327,7 +327,7 @@ export function isTidalMainMenuRequest(mediaId?: string, mediaType?: string): bo
     return false;
   }
 
-  return mediaId === TIDAL_MAIN_MENU_ID;
+  return mediaId === TIDAL_MENU_ROOT_ID;
 }
 
 function createTuneInPresetItem(preset: TuneInPreset, nowPlayingStation: string): uc.BrowseMediaItem {
@@ -357,7 +357,7 @@ function createTidalMenuItem(option: TidalMenuOption, nowPlayingTitle: string): 
 }
 
 function createTidalMainMenuItem(_entityId: string): uc.BrowseMediaItem {
-  return new uc.BrowseMediaItem(TIDAL_MAIN_MENU_ID, "Main Tidal Menu", {
+  return new uc.BrowseMediaItem(TIDAL_MENU_ROOT_ID, "Tidal Main Menu", {
     can_browse: true,
     media_class: uc.KnownMediaClass.Directory,
     media_type: TIDAL_ROOT_TYPE,
