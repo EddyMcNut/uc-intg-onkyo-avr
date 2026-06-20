@@ -6,10 +6,9 @@ import { SONG_INFO } from "./constants.js";
 import { TuneInPreloader } from "./tuneInPreloader.js";
 import { ZoneAgnosticMediaStateStore } from "./zoneAgnosticMediaState.js";
 import { ZoneMediaRenderer } from "./zoneMediaRenderer.js";
-import { TidalZoneAgnosticAdapter, TuneInZoneAgnosticAdapter, type ZoneAgnosticServiceAdapter } from "./zoneAgnosticServiceAdapters.js";
+import { DeezerZoneAgnosticAdapter, TidalZoneAgnosticAdapter, TuneInZoneAgnosticAdapter, type ZoneAgnosticServiceAdapter } from "./zoneAgnosticServiceAdapters.js";
 import { ZoneAgnosticServiceCommandRouter } from "./zoneAgnosticServiceCommandRouter.js";
 import { ZoneAgnosticFrontPanelRouter } from "./zoneAgnosticFrontPanelRouter.js";
-import { detectServiceFromAsciiPrefix } from "./serviceDetector.js";
 import type { AvrStateApi } from "./types.js";
 
 const integrationName = "zoneAgnosticUpdateProcessor:";
@@ -40,6 +39,10 @@ export class ZoneAgnosticUpdateProcessor {
         preloadTuneInPresets: (sourceEntityId) => this.preloadTuneInPresets(sourceEntityId)
       }),
       new TidalZoneAgnosticAdapter({
+        state: this.state,
+        getPhysicalAvrId: (entityId) => this.getPhysicalAvrId(entityId)
+      }),
+      new DeezerZoneAgnosticAdapter({
         state: this.state,
         getPhysicalAvrId: (entityId) => this.getPhysicalAvrId(entityId)
       })

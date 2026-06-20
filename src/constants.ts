@@ -2,7 +2,7 @@
 export const ALBUM_ART = ["tunein", "spotify", "deezer", "tidal", "amazonmusic", "dts-play-fi"];
 
 /** Network services that support media browsing */
-export const MEDIA_BROWSING = ["tunein", "tidal"];
+export const MEDIA_BROWSING = ["tunein", "tidal", "deezer"];
 
 /** Network services that support song metadata */
 export const SONG_INFO = ["tunein", "spotify", "deezer", "tidal", "amazonmusic", "dts-play-fi", "airplay"];

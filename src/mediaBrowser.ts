@@ -4,6 +4,11 @@ import { avrStateManager } from "./avrState.js";
 import type { AvrStateApi } from "./types.js";
 import log from "./loggers.js";
 import {
+  DEEZER_BACK_ID,
+  DEEZER_MENU_ROOT_ID,
+  DEEZER_ROOT_ID,
+  DEEZER_ROOT_TYPE,
+  browseDeezerMedia,
   browseTidalMedia,
   browseTuneInMedia,
   browseTuneInMenuMedia,
@@ -18,16 +23,21 @@ import {
   TUNEIN_ROOT_TYPE,
   getTuneInPresetCount,
   hasTuneInPresets,
+  ingestDeezerListEntry,
+  ingestDeezerXmlEntries,
   ingestTidalListEntry,
   ingestTidalXmlEntries,
   ingestTuneInListEntry,
   ingestTuneInMenuListEntry,
   ingestTuneInMenuXmlEntries,
   ingestTuneInXmlEntries,
+  isDeezerBackRequest,
+  isDeezerMainMenuRequest,
   isTidalBackRequest,
   isTidalMainMenuRequest,
   isTuneInBackRequest,
   isTuneInMenuRootRequest,
+  resolveDeezerMenuOption,
   resolveTidalMenuOption,
   resolveTuneInMenuOption,
   resolveTuneInPreset,
@@ -38,21 +48,31 @@ const integrationName = "mediaBrowser:";
 const DEFAULT_BROWSE_PAGE_SIZE = 25;
 
 export {
+  DEEZER_BACK_ID,
+  DEEZER_MENU_ROOT_ID,
+  DEEZER_ROOT_ID,
+  DEEZER_ROOT_TYPE,
+  browseDeezerMedia,
   browseTidalMedia,
   browseTuneInMedia,
   browseTuneInMenuMedia,
   getTuneInPresetCount,
   hasTuneInPresets,
+  ingestDeezerListEntry,
+  ingestDeezerXmlEntries,
   ingestTidalListEntry,
   ingestTidalXmlEntries,
   ingestTuneInListEntry,
   ingestTuneInMenuListEntry,
   ingestTuneInMenuXmlEntries,
   ingestTuneInXmlEntries,
+  isDeezerBackRequest,
+  isDeezerMainMenuRequest,
   isTidalBackRequest,
   isTidalMainMenuRequest,
   isTuneInBackRequest,
   isTuneInMenuRootRequest,
+  resolveDeezerMenuOption,
   resolveTidalMenuOption,
   resolveTuneInMenuOption,
   resolveTuneInPreset,
@@ -96,6 +116,8 @@ export function createMediaBrowser(avrStateApi: AvrStateApi) {
           return browseTuneInMedia(entityId, withPaging(options));
         case "tidal":
           return browseTidalMedia(entityId, withPaging(options));
+        case "deezer":
+          return browseDeezerMedia(entityId, withPaging(options));
         default:
           log.debug("%s [%s] unsupported media browsing for subSource [%s]", integrationName, entityId, subSource);
           return uc.StatusCodes.NotFound;

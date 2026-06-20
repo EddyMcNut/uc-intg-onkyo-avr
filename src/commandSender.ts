@@ -3,7 +3,7 @@ import { EiscpDriver } from "./eiscp.js";
 import { buildEntityId, DEFAULT_QUEUE_THRESHOLD, MAX_LENGTHS, PATTERNS, OnkyoConfig } from "./configManager.js";
 import { ICommandReceiver, AvrStateApi } from "./types.js";
 import log from "./loggers.js";
-import { delay, toHex, ensureEiscpConnected } from "./utils.js";
+import { toHex, ensureEiscpConnected } from "./utils.js";
 import { browseMedia, isMediaBrowsingAvailable } from "./mediaBrowser.js";
 import { PlayMediaCommandHandler } from "./playMediaCommandHandler.js";
 

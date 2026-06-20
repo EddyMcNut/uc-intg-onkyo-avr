@@ -39,11 +39,7 @@ export function createMenuBrowseState<TOption extends MenuBrowseOption>(): MenuB
   };
 }
 
-export function upsertMenuOption<TOption extends MenuBrowseOption>(
-  state: MenuBrowseState<TOption>,
-  menuIndex: number,
-  createOption: () => TOption
-): void {
+export function upsertMenuOption<TOption extends MenuBrowseOption>(state: MenuBrowseState<TOption>, menuIndex: number, createOption: () => TOption): void {
   if (state.browseListFrozen) {
     return;
   }

@@ -4,8 +4,12 @@ import { ICommandReceiver, AvrStateApi } from "./types.js";
 import log from "./loggers.js";
 import { delay } from "./utils.js";
 import {
+  DEEZER_BACK_ID,
+  DEEZER_ROOT_TYPE,
   isTidalMainMenuRequest,
+  isDeezerMainMenuRequest,
   isTuneInMenuRootRequest,
+  resolveDeezerMenuOption,
   resolveTidalMenuOption,
   resolveTuneInMenuOption,
   resolveTuneInPreset,
@@ -15,15 +19,10 @@ import {
   TUNEIN_MENU_ROOT_TYPE
 } from "./mediaBrowser.js";
 import { consumeTidalListModeActive, consumeTraceNextTidalSelectionAfterMainMenu, getTidalBrowseState, listTidalMenuOptions } from "./tidalBrowserStore.js";
+import { consumeDeezerListModeActive, consumeTraceNextDeezerSelectionAfterMainMenu, getDeezerBrowseState, listDeezerMenuOptions } from "./deezerBrowserStore.js";
 import { consumeTuneInListModeActive, setTuneInMenuBrowseFrozen, setTuneInMenuNowPlayingStation } from "./tuneInMenuStore.js";
 import { DEFAULT_QUEUE_THRESHOLD } from "./configManager.js";
-import {
-  getBrowseServiceSelectSourceCommand,
-  isBrowseServiceActive,
-  TIDAL_SERVICE_ID,
-  TUNEIN_SERVICE_ID,
-  type BrowseServiceId
-} from "./browseServiceContract.js";
+import { DEEZER_SERVICE_ID, getBrowseServiceSelectSourceCommand, isBrowseServiceActive, TIDAL_SERVICE_ID, TUNEIN_SERVICE_ID, type BrowseServiceId } from "./browseServiceContract.js";
 
 const integrationName = "playMediaCommandHandler:";
 
@@ -47,11 +46,14 @@ function isValidPlayMediaRequest(
   tuneInRootRequest: boolean,
   tuneInMenuOption: any,
   tidalMainMenu: boolean,
+  deezerMainMenu: boolean,
   tidalOption: any,
+  deezerOption: any,
   tuneInBackRequest: boolean,
-  tidalBackRequest: boolean
+  tidalBackRequest: boolean,
+  deezerBackRequest: boolean
 ): boolean {
-  return !!(preset || tuneInRootRequest || tuneInMenuOption || tidalMainMenu || tidalOption || tuneInBackRequest || tidalBackRequest);
+  return !!(preset || tuneInRootRequest || tuneInMenuOption || tidalMainMenu || deezerMainMenu || tidalOption || deezerOption || tuneInBackRequest || tidalBackRequest || deezerBackRequest);
 }
 
 export class PlayMediaCommandHandler {
@@ -89,15 +91,18 @@ export class PlayMediaCommandHandler {
     const tuneInMenuOption = resolveTuneInMenuOption(entityId, mediaId, mediaType);
     const tuneInRootRequest = isTuneInMenuRootRequest(mediaId, mediaType);
     const tidalMainMenu = isTidalMainMenuRequest(mediaId, mediaType);
+    const deezerMainMenu = isDeezerMainMenuRequest(mediaId, mediaType);
     const tidalOption = resolveTidalMenuOption(mediaId, mediaType);
+    const deezerOption = resolveDeezerMenuOption(mediaId, mediaType);
     const tuneInBackRequest = isBackRequest(mediaId, mediaType, TUNEIN_MENU_BACK_ID, TUNEIN_MENU_ROOT_TYPE);
     const tidalBackRequest = isBackRequest(mediaId, mediaType, TIDAL_BACK_ID, TIDAL_ROOT_TYPE);
+    const deezerBackRequest = isBackRequest(mediaId, mediaType, DEEZER_BACK_ID, DEEZER_ROOT_TYPE);
 
-    if (!isValidPlayMediaRequest(preset, tuneInRootRequest, tuneInMenuOption, tidalMainMenu, tidalOption, tuneInBackRequest, tidalBackRequest)) {
+    if (!isValidPlayMediaRequest(preset, tuneInRootRequest, tuneInMenuOption, tidalMainMenu, deezerMainMenu, tidalOption, deezerOption, tuneInBackRequest, tidalBackRequest, deezerBackRequest)) {
       return uc.StatusCodes.NotFound;
     }
 
-    if (tuneInBackRequest || tidalBackRequest) {
+    if (tuneInBackRequest || tidalBackRequest || deezerBackRequest) {
       await this.eiscp.raw("NTCRETURN");
       return uc.StatusCodes.Ok;
     }
@@ -144,27 +149,38 @@ export class PlayMediaCommandHandler {
       return uc.StatusCodes.Ok;
     }
 
-    if (!tidalOption) {
+    if (deezerMainMenu) {
+      await this.selectBrowseService(entityId, DEEZER_SERVICE_ID, setZonePrefix, netMenuDelay, { force: true });
+      return uc.StatusCodes.Ok;
+    }
+
+    const activeServiceId = tidalOption ? TIDAL_SERVICE_ID : deezerOption ? DEEZER_SERVICE_ID : undefined;
+    const activeOption = tidalOption ?? deezerOption;
+    const activeLabel = activeServiceId === TIDAL_SERVICE_ID ? "Tidal" : "Deezer";
+
+    if (!activeOption || !activeServiceId) {
       return uc.StatusCodes.NotFound;
     }
 
-    const shouldTraceSelection = consumeTraceNextTidalSelectionAfterMainMenu(entityId);
+    const shouldTraceSelection = activeServiceId === TIDAL_SERVICE_ID ? consumeTraceNextTidalSelectionAfterMainMenu(entityId) : consumeTraceNextDeezerSelectionAfterMainMenu(entityId);
 
-    const requestedTitle = /^Menu \d+$/.test(tidalOption.title) ? listTidalMenuOptions(entityId).find((item) => item.menuIndex === tidalOption.menuIndex)?.title : tidalOption.title;
+    const requestedTitle = /^Menu \d+$/.test(activeOption.title)
+      ? (activeServiceId === TIDAL_SERVICE_ID ? listTidalMenuOptions(entityId) : listDeezerMenuOptions(entityId)).find((item) => item.menuIndex === activeOption.menuIndex)?.title
+      : activeOption.title;
     if (shouldTraceSelection) {
-      const cached = listTidalMenuOptions(entityId)
+      const cached = (activeServiceId === TIDAL_SERVICE_ID ? listTidalMenuOptions(entityId) : listDeezerMenuOptions(entityId))
         .slice(0, 12)
         .map((item) => `${item.menuIndex}:${item.title}`)
         .join(", ");
-      log.info("%s [%s] TRACE cached Tidal menu before command: [%s] requestedTitle='%s'", integrationName, entityId, cached, requestedTitle ?? "");
+      log.info("%s [%s] TRACE cached %s menu before command: [%s] requestedTitle='%s'", integrationName, entityId, activeLabel, cached, requestedTitle ?? "");
     }
 
     const currentSource = this.avrStateApi.getSource(entityId);
     const currentSubSource = this.avrStateApi.getSubSource(entityId);
-    if (!isBrowseServiceActive(currentSource, currentSubSource, TIDAL_SERVICE_ID)) {
-      await this.selectBrowseService(entityId, TIDAL_SERVICE_ID, setZonePrefix, netMenuDelay, { delayAfterSelect: true });
-    } else if (!tidalOption.isBrowsable) {
-      const alreadyInListMode = consumeTidalListModeActive(entityId);
+    if (!isBrowseServiceActive(currentSource, currentSubSource, activeServiceId)) {
+      await this.selectBrowseService(entityId, activeServiceId, setZonePrefix, netMenuDelay, { delayAfterSelect: true });
+    } else if (!activeOption.isBrowsable) {
+      const alreadyInListMode = activeServiceId === TIDAL_SERVICE_ID ? consumeTidalListModeActive(entityId) : consumeDeezerListModeActive(entityId);
       if (!alreadyInListMode) {
         const playbackStatus = this.avrStateApi.getPlaybackStatus(entityId);
         if (playbackStatus === "playing" || playbackStatus === "paused" || playbackStatus === "ff" || playbackStatus === "fr") {
@@ -174,21 +190,26 @@ export class PlayMediaCommandHandler {
       }
     }
 
-    let menuIndexToSelect = tidalOption.menuIndex;
+    let menuIndexToSelect = activeOption.menuIndex;
     if (requestedTitle) {
-      const remapped = listTidalMenuOptions(entityId).find((item) => item.title === requestedTitle);
-      if (remapped && remapped.menuIndex !== tidalOption.menuIndex) {
-        log.debug("%s [%s] remapped Tidal selection '%s' from index %d to %d", integrationName, entityId, requestedTitle, tidalOption.menuIndex, remapped.menuIndex);
+      const remapped = (activeServiceId === TIDAL_SERVICE_ID ? listTidalMenuOptions(entityId) : listDeezerMenuOptions(entityId)).find((item) => item.title === requestedTitle);
+      if (remapped && remapped.menuIndex !== activeOption.menuIndex) {
+        log.debug("%s [%s] remapped %s selection '%s' from index %d to %d", integrationName, entityId, activeLabel, requestedTitle, activeOption.menuIndex, remapped.menuIndex);
         menuIndexToSelect = remapped.menuIndex;
       }
     }
 
     if (shouldTraceSelection) {
-      log.info("%s [%s] TRACE final Tidal selection index=%d source=%s subsource=%s", integrationName, entityId, menuIndexToSelect, currentSource, currentSubSource);
+      log.info("%s [%s] TRACE final %s selection index=%d source=%s subsource=%s", integrationName, entityId, activeLabel, menuIndexToSelect, currentSource, currentSubSource);
     }
 
-    const tidalState = getTidalBrowseState(entityId);
-    if (tidalState) tidalState.browseListFrozen = !tidalOption.isBrowsable;
+    if (activeServiceId === TIDAL_SERVICE_ID) {
+      const tidalState = getTidalBrowseState(entityId);
+      if (tidalState) tidalState.browseListFrozen = !activeOption.isBrowsable;
+    } else {
+      const deezerState = getDeezerBrowseState(entityId);
+      if (deezerState) deezerState.browseListFrozen = !activeOption.isBrowsable;
+    }
     await this.eiscp.raw(`NLSI${String(menuIndexToSelect).padStart(5, "0")}`);
     return uc.StatusCodes.Ok;
   }

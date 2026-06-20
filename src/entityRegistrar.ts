@@ -6,6 +6,7 @@ import { eiscpMappings } from "./eiscp-mappings.js";
 import { getCompatibleListeningModes } from "./listeningModeFilters.js";
 import { ConfigManager, buildEntityId } from "./configManager.js";
 import { browseMedia } from "./mediaBrowser.js";
+import { DeezerBrowseHandler } from "./deezerBrowseHandler.js";
 import { TidalBrowseHandler } from "./tidalBrowseHandler.js";
 import { TuneInBrowseHandler } from "./tuneInBrowseHandler.js";
 import type { AvrStateApi } from "./types.js";
@@ -27,7 +28,7 @@ export default class EntityRegistrar {
   private readonly browseHandlers: EntityBrowseHandler[];
 
   constructor(avrStateApi: AvrStateApi) {
-    this.browseHandlers = [new TuneInBrowseHandler(avrStateApi), new TidalBrowseHandler()];
+    this.browseHandlers = [new TuneInBrowseHandler(avrStateApi), new TidalBrowseHandler(), new DeezerBrowseHandler()];
   }
 
   // Build a user-facing base name from an AVR entry id. Input format is typically: "MODEL HOST ZONE". Long style keeps the full entry, short style omits HOST (IP/hostname).
@@ -85,12 +86,7 @@ export default class EntityRegistrar {
     return allModes.sort();
   }
 
-  createMediaPlayerEntity(
-    avrEntry: string,
-    volumeScale: number,
-    cmdHandler?: CmdHandlerFn,
-    rawSend?: RawSendFn
-  ): uc.MediaPlayer {
+  createMediaPlayerEntity(avrEntry: string, volumeScale: number, cmdHandler?: CmdHandlerFn, rawSend?: RawSendFn): uc.MediaPlayer {
     const displayBaseName = this.getDisplayBaseName(avrEntry);
     const mediaPlayerEntity = new uc.MediaPlayer(
       avrEntry,

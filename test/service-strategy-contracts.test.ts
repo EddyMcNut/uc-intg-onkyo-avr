@@ -165,15 +165,10 @@ test.serial("Tidal adapter contract ingests NLA and metadata for active zones", 
 
 test.serial("Browse service contract maps service ids to activation rules and selector commands", async (t) => {
   const contractModule = await importDist("dist/src/browseServiceContract.js");
-  const {
-    TUNEIN_SERVICE_ID,
-    TIDAL_SERVICE_ID,
-    isBrowseServiceId,
-    isBrowseServiceActive,
-    getBrowseServiceSelectSourceCommand
-  } = contractModule as {
+  const { TUNEIN_SERVICE_ID, TIDAL_SERVICE_ID, DEEZER_SERVICE_ID, isBrowseServiceId, isBrowseServiceActive, getBrowseServiceSelectSourceCommand } = contractModule as {
     TUNEIN_SERVICE_ID: string;
     TIDAL_SERVICE_ID: string;
+    DEEZER_SERVICE_ID: string;
     isBrowseServiceId: (serviceId: string) => boolean;
     isBrowseServiceActive: (source: string, subSource: string, serviceId: string) => boolean;
     getBrowseServiceSelectSourceCommand: (serviceId: string) => string;
@@ -181,12 +176,15 @@ test.serial("Browse service contract maps service ids to activation rules and se
 
   t.true(isBrowseServiceId(TUNEIN_SERVICE_ID));
   t.true(isBrowseServiceId(TIDAL_SERVICE_ID));
+  t.true(isBrowseServiceId(DEEZER_SERVICE_ID));
   t.false(isBrowseServiceId("spotify"));
 
   t.true(isBrowseServiceActive("net", "tunein", TUNEIN_SERVICE_ID));
   t.false(isBrowseServiceActive("net", "tidal", TUNEIN_SERVICE_ID));
   t.false(isBrowseServiceActive("dab", "tunein", TUNEIN_SERVICE_ID));
+  t.true(isBrowseServiceActive("net", "deezer", DEEZER_SERVICE_ID));
 
   t.is(getBrowseServiceSelectSourceCommand(TUNEIN_SERVICE_ID), "input-selector tunein");
   t.is(getBrowseServiceSelectSourceCommand(TIDAL_SERVICE_ID), "input-selector tidal");
+  t.is(getBrowseServiceSelectSourceCommand(DEEZER_SERVICE_ID), "input-selector deezer");
 });

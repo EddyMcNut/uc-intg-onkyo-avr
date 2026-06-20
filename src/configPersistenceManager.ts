@@ -1,6 +1,6 @@
 // Focused responsibility: Handle auto-discovery and configuration persistence
 import EiscpDriver from "./eiscp.js";
-import { ConfigManager, type AvrConfig, type AvrZone, AVR_DEFAULTS, parseSelectOptions, type LogLevel, type OnkyoConfig } from "./configManager.js";
+import { ConfigManager, type AvrConfig, type AvrZone, AVR_DEFAULTS, parseSelectOptions, type OnkyoConfig } from "./configManager.js";
 import { setLogLevel } from "./loggers.js";
 import { type ParsedManualConfig } from "./manualConfigParser.js";
 
@@ -30,10 +30,7 @@ export class ConfigPersistenceManager {
     }
   }
 
-  async saveDiscoveredAvr(
-    discovered: { model: string; host: string; port: number },
-    parsedConfig: ParsedManualConfig
-  ): Promise<void> {
+  async saveDiscoveredAvr(discovered: { model: string; host: string; port: number }, parsedConfig: ParsedManualConfig): Promise<void> {
     const discoveredAvr: Partial<AvrConfig> = {
       model: discovered.model,
       ip: discovered.host,

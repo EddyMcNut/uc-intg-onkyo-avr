@@ -262,7 +262,10 @@ export class TuneInMediaBrowser {
   private createRootItem(entityId: string, paging: uc.Paging): uc.BrowseMediaItem {
     const presets = listTuneInPresets(entityId);
     const nowPlayingStation = getTuneInBrowseState(entityId)?.nowPlayingStation ?? "";
-    const items = this.slicePagedItems(presets.map((preset) => this.createPresetItem(preset, nowPlayingStation)), paging);
+    const items = this.slicePagedItems(
+      presets.map((preset) => this.createPresetItem(preset, nowPlayingStation)),
+      paging
+    );
 
     return new uc.BrowseMediaItem(TUNEIN_ROOT_ID, "TuneIn", {
       can_browse: true,

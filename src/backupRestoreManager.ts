@@ -31,8 +31,6 @@ export class BackupRestoreManager {
   parseRestorePayload(rawData: string): { payload: BackupPayload; isValid: boolean; errors?: string[] } {
     try {
       const parsed = JSON.parse(rawData);
-      // Support both wrapped (with meta) and direct config format
-      const configToValidate = parsed && parsed.config ? parsed.config : parsed;
       return { payload: parsed, isValid: true };
     } catch (err) {
       return {

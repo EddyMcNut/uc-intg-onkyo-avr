@@ -1,4 +1,3 @@
-import * as uc from "@unfoldedcircle/integration-api";
 import log from "./loggers.js";
 import { delay, toHex } from "./utils.js";
 
@@ -24,7 +23,9 @@ export abstract class MenuBrowseHandlerBase {
   protected phase2HarvestEnabled = false;
 
   protected buildMenuSignature(entityId: string): string {
-    return this.listMenuItems(entityId).map((item) => `${item.menuIndex}:${item.title}`).join("|");
+    return this.listMenuItems(entityId)
+      .map((item) => `${item.menuIndex}:${item.title}`)
+      .join("|");
   }
 
   protected async waitForMenuStable(entityId: string, beforeSignature: string, menuDelay: number): Promise<void> {
@@ -63,7 +64,15 @@ export abstract class MenuBrowseHandlerBase {
     const knownLayer = state.nlsLayerNumber;
     const layersToTry = knownLayer > 0 ? [knownLayer, knownLayer - 1, knownLayer + 1].filter((layer) => layer > 0).map((layer) => toHex(layer, 2)) : ["02", "01", "03"];
 
-    log.info("%s [%s] %s NLAL harvest: need %d items, have %d, trying layers %s", this.integrationName, entityId, this.getServiceLabel(), state.totalListItemCount, currentCount, layersToTry.join(","));
+    log.info(
+      "%s [%s] %s NLAL harvest: need %d items, have %d, trying layers %s",
+      this.integrationName,
+      entityId,
+      this.getServiceLabel(),
+      state.totalListItemCount,
+      currentCount,
+      layersToTry.join(",")
+    );
 
     state.harvestMode = true;
     try {
@@ -116,5 +125,4 @@ export abstract class MenuBrowseHandlerBase {
       await delay(scanDelay);
     }
   }
-
 }

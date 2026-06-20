@@ -2,6 +2,7 @@ import { eiscpCommands } from "./eiscp-commands.js";
 import { eiscpMappings } from "./eiscp-mappings.js";
 import { NO_TITLE } from "./constants.js";
 import { detectServiceFromText, detectServiceFromAsciiPrefix, getCanonicalServiceName } from "./serviceDetector.js";
+import type { DeezerBrowseState } from "./deezerBrowserStore.js";
 import type { TidalBrowseState } from "./tidalBrowserStore.js";
 import type { TuneInMenuBrowseState } from "./tuneInMenuStore.js";
 
@@ -16,6 +17,10 @@ const ZONE4_REVERSE_MAP: Record<string, string> = { VL4: "MVL", PW4: "PWR", MT4:
 export interface AvrStateReader {
   getSource(entityId: string): string;
   getSubSource(entityId: string): string;
+}
+
+export interface DeezerStoreApi {
+  getBrowseState(entityId: string): DeezerBrowseState | null;
 }
 
 export interface TidalStoreApi {
@@ -49,6 +54,7 @@ export class IscpCommandParser {
   constructor(
     private readonly getEntityId: (zone: string) => string,
     private readonly stateReader: AvrStateReader,
+    private readonly deezerStore: DeezerStoreApi,
     private readonly tidalStore: TidalStoreApi,
     private readonly tuneInMenuStore: TuneInMenuStoreApi
   ) {
@@ -369,6 +375,15 @@ export class IscpCommandParser {
         const cursorOffset = parseInt(cursorHex, 16);
         const totalCount = parseInt(countHex, 16);
         const layerNumber = /^[0-9A-Fa-f]{2}$/.test(layerHex) ? parseInt(layerHex, 16) : 0;
+        if (this.stateReader.getSubSource(entityId) === "deezer") {
+          const deezerState = this.deezerStore.getBrowseState(entityId);
+          if (deezerState) {
+            if (!deezerState.harvestMode) deezerState.nlsCursorOffset = cursorOffset;
+            deezerState.totalListItemCount = totalCount;
+            if (layerNumber > 0) deezerState.nlsLayerNumber = layerNumber;
+          }
+        }
+
         if (this.stateReader.getSubSource(entityId) === "tidal") {
           const tidalState = this.tidalStore.getBrowseState(entityId);
           if (tidalState) {

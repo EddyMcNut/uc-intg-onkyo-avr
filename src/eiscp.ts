@@ -9,6 +9,7 @@ import { delay } from "./utils.js";
 import { IscpCommandParser, type CommandResult } from "./eiscp-command-parser.js";
 import { createEiscpPacket, extractIscpMessage, extractAllIscpMessages } from "./eiscp-packet.js";
 import { buildMultiZoneVolumeCommands, buildMultiZoneMuteCommands } from "./eiscp-multi-zone.js";
+import { getDeezerBrowseState } from "./deezerBrowserStore.js";
 import { getTidalBrowseState } from "./tidalBrowserStore.js";
 import { getTuneInMenuBrowseState } from "./tuneInMenuStore.js";
 import type { AvrStateReader } from "./eiscp-command-parser.js";
@@ -114,7 +115,10 @@ export class EiscpDriver extends EventEmitter {
   private tcpBuffer: Buffer = Buffer.alloc(0);
   private readonly commandParser: IscpCommandParser;
 
-  constructor(config?: EiscpConfig, private readonly stateReader: AvrStateReader = NOOP_STATE_READER) {
+  constructor(
+    config?: EiscpConfig,
+    private readonly stateReader: AvrStateReader = NOOP_STATE_READER
+  ) {
     super();
     this.config = {
       host: config?.host,
@@ -131,6 +135,9 @@ export class EiscpDriver extends EventEmitter {
     this.commandParser = new IscpCommandParser(
       (zone) => buildEntityId(this.config.model!, this.config.host!, zone),
       this.stateReader,
+      {
+        getBrowseState: getDeezerBrowseState
+      },
       {
         getBrowseState: getTidalBrowseState
       },

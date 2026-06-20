@@ -1,14 +1,17 @@
 import * as uc from "@unfoldedcircle/integration-api";
 import { TuneInMediaBrowser } from "./tuneInMediaBrowser.js";
 import { TidalMediaBrowser } from "./tidalMediaBrowser.js";
+import { DeezerMediaBrowser } from "./deezerMediaBrowser.js";
 
 // Re-export service constants
 export { TUNEIN_ROOT_ID, TUNEIN_ROOT_TYPE, TUNEIN_MENU_ROOT_ID, TUNEIN_MENU_ROOT_TYPE, TUNEIN_MENU_BACK_ID } from "./tuneInMediaBrowser.js";
 export { TIDAL_ROOT_ID, TIDAL_ROOT_TYPE, TIDAL_MENU_ROOT_ID, TIDAL_BACK_ID } from "./tidalMediaBrowser.js";
+export { DEEZER_ROOT_ID, DEEZER_ROOT_TYPE, DEEZER_MENU_ROOT_ID, DEEZER_BACK_ID } from "./deezerMediaBrowser.js";
 
 // Service browser instances
 const tuneInBrowser = new TuneInMediaBrowser();
 const tidalBrowser = new TidalMediaBrowser();
+const deezerBrowser = new DeezerMediaBrowser();
 
 // TuneIn service delegation
 export function setTuneInBrowseContext(entityId: string, title: string): void {
@@ -86,4 +89,29 @@ export function isTidalBackRequest(mediaId?: string, mediaType?: string): boolea
 
 export async function browseTidalMedia(entityId: string, options: uc.BrowseOptions): Promise<uc.StatusCodes | uc.BrowseResult> {
   return tidalBrowser.browse(entityId, options);
+}
+
+// Deezer service delegation
+export function ingestDeezerXmlEntries(entityId: string, xmlPayload: string): void {
+  deezerBrowser.ingestXmlEntries(entityId, xmlPayload);
+}
+
+export function ingestDeezerListEntry(entityId: string, entry: string): void {
+  deezerBrowser.ingestListEntry(entityId, entry);
+}
+
+export function resolveDeezerMenuOption(mediaId?: string, mediaType?: string) {
+  return deezerBrowser.resolveMenuOption(mediaId, mediaType);
+}
+
+export function isDeezerMainMenuRequest(mediaId?: string, mediaType?: string): boolean {
+  return deezerBrowser.isMainMenuRequest(mediaId, mediaType);
+}
+
+export function isDeezerBackRequest(mediaId?: string, mediaType?: string): boolean {
+  return deezerBrowser.isBackRequest(mediaId, mediaType);
+}
+
+export async function browseDeezerMedia(entityId: string, options: uc.BrowseOptions): Promise<uc.StatusCodes | uc.BrowseResult> {
+  return deezerBrowser.browse(entityId, options);
 }
