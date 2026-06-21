@@ -7,8 +7,9 @@ import { ConfigManager, setConfigDir, OnkyoConfig, AvrConfig, buildEntityId, bui
 import { CommandSender } from "./commandSender.js";
 import { CommandReceiver } from "./commandReceiver.js";
 import { ReconnectionManager } from "./reconnectionManager.js";
-import { avrStateManager } from "./avrState.js";
+import { AvrStateManager } from "./avrState.js";
 import { avrStateQueryService } from "./avrStateQuery.js";
+import { initMediaBrowser } from "./mediaBrowser.js";
 import log, { setLogLevel } from "./loggers.js";
 import SetupHandler from "./setupHandler.js";
 import EntityRegistrar from "./entityRegistrar.js";
@@ -16,7 +17,7 @@ import ConnectionManager from "./connectionManager.js";
 import { SelectEntityHandler } from "./selectEntityHandler.js";
 import SubscriptionHandler from "./subscriptionHandler.js";
 import ConnectCoordinator from "./connectCoordinator.js";
-import { AvrInstance } from "./types.js";
+import { AvrInstance, type AvrStateApi } from "./types.js";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { delay } from "./utils.js";
@@ -41,6 +42,7 @@ export default class OnkyoDriver {
   private reconnectionManager: ReconnectionManager = new ReconnectionManager();
   private connectionManager: import("./connectionManager.js").default;
   private readonly avrInstances = new Map<string, AvrInstance>();
+  private readonly avrStateApi: AvrStateApi = new AvrStateManager();
   private driverVersion: string = "unknown";
 
   // Handler extracted to separate module for clarity/testing
@@ -79,14 +81,17 @@ export default class OnkyoDriver {
     if (this.config.logLevel) setLogLevel(this.config.logLevel);
 
     // Create connection manager (needs reconnectionManager and query callback)
-    this.connectionManager = new ConnectionManager(this.reconnectionManager, this.queryAllZonesState.bind(this));
+    this.connectionManager = new ConnectionManager(this.reconnectionManager, this.queryAllZonesState.bind(this), undefined, this.avrStateApi);
 
     // Initialize entity registrar before handing it to helper classes
-    this.entityRegistrar = new EntityRegistrar();
+    this.entityRegistrar = new EntityRegistrar(this.avrStateApi);
+
+    // Initialize media browser with dependency injection
+    initMediaBrowser(this.avrStateApi);
 
     // initialize helpers
     this.listeningModeHandler = new SelectEntityHandler(this.driver, this.connectionManager, this.avrInstances, "_listening_mode", "listening-mode", "Listening Mode", (avrEntry) => {
-      const audioFormat = avrStateManager.getAudioFormat(avrEntry);
+      const audioFormat = this.avrStateApi.getAudioFormat(avrEntry);
       return this.entityRegistrar.getListeningModeOptions(audioFormat !== "unknown" ? audioFormat : undefined, avrEntry);
     });
     this.inputSelectorHandler = new SelectEntityHandler(this.driver, this.connectionManager, this.avrInstances, "_input_selector", "input-selector", "Input Selector", (avrEntry) =>
@@ -197,7 +202,7 @@ export default class OnkyoDriver {
 
   private registerAvailableEntities(): void {
     log.info("%s Registering available entities from config", integrationName);
-    if (!this.entityRegistrar) this.entityRegistrar = new EntityRegistrar();
+    if (!this.entityRegistrar) this.entityRegistrar = new EntityRegistrar(this.avrStateApi);
     for (const avrConfig of this.config.avrs!) {
       const avrEntry = buildEntityId(avrConfig.model, avrConfig.ip, avrConfig.zone);
       const physicalAVR = buildPhysicalAvrId(avrConfig.model, avrConfig.ip);
@@ -277,7 +282,7 @@ export default class OnkyoDriver {
       if (entryPhysicalAVR === physicalAVR) {
         // For non-initial queries, only query zones that are powered on Initial queries (after connection) will query all zones to get power state
         const isInitialQuery = context.includes("after reconnection") || context.includes("after connection");
-        if (!isInitialQuery && !avrStateManager.isEntityOn(avrEntry)) {
+        if (!isInitialQuery && !this.avrStateApi.isEntityOn(avrEntry)) {
           log.debug("%s [%s] Skipping query for zone in standby (%s)", integrationName, avrEntry, context);
           continue;
         }
@@ -325,9 +330,9 @@ export default class OnkyoDriver {
       this.config,
       (avrConfig) => (eiscpInstance) => {
         const avrSpecificConfig = this.createAvrSpecificConfig(avrConfig);
-        return new CommandReceiver(this.driver, avrSpecificConfig, eiscpInstance, this.driverVersion);
+        return new CommandReceiver(this.driver, avrSpecificConfig, eiscpInstance, this.avrStateApi, this.driverVersion);
       },
-      (avrSpecificConfig, eiscp, commandReceiver) => new CommandSender(this.driver, avrSpecificConfig, eiscp, commandReceiver)
+      (avrSpecificConfig, eiscp, commandReceiver) => new CommandSender(this.driver, avrSpecificConfig, eiscp, this.avrStateApi, commandReceiver)
     );
 
     if (hasInstances) {

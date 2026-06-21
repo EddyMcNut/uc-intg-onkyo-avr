@@ -5,6 +5,7 @@ import log from "./loggers.js";
 import { delay } from "./utils.js";
 import { ALBUM_ART, SONG_INFO } from "./constants.js";
 import type { ICommandReceiver } from "./types.js";
+import { resetDeezerBrowseState } from "./deezerBrowserStore.js";
 import { resetTidalBrowseState } from "./tidalBrowserStore.js";
 
 const integrationName = "avrState:";
@@ -20,7 +21,7 @@ interface EntityState {
 }
 
 // Manages per-entity state (source, volume, power, etc.) — each AVR zone has independent state.
-class AvrStateManager {
+export class AvrStateManager {
   private states: Map<string, EntityState> = new Map();
 
   /** Get or create state for an entity */
@@ -309,10 +310,14 @@ class AvrStateManager {
       await eiscpInstance.raw("NSTQSTN"); // Query play/pause status
     }
 
-    // For Tidal, reset the browse state and re-request the NLS list so the media browser stays fresh
-    if (currentSubSource === "tidal") {
-      log.info("%s [%s] refreshing Tidal browse state via NTCTOP + NTCSELECT", integrationName, entityId);
-      resetTidalBrowseState(entityId);
+    // For Tidal/Deezer, reset browse state and re-request the NLS list so the media browser stays fresh
+    if (currentSubSource === "tidal" || currentSubSource === "deezer") {
+      log.info("%s [%s] refreshing %s browse state via NTCTOP + NTCSELECT", integrationName, entityId, currentSubSource);
+      if (currentSubSource === "tidal") {
+        resetTidalBrowseState(entityId);
+      } else {
+        resetDeezerBrowseState(entityId);
+      }
       await eiscpInstance.raw("NTCTOP");
       await eiscpInstance.raw("NTCSELECT");
     }

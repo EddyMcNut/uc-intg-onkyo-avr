@@ -1,6 +1,8 @@
 import { eiscpCommands } from "./eiscp-commands.js";
 import { eiscpMappings } from "./eiscp-mappings.js";
-import { NETWORK_SERVICES, NO_TITLE } from "./constants.js";
+import { NO_TITLE } from "./constants.js";
+import { detectServiceFromText, detectServiceFromAsciiPrefix, getCanonicalServiceName } from "./serviceDetector.js";
+import type { DeezerBrowseState } from "./deezerBrowserStore.js";
 import type { TidalBrowseState } from "./tidalBrowserStore.js";
 import type { TuneInMenuBrowseState } from "./tuneInMenuStore.js";
 
@@ -15,6 +17,10 @@ const ZONE4_REVERSE_MAP: Record<string, string> = { VL4: "MVL", PW4: "PWR", MT4:
 export interface AvrStateReader {
   getSource(entityId: string): string;
   getSubSource(entityId: string): string;
+}
+
+export interface DeezerStoreApi {
+  getBrowseState(entityId: string): DeezerBrowseState | null;
 }
 
 export interface TidalStoreApi {
@@ -48,6 +54,7 @@ export class IscpCommandParser {
   constructor(
     private readonly getEntityId: (zone: string) => string,
     private readonly stateReader: AvrStateReader,
+    private readonly deezerStore: DeezerStoreApi,
     private readonly tidalStore: TidalStoreApi,
     private readonly tuneInMenuStore: TuneInMenuStoreApi
   ) {
@@ -158,6 +165,9 @@ export class IscpCommandParser {
   private timeToSeconds(timeStr: string): number {
     if (!timeStr) return 0;
     const parts = timeStr.split(":").map(Number);
+    if (parts.some(isNaN)) {
+      return 0;
+    }
     if (parts.length === 3) {
       return parts[0] * 3600 + parts[1] * 60 + parts[2];
     } else if (parts.length === 2) {
@@ -281,8 +291,8 @@ export class IscpCommandParser {
         if (type === "NAT") {
           // Override artist with service name for configured streaming services
           if (NO_TITLE.map((s) => s.toLowerCase()).includes(currentSubSource)) {
-            // Find matching service name from NETWORK_SERVICES (case-insensitive)
-            const serviceName = NETWORK_SERVICES.find((s) => s.toLowerCase() === currentSubSource);
+            // Find matching service name (e.g., "Spotify" for "spotify")
+            const serviceName = getCanonicalServiceName(currentSubSource);
             this.currentMetadata.title = serviceName || val;
           } else {
             this.currentMetadata.title = val;
@@ -297,8 +307,8 @@ export class IscpCommandParser {
       if (command === "NAT") {
         // Override artist with service name for configured streaming services
         if (NO_TITLE.map((s) => s.toLowerCase()).includes(currentSubSource)) {
-          // Find matching service name from NETWORK_SERVICES (case-insensitive)
-          const serviceName = NETWORK_SERVICES.find((s) => s.toLowerCase() === currentSubSource);
+          // Find matching service name (e.g., "Spotify" for "spotify")
+          const serviceName = getCanonicalServiceName(currentSubSource);
           this.currentMetadata.title = serviceName || originalValue;
         } else {
           this.currentMetadata.title = originalValue;
@@ -365,6 +375,15 @@ export class IscpCommandParser {
         const cursorOffset = parseInt(cursorHex, 16);
         const totalCount = parseInt(countHex, 16);
         const layerNumber = /^[0-9A-Fa-f]{2}$/.test(layerHex) ? parseInt(layerHex, 16) : 0;
+        if (this.stateReader.getSubSource(entityId) === "deezer") {
+          const deezerState = this.deezerStore.getBrowseState(entityId);
+          if (deezerState) {
+            if (!deezerState.harvestMode) deezerState.nlsCursorOffset = cursorOffset;
+            deezerState.totalListItemCount = totalCount;
+            if (layerNumber > 0) deezerState.nlsLayerNumber = layerNumber;
+          }
+        }
+
         if (this.stateReader.getSubSource(entityId) === "tidal") {
           const tidalState = this.tidalStore.getBrowseState(entityId);
           if (tidalState) {
@@ -403,18 +422,17 @@ export class IscpCommandParser {
     const currentSource = this.stateReader.getSource(entityId);
 
     // Check if the title contains a known network service name
-    const normalizedText = text.toLowerCase();
-    const detectedService = NETWORK_SERVICES.find((service) => normalizedText.includes(service.toLowerCase()));
+    const detectedService = detectServiceFromText(text);
     if (detectedService) {
       const currentSubSource = this.stateReader.getSubSource(entityId);
-      if (currentSubSource !== detectedService.toLowerCase()) {
+      if (currentSubSource !== detectedService) {
         result.command = "NLT";
-        result.argument = detectedService;
+        result.argument = getCanonicalServiceName(detectedService) || detectedService;
         return result;
       }
     }
 
-    if (currentSource === "net" && normalizedText === "my presets") {
+    if (currentSource === "net" && text.toLowerCase() === "my presets") {
       result.command = "NLT_CONTEXT";
       result.argument = "My Presets";
       return result;
@@ -435,6 +453,10 @@ export class IscpCommandParser {
   }
 
   private handleNLA(value: string, result: CommandResult): CommandResult {
+    if (value.length < 6) {
+      return result;
+    }
+
     const xmlStart = value.indexOf("<");
     if (xmlStart === -1 || value.charAt(0) !== "X" || value.charAt(5).toUpperCase() !== "S") {
       return result;
@@ -453,7 +475,7 @@ export class IscpCommandParser {
     const currentSource = this.stateReader.getSource(entityId);
 
     // Check if FLD content matches a network service (regardless of current source)
-    const detectedService = NETWORK_SERVICES.find((service) => ascii.startsWith(service));
+    const detectedService = detectServiceFromAsciiPrefix(ascii);
 
     switch (currentSource) {
       case "net": {

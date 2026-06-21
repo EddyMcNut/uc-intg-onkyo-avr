@@ -9,7 +9,21 @@ graph TB
         CC["ConnectCoordinator\nsrc/connectCoordinator.ts"]
         ER["EntityRegistrar\nsrc/entityRegistrar.ts"]
         SEH["SelectEntityHandler\nsrc/selectEntityHandler.ts"]
-        SubH["SubscriptionHandler"]
+        SubH["SubscriptionHandler\nsrc/subscriptionHandler.ts"]
+    end
+
+    subgraph MediaBrowse["Media-Browser Subsystem"]
+        MB["mediaBrowser.ts\nbrowse entrypoint"]
+        MBSVC["mediaBrowserServices.ts\nservice delegation facade"]
+        BSC["browseServiceContract.ts\nservice IDs + source commands"]
+        PMCH["PlayMediaCommandHandler\nsrc/playMediaCommandHandler.ts"]
+        MBASE["menuBrowseHandlerBase.ts\nshared menu harvest base"]
+        MBSTATE["menuBrowseState.ts\nmenu options + freeze state"]
+        MEP["menuEntryParser.ts\nNLS/NLA parsing helpers"]
+        THUMB["serviceThumbnails.ts\nlogo/backdrop generation"]
+        TIN["TuneIn modules\ntuneInMediaBrowser.ts\ntuneInBrowseHandler.ts\ntuneInBrowserStore.ts\ntuneInMenuStore.ts\ntuneInPreloader.ts"]
+        TID["Tidal modules\ntidalMediaBrowser.ts\ntidalBrowseHandler.ts\ntidalBrowserStore.ts"]
+        DEE["Deezer modules\ndeezerMediaBrowser.ts\ndeezerBrowseHandler.ts\ndeezerBrowserStore.ts"]
     end
 
     subgraph ConnLayer["Connection Layer"]
@@ -25,6 +39,9 @@ graph TB
         MZONE["eiscp-multi-zone.ts\nmulti-zone command builders"]
         CR["CommandReceiver\nsrc/commandReceiver.ts\nISCP → UC attributes"]
         ZAUP["ZoneAgnosticUpdateProcessor\nsrc/zoneAgnosticUpdateProcessor.ts\nFLD / NLT / metadata fanout"]
+        ZAFPR["ZoneAgnosticFrontPanelRouter\nsrc/zoneAgnosticFrontPanelRouter.ts"]
+        ZASCR["ZoneAgnosticServiceCommandRouter\nsrc/zoneAgnosticServiceCommandRouter.ts"]
+        ZASAD["ZoneAgnosticServiceAdapters\nsrc/zoneAgnosticServiceAdapters.ts\nTuneIn / Tidal / Deezer"]
         ZAMSS["ZoneAgnosticMediaStateStore\nsrc/zoneAgnosticMediaState.ts\nnow-playing · image cache"]
         ZMR["ZoneMediaRenderer\nsrc/zoneMediaRenderer.ts\nalbum-art fetch + push"]
     end
@@ -54,12 +71,35 @@ graph TB
     CC --> CM
     CC -- "ensureZoneInstances()" --> INSTANCES
     Driver -- "queryAvrState /\nqueryAllZonesState" --> ASQ
+    Driver --> MB
 
     %% Connection layer
     CM --> EISCP
     CM --> CR
     CM --> RM
     INSTANCES --> CS
+
+    %% Browse subsystem wiring
+    MB --> MBSVC
+    MB --> BSC
+    CS --> PMCH
+    PMCH --> BSC
+    PMCH --> MBSVC
+    MBSVC --> TIN
+    MBSVC --> TID
+    MBSVC --> DEE
+    TIN --> MBASE
+    TID --> MBASE
+    DEE --> MBASE
+    TIN --> MBSTATE
+    TID --> MBSTATE
+    DEE --> MBSTATE
+    TIN --> MEP
+    TID --> MEP
+    DEE --> MEP
+    TIN --> THUMB
+    TID --> THUMB
+    DEE --> THUMB
 
     %% EiscpDriver sub-modules
     EISCP --> PKT
@@ -71,8 +111,12 @@ graph TB
     CR -- "zone-agnostic commands" --> ZAUP
     CR -- "write state" --> ASM
     ZAUP -- "read: resolve zones\nwrite: setSource (DAB)" --> ASM
+    ZAUP --> ZAFPR
+    ZAUP --> ZASCR
+    ZASCR --> ZASAD
     ZAUP --> ZAMSS
     ZAUP --> ZMR
+    ZAFPR --> ZASAD
 
     %% EiscpDriver reads state for FM/NET routing
     EISCP -- "read: source / sub-source\nfor FLD routing" --> ASM
@@ -96,9 +140,11 @@ graph TB
     classDef conn fill:#2d7a4a,color:#fff,stroke:#1a5c34
     classDef data fill:#7a4a2d,color:#fff,stroke:#5c3419
     classDef avr fill:#5c2d7a,color:#fff,stroke:#3e1a5c
+    classDef browse fill:#7a5c2d,color:#fff,stroke:#5c451a
     class CC,CM,RM,INSTANCES conn
     class ASM,ASQ,CFG,MAPS data
     class EISCP,AVRBox avr
     class PKT,PARSER,MZONE util
     class SetupH,ER,SEH,SubH entry
+    class MB,MBSVC,BSC,PMCH,MBASE,MBSTATE,MEP,THUMB,TIN,TID,DEE browse
     classDef util fill:#6a5a2d,color:#fff,stroke:#4e4219

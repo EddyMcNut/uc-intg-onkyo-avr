@@ -17,9 +17,11 @@ test.serial("EntityRegistrar builds entities correctly", async (t) => {
     }
 
     // Import compiled module from dist
+    const avrStateModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/avrState.js")).href);
     const module = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/entityRegistrar.js")).href);
     const EntityRegistrar = module.default as any;
-    const registrar = new EntityRegistrar();
+    const { avrStateManager } = avrStateModule as any;
+    const registrar = new EntityRegistrar(avrStateManager);
 
     const avrEntry = "Model_192.168.1.2_main";
 
@@ -45,9 +47,11 @@ test.serial("EntityRegistrar builds entities correctly", async (t) => {
     // When user config contains listeningModeOptions, the select entity should use it exactly
     const userList = ["stereo", "straight-decode", "neural-thx", "full-mono"];
     (cfgModule as any).ConfigManager.save({ avrs: [{ model: "Model", ip: "192.168.1.2", port: 60128, zone: "main", listeningModeOptions: userList, entityNameStyle: "long" }] });
+    const avrStateModule2 = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/avrState.js")).href);
     const registrar2Module = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/entityRegistrar.js")).href);
     const Registrar2 = registrar2Module.default as any;
-    const registrar2 = new Registrar2();
+    const { avrStateManager: avrStateManager2 } = avrStateModule2 as any;
+    const registrar2 = new Registrar2(avrStateManager2);
     const select2 = registrar2.createListeningModeSelectEntity("Model 192.168.1.2 main", async () => {});
     const attrs2 = (select2 as any).attributes || {};
     t.deepEqual(attrs2.options, userList);
@@ -65,8 +69,10 @@ test.serial("EntityRegistrar sensor names omit host from display name", async (t
     }
     (cfgModule as any).ConfigManager.save({ avrs: [{ model: "TX-RZ50", ip: "192.168.1.2", port: 60128, zone: "main", entityNameStyle: "short" }] });
     const module = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/entityRegistrar.js")).href);
+    const avrStateModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/avrState.js")).href);
     const EntityRegistrar = module.default as any;
-    const registrar = new EntityRegistrar();
+    const { avrStateManager } = avrStateModule as any;
+    const registrar = new EntityRegistrar(avrStateManager);
 
     const avrEntry = "TX-RZ50 192.168.1.2 main";
     const sensors = registrar.createSensorEntities(avrEntry);
@@ -100,7 +106,9 @@ test.serial("EntityRegistrar long entity names include host when configured", as
 
     const module = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/entityRegistrar.js")).href);
     const EntityRegistrar = module.default as any;
-    const registrar = new EntityRegistrar();
+    const avrStateModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/avrState.js")).href);
+    const { avrStateManager } = avrStateModule as any;
+    const registrar = new EntityRegistrar(avrStateManager);
     const avrEntry = "TX-RZ50 192.168.1.2 main";
 
     const mp = registrar.createMediaPlayerEntity(avrEntry, 100, async () => {});

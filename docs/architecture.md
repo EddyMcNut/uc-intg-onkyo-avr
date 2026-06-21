@@ -80,7 +80,36 @@ The integration uses **eISCP (Ethernet Integrated Serial Control Protocol)**, wh
 
 - `buildMultiZoneVolumeCommands` / `buildMultiZoneMuteCommands` — build batched zone command lists from a single multi-zone action string (e.g. `"all-up"`, `"main-zone2-toggle"`)
 
-### 3. Command Flow (Outbound)
+### 3. Media-Browser Subsystem (TuneIn / Tidal / Deezer)
+
+The integration has a dedicated media-browsing stack for NET services.
+
+**Orchestration and contracts**
+
+- **`mediaBrowser.ts`** — top-level browse entrypoint used by entity browse handlers and `CommandSender`; checks source/sub-source compatibility and routes requests to service-specific handlers
+- **`mediaBrowserServices.ts`** — service delegation facade; re-exports service IDs/root constants and binds TuneIn/Tidal/Deezer browser modules
+- **`browseServiceContract.ts`** — canonical browse service IDs and source-selection commands (e.g. TuneIn/Tidal/Deezer)
+
+**Play command routing**
+
+- **`playMediaCommandHandler.ts`** — central PlayMedia decision engine
+- Handles TuneIn preset/menu flow, Tidal menu flow, and Deezer menu flow
+- Maintains list-mode/freeze/now-playing browse state for track selections and back/main-menu navigation
+
+**Service-specific browser modules**
+
+- **TuneIn**: `tuneInMediaBrowser.ts`, `tuneInBrowseHandler.ts`, `tuneInBrowserStore.ts`, `tuneInMenuStore.ts`, `tuneInPreloader.ts`, `tuneInFilters.ts`
+- **Tidal**: `tidalMediaBrowser.ts`, `tidalBrowseHandler.ts`, `tidalBrowserStore.ts`
+- **Deezer**: `deezerMediaBrowser.ts`, `deezerBrowseHandler.ts`, `deezerBrowserStore.ts`
+
+**Shared browse helpers**
+
+- **`menuBrowseHandlerBase.ts`** — shared menu harvest/navigation base for Tidal/Deezer browse handlers
+- **`menuBrowseState.ts`** — generic browse-state model (options, cursor, harvest flags, now-playing title, freeze state)
+- **`menuEntryParser.ts`** — parsing helpers for NLS/NLA list payloads and XML menu entries
+- **`serviceThumbnails.ts`** — backdrop and per-item thumbnail generation from logos
+
+### 4. Command Flow (Outbound)
 
 **CommandSender** (`src/commandSender.ts`)
 
@@ -88,6 +117,7 @@ The integration uses **eISCP (Ethernet Integrated Serial Control Protocol)**, wh
 - Translates high-level media player commands into eISCP protocol commands and sends them via `EiscpDriver`
 - Routes commands to the appropriate zone (main, zone2, zone3) via the `setZonePrefix` helper
 - Verifies connection state before sending; triggers reconnection if disconnected
+- Delegates PlayMedia command routing to `PlayMediaCommandHandler` for service-aware browse/play behavior
 - Two send paths:
   - **`eiscp.command(name)`** — for most commands (power, mute, source, presets…); looks up the human-readable name in `eiscp-commands.ts` to get the raw ISCP code
   - **`eiscp.raw(code)`** — for volume up/down and absolute volume set; sends the zone-specific raw ISCP code directly (e.g. `"MVLUP1"`, `"ZVLDOWN1"`) bypassing the command lookup
@@ -110,7 +140,7 @@ AVR adjusts volume and sends back a volume state update
 
 ```
 
-### 4. Event Flow (Inbound)
+### 5. Event Flow (Inbound)
 
 **CommandReceiver** (`src/commandReceiver.ts`)
 
@@ -126,6 +156,8 @@ AVR adjusts volume and sends back a volume state update
 - For NET zones: updates the front panel display sensor and detects sub-source changes (Spotify, TuneIn, Tidal…)
 - For FM zones: updates both the media player station/artist and the front panel display sensor
 - Owns a `ZoneAgnosticMediaStateStore` for shared media state; delegates album-art fetching to `ZoneMediaRenderer`
+- Uses `ZoneAgnosticFrontPanelRouter` for FLD/service detection fanout
+- Uses `ZoneAgnosticServiceCommandRouter` with per-service adapters (`TuneInZoneAgnosticAdapter`, `TidalZoneAgnosticAdapter`, `DeezerZoneAgnosticAdapter`) for NLS/NLA/metadata handling
 
 **ZoneAgnosticMediaStateStore** (`src/zoneAgnosticMediaState.ts`)
 
@@ -156,7 +188,7 @@ CommandReceiver processes volume command:
 
 ```
 
-### 5. State Management
+### 6. State Management
 
 **AvrStateManager** (`src/avrState.ts`)
 
@@ -169,7 +201,7 @@ CommandReceiver processes volume command:
 - Sends the full set of ISCP query commands for a zone (power, input-selector, volume, audio-info, video-info, fp-display…)
 - Includes a 5-second debounce guard per entity to prevent redundant queries from multiple events firing in quick succession
 
-### 6. Entity Registration — OCP Pattern
+### 7. Entity Registration — OCP Pattern
 
 Entity types are defined as `EntityRegistration` descriptors in `buildEntityRegistrations()`:
 
@@ -192,7 +224,7 @@ Current registrations (in order):
 3. **Listening Mode select** — conditional on `listeningModeOptions` not being `null`
 4. **Input Selector select** — conditional on `inputSelectorOptions` not being `null`
 
-### 7. Specialist Handlers
+### 8. Specialist Handlers
 
 **SetupHandler** (`src/setupHandler.ts`) — setup UI flow (manual config, auto-discovery, backup/restore)
 
@@ -201,6 +233,12 @@ Current registrations (in order):
 **SelectEntityHandler** (`src/selectEntityHandler.ts`) — generic parameterised handler for select-entity commands (Listening Mode, Input Selector); the entity suffix, EISCP command name, log label, and options callback differ per use — no separate files per entity type
 
 **SubscriptionHandler** (`src/subscriptionHandler.ts`) — handles entity subscribe/unsubscribe events; queries state for newly subscribed entities
+
+**ZoneAgnosticFrontPanelRouter** (`src/zoneAgnosticFrontPanelRouter.ts`) — routes FLD updates, detects service transitions, and syncs front-panel sensors across affected zones
+
+**ZoneAgnosticServiceCommandRouter** (`src/zoneAgnosticServiceCommandRouter.ts`) — dispatches NLT_CONTEXT/NLS/NLA/metadata to active service adapters
+
+**ZoneAgnosticServiceAdapters** (`src/zoneAgnosticServiceAdapters.ts`) — service-specific zone-agnostic behavior for TuneIn/Tidal/Deezer
 
 ## Event-Based Model
 

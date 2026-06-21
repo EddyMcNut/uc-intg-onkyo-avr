@@ -17,8 +17,10 @@ test.serial("EntityRegistrar returns user-configured listeningModeOptions from c
     const { ConfigManager, setConfigDir } = cfgModule;
     if (typeof setConfigDir === "function") setConfigDir(tmp);
 
+    const avrStateModule = (await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/avrState.js")).href)) as any;
     const EntityRegistrar = module.default as any;
-    const registrar = new EntityRegistrar();
+    const { avrStateManager } = avrStateModule;
+    const registrar = new EntityRegistrar(avrStateManager);
 
     // Save a config with listeningModeOptions and reload
     ConfigManager.save({ avrs: [{ model: "M", ip: "1.2.3.4", port: 60128, zone: "main", listeningModeOptions: ["stereo", "straight-decode"] }] });

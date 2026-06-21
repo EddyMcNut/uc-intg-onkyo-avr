@@ -1,12 +1,12 @@
 import * as uc from "@unfoldedcircle/integration-api";
 import { SelectAttributes } from "@unfoldedcircle/integration-api";
-import { avrStateManager } from "./avrState.js";
 import { OnkyoConfig, buildEntityId } from "./configManager.js";
 import { EiscpDriver } from "./eiscp.js";
 import { getCompatibleListeningModes, detectAudioFormatType } from "./listeningModeFilters.js";
 import { eiscpMappings } from "./eiscp-mappings.js";
 import log, { getLogLevel } from "./loggers.js";
 import { ZoneAgnosticUpdateProcessor } from "./zoneAgnosticUpdateProcessor.js";
+import type { AvrStateApi } from "./types.js";
 
 const integrationName = "commandReceiver:";
 
@@ -34,24 +34,32 @@ type AvrUpdateEvent = {
 
 type ZoneAgnosticHandler = (avrUpdates: AvrUpdateEvent, entityId: string, eventZone: string) => Promise<void>;
 
+// Extract metadata from union argument type for clarity; returns null if not an object
+function extractMetadataArgument(arg: string | number | Record<string, string>): Record<string, string> | null {
+  return typeof arg === "object" && arg !== null ? (arg as Record<string, string>) : null;
+}
+
 export class CommandReceiver {
   private driver: uc.IntegrationAPI;
   private config: OnkyoConfig;
   private eiscpInstance: EiscpDriver;
   private avrPreset: string = "unknown";
   private driverVersion: string;
+  private avrStateApi: AvrStateApi;
   private zoneAgnosticProcessor: ZoneAgnosticUpdateProcessor;
   private zoneAgnosticHandlers: Record<string, ZoneAgnosticHandler>;
   private avInfoRequeryTimer: ReturnType<typeof setTimeout> | null = null;
 
-  constructor(driver: uc.IntegrationAPI, config: OnkyoConfig, eiscpInstance: EiscpDriver, driverVersion: string = "unknown") {
+  constructor(driver: uc.IntegrationAPI, config: OnkyoConfig, eiscpInstance: EiscpDriver, avrStateApi: AvrStateApi, driverVersion: string = "unknown") {
     this.driver = driver;
     this.config = config;
     this.eiscpInstance = eiscpInstance;
+    this.avrStateApi = avrStateApi;
     this.driverVersion = driverVersion;
-    this.zoneAgnosticProcessor = new ZoneAgnosticUpdateProcessor(driver, config, eiscpInstance, avrStateManager);
+    this.zoneAgnosticProcessor = new ZoneAgnosticUpdateProcessor(driver, config, eiscpInstance, avrStateApi);
     this.zoneAgnosticHandlers = {
       IFA: async (avrUpdates, entityId, eventZone) => {
+        // IFA handler invokes audio format callback for listening mode updates when format changes
         await this.zoneAgnosticProcessor.handleIfa(entityId, eventZone, avrUpdates.argument as Record<string, string> | undefined, async (zoneEntityId, audioInputValue) => {
           await this.updateListeningModeOptionsForAudioFormat(zoneEntityId, audioInputValue);
         });
@@ -83,7 +91,7 @@ export class CommandReceiver {
         await this.zoneAgnosticProcessor.handleNtm(entityId, avrUpdates.argument.toString());
       },
       metadata: async (avrUpdates, entityId) => {
-        const metadata = typeof avrUpdates.argument === "object" && avrUpdates.argument !== null ? (avrUpdates.argument as Record<string, string>) : null;
+        const metadata = extractMetadataArgument(avrUpdates.argument);
         await this.zoneAgnosticProcessor.handleMetadata(entityId, metadata);
       }
     };
@@ -100,7 +108,7 @@ export class CommandReceiver {
 
   private async updateListeningModeOptionsForAudioFormat(zoneEntityId: string, audioInputValue: string): Promise<void> {
     const audioFormatType = detectAudioFormatType(audioInputValue);
-    const formatChanged = avrStateManager.setAudioFormat(zoneEntityId, audioFormatType);
+    const formatChanged = this.avrStateApi.setAudioFormat(zoneEntityId, audioFormatType);
 
     if (!formatChanged) {
       return;
@@ -200,7 +208,7 @@ export class CommandReceiver {
           console.log("[INFO]", `${integrationName} [${entityId}] power set to: ${powerState} (log level: ${getLogLevel()})`);
 
           // Track power state in state manager
-          avrStateManager.setPowerState(entityId, avrUpdates.argument as string, this.driver);
+          this.avrStateApi.setPowerState(entityId, avrUpdates.argument as string, this.driver);
 
           // When AVR is off, set all sensor states to standby
           if (avrUpdates.argument !== "on") {
@@ -240,7 +248,7 @@ export class CommandReceiver {
           this.driver.updateEntityAttributes(entityId, {
             [uc.MediaPlayerAttributes.Volume]: volumeSensorValue
           });
-          avrStateManager.setVolume(entityId, eiscpValue);
+          this.avrStateApi.setVolume(entityId, eiscpValue);
 
           // Update volume sensor
           const volumeSensorId = `${entityId}_volume_sensor`;
@@ -257,7 +265,7 @@ export class CommandReceiver {
         }
         case "input-selector": {
           const source = avrUpdates.argument.toString().split(",")[0];
-          avrStateManager.setSource(entityId, source, this.eiscpInstance, eventZone, this.driver);
+          this.avrStateApi.setSource(entityId, source, this.eiscpInstance, eventZone, this.driver);
           this.driver.updateEntityAttributes(entityId, {
             [uc.MediaPlayerAttributes.Source]: source
           });
@@ -305,8 +313,12 @@ export class CommandReceiver {
             });
             // Query AV info on every valid listening-mode update — this catches content changes on the same source (e.g. switching tracks on Apple TV) where the AVR doesn't push IFA/IFV spontaneously.
             log.info("%s [%s] querying AV info after listening-mode update", integrationName, entityId);
-            this.eiscpInstance.command({ zone: eventZone, command: "audio-information", args: "query" }).catch(() => {});
-            this.eiscpInstance.command({ zone: eventZone, command: "video-information", args: "query" }).catch(() => {});
+            this.eiscpInstance.command({ zone: eventZone, command: "audio-information", args: "query" }).catch((err) => {
+              log.debug("%s [%s] audio-information query failed: %s", integrationName, entityId, err instanceof Error ? err.message : String(err));
+            });
+            this.eiscpInstance.command({ zone: eventZone, command: "video-information", args: "query" }).catch((err) => {
+              log.debug("%s [%s] video-information query failed: %s", integrationName, entityId, err instanceof Error ? err.message : String(err));
+            });
           }
           break;
         }
@@ -343,9 +355,18 @@ export class CommandReceiver {
           break;
         }
         default:
+          log.debug("%s [%s] Received unknown command type: '%s' with argument: %s", integrationName, entityId, avrUpdates.command, avrUpdates.argument);
           break;
       }
       await this.zoneAgnosticProcessor.renderEntity(entityId);
     });
+  }
+
+  // Cleanup method to ensure no orphaned timers leak resources
+  public cleanup(): void {
+    if (this.avInfoRequeryTimer) {
+      clearTimeout(this.avInfoRequeryTimer);
+      this.avInfoRequeryTimer = null;
+    }
   }
 }

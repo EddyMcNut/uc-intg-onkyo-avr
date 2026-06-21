@@ -11,10 +11,6 @@ Custom integration for Unfolded Circle remotes to control your Onkyo / Pioneer /
 
 You use this integration at your own risk!
 
-## Kudos
-
-[Kudos](./docs/kudos.md)
-
 ## Prerequisites
 
 Read this readme completely, it contains some tips for known issues and it also explains how to use `Input source` in a flexibale way so you can send a lot of different commands to your AVR.
@@ -30,7 +26,7 @@ Read this readme completely, it contains some tips for known issues and it also 
 
   ![](./screenshots/new-reconnect-logic.png)
 
-If your AVR is disconnected from power (off) this integration will fail. If your AVR has been disconnected from power, it could be that you first have to switch on your AVR manually one time before network commands work again (depends on the model), waking up after STANDBY should then work again.
+_If your AVR has been disconnected from power, it could be that you first have to switch on your AVR manually one time before network commands work again (depends on the model), waking up after STANDBY should then work again._
 
 ## Reported to work on different brands and models
 
@@ -51,9 +47,15 @@ Users report it also to work with:
 - Pioneer VSA-LX805
 - Integra (model unknown)
 
-## Installation and usage
+## Install
 
 [Installation](./docs/installation.md)
+
+[Upgrade to new version](./docs/new-version.md)
+
+[Backup and Restore](./docs/backup-restore.md)
+
+[Migrate from pre-v.0.7.0 to v.0.7.0+](./docs/v070-migration.md)
 
 Example activities:
 
@@ -62,15 +64,10 @@ Example activities:
 - [DAB Radio](./docs/dab.md)
 - [TuneIn Radio](./docs/tunein.md)
 - [Tidal](./docs/tidal.md)
+- [Deezer](./docs/deezer.md)
 - Make sure that you add your Activities to an [Activity Group](./docs/activitygroup.md).
 - `Home` \ `Customise your remote` Add your new Activity to a page and now you can give it a try on the awesome Unfolded Circle Remote!
 - or, when not created an activity yet: `Home` \ `Customise your remote` and just add your AVR, in that case physical buttons are mapped.
-
-## Install new version
-
-[Install new version](./docs/new-version.md)
-
-[Migrate from pre-v.0.7.0 to v.0.7.0+](./docs/v070-migration.md)
 
 ## Album Art
 
@@ -104,20 +101,16 @@ Example activities:
 
 [Multiple zones](./docs/multiple-zones.md)
 
-## Raw messages
+## Other
+
+[Kudos](./docs/kudos.md)
 
 [Raw messages](./docs/raw.md)
 
-## Backup, Restore, Logs
-
-[Backup and Restore](./docs/backup-restore.md)
+[Log level](./docs/loglevel.md)
 
 [Collect logs](./docs/collect-logs.md)
-
-## Other
 
 [Known issues and solutions](./docs/known-issues.md)
 
 [Architecture and Operation](./docs/architecture.md)
-
-[Log level](./docs/loglevel.md)

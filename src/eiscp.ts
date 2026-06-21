@@ -9,9 +9,10 @@ import { delay } from "./utils.js";
 import { IscpCommandParser, type CommandResult } from "./eiscp-command-parser.js";
 import { createEiscpPacket, extractIscpMessage, extractAllIscpMessages } from "./eiscp-packet.js";
 import { buildMultiZoneVolumeCommands, buildMultiZoneMuteCommands } from "./eiscp-multi-zone.js";
-import { avrStateManager } from "./avrState.js";
+import { getDeezerBrowseState } from "./deezerBrowserStore.js";
 import { getTidalBrowseState } from "./tidalBrowserStore.js";
 import { getTuneInMenuBrowseState } from "./tuneInMenuStore.js";
+import type { AvrStateReader } from "./eiscp-command-parser.js";
 
 export interface EiscpConfig {
   host?: string;
@@ -25,6 +26,11 @@ export interface EiscpConfig {
   tuneinPresetPosition?: number;
   configuredZones?: string[]; // Zones configured for this physical AVR (e.g., ["main", "zone2"])
 }
+
+const NOOP_STATE_READER: AvrStateReader = {
+  getSource: () => "unknown",
+  getSubSource: () => "unknown"
+};
 
 const COMMAND_MAPPINGS = eiscpMappings.command_mappings;
 const VALUE_MAPPINGS = eiscpMappings.value_mappings;
@@ -109,7 +115,10 @@ export class EiscpDriver extends EventEmitter {
   private tcpBuffer: Buffer = Buffer.alloc(0);
   private readonly commandParser: IscpCommandParser;
 
-  constructor(config?: EiscpConfig) {
+  constructor(
+    config?: EiscpConfig,
+    private readonly stateReader: AvrStateReader = NOOP_STATE_READER
+  ) {
     super();
     this.config = {
       host: config?.host,
@@ -125,7 +134,10 @@ export class EiscpDriver extends EventEmitter {
     };
     this.commandParser = new IscpCommandParser(
       (zone) => buildEntityId(this.config.model!, this.config.host!, zone),
-      avrStateManager,
+      this.stateReader,
+      {
+        getBrowseState: getDeezerBrowseState
+      },
       {
         getBrowseState: getTidalBrowseState
       },

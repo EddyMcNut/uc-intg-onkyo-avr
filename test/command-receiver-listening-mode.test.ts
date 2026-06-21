@@ -16,8 +16,10 @@ test.serial("CommandReceiver preserves user-configured listeningModeOptions acro
   try {
     const crModule = (await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/commandReceiver.js")).href)) as any;
     const ConfigModule = (await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/configManager.js")).href)) as any;
+    const avrStateModule = (await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/avrState.js")).href)) as any;
     const { CommandReceiver } = crModule;
     const { ConfigManager, setConfigDir } = ConfigModule;
+    const { avrStateManager } = avrStateModule;
     if (typeof setConfigDir === "function") setConfigDir(tmp);
 
     // Prepare config with user-specified listeningModeOptions
@@ -51,7 +53,7 @@ test.serial("CommandReceiver preserves user-configured listeningModeOptions acro
 
     // Construct CommandReceiver with the persisted config
     const onkyoCfg = ConfigManager.load();
-    const receiver = new CommandReceiver(mockDriver, onkyoCfg, mockEiscp as any, "v-test");
+    const receiver = new CommandReceiver(mockDriver, onkyoCfg, mockEiscp as any, avrStateManager, "v-test");
     receiver.setupEiscpListener();
 
     // Emit an IFA event that would normally trigger listening-mode option filtering
@@ -83,8 +85,10 @@ test.serial("CommandReceiver sets media player state to Playing only for ON+NET+
   try {
     const crModule = (await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/commandReceiver.js")).href)) as any;
     const ConfigModule = (await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/configManager.js")).href)) as any;
+    const avrStateModule = (await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/avrState.js")).href)) as any;
     const { CommandReceiver } = crModule;
     const { ConfigManager, setConfigDir } = ConfigModule;
+    const { avrStateManager } = avrStateModule;
     if (typeof setConfigDir === "function") setConfigDir(tmp);
 
     ConfigManager.save({ avrs: [{ model: "M", ip: "1.2.3.4", port: 60128, zone: "main" }] });
@@ -114,7 +118,7 @@ test.serial("CommandReceiver sets media player state to Playing only for ON+NET+
 
     const mockEiscp = new MockEiscp();
     const onkyoCfg = ConfigManager.load();
-    const receiver = new CommandReceiver(mockDriver, onkyoCfg, mockEiscp as any, "v-test");
+    const receiver = new CommandReceiver(mockDriver, onkyoCfg, mockEiscp as any, avrStateManager, "v-test");
     receiver.setupEiscpListener();
 
     const entityId = "M 1.2.3.4 main";
