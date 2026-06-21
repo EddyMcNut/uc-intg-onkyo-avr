@@ -21,7 +21,8 @@ test("createEiscpPacket adds !1 prefix and valid ISCP header", async (t) => {
 
   t.is(packet.toString("ascii", 0, 4), "ISCP");
   t.is(packet.readUInt32BE(4), 16);
-  t.is(extractIscpMessage(packet), "!1PWRQSTN");
+  // extractIscpMessage strips the "!1" prefix and returns the logical command body.
+  t.is(extractIscpMessage(packet), "PWRQSTN");
 });
 
 test("extractAllIscpMessages falls back to single-frame extraction for malformed input", async (t) => {
