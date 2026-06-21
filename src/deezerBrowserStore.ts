@@ -16,6 +16,10 @@ export type DeezerBrowseState = MenuBrowseState<DeezerMenuOption>;
 
 const deezerBrowseStateByPhysicalAvr = new Map<string, DeezerBrowseState>();
 
+function isLikelyDeezerTrackTitle(title: string): boolean {
+  return title.includes(" / ") || title.includes(" - ");
+}
+
 function buildDeezerMenuMediaId(menuIndex: number, title: string): string {
   return `deezer:menu:${menuIndex}:${encodeURIComponent(title)}`;
 }
@@ -42,7 +46,7 @@ export function addDeezerMenuOption(entityId: string, menuIndex: number, title: 
     return;
   }
 
-  const isBrowsable = !title.includes(" - ");
+  const isBrowsable = !isLikelyDeezerTrackTitle(title);
 
   upsertMenuOption(state, menuIndex, () => ({
     menuIndex,

@@ -163,23 +163,26 @@ export class PlayMediaCommandHandler {
     }
 
     const shouldTraceSelection = activeServiceId === TIDAL_SERVICE_ID ? consumeTraceNextTidalSelectionAfterMainMenu(entityId) : consumeTraceNextDeezerSelectionAfterMainMenu(entityId);
+    const activeOptions = activeServiceId === TIDAL_SERVICE_ID ? listTidalMenuOptions(entityId) : listDeezerMenuOptions(entityId);
 
-    const requestedTitle = /^Menu \d+$/.test(activeOption.title)
-      ? (activeServiceId === TIDAL_SERVICE_ID ? listTidalMenuOptions(entityId) : listDeezerMenuOptions(entityId)).find((item) => item.menuIndex === activeOption.menuIndex)?.title
-      : activeOption.title;
+    const requestedTitle = /^Menu \d+$/.test(activeOption.title) ? activeOptions.find((item) => item.menuIndex === activeOption.menuIndex)?.title : activeOption.title;
     if (shouldTraceSelection) {
-      const cached = (activeServiceId === TIDAL_SERVICE_ID ? listTidalMenuOptions(entityId) : listDeezerMenuOptions(entityId))
+      const cached = activeOptions
         .slice(0, 12)
         .map((item) => `${item.menuIndex}:${item.title}`)
         .join(", ");
       log.info("%s [%s] TRACE cached %s menu before command: [%s] requestedTitle='%s'", integrationName, entityId, activeLabel, cached, requestedTitle ?? "");
     }
 
+    const cachedOption = activeOptions.find((item) => item.menuIndex === activeOption.menuIndex) ?? (requestedTitle ? activeOptions.find((item) => item.title === requestedTitle) : undefined);
+    const selectedIsBrowsable = cachedOption?.isBrowsable ?? activeOption.isBrowsable;
+    const selectedTitle = cachedOption?.title ?? requestedTitle ?? activeOption.title;
+
     const currentSource = this.avrStateApi.getSource(entityId);
     const currentSubSource = this.avrStateApi.getSubSource(entityId);
     if (!isBrowseServiceActive(currentSource, currentSubSource, activeServiceId)) {
       await this.selectBrowseService(entityId, activeServiceId, setZonePrefix, netMenuDelay, { delayAfterSelect: true });
-    } else if (!activeOption.isBrowsable) {
+    } else if (!selectedIsBrowsable) {
       const alreadyInListMode = activeServiceId === TIDAL_SERVICE_ID ? consumeTidalListModeActive(entityId) : consumeDeezerListModeActive(entityId);
       if (!alreadyInListMode) {
         const playbackStatus = this.avrStateApi.getPlaybackStatus(entityId);
@@ -192,7 +195,7 @@ export class PlayMediaCommandHandler {
 
     let menuIndexToSelect = activeOption.menuIndex;
     if (requestedTitle) {
-      const remapped = (activeServiceId === TIDAL_SERVICE_ID ? listTidalMenuOptions(entityId) : listDeezerMenuOptions(entityId)).find((item) => item.title === requestedTitle);
+      const remapped = activeOptions.find((item) => item.title === requestedTitle);
       if (remapped && remapped.menuIndex !== activeOption.menuIndex) {
         log.debug("%s [%s] remapped %s selection '%s' from index %d to %d", integrationName, entityId, activeLabel, requestedTitle, activeOption.menuIndex, remapped.menuIndex);
         menuIndexToSelect = remapped.menuIndex;
@@ -205,10 +208,20 @@ export class PlayMediaCommandHandler {
 
     if (activeServiceId === TIDAL_SERVICE_ID) {
       const tidalState = getTidalBrowseState(entityId);
-      if (tidalState) tidalState.browseListFrozen = !activeOption.isBrowsable;
+      if (tidalState) {
+        tidalState.browseListFrozen = !selectedIsBrowsable;
+        if (!selectedIsBrowsable) {
+          tidalState.nowPlayingTitle = selectedTitle;
+        }
+      }
     } else {
       const deezerState = getDeezerBrowseState(entityId);
-      if (deezerState) deezerState.browseListFrozen = !activeOption.isBrowsable;
+      if (deezerState) {
+        deezerState.browseListFrozen = !selectedIsBrowsable;
+        if (!selectedIsBrowsable) {
+          deezerState.nowPlayingTitle = selectedTitle;
+        }
+      }
     }
     await this.eiscp.raw(`NLSI${String(menuIndexToSelect).padStart(5, "0")}`);
     return uc.StatusCodes.Ok;

@@ -53,6 +53,8 @@ Users report it also to work with:
 
 [Upgrade to new version](./docs/new-version.md)
 
+[Backup and Restore](./docs/backup-restore.md)
+
 [Migrate from pre-v.0.7.0 to v.0.7.0+](./docs/v070-migration.md)
 
 Example activities:
@@ -62,6 +64,7 @@ Example activities:
 - [DAB Radio](./docs/dab.md)
 - [TuneIn Radio](./docs/tunein.md)
 - [Tidal](./docs/tidal.md)
+- [Deezer](./docs/deezer.md)
 - Make sure that you add your Activities to an [Activity Group](./docs/activitygroup.md).
 - `Home` \ `Customise your remote` Add your new Activity to a page and now you can give it a try on the awesome Unfolded Circle Remote!
 - or, when not created an activity yet: `Home` \ `Customise your remote` and just add your AVR, in that case physical buttons are mapped.
@@ -102,14 +105,12 @@ Example activities:
 
 [Kudos](./docs/kudos.md)
 
-[Backup and Restore](./docs/backup-restore.md)
+[Raw messages](./docs/raw.md)
+
+[Log level](./docs/loglevel.md)
 
 [Collect logs](./docs/collect-logs.md)
 
 [Known issues and solutions](./docs/known-issues.md)
-
-[Raw messages](./docs/raw.md)
-
-[Log level](./docs/loglevel.md)
 
 [Architecture and Operation](./docs/architecture.md)

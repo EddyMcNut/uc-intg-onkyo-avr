@@ -10,13 +10,13 @@ const NOW_PLAYING_LABEL = "▶ Now Playing";
 
 const { createBackdrop: createDeezerBackdrop, getOrCreateThumbnail: getOrCreateDeezerThumbnail } = createServiceThumbnails({
   svgFileName: "deezer.svg",
-  logoTransform: "translate(245 248) scale(.103275)",
-  logoPathAttrs: 'fill="#ffffff"',
+  logoTransform: "translate(245 248) scale(1)",
+  logoPathAttrs: 'fill="#A238FF"',
   backgroundColor: "#000000",
   fallbackLabel: "DEEZER",
-  fallbackLabelColor: "#ff6a00",
+  fallbackLabelColor: "#A238FF",
   fallbackBgOpacity: ".15",
-  textColor: "#ff6a00",
+  textColor: "#A238FF",
   fallbackIcon: "icon://uc:music",
   logName: "Deezer"
 });
@@ -24,12 +24,12 @@ const { createBackdrop: createDeezerBackdrop, getOrCreateThumbnail: getOrCreateD
 const { createBackdrop: createDeezerMainMenuBackdrop } = createServiceThumbnails({
   svgFileName: "menu.svg",
   logoTransform: "translate(180 40) scale(5)",
-  logoPathAttrs: 'fill="#ff6a00"',
+  logoPathAttrs: 'fill="#A238FF"',
   backgroundColor: "#000000",
   fallbackLabel: "MENU",
-  fallbackLabelColor: "#ff6a00",
+  fallbackLabelColor: "#A238FF",
   fallbackBgOpacity: ".15",
-  textColor: "#ff6a00",
+  textColor: "#A238FF",
   fallbackIcon: "icon://uc:music",
   logName: "DeezerMainMenu"
 });
@@ -37,12 +37,12 @@ const { createBackdrop: createDeezerMainMenuBackdrop } = createServiceThumbnails
 const { createBackdrop: createDeezerBackBackdrop } = createServiceThumbnails({
   svgFileName: "back.svg",
   logoTransform: "translate(140 1) scale(0.7)",
-  logoPathAttrs: 'fill="#ff6a00"',
+  logoPathAttrs: 'fill="#A238FF"',
   backgroundColor: "#000000",
   fallbackLabel: "BACK",
-  fallbackLabelColor: "#ff6a00",
+  fallbackLabelColor: "#A238FF",
   fallbackBgOpacity: ".15",
-  textColor: "#ff6a00",
+  textColor: "#A238FF",
   fallbackIcon: "icon://uc:music",
   logName: "DeezerMenuBack"
 });
@@ -53,6 +53,10 @@ export const DEEZER_MENU_ROOT_ID = "deezer:main-menu";
 export const DEEZER_BACK_ID = "deezer:menu-back";
 
 const DEEZER_EXCLUDED_MENU_TITLES = new Set(["search", "login", "logout", "all stations"]);
+
+function isLikelyDeezerTrackTitle(title: string): boolean {
+  return title.includes(" / ") || title.includes(" - ");
+}
 
 export class DeezerMediaBrowser {
   ingestXmlEntries(entityId: string, xmlPayload: string): void {
@@ -122,7 +126,7 @@ export class DeezerMediaBrowser {
       menuIndex,
       title,
       mediaId,
-      isBrowsable: !title.includes(" - ")
+      isBrowsable: !isLikelyDeezerTrackTitle(title)
     };
   }
 
