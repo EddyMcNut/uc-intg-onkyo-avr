@@ -67,3 +67,20 @@ test.serial("Multi-zone command generation is deterministic and repeatable", asy
   const muteCmds2 = buildMultiZoneMuteCommands("main-zone2-on", ["main", "zone2"]);
   t.deepEqual(muteCmds1, muteCmds2);
 });
+
+test.serial("Multi-zone command generation ignores unknown directions and zones", async (t) => {
+  const multiZoneModule = await importDist("dist/src/eiscp-multi-zone.js");
+  const { buildMultiZoneVolumeCommands, buildMultiZoneMuteCommands } = multiZoneModule as {
+    buildMultiZoneVolumeCommands: (action: string, configuredZones: string[]) => string[];
+    buildMultiZoneMuteCommands: (action: string, configuredZones: string[]) => string[];
+  };
+
+  const unknownVolumeDirection = buildMultiZoneVolumeCommands("all-sideways", ["main", "zone2", "zone3", "zone4"]);
+  t.deepEqual(unknownVolumeDirection, []);
+
+  const unknownMuteDirection = buildMultiZoneMuteCommands("all-flip", ["main", "zone2", "zone3", "zone4"]);
+  t.deepEqual(unknownMuteDirection, []);
+
+  const includesUnknownZone = buildMultiZoneVolumeCommands("main-zone5-up", ["main", "zone2", "zone3", "zone4"]);
+  t.deepEqual(includesUnknownZone, ["MVLUP1"]);
+});
