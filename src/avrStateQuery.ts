@@ -2,10 +2,12 @@
 import { EiscpDriver } from "./eiscp.js";
 import log from "./loggers.js";
 import { delay } from "./utils.js";
+import { QUERY_DEFAULT_DELAY, WAIT_FOR_CONNECT_TIMEOUT } from "./constants.js";
 
 const integrationName = "avrStateQuery:";
 
-const QUERY_TTL = 5000; // ms — minimum time between queries for the same entity
+// ms — minimum time between queries for the same entity
+const QUERY_TTL = WAIT_FOR_CONNECT_TIMEOUT;
 
 class AvrStateQueryService {
   private readonly lastQueries: Map<string, number> = new Map();
@@ -39,7 +41,7 @@ class AvrStateQueryService {
     }
     this.recordQuery(entityId);
 
-    const threshold = queueThreshold ?? (typeof eiscpInstance.eiscpConfig?.sendDelay === "number" ? eiscpInstance.eiscpConfig.sendDelay : 250);
+    const threshold = queueThreshold ?? (typeof eiscpInstance.eiscpConfig?.sendDelay === "number" ? eiscpInstance.eiscpConfig.sendDelay : QUERY_DEFAULT_DELAY);
 
     log.info(`${integrationName} [%s] Querying AVR state for zone %s (%s)...`, entityId, zone, context);
     try {

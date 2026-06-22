@@ -115,6 +115,11 @@ export class ReconnectionManager {
     return false;
   }
 
+  // Check if a reconnection is currently scheduled for an AVR.
+  hasScheduledReconnection(physicalAVR: string): boolean {
+    return this.timers.has(physicalAVR);
+  }
+
   // Cancel all scheduled reconnections.
   cancelAllScheduledReconnections(): void {
     for (const [physicalAVR, timer] of this.timers) {
@@ -122,10 +127,5 @@ export class ReconnectionManager {
       clearTimeout(timer);
     }
     this.timers.clear();
-  }
-
-  // Check if a reconnection is currently scheduled for an AVR.
-  hasScheduledReconnection(physicalAVR: string): boolean {
-    return this.timers.has(physicalAVR);
   }
 }

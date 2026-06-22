@@ -80,6 +80,12 @@ The integration uses **eISCP (Ethernet Integrated Serial Control Protocol)**, wh
 
 - `buildMultiZoneVolumeCommands` / `buildMultiZoneMuteCommands` — build batched zone command lists from a single multi-zone action string (e.g. `"all-up"`, `"main-zone2-toggle"`)
 
+**zoneMappings.ts** (pure constants)
+
+- Single source of truth for zone-specific ISCP command prefix mappings (volume, muting, generic prefix translation)
+- `getZonePrefix()` — translates a main-zone prefix to any zone's equivalent
+- Consumed by `CommandSender`, `eiscp-multi-zone.ts`, and `EiscpDriver`
+
 ### 3. Media-Browser Subsystem (TuneIn / Tidal / Deezer)
 
 The integration has a dedicated media-browsing stack for NET services.
@@ -148,6 +154,17 @@ AVR adjusts volume and sends back a volume state update
 - Routes incoming messages to handlers based on command type
 - Translates eISCP responses into Unfolded Circle entity attribute updates (volume, source, power, sensors…)
 - For zone-agnostic commands (FLD, NLT, IFA, DSN, NST, NLS, NLA, NTM, metadata), delegates to `ZoneAgnosticUpdateProcessor`
+
+**audioFormatClassifier.ts** (pure functions)
+
+- `classifyAudioFormat()` — detects audio format type (Dolby Atmos, DTS:X, PCM, Stereo, etc.) from an IFA audio input string
+- `formatAudioTypeName()` — human-readable label for each format type
+- Consumed by `CommandReceiver` (dynamic listening-mode option filtering) and `listeningModeFilters.ts`
+
+**sensorSuffixes.ts** (pure constants)
+
+- `SENSOR_SUFFIXES`, `SELECT_SUFFIXES`, `ALL_SUFFIXES` — single source of truth for entity ID suffix strings
+- Consumed by `CommandReceiver`, `EntityRegistrar`, and `SubscriptionHandler` to eliminate suffix duplication across files
 
 **ZoneAgnosticUpdateProcessor** (`src/zoneAgnosticUpdateProcessor.ts`)
 
@@ -325,6 +342,11 @@ Some information arrives as fragmented streams:
 
 - Protocol values → human-readable values
 - E.g., `"SLI10"` → `{ command: "input-selector", value: "dvd" }`
+
+**constants.ts** (`src/constants.ts`)
+
+- Named timing constants: `QUERY_DEFAULT_DELAY`, `CONNECTION_TIMEOUT`, `AV_INFO_REQUERY_DELAY`, `WAIT_FOR_CONNECT_TIMEOUT`
+- Referenced by connection, state-query, and event-processing modules
 
 ## Performance Considerations
 

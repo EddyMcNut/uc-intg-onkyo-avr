@@ -37,7 +37,9 @@ graph TB
         PKT["eiscp-packet.ts\npacket encode / decode"]
         PARSER["IscpCommandParser\neiscp-command-parser.ts\nISCP → CommandResult"]
         MZONE["eiscp-multi-zone.ts\nmulti-zone command builders"]
+        ZM["zoneMappings.ts\nzone prefix mappings"]
         CR["CommandReceiver\nsrc/commandReceiver.ts\nISCP → UC attributes"]
+        AFC["audioFormatClassifier.ts\naud.io format detection"]
         ZAUP["ZoneAgnosticUpdateProcessor\nsrc/zoneAgnosticUpdateProcessor.ts\nFLD / NLT / metadata fanout"]
         ZAFPR["ZoneAgnosticFrontPanelRouter\nsrc/zoneAgnosticFrontPanelRouter.ts"]
         ZASCR["ZoneAgnosticServiceCommandRouter\nsrc/zoneAgnosticServiceCommandRouter.ts"]
@@ -55,6 +57,7 @@ graph TB
         ASQ["AvrStateQueryService\nsrc/avrStateQuery.ts\ndebounced query send"]
         CFG["ConfigManager\nsrc/configManager.ts\nconfig.json"]
         MAPS["Command maps\neiscp-commands.ts\neiscp-mappings.ts"]
+        CONST["constants.ts\ntiming constants"]
     end
 
     subgraph AVR["Physical AVR(s)"]
@@ -105,9 +108,11 @@ graph TB
     EISCP --> PKT
     EISCP --> PARSER
     EISCP --> MZONE
+    EISCP --> ZM
 
     %% Per-AVR: receive path
     EISCP -- "raw 'data' events" --> CR
+    CR --> AFC
     CR -- "zone-agnostic commands" --> ZAUP
     CR -- "write state" --> ASM
     ZAUP -- "read: resolve zones\nwrite: setSource (DAB)" --> ASM
@@ -123,6 +128,7 @@ graph TB
 
     %% Per-zone: send path
     CS --> EISCP
+    CS --> ZM
 
     %% SubscriptionHandler queries AVR on subscribe
     SubH --> ASQ
@@ -144,7 +150,8 @@ graph TB
     class CC,CM,RM,INSTANCES conn
     class ASM,ASQ,CFG,MAPS data
     class EISCP,AVRBox avr
-    class PKT,PARSER,MZONE util
+    class PKT,PARSER,MZONE,ZM util
     class SetupH,ER,SEH,SubH entry
     class MB,MBSVC,BSC,PMCH,MBASE,MBSTATE,MEP,THUMB,TIN,TID,DEE browse
     classDef util fill:#6a5a2d,color:#fff,stroke:#4e4219
+    class AFC util

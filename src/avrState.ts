@@ -3,7 +3,7 @@ import { physicalAvrIdFromEntityId } from "./configManager.js";
 import { EiscpDriver } from "./eiscp.js";
 import log from "./loggers.js";
 import { delay } from "./utils.js";
-import { ALBUM_ART, SONG_INFO } from "./constants.js";
+import { ALBUM_ART, SONG_INFO, QUERY_DEFAULT_DELAY } from "./constants.js";
 import type { ICommandReceiver } from "./types.js";
 import { resetDeezerBrowseState } from "./deezerBrowserStore.js";
 import { resetTidalBrowseState } from "./tidalBrowserStore.js";
@@ -162,7 +162,6 @@ export class AvrStateManager {
       state.source = normalizedSource;
       state.playbackStatus = "unknown";
       this.applyMediaPlayerState(entityId, _driver);
-      // state.subSource = "unknown"; // Reset sub-source on source change
       this.refreshAvrState(entityId, eiscpInstance, zone, _driver);
       return true;
     }
@@ -262,7 +261,7 @@ export class AvrStateManager {
     }
 
     // Use provided queueThreshold or fallback to default
-    const threshold = queueThreshold ?? (typeof eiscpInstance.eiscpConfig?.sendDelay === "number" ? eiscpInstance.eiscpConfig.sendDelay : 250);
+    const threshold = queueThreshold ?? (typeof eiscpInstance.eiscpConfig?.sendDelay === "number" ? eiscpInstance.eiscpConfig.sendDelay : QUERY_DEFAULT_DELAY);
 
     log.info("%s [%s] querying volume for zone '%s'", integrationName, entityId, zone);
     await eiscpInstance.command({ zone, command: "volume", args: "query" });
@@ -294,7 +293,6 @@ export class AvrStateManager {
     const currentSource = this.getSource(entityId);
     const currentSubSource = this.getSubSource(entityId);
     const hasAlbumArt = currentSource === "net";
-    // const hasAlbumArt = ALBUM_ART.some((name) => currentSubSource.toLowerCase().includes(name));
     if (hasAlbumArt && commandReceiver) {
       log.info("%s [%s] forcing album art refresh for subsource '%s'", integrationName, entityId, currentSubSource);
       await commandReceiver.maybeUpdateImage(entityId, true);

@@ -2,9 +2,14 @@ import { AvrInstance } from "./types.js";
 import ConnectionManager from "./connectionManager.js";
 import { avrStateQueryService } from "./avrStateQuery.js";
 import { buildPhysicalAvrId } from "./configManager.js";
+import { ALL_SUFFIXES } from "./sensorSuffixes.js";
+import { CONNECTION_TIMEOUT } from "./constants.js";
 import log from "./loggers.js";
 
 const integrationName = "subscriptionHandler:";
+
+// Build regex from the shared suffix constants to strip sensor/select suffixes from entity IDs
+const SUFFIX_PATTERN = new RegExp(`(${ALL_SUFFIXES.map((s) => s.replace(/^_/, "")).join("|")})$`);
 
 export default class SubscriptionHandler {
   constructor(
@@ -14,10 +19,7 @@ export default class SubscriptionHandler {
 
   public async handle(entityId: string): Promise<void> {
     // Normalize to base AVR entry (remove sensor/select suffix)
-    const baseEntityId = entityId.replace(
-      /_(volume_sensor|audio_input_sensor|audio_output_sensor|source_sensor|video_input_sensor|video_output_sensor|output_display_sensor|front_panel_display_sensor|mute_sensor|listening_mode|input_selector)$/,
-      ""
-    );
+    const baseEntityId = entityId.replace(SUFFIX_PATTERN, "");
 
     const instance = this.avrInstances.get(baseEntityId);
     if (!instance) {
@@ -52,7 +54,7 @@ export default class SubscriptionHandler {
         host: instance.config.ip,
         port: instance.config.port
       });
-      await physicalConnection.eiscp.waitForConnect(3000);
+      await physicalConnection.eiscp.waitForConnect(CONNECTION_TIMEOUT);
       log.info("%s [%s] Reconnected on subscription", integrationName, physicalAVR);
 
       await avrStateQueryService.queryAvrState(baseEntityId, physicalConnection.eiscp, instance.config.zone, "after subscription reconnection", instance.config.queueThreshold ?? 0);

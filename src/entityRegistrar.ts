@@ -9,6 +9,7 @@ import { browseMedia } from "./mediaBrowser.js";
 import { DeezerBrowseHandler } from "./deezerBrowseHandler.js";
 import { TidalBrowseHandler } from "./tidalBrowseHandler.js";
 import { TuneInBrowseHandler } from "./tuneInBrowseHandler.js";
+import { SELECT_SUFFIXES } from "./sensorSuffixes.js";
 import type { AvrStateApi } from "./types.js";
 
 type CmdHandlerFn = (entity: uc.Entity, cmdId: string, params?: { [key: string]: string | number | boolean }) => Promise<uc.StatusCodes>;
@@ -147,135 +148,34 @@ export default class EntityRegistrar {
     const sensors: uc.Sensor[] = [];
     const displayBaseName = this.getDisplayBaseName(avrEntry);
 
-    const volumeSensor = new uc.Sensor(
-      `${avrEntry}_volume_sensor`,
-      { en: `${displayBaseName} Volume` },
-      {
-        attributes: {
-          [uc.SensorAttributes.State]: uc.SensorStates.Unknown,
-          [uc.SensorAttributes.Value]: 0
-        },
-        deviceClass: uc.SensorDeviceClasses.Custom,
-        options: {
-          [uc.SensorOptions.Decimals]: 1,
-          [uc.SensorOptions.MinValue]: 0,
-          [uc.SensorOptions.MaxValue]: 200
-        }
-      }
-    );
-    sensors.push(volumeSensor);
+    const SENSOR_DEFS = [
+      { suffix: "_volume_sensor", label: "Volume", initialValue: 0, options: { [uc.SensorOptions.Decimals]: 1, [uc.SensorOptions.MinValue]: 0, [uc.SensorOptions.MaxValue]: 200 } },
+      { suffix: "_audio_input_sensor", label: "Audio Input", initialValue: "", options: {} },
+      { suffix: "_audio_output_sensor", label: "Audio Output", initialValue: "", options: {} },
+      { suffix: "_source_sensor", label: "Source", initialValue: "", options: {} },
+      { suffix: "_video_input_sensor", label: "Video Input", initialValue: "", options: {} },
+      { suffix: "_video_output_sensor", label: "Video Output", initialValue: "", options: {} },
+      { suffix: "_output_display_sensor", label: "Output Display", initialValue: "", options: {} },
+      { suffix: "_front_panel_display_sensor", label: "Front Panel Display", initialValue: "", options: {} },
+      { suffix: "_mute_sensor", label: "Mute", initialValue: "", options: {} }
+    ];
 
-    const audioInputSensor = new uc.Sensor(
-      `${avrEntry}_audio_input_sensor`,
-      { en: `${displayBaseName} Audio Input` },
-      {
-        attributes: {
-          [uc.SensorAttributes.State]: uc.SensorStates.Unknown,
-          [uc.SensorAttributes.Value]: ""
-        },
-        deviceClass: uc.SensorDeviceClasses.Custom,
-        options: {}
-      }
-    );
-    sensors.push(audioInputSensor);
-
-    const audioOutputSensor = new uc.Sensor(
-      `${avrEntry}_audio_output_sensor`,
-      { en: `${displayBaseName} Audio Output` },
-      {
-        attributes: {
-          [uc.SensorAttributes.State]: uc.SensorStates.Unknown,
-          [uc.SensorAttributes.Value]: ""
-        },
-        deviceClass: uc.SensorDeviceClasses.Custom,
-        options: {}
-      }
-    );
-    sensors.push(audioOutputSensor);
-
-    const sourceSensor = new uc.Sensor(
-      `${avrEntry}_source_sensor`,
-      { en: `${displayBaseName} Source` },
-      {
-        attributes: {
-          [uc.SensorAttributes.State]: uc.SensorStates.Unknown,
-          [uc.SensorAttributes.Value]: ""
-        },
-        deviceClass: uc.SensorDeviceClasses.Custom,
-        options: {}
-      }
-    );
-    sensors.push(sourceSensor);
-
-    const videoInputSensor = new uc.Sensor(
-      `${avrEntry}_video_input_sensor`,
-      { en: `${displayBaseName} Video Input` },
-      {
-        attributes: {
-          [uc.SensorAttributes.State]: uc.SensorStates.Unknown,
-          [uc.SensorAttributes.Value]: ""
-        },
-        deviceClass: uc.SensorDeviceClasses.Custom,
-        options: {}
-      }
-    );
-    sensors.push(videoInputSensor);
-
-    const videoOutputSensor = new uc.Sensor(
-      `${avrEntry}_video_output_sensor`,
-      { en: `${displayBaseName} Video Output` },
-      {
-        attributes: {
-          [uc.SensorAttributes.State]: uc.SensorStates.Unknown,
-          [uc.SensorAttributes.Value]: ""
-        },
-        deviceClass: uc.SensorDeviceClasses.Custom,
-        options: {}
-      }
-    );
-    sensors.push(videoOutputSensor);
-
-    const outputDisplaySensor = new uc.Sensor(
-      `${avrEntry}_output_display_sensor`,
-      { en: `${displayBaseName} Output Display` },
-      {
-        attributes: {
-          [uc.SensorAttributes.State]: uc.SensorStates.Unknown,
-          [uc.SensorAttributes.Value]: ""
-        },
-        deviceClass: uc.SensorDeviceClasses.Custom,
-        options: {}
-      }
-    );
-    sensors.push(outputDisplaySensor);
-
-    const frontPanelDisplaySensor = new uc.Sensor(
-      `${avrEntry}_front_panel_display_sensor`,
-      { en: `${displayBaseName} Front Panel Display` },
-      {
-        attributes: {
-          [uc.SensorAttributes.State]: uc.SensorStates.Unknown,
-          [uc.SensorAttributes.Value]: ""
-        },
-        deviceClass: uc.SensorDeviceClasses.Custom,
-        options: {}
-      }
-    );
-    sensors.push(frontPanelDisplaySensor);
-
-    const muteSensor = new uc.Sensor(
-      `${avrEntry}_mute_sensor`,
-      { en: `${displayBaseName} Mute` },
-      {
-        attributes: {
-          [uc.SensorAttributes.State]: uc.SensorStates.Unknown,
-          [uc.SensorAttributes.Value]: ""
-        },
-        deviceClass: uc.SensorDeviceClasses.Custom,
-        options: {}
-      }
-    );
-    sensors.push(muteSensor);
+    for (const def of SENSOR_DEFS) {
+      sensors.push(
+        new uc.Sensor(
+          `${avrEntry}${def.suffix}`,
+          { en: `${displayBaseName} ${def.label}` },
+          {
+            attributes: {
+              [uc.SensorAttributes.State]: uc.SensorStates.Unknown,
+              [uc.SensorAttributes.Value]: def.initialValue
+            },
+            deviceClass: uc.SensorDeviceClasses.Custom,
+            options: def.options
+          }
+        )
+      );
+    }
 
     return sensors;
   }
@@ -284,7 +184,7 @@ export default class EntityRegistrar {
     const options = this.getListeningModeOptions(undefined, avrEntry);
     const displayBaseName = this.getDisplayBaseName(avrEntry);
     const selectEntity = new Select(
-      `${avrEntry}_listening_mode`,
+      `${avrEntry}${SELECT_SUFFIXES[0]}`,
       { en: `${displayBaseName} Listening Mode` },
       {
         attributes: {
@@ -324,7 +224,7 @@ export default class EntityRegistrar {
     const options = this.getInputSelectorOptions(avrEntry);
     const displayBaseName = this.getDisplayBaseName(avrEntry);
     const selectEntity = new Select(
-      `${avrEntry}_input_selector`,
+      `${avrEntry}${SELECT_SUFFIXES[1]}`,
       { en: `${displayBaseName} Input Selector` },
       {
         attributes: {

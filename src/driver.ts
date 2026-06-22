@@ -229,16 +229,7 @@ export default class OnkyoDriver {
   private setupDriverEvents() {
     this.driver.on(uc.Events.Connect, async () => {
       log.info(`${integrationName} ===== CONNECT EVENT RECEIVED =====`);
-      // Log current version from driver.json
-      try {
-        const driverJsonPath = resolve(process.cwd(), "driver.json");
-        const driverJsonRaw = readFileSync(driverJsonPath, "utf-8");
-        const driverJson = JSON.parse(driverJsonRaw);
-        this.driverVersion = driverJson.version || "unknown";
-        log.info(`${integrationName} Driver version: ${this.driverVersion}`);
-      } catch (err) {
-        log.warn(`${integrationName} Could not read driver version from driver.json:`, err);
-      }
+      log.info(`${integrationName} Driver version: ${this.driverVersion}`);
       await this.handleConnect();
     });
     this.driver.on(uc.Events.EnterStandby, async () => {

@@ -12,6 +12,8 @@ import { buildMultiZoneVolumeCommands, buildMultiZoneMuteCommands } from "./eisc
 import { getDeezerBrowseState } from "./deezerBrowserStore.js";
 import { getTidalBrowseState } from "./tidalBrowserStore.js";
 import { getTuneInMenuBrowseState } from "./tuneInMenuStore.js";
+import { getZonePrefix } from "./zoneMappings.js";
+import { WAIT_FOR_CONNECT_TIMEOUT } from "./constants.js";
 import type { AvrStateReader } from "./eiscp-command-parser.js";
 
 export interface EiscpConfig {
@@ -39,28 +41,8 @@ const IGNORED_COMMANDS = new Set(["NMS", "NPB"]); // Commands to ignore from AVR
 const THROTTLED_COMMANDS = new Set(["IFA", "IFV", "FLD"]); // Commands to send to incoming queue for throttling
 const FLD_VOLUME_HEX_PREFIX = "566F6C756D65"; // "Volume" in hex - skip these FLD messages
 
-// Zone command prefix mappings (main -> zone-specific)
-const ZONE2_COMMAND_MAP: Record<string, string> = {
-  MVL: "ZVL",
-  PWR: "ZPW",
-  AMT: "ZMT",
-  SLI: "SLZ",
-  TUN: "TUZ"
-};
-const ZONE3_COMMAND_MAP: Record<string, string> = {
-  MVL: "VL3",
-  PWR: "PW3",
-  AMT: "MT3",
-  SLI: "SL3",
-  TUN: "TU3"
-};
-const ZONE4_COMMAND_MAP: Record<string, string> = {
-  MVL: "VL4",
-  PWR: "PW4",
-  AMT: "MT4",
-  SLI: "SL4",
-  TUN: "TU4"
-};
+// Re-export zone prefix lookup for backward compatibility — canonical definition is in zoneMappings.ts
+export { getZonePrefix, ZONE_COMMAND_MAP, ZONE_VOLUME_PREFIX, ZONE_VOLUME_UP_DOWN, ZONE_MUTE } from "./zoneMappings.js";
 
 /** Result from parsing an ISCP command — re-exported from eiscp-command-parser.ts */
 export type { CommandResult };
@@ -150,12 +132,6 @@ export class EiscpDriver extends EventEmitter {
         log.error("%s eiscp error (unhandled):", integrationName, err);
       });
     }
-  }
-
-  /** Translate main zone command prefix to zone-specific prefix */
-  private getZonePrefix(prefix: string, zone: string): string {
-    const zoneMaps: Record<string, Record<string, string>> = { zone2: ZONE2_COMMAND_MAP, zone3: ZONE3_COMMAND_MAP, zone4: ZONE4_COMMAND_MAP };
-    return zoneMaps[zone]?.[prefix] ?? prefix;
   }
 
   async discover(options?: { devices?: number; timeout?: number; address?: string; port?: number; subnetBroadcast?: string }): Promise<DiscoveredDevice[]> {
@@ -363,9 +339,10 @@ export class EiscpDriver extends EventEmitter {
 
   /** Enqueue a command to be sent with proper delay between commands */
   private enqueueSend(data: string | string[]): Promise<void> {
-    const task = this.sendQueue.then(async () => {
+    const prevQueue = this.sendQueue;
+    const task = (async () => {
+      await prevQueue;
       if (this.isConnected && this.eiscp) {
-        // Handle single command (most common case)
         if (typeof data === "string") {
           this.eiscp.write(createEiscpPacket(data));
         } else {
@@ -377,21 +354,23 @@ export class EiscpDriver extends EventEmitter {
       } else {
         throw new Error("Send command while not connected");
       }
-    });
-    this.sendQueue = task.catch(() => {}); // Prevent unhandled rejection, errors handled by caller
+    })();
+    this.sendQueue = task.catch(() => {});
     return task;
   }
 
   /** Enqueue an incoming message to be emitted with throttle delay */
   private enqueueIncoming(data: DataPayload): void {
-    this.receiveQueue = this.receiveQueue
-      .then(async () => {
+    const prevQueue = this.receiveQueue;
+    this.receiveQueue = (async () => {
+      await prevQueue;
+      try {
         await delay(this.config.receiveDelay! ?? DEFAULT_QUEUE_THRESHOLD);
         this.emit("data", data);
-      })
-      .catch((err) => {
+      } catch (err) {
         log.error("%s Error processing queued incoming message:", integrationName, err);
-      });
+      }
+    })();
   }
 
   /** Send a raw ISCP command */
@@ -461,7 +440,7 @@ export class EiscpDriver extends EventEmitter {
 
   private async handleNSSsend(nssCode: string, zone: string): Promise<void> {
     const menuDelay = this.config.netMenuDelay ?? 2500;
-    const sliPrefix = this.getZonePrefix("SLI", zone);
+    const sliPrefix = getZonePrefix("SLI", zone);
     const netCommand = `${sliPrefix}2B`; // 2B = NET input
     const queryCommand = `${sliPrefix}QSTN`;
     const newSubsource = String(nssCode.slice(-2)).padStart(5, "0");
@@ -509,11 +488,11 @@ export class EiscpDriver extends EventEmitter {
       // Fast path: most commands are not multi-zone, so only check detailed variants when needed.
       if (normalizedData.startsWith("multi-zone-")) {
         if (normalizedData.startsWith("multi-zone-volume")) {
-          await this.handleMultiZoneVolume(data);
+          await this.handleMultiZoneCommand(data, "volume");
           return;
         }
         if (normalizedData.startsWith("multi-zone-muting")) {
-          await this.handleMultiZoneMuting(data);
+          await this.handleMultiZoneCommand(data, "muting");
           return;
         }
       }
@@ -542,51 +521,27 @@ export class EiscpDriver extends EventEmitter {
     await this.sendIscp(this.commandToIscp(command, args, zone), zone);
   }
 
-  private async handleMultiZoneVolume(data: string): Promise<void> {
+  private async handleMultiZoneCommand(data: string, commandType: "volume" | "muting"): Promise<void> {
     const parts = data
       .toLowerCase()
       .split(/[\s]+/)
       .filter((item) => item !== "");
 
     if (parts.length !== 2) {
-      log.warn("%s Invalid multi-zone-volume command format: %s", integrationName, data);
+      log.warn("%s Invalid multi-zone-%s command format: %s", integrationName, commandType, data);
       return;
     }
 
     const action = parts[1];
     const configuredZones = this.config.configuredZones ?? ["main"];
-    const commands = buildMultiZoneVolumeCommands(action, configuredZones);
+    const commands = commandType === "volume" ? buildMultiZoneVolumeCommands(action, configuredZones) : buildMultiZoneMuteCommands(action, configuredZones);
 
     if (commands.length === 0) {
-      log.warn("%s No zones configured for multi-zone-volume action: %s (configured zones: %s)", integrationName, action, configuredZones.join(", "));
+      log.warn("%s No zones configured for multi-zone-%s action: %s (configured zones: %s)", integrationName, commandType, action, configuredZones.join(", "));
       return;
     }
 
-    log.info("%s Multi-zone volume command: %s -> sending %d zone commands (configured zones: %s)", integrationName, data, commands.length, configuredZones.join(", "));
-    this.enqueueSend(commands);
-  }
-
-  private async handleMultiZoneMuting(data: string): Promise<void> {
-    const parts = data
-      .toLowerCase()
-      .split(/[\s]+/)
-      .filter((item) => item !== "");
-
-    if (parts.length !== 2) {
-      log.warn("%s Invalid multi-zone-muting command format: %s", integrationName, data);
-      return;
-    }
-
-    const action = parts[1];
-    const configuredZones = this.config.configuredZones ?? ["main"];
-    const commands = buildMultiZoneMuteCommands(action, configuredZones);
-
-    if (commands.length === 0) {
-      log.warn("%s No zones configured for multi-zone-muting action: %s (configured zones: %s)", integrationName, action, configuredZones.join(", "));
-      return;
-    }
-
-    log.info("%s Multi-zone muting command: %s -> sending %d zone commands (configured zones: %s)", integrationName, data, commands.length, configuredZones.join(", "));
+    log.info("%s Multi-zone %s command: %s -> sending %d zone commands (configured zones: %s)", integrationName, commandType, data, commands.length, configuredZones.join(", "));
     this.enqueueSend(commands);
   }
 
@@ -604,7 +559,7 @@ export class EiscpDriver extends EventEmitter {
     }
 
     // Translate main zone command prefixes to zone-specific prefixes
-    const zonePrefix = this.getZonePrefix(prefix, zone);
+    const zonePrefix = getZonePrefix(prefix, zone);
 
     return zonePrefix + value;
   }
@@ -624,7 +579,7 @@ export class EiscpDriver extends EventEmitter {
     return Object.keys(valueMap);
   }
 
-  waitForConnect(timeoutMs = 5000): Promise<void> {
+  waitForConnect(timeoutMs = WAIT_FOR_CONNECT_TIMEOUT): Promise<void> {
     return new Promise((resolve, reject) => {
       if (this.isConnected) {
         resolve();

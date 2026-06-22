@@ -5,6 +5,7 @@ import { ReconnectionManager } from "./reconnectionManager.js";
 import { AvrConfig, OnkyoConfig, DEFAULT_QUEUE_THRESHOLD } from "./configManager.js";
 import EiscpDriver from "./eiscp.js";
 import { PhysicalConnection, CreateCommandReceiverFn, QueryAllZonesStateFn, EiscpDriverFactory, type AvrStateApi } from "./types.js";
+import { CONNECTION_TIMEOUT } from "./constants.js";
 
 const integrationName = "connectionManager:";
 
@@ -90,7 +91,7 @@ export default class ConnectionManager {
         throw new Error("AVR connection failed or returned null");
       }
 
-      await eiscpInstance.waitForConnect(3000);
+      await eiscpInstance.waitForConnect(CONNECTION_TIMEOUT);
       log.info(`${integrationName} [${physicalAVR}] Connected to AVR`);
       return physicalConnection;
     } catch (err) {

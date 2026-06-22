@@ -191,7 +191,7 @@ export const eiscpCommands = {
         BDOWN: { name: "bass-down", description: "sets Center Bass down(2 step)" },
         TUP: { name: "treble-up", description: "sets Center Treble up(2 step)" },
         TDOWN: { name: "treble-down", description: "sets Center Treble down(2 step)" },
-        QSTN: { name: "query", description: 'gets Cetner Tone ("BxxTxx")' }
+        QSTN: { name: "query", description: 'gets Center Tone ("BxxTxx")' }
       }
     },
     TSR: {
