@@ -3,6 +3,7 @@
 import * as uc from "@unfoldedcircle/integration-api";
 import { Select, SelectStates } from "@unfoldedcircle/integration-api";
 import { eiscpMappings } from "./eiscp-mappings.js";
+import { ALL_SIMPLE_COMMANDS } from "./simpleCommands.js";
 import { getCompatibleListeningModes } from "./listeningModeFilters.js";
 import { ConfigManager, buildEntityId } from "./configManager.js";
 import { browseMedia } from "./mediaBrowser.js";
@@ -126,7 +127,8 @@ export default class EntityRegistrar {
         },
         deviceClass: uc.MediaPlayerDeviceClasses.Receiver,
         options: {
-          volume_steps: volumeScale
+          volume_steps: volumeScale,
+          simple_commands: ALL_SIMPLE_COMMANDS
         }
       }
     );

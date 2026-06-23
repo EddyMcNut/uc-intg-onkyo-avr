@@ -3,6 +3,7 @@ import { EiscpDriver } from "./eiscp.js";
 import { buildEntityId, DEFAULT_QUEUE_THRESHOLD, MAX_LENGTHS, PATTERNS, OnkyoConfig } from "./configManager.js";
 import { ICommandReceiver, AvrStateApi } from "./types.js";
 import { ZONE_VOLUME_PREFIX, ZONE_VOLUME_UP_DOWN } from "./zoneMappings.js";
+import { SIMPLE_COMMANDS_MAP } from "./simpleCommands.js";
 import log from "./loggers.js";
 import { toHex, ensureEiscpConnected } from "./utils.js";
 import { browseMedia, isMediaBrowsingAvailable } from "./mediaBrowser.js";
@@ -70,7 +71,7 @@ export class CommandSender {
         log.debug("%s [%s] ignoring unsupported media-player command '%s'", integrationName, entity.id, cmdId);
         return uc.StatusCodes.Ok;
       }
-      return uc.StatusCodes.NotImplemented;
+      return this.handleSimpleCommand(cmdId, zone);
     }
 
     return handler(entity, zone, setZonePrefix, params, targetAvr, queueThreshold, now);
@@ -296,4 +297,16 @@ export class CommandSender {
       }
     ]
   ]);
+
+  private async handleSimpleCommand(cmdId: string, zone: string): Promise<uc.StatusCodes> {
+    const commandStr = SIMPLE_COMMANDS_MAP[cmdId];
+    if (!commandStr) {
+      return uc.StatusCodes.NotImplemented;
+    }
+
+    const zonePrefixed = zone === "main" ? commandStr : `${zone}.${commandStr}`;
+    log.info("%s executing simple command '%s' → %s", integrationName, cmdId, zonePrefixed);
+    await this.eiscp.command(zonePrefixed);
+    return uc.StatusCodes.Ok;
+  }
 }

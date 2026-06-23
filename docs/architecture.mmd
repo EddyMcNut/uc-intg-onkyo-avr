@@ -57,6 +57,7 @@ graph TB
         ASQ["AvrStateQueryService\nsrc/avrStateQuery.ts\ndebounced query send"]
         CFG["ConfigManager\nsrc/configManager.ts\nconfig.json"]
         MAPS["Command maps\neiscp-commands.ts\neiscp-mappings.ts"]
+        SC["simpleCommands.ts\nSimpleCommandDef →\ngenerated map"]
         CONST["constants.ts\ntiming constants"]
     end
 
@@ -129,6 +130,10 @@ graph TB
     %% Per-zone: send path
     CS --> EISCP
     CS --> ZM
+
+    %% Simple commands: EntityRegistrar passes ALL_SIMPLE_COMMANDS in options; CommandSender looks up cmdId
+    ER --> SC
+    CS --> SC
 
     %% SubscriptionHandler queries AVR on subscribe
     SubH --> ASQ

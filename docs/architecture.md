@@ -124,9 +124,10 @@ The integration has a dedicated media-browsing stack for NET services.
 - Routes commands to the appropriate zone (main, zone2, zone3) via the `setZonePrefix` helper
 - Verifies connection state before sending; triggers reconnection if disconnected
 - Delegates PlayMedia command routing to `PlayMediaCommandHandler` for service-aware browse/play behavior
-- Two send paths:
-  - **`eiscp.command(name)`** — for most commands (power, mute, source, presets…); looks up the human-readable name in `eiscp-commands.ts` to get the raw ISCP code
+- Three send paths:
+  - **`eiscp.command(name)`** — for standard commands (power, mute, source, presets…); looks up the human-readable name in `eiscp-commands.ts` to get the raw ISCP code
   - **`eiscp.raw(code)`** — for volume up/down and absolute volume set; sends the zone-specific raw ISCP code directly (e.g. `"MVLUP1"`, `"ZVLDOWN1"`) bypassing the command lookup
+  - **Simple commands** (`simpleCommands.ts` → `handleSimpleCommand`) — for user-defined actions declared via `COMMAND_DEFS`; uses `eiscp.command()` internally, so NSS multi-step and zone-prefixing work automatically
 
 **Flow Example — Volume Up:**
 
@@ -143,6 +144,30 @@ CommandSender calls eiscp.raw("MVLUP1")  — raw main-zone volume-up code, no lo
 EiscpDriver wraps the raw code in an eISCP packet and sends it over TCP to the AVR
 ↓
 AVR adjusts volume and sends back a volume state update
+
+```
+
+**Flow Example — Simple Command (INPUT_CD on zone2):**
+
+```
+
+User taps INPUT_CD on remote
+↓
+Unfolded Circle Integration API calls entity command with cmdId = "INPUT_CD"
+↓
+CommandSender.sharedCmdHandler() — cmdId not found in handler map
+↓
+handleSimpleCommand("INPUT_CD", "zone2")
+↓
+SIMPLE_COMMANDS_MAP["INPUT_CD"] → "input-selector cd"
+↓
+eiscp.command("zone2.input-selector cd") — zone-prefixed, handled by commandToIscp
+↓
+commandToIscp: "input-selector" → "SLI", "cd" → "23", getZonePrefix("SLI","zone2") → "SLZ"
+↓
+sendIscp("SLZ23") → raw("SLZ23") → TCP
+↓
+AVR switches zone2 input to CD and sends state updates
 
 ```
 
@@ -236,7 +261,7 @@ afterRegister() → void // optional post-registration hook
 
 Current registrations (in order):
 
-1. **Media player** — always registered
+1. **Media player** — always registered. Options include `simple_commands: ALL_SIMPLE_COMMANDS` derived from `simpleCommands.ts`, enabling user-defined buttons on the remote
 2. **Sensor entities** — conditional on `createSensors` flag (volume, source, audio/video format, front panel display…)
 3. **Listening Mode select** — conditional on `listeningModeOptions` not being `null`
 4. **Input Selector select** — conditional on `inputSelectorOptions` not being `null`
@@ -330,6 +355,16 @@ Some information arrives as fragmented streams:
 - **Throttling**: High-frequency commands (IFA, IFV, FLD) go through the receive queue
 - **Filtering**: Volume-overlay FLD messages and known-noisy commands (NMS, NPB) are discarded early
 - **Validation**: Unknown or malformed messages are safely ignored
+
+### 9. Simple Commands (OCP)
+
+**simpleCommands.ts** (`src/simpleCommands.ts`)
+
+- Declarative array of `SimpleCommandDef` entries (`{ command, prefix, excludeValues }`) describing which eISCP commands to expose as UC simple commands
+- `generateSimpleCommands()` iterates the definitions at module load, looks up each command's values in `eiscp-commands.ts`, and builds `SIMPLE_COMMANDS_MAP` — a `Record<string, string>` mapping simple command IDs (e.g. `"INPUT_CD"`) to `eiscp.command()`‑compatible strings (e.g. `"input-selector cd"`)
+- All value aliases from the source definition are included automatically (e.g. `"video1"`, `"vcr"`, `"dvr"` each produce a separate simple command mapping to the same ISCP value)
+- `ALL_SIMPLE_COMMANDS` (the list of IDs) is consumed by `EntityRegistrar` and passed as `simple_commands` in the MediaPlayer entity options, making them visible to the UC core
+- At command time, `CommandSender.handleSimpleCommand()` does a single hash lookup and calls `eiscp.command()` — NSS multi-step sequences and zone prefixing work automatically
 
 ## Command Mapping
 

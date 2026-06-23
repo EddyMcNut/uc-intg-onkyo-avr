@@ -28,6 +28,8 @@ test.serial("EntityRegistrar builds entities correctly", async (t) => {
     const mp = registrar.createMediaPlayerEntity(avrEntry, 80, async () => {});
     t.truthy(mp);
     t.is((mp as any).options?.volume_steps, 80);
+    t.true(Array.isArray((mp as any).options?.simple_commands));
+    t.true((mp as any).options?.simple_commands.length > 0);
     t.is((mp as any).name?.en, "Model_192.168.1.2_main");
 
     const sensors = registrar.createSensorEntities(avrEntry);

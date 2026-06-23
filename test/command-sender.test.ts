@@ -204,3 +204,35 @@ test.serial("CommandSender enforces source validation, relative volume ignore, a
   t.is(await sender.sharedCmdHandler(mainEntity, uc.MediaPlayerCommands.Next), uc.StatusCodes.Ok);
   t.false(mockEiscp.commands.includes("network-usb trup"));
 });
+
+test.serial("CommandSender handles known simple commands via handleSimpleCommand fallthrough", async (t) => {
+  const commandSenderModule = await importDist("dist/src/commandSender.js");
+  const { CommandSender } = commandSenderModule as { CommandSender: new (...deps: any[]) => any };
+
+  const mockDriver = {} as any;
+  const mockEiscp = makeMockEiscp(true);
+  const mockAvrState = {
+    getSubSource: () => "spotify",
+    refreshAvrState: async () => undefined
+  } as any;
+
+  const sender = new CommandSender(mockDriver, makeConfig(), mockEiscp as any, mockAvrState, undefined);
+
+  const mainEntity = { id: "TX-RZ50 192.168.2.103 main", attributes: { state: uc.MediaPlayerStates.On } } as any;
+  const zone2Entity = { id: "TX-RZ50 192.168.2.103 zone2", attributes: { state: uc.MediaPlayerStates.On } } as any;
+
+  // Known simple command on main zone
+  t.is(await sender.sharedCmdHandler(mainEntity, "INPUT_CD"), uc.StatusCodes.Ok);
+  t.true(mockEiscp.commands.includes("input-selector cd"));
+
+  // Known simple command on zone2
+  t.is(await sender.sharedCmdHandler(zone2Entity, "INPUT_CD"), uc.StatusCodes.Ok);
+  t.true(mockEiscp.commands.includes("zone2.input-selector cd"));
+
+  // NSS simple command on main zone
+  t.is(await sender.sharedCmdHandler(mainEntity, "INPUT_TUNEIN"), uc.StatusCodes.Ok);
+  t.true(mockEiscp.commands.includes("input-selector tunein"));
+
+  // Unknown simple command returns NotImplemented
+  t.is(await sender.sharedCmdHandler(mainEntity, "INPUT_NONEXISTENT"), uc.StatusCodes.NotImplemented);
+});
