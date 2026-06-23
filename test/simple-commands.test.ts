@@ -14,7 +14,7 @@ test.serial("SIMPLE_COMMANDS_MAP loads and contains expected total keys", async 
   t.truthy(map);
   t.truthy(all);
   t.is(all.length, Object.keys(map).length);
-  t.is(all.length, 90);
+  t.is(all.length, 217);
 });
 
 test.serial("SIMPLE_COMMANDS_MAP contains expected known input keys", async (t) => {
@@ -103,6 +103,78 @@ test.serial("SIMPLE_COMMANDS_MAP includes multi-zone-volume commands", async (t)
   t.is(map["MULTI_ZONE_VOLUME_MAIN_ZONE2_UP"], "multi-zone-volume main-zone2-up");
   t.is(map["MULTI_ZONE_VOLUME_ZONE2_ZONE3_DOWN"], "multi-zone-volume zone2-zone3-down");
   t.is(map["MULTI_ZONE_VOLUME_ZONE2_ZONE3_ZONE4_UP"], "multi-zone-volume zone2-zone3-zone4-up");
+});
+
+test.serial("SIMPLE_COMMANDS_MAP includes audio-return-channel commands", async (t) => {
+  const mod = await importDist("dist/src/simpleCommands.js");
+  const map = mod.SIMPLE_COMMANDS_MAP as Record<string, string>;
+
+  t.is(map["AUDIO_RETURN_CHANNEL_AUTO"], "audio-return-channel auto");
+  t.is(map["AUDIO_RETURN_CHANNEL_OFF"], "audio-return-channel off");
+});
+
+test.serial("SIMPLE_COMMANDS_MAP includes dimmer-level commands", async (t) => {
+  const mod = await importDist("dist/src/simpleCommands.js");
+  const map = mod.SIMPLE_COMMANDS_MAP as Record<string, string>;
+
+  t.is(map["DIMMER_BRIGHT"], "dimmer-level bright");
+  t.is(map["DIMMER_DARK"], "dimmer-level dark");
+  t.is(map["DIMMER_DIM"], "dimmer-level dim");
+});
+
+test.serial("SIMPLE_COMMANDS_MAP includes dirac commands", async (t) => {
+  const mod = await importDist("dist/src/simpleCommands.js");
+  const map = mod.SIMPLE_COMMANDS_MAP as Record<string, string>;
+
+  t.is(map["DIRAC_SLOT1"], "dirac slot1");
+  t.is(map["DIRAC_SLOT2"], "dirac slot2");
+  t.is(map["DIRAC_SLOT3"], "dirac slot3");
+  t.is(map["DIRAC_OFF"], "dirac off");
+});
+
+test.serial("SIMPLE_COMMANDS_MAP includes listening-mode commands", async (t) => {
+  const mod = await importDist("dist/src/simpleCommands.js");
+  const map = mod.SIMPLE_COMMANDS_MAP as Record<string, string>;
+
+  t.is(map["LISTENING_MODE_STEREO"], "listening-mode stereo");
+  t.is(map["LISTENING_MODE_DIRECT"], "listening-mode direct");
+  t.is(map["LISTENING_MODE_MONO"], "listening-mode mono");
+  t.falsy(map["LISTENING_MODE_UP"]);
+  t.falsy(map["LISTENING_MODE_DOWN"]);
+});
+
+test.serial("SIMPLE_COMMANDS_MAP includes late-night commands", async (t) => {
+  const mod = await importDist("dist/src/simpleCommands.js");
+  const map = mod.SIMPLE_COMMANDS_MAP as Record<string, string>;
+
+    t.is(map["LATE_NIGHT_OFF"], "late-night off");
+  t.is(map["LATE_NIGHT_LOW_DOLBYDIGITAL"], "late-night low-dolbydigital");
+  t.is(map["LATE_NIGHT_HIGH_DOLBYDIGITAL"], "late-night high-dolbydigital");
+});
+
+test.serial("SIMPLE_COMMANDS_MAP includes lfe-level commands", async (t) => {
+  const mod = await importDist("dist/src/simpleCommands.js");
+  const map = mod.SIMPLE_COMMANDS_MAP as Record<string, string>;
+
+  t.is(map["LFE_LEVEL_0DB"], "lfe-level 0dB");
+  t.is(map["LFE_LEVEL__10DB"], "lfe-level -10dB");
+  t.truthy(map["LFE_LEVEL__5DB"]);
+});
+
+test.serial("SIMPLE_COMMANDS_MAP includes loudness-management commands", async (t) => {
+  const mod = await importDist("dist/src/simpleCommands.js");
+  const map = mod.SIMPLE_COMMANDS_MAP as Record<string, string>;
+
+  t.is(map["LOUDNESS_MANAGEMENT_ON"], "loudness-management on");
+  t.is(map["LOUDNESS_MANAGEMENT_OFF"], "loudness-management off");
+});
+
+test.serial("SIMPLE_COMMANDS_MAP includes music-optimizer commands", async (t) => {
+  const mod = await importDist("dist/src/simpleCommands.js");
+  const map = mod.SIMPLE_COMMANDS_MAP as Record<string, string>;
+
+  t.is(map["MUSIC_OPTIMIZER_ON"], "music-optimizer on");
+  t.is(map["MUSIC_OPTIMIZER_OFF"], "music-optimizer off");
 });
 
 test.serial("SIMPLE_COMMANDS_MAP replaces hyphens with underscores in IDs", async (t) => {
