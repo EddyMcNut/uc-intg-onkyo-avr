@@ -14,7 +14,7 @@ test.serial("SIMPLE_COMMANDS_MAP loads and contains expected total keys", async 
   t.truthy(map);
   t.truthy(all);
   t.is(all.length, Object.keys(map).length);
-  t.is(all.length, 218);
+  t.is(all.length, 343);
 });
 
 test.serial("SIMPLE_COMMANDS_MAP contains expected known input keys", async (t) => {
