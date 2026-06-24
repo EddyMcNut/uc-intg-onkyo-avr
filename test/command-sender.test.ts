@@ -152,7 +152,7 @@ test.serial("CommandSender executes core command branches and zone-specific rout
   t.true(mockEiscp.commands.includes("audio-muting toggle"));
   t.true(mockEiscp.commands.includes("preset up"));
   t.true(mockEiscp.commands.includes("preset down"));
-  t.true(mockEiscp.commands.includes("cd"));
+  t.true(mockEiscp.commands.includes("input-selector cd"));
   t.true(mockEiscp.commands.includes("multi-zone-all-up"));
   t.true(mockEiscp.commands.includes("network-usb play"));
   t.true(mockEiscp.commands.includes("network-usb trup"));
@@ -172,7 +172,7 @@ test.serial("CommandSender executes core command branches and zone-specific rout
   t.is(refreshCalls, 1);
 });
 
-test.serial("CommandSender enforces source validation, relative volume ignore, and throttle", async (t) => {
+test.serial("CommandSender handles relative volume ignore and throttle", async (t) => {
   const commandSenderModule = await importDist("dist/src/commandSender.js");
   const { CommandSender } = commandSenderModule as { CommandSender: new (...deps: any[]) => any };
 

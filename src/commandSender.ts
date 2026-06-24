@@ -1,9 +1,11 @@
 import * as uc from "@unfoldedcircle/integration-api";
 import { EiscpDriver } from "./eiscp.js";
-import { buildEntityId, DEFAULT_QUEUE_THRESHOLD, MAX_LENGTHS, PATTERNS, OnkyoConfig } from "./configManager.js";
+import { buildEntityId, DEFAULT_QUEUE_THRESHOLD, OnkyoConfig } from "./configManager.js";
+import { MAX_LENGTHS, PATTERNS } from "./configConstants.js";
 import { ICommandReceiver, AvrStateApi } from "./types.js";
 import { ZONE_VOLUME_PREFIX, ZONE_VOLUME_UP_DOWN } from "./zoneMappings.js";
-import { SIMPLE_COMMANDS_MAP } from "./simpleCommands.js";
+import { SIMPLE_COMMANDS_MAP, ALL_INPUT_SELECTOR_NAMES } from "./simpleCommands.js";
+const INPUT_NAMES_SET = new Set(ALL_INPUT_SELECTOR_NAMES);
 import log from "./loggers.js";
 import { toHex, ensureEiscpConnected } from "./utils.js";
 import { browseMedia, isMediaBrowsingAvailable } from "./mediaBrowser.js";
@@ -167,20 +169,10 @@ export class CommandSender {
     ],
     [
       uc.MediaPlayerCommands.SelectSource,
-      async (_e, zone, sz, params) => {
+      async (_e, _zone, sz, params) => {
         if (!params?.source || typeof params.source !== "string") return uc.StatusCodes.Ok;
         const request = params.source.toLowerCase();
-        if (!request.startsWith("raw")) {
-          if (request.length > MAX_LENGTHS.USER_COMMAND) {
-            log.error("%s Command too long (%d chars), rejecting", integrationName, request.length);
-            return uc.StatusCodes.BadRequest;
-          }
-          if (!PATTERNS.USER_COMMAND.test(request)) {
-            log.error("%s Command contains invalid characters, rejecting", integrationName);
-            return uc.StatusCodes.BadRequest;
-          }
-          await this.eiscp.command(request.startsWith("multi-zone") ? request : sz(request));
-        } else {
+        if (request.startsWith("raw ")) {
           const rawCmd = request.substring(3).trim().toUpperCase();
           if (rawCmd.length > MAX_LENGTHS.RAW_COMMAND) {
             log.error("%s Raw command too long (%d chars), rejecting", integrationName, rawCmd.length);
@@ -190,8 +182,25 @@ export class CommandSender {
             log.error("%s Raw command contains invalid characters, rejecting", integrationName);
             return uc.StatusCodes.BadRequest;
           }
-          log.info("%s sending raw command: %s", integrationName, rawCmd);
           await this.eiscp.raw(rawCmd);
+          return uc.StatusCodes.Ok;
+        }
+
+        if (request.length > MAX_LENGTHS.USER_COMMAND) {
+          log.error("%s Command too long (%d chars), rejecting", integrationName, request.length);
+          return uc.StatusCodes.BadRequest;
+        }
+        if (!PATTERNS.USER_COMMAND.test(request)) {
+          log.error("%s Command contains invalid characters, rejecting", integrationName);
+          return uc.StatusCodes.BadRequest;
+        }
+
+        if (request.startsWith("multi-zone")) {
+          await this.eiscp.command(request);
+        } else if (INPUT_NAMES_SET.has(request)) {
+          await this.eiscp.command(sz(`input-selector ${request}`));
+        } else {
+          await this.eiscp.command(sz(request));
         }
         return uc.StatusCodes.Ok;
       }

@@ -6,6 +6,28 @@ interface SimpleCommandDef {
   excludeValues?: string[];
 }
 
+function getInputSelectorNames(): string[] {
+  const cmd = Object.values(eiscpCommands.commands).find((c) => c.name === "input-selector");
+  if (!cmd) return [];
+
+  const exclude = new Set(["up", "down", "query"]);
+  const names = new Set<string>();
+
+  for (const entry of Object.values(cmd.values)) {
+    if (!("name" in entry)) continue;
+    const entryNames = Array.isArray(entry.name) ? entry.name : [entry.name];
+    for (const name of entryNames) {
+      if (name && !exclude.has(name)) {
+        names.add(name);
+      }
+    }
+  }
+
+  return [...names].sort();
+}
+
+export const ALL_INPUT_SELECTOR_NAMES = getInputSelectorNames();
+
 function generateSimpleCommands(defs: SimpleCommandDef[]): Record<string, string> {
   const map: Record<string, string> = {};
   const DEFAULT_EXCLUDE = new Set(["query"]);

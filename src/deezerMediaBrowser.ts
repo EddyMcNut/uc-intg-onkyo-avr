@@ -52,7 +52,17 @@ export const DEEZER_ROOT_TYPE = "deezer://menu";
 export const DEEZER_MENU_ROOT_ID = "deezer:main-menu";
 export const DEEZER_BACK_ID = "deezer:menu-back";
 
-const DEEZER_EXCLUDED_MENU_TITLES = new Set(["search", "login", "logout", "all stations"]);
+const DEEZER_EXCLUDED_MENU_PREFIXES = ["search", "login", "logout", "log out", "all stations"];
+
+function isExcludedDeezerTitle(title: string): boolean {
+  const lower = title.toLowerCase();
+  return DEEZER_EXCLUDED_MENU_PREFIXES.some((prefix) => {
+    if (lower === prefix) return true;
+    if (!lower.startsWith(prefix)) return false;
+    const next = lower[prefix.length];
+    return next === undefined || next === " " || next === "(";
+  });
+}
 
 function isLikelyDeezerTrackTitle(title: string): boolean {
   return title.includes(" / ") || title.includes(" - ");
@@ -66,7 +76,7 @@ export class DeezerMediaBrowser {
     for (let i = 0; i < xmlItems.length; i++) {
       const item = xmlItems[i];
       if (!item.title) continue;
-      if (DEEZER_EXCLUDED_MENU_TITLES.has(item.title.toLowerCase())) continue;
+      if (isExcludedDeezerTitle(item.title)) continue;
       const menuIndex = xmlOffset + i + 1;
       addDeezerMenuOption(entityId, menuIndex, item.title, getOrCreateDeezerThumbnail);
     }
@@ -83,7 +93,7 @@ export class DeezerMediaBrowser {
       return;
     }
 
-    if (DEEZER_EXCLUDED_MENU_TITLES.has(title.toLowerCase())) {
+    if (isExcludedDeezerTitle(title)) {
       return;
     }
 

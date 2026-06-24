@@ -14,7 +14,7 @@ test.serial("SIMPLE_COMMANDS_MAP loads and contains expected total keys", async 
   t.truthy(map);
   t.truthy(all);
   t.is(all.length, Object.keys(map).length);
-  t.is(all.length, 217);
+  t.is(all.length, 218);
 });
 
 test.serial("SIMPLE_COMMANDS_MAP contains expected known input keys", async (t) => {
@@ -192,4 +192,26 @@ test.serial("ALL_SIMPLE_COMMANDS is an array of all map keys", async (t) => {
 
   t.true(Array.isArray(all));
   t.deepEqual(all.sort(), Object.keys(map).sort());
+});
+
+test.serial("ALL_INPUT_SELECTOR_NAMES contains canonical input names from eiscpCommands", async (t) => {
+  const mod = await importDist("dist/src/simpleCommands.js");
+  const names = mod.ALL_INPUT_SELECTOR_NAMES as string[];
+
+  t.true(Array.isArray(names));
+  t.true(names.includes("cd"), "should include cd");
+  t.true(names.includes("bd"), "should include bd (primary of bd/dvd)");
+  t.true(names.includes("tv"), "should include tv");
+  t.true(names.includes("net"), "should include net (primary of net/network)");
+  t.true(names.includes("tunein"), "should include tunein");
+  t.true(names.includes("spotify"), "should include spotify");
+  t.true(names.includes("bluetooth"), "should include bluetooth");
+  t.true(names.includes("dts-play-fi"), "should include dts-play-fi");
+  t.true(names.includes("music-server"), "should include music-server");
+  t.false(names.includes("query"), "should exclude query");
+  t.false(names.includes("up"), "should exclude up");
+  t.false(names.includes("down"), "should exclude down");
+  t.true(names.includes("dvd"), "should include alias dvd alongside primary bd");
+  t.true(names.includes("vcr"), "should include alias vcr alongside primary video1");
+  t.true(names.includes("network"), "should include alias network alongside primary net");
 });

@@ -43,8 +43,8 @@ export class ConfigManager {
       netMenuDelay: avr.netMenuDelay ?? AVR_DEFAULTS.netMenuDelay,
       tuneinPresetPosition: avr.tuneinPresetPosition ?? AVR_DEFAULTS.tuneinPresetPosition,
       tuneinMenuStyle: avr.tuneinMenuStyle ?? AVR_DEFAULTS.tuneinMenuStyle,
-      listeningModeOptions: avr.listeningModeOptions,
-      inputSelectorOptions: avr.inputSelectorOptions
+      listeningModeOptions: avr.listeningModeOptions !== undefined ? parseSelectOptions(avr.listeningModeOptions) : undefined,
+      inputSelectorOptions: avr.inputSelectorOptions !== undefined ? parseSelectOptions(avr.inputSelectorOptions) : undefined
     };
   }
 

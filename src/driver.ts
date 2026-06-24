@@ -150,7 +150,12 @@ export default class OnkyoDriver {
       // ── Media player — always registered ───────────────────────────────────
       {
         enabled: () => true,
-        create: () => this.entityRegistrar.createMediaPlayerEntity(avrEntry, avrConfig.volumeScale ?? 100, this.sharedCmdHandler.bind(this), rawSend)
+        create: () => this.entityRegistrar.createMediaPlayerEntity(avrEntry, avrConfig.volumeScale ?? 100, this.sharedCmdHandler.bind(this), rawSend),
+        afterRegister: () => {
+          if (typeof this.driver.updateEntityAttributes === "function") {
+            this.driver.updateEntityAttributes(avrEntry, { [uc.MediaPlayerAttributes.SourceList]: this.entityRegistrar.getInputSelectorOptions(avrEntry) });
+          }
+        }
       },
 
       // ── Sensor entities — conditional on createSensors flag ────────────────
@@ -343,8 +348,13 @@ export default class OnkyoDriver {
     this.driver.on(uc.Events.SubscribeEntities, async (entityIds: string[]) => {
       log.info("%s Entities subscribed: %s", integrationName, entityIds.join(", "));
 
-      // Delegate each subscription to handler
+      // Push source list for MediaPlayer entities
       for (const entityId of entityIds) {
+        if (this.avrInstances.has(entityId)) {
+          if (typeof this.driver.updateEntityAttributes === "function") {
+            this.driver.updateEntityAttributes(entityId, { [uc.MediaPlayerAttributes.SourceList]: this.entityRegistrar.getInputSelectorOptions(entityId) });
+          }
+        }
         await this.subscriptionHandler.handle(entityId);
       }
     });

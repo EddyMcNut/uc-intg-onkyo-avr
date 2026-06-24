@@ -123,6 +123,7 @@ export default class EntityRegistrar {
           [uc.MediaPlayerAttributes.Muted]: uc.MediaPlayerStates.Unknown,
           [uc.MediaPlayerAttributes.Volume]: 0,
           [uc.MediaPlayerAttributes.Source]: uc.MediaPlayerStates.Unknown,
+          [uc.MediaPlayerAttributes.SourceList]: this.getInputSelectorOptions(avrEntry),
           [uc.MediaPlayerAttributes.MediaType]: uc.MediaPlayerStates.Unknown
         },
         deviceClass: uc.MediaPlayerDeviceClasses.Receiver,
@@ -200,15 +201,17 @@ export default class EntityRegistrar {
     return selectEntity;
   }
 
-  // Return input selector options for the given AVR entry. If a user-configured `inputSelectorOptions` list is present it is returned exactly; otherwise all SLI keys (excluding navigation/query keys) are returned sorted.
+  // Return input selector options for the given AVR entry. If a user-configured `inputSelectorOptions` list is present it is returned exactly; if `null` (disabled) returns empty; otherwise all SLI keys (excluding navigation/query keys) are returned sorted.
   getInputSelectorOptions(avrEntry?: string): string[] {
     if (avrEntry) {
       try {
         const cfg = ConfigManager.get();
         if (cfg && Array.isArray(cfg.avrs)) {
           const match = cfg.avrs.find((a) => buildEntityId(a.model, a.ip, a.zone) === avrEntry);
-          if (match && Array.isArray(match.inputSelectorOptions) && match.inputSelectorOptions.length > 0) {
-            return match.inputSelectorOptions.map((s) => s.trim());
+          if (match && Object.prototype.hasOwnProperty.call(match, "inputSelectorOptions")) {
+            const opts = match.inputSelectorOptions;
+            if (opts === null) return [];
+            if (Array.isArray(opts) && opts.length > 0) return opts.map((s) => s.trim());
           }
         }
       } catch {

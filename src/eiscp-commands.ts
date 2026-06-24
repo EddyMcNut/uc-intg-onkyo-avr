@@ -399,7 +399,7 @@ export const eiscpCommands = {
         "08": { name: "video9", description: "sets VIDEO9" },
         "09": { name: "video10", description: "sets VIDEO10" },
         "10": { name: ["bd", "dvd"], description: "sets DVD, BD/DVD" },
-        "11": { name: "stm", description: "sets STM, STMBOX" },
+        "11": { name: ["stm", "stmbox"], description: "sets STM, STMBOX" },
         "12": { name: "tv", description: "sets TV" },
         "20": { name: ["tape", "tape1"], description: "sets TAPE(1), TV/TAPE" },
         "21": { name: "tape2", description: "sets TAPE2" },

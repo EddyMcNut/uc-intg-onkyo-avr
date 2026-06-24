@@ -52,7 +52,17 @@ export const TIDAL_ROOT_TYPE = "tidal://menu";
 export const TIDAL_MENU_ROOT_ID = "tidal:main-menu";
 export const TIDAL_BACK_ID = "tidal:menu-back";
 
-const TIDAL_EXCLUDED_MENU_TITLES = new Set(["search", "login", "logout", "all stations"]);
+const TIDAL_EXCLUDED_MENU_PREFIXES = ["search", "login", "logout", "log out", "all stations"];
+
+function isExcludedTidalTitle(title: string): boolean {
+  const lower = title.toLowerCase();
+  return TIDAL_EXCLUDED_MENU_PREFIXES.some((prefix) => {
+    if (lower === prefix) return true;
+    if (!lower.startsWith(prefix)) return false;
+    const next = lower[prefix.length];
+    return next === undefined || next === " " || next === "(";
+  });
+}
 
 export class TidalMediaBrowser {
   ingestXmlEntries(entityId: string, xmlPayload: string): void {
@@ -62,7 +72,7 @@ export class TidalMediaBrowser {
     for (let i = 0; i < xmlItems.length; i++) {
       const item = xmlItems[i];
       if (!item.title) continue;
-      if (TIDAL_EXCLUDED_MENU_TITLES.has(item.title.toLowerCase())) continue;
+      if (isExcludedTidalTitle(item.title)) continue;
       const menuIndex = xmlOffset + i + 1;
       addTidalMenuOption(entityId, menuIndex, item.title, getOrCreateTidalThumbnail);
     }
@@ -79,7 +89,7 @@ export class TidalMediaBrowser {
       return;
     }
 
-    if (TIDAL_EXCLUDED_MENU_TITLES.has(title.toLowerCase())) {
+    if (isExcludedTidalTitle(title)) {
       return;
     }
 
