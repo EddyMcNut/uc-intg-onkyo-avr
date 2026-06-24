@@ -1,12 +1,11 @@
-import test from "ava";
+import { describe, it, expect } from "vitest";
 import * as uc from "@unfoldedcircle/integration-api";
-import { pathToFileURL } from "url";
 import path from "path";
 
-test.serial("Media player browse returns TuneIn presets only for NET TuneIn", async (t) => {
-  const registrarModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/entityRegistrar.js")).href);
-  const avrStateModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/avrState.js")).href);
-  const mediaBrowserModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/mediaBrowser.js")).href);
+it("Media player browse returns TuneIn presets only for NET TuneIn", async () => {
+  const registrarModule = await import("../src/entityRegistrar.js");
+  const avrStateModule = await import("../src/avrState.js");
+  const mediaBrowserModule = await import("../src/mediaBrowser.js");
 
   const EntityRegistrar = registrarModule.default as any;
   const { avrStateManager } = avrStateModule as any;
@@ -17,7 +16,7 @@ test.serial("Media player browse returns TuneIn presets only for NET TuneIn", as
   const player = registrar.createMediaPlayerEntity(entityId, 100, async () => uc.StatusCodes.Ok);
 
   const unavailable = await player.browse({ paging: new uc.Paging(1, 10) });
-  t.is(unavailable, uc.StatusCodes.NotFound);
+  expect(unavailable).toBe(uc.StatusCodes.NotFound);
 
   avrStateManager.setSource(entityId, "net");
   avrStateManager.setSubSource(entityId, "tunein");
@@ -27,21 +26,20 @@ test.serial("Media player browse returns TuneIn presets only for NET TuneIn", as
   ingestTuneInListEntry(entityId, "U2-Decibel EuroDance (Euro Hits)");
 
   const result = await player.browse({ paging: new uc.Paging(1, 2) });
-  t.true(result instanceof uc.BrowseResult);
+  expect(result).toBeInstanceOf(uc.BrowseResult);
 
   const browseResult = result as uc.BrowseResult;
-  t.is(browseResult.media?.title, "TuneIn");
-  t.is(browseResult.media?.media_id, "tunein:root");
-  t.is(browseResult.media?.items?.length, 2);
-  t.deepEqual(
-    browseResult.media?.items?.map((item) => item.title),
-    ["America's Country (Country)", "Decibel EuroDance (Euro Hits)"]
-  );
-  t.true((browseResult.media?.items?.[0].thumbnail || "").startsWith("data:image/"));
-  t.true((browseResult.media?.items?.[0].thumbnail || "").length < 4000);
-  t.is(browseResult.pagination.page, 1);
-  t.is(browseResult.pagination.limit, 2);
-  t.is(browseResult.pagination.count, 3);
+  expect(browseResult.media?.title).toBe("TuneIn");
+  expect(browseResult.media?.media_id).toBe("tunein:root");
+  expect(browseResult.media?.items?.length).toBe(2);
+  expect(
+    browseResult.media?.items?.map((item) => item.title)
+  ).toEqual(["America's Country (Country)", "Decibel EuroDance (Euro Hits)"]);
+  expect((browseResult.media?.items?.[0].thumbnail || "").startsWith("data:image/")).toBe(true);
+  expect((browseResult.media?.items?.[0].thumbnail || "").length < 4000).toBe(true);
+  expect(browseResult.pagination.page).toBe(1);
+  expect(browseResult.pagination.limit).toBe(2);
+  expect(browseResult.pagination.count).toBe(3);
 
   const leafResult = await player.browse({
     media_id: "tunein:preset:3",
@@ -49,15 +47,15 @@ test.serial("Media player browse returns TuneIn presets only for NET TuneIn", as
     paging: new uc.Paging(1, 10)
   });
 
-  t.true(leafResult instanceof uc.BrowseResult);
-  t.is((leafResult as uc.BrowseResult).media?.title, "Preset 3");
-  t.true((leafResult as uc.BrowseResult).media?.can_play ?? false);
+  expect(leafResult).toBeInstanceOf(uc.BrowseResult);
+  expect((leafResult as uc.BrowseResult).media?.title).toBe("Preset 3");
+  expect((leafResult as uc.BrowseResult).media?.can_play ?? false).toBe(true);
 });
 
-test.serial("Media player browse ignores TuneIn menu entries until My Presets is active", async (t) => {
-  const registrarModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/entityRegistrar.js")).href);
-  const avrStateModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/avrState.js")).href);
-  const mediaBrowserModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/mediaBrowser.js")).href);
+it("Media player browse ignores TuneIn menu entries until My Presets is active", async () => {
+  const registrarModule = await import("../src/entityRegistrar.js");
+  const avrStateModule = await import("../src/avrState.js");
+  const mediaBrowserModule = await import("../src/mediaBrowser.js");
 
   const EntityRegistrar = registrarModule.default as any;
   const { avrStateManager } = avrStateModule as any;
@@ -75,27 +73,25 @@ test.serial("Media player browse ignores TuneIn menu entries until My Presets is
 
   let result = await player.browse({ paging: new uc.Paging(1, 10) });
 
-  t.true(result instanceof uc.BrowseResult);
-  t.deepEqual(
-    (result as uc.BrowseResult).media?.items?.map((item) => item.title),
-    []
-  );
+  expect(result).toBeInstanceOf(uc.BrowseResult);
+  expect(
+    (result as uc.BrowseResult).media?.items?.map((item) => item.title)
+  ).toEqual([]);
 
   setTuneInBrowseContext(entityId, "My Presets");
   ingestTuneInListEntry(entityId, "U0-89.7 | WTMD (Alternative Rock)");
   ingestTuneInListEntry(entityId, "U1-America's Country (Country)");
 
   result = await player.browse({ paging: new uc.Paging(1, 10) });
-  t.deepEqual(
-    (result as uc.BrowseResult).media?.items?.map((item) => item.title),
-    ["America's Country (Country)", "WTMD (Alternative Rock)"]
-  );
+  expect(
+    (result as uc.BrowseResult).media?.items?.map((item) => item.title)
+  ).toEqual(["America's Country (Country)", "WTMD (Alternative Rock)"]);
 });
 
-test.serial("TuneIn browse root exposes all presets when the list is longer than 10", async (t) => {
-  const registrarModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/entityRegistrar.js")).href);
-  const avrStateModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/avrState.js")).href);
-  const mediaBrowserModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/mediaBrowser.js")).href);
+it("TuneIn browse root exposes all presets when the list is longer than 10", async () => {
+  const registrarModule = await import("../src/entityRegistrar.js");
+  const avrStateModule = await import("../src/avrState.js");
+  const mediaBrowserModule = await import("../src/mediaBrowser.js");
 
   const EntityRegistrar = registrarModule.default as any;
   const { avrStateManager } = avrStateModule as any;
@@ -125,26 +121,24 @@ test.serial("TuneIn browse root exposes all presets when the list is longer than
 
   const result = await player.browse({ paging: new uc.Paging(1, 10) });
 
-  t.true(result instanceof uc.BrowseResult);
-  t.deepEqual(
-    (result as uc.BrowseResult).media?.items?.map((item) => item.title),
-    ["Station A", "Station B", "Station C", "Station D", "Station E", "Station F", "Station G", "Station H", "Station I", "Station J"]
-  );
-  t.is((result as uc.BrowseResult).pagination.count, 12);
+  expect(result).toBeInstanceOf(uc.BrowseResult);
+  expect(
+    (result as uc.BrowseResult).media?.items?.map((item) => item.title)
+  ).toEqual(["Station A", "Station B", "Station C", "Station D", "Station E", "Station F", "Station G", "Station H", "Station I", "Station J"]);
+  expect((result as uc.BrowseResult).pagination.count).toBe(12);
 
   const pageResult = await player.browse({ paging: new uc.Paging(2, 10) });
 
-  t.true(pageResult instanceof uc.BrowseResult);
-  t.deepEqual(
-    (pageResult as uc.BrowseResult).media?.items?.map((item) => item.title),
-    ["Station K", "Station L"]
-  );
+  expect(pageResult).toBeInstanceOf(uc.BrowseResult);
+  expect(
+    (pageResult as uc.BrowseResult).media?.items?.map((item) => item.title)
+  ).toEqual(["Station K", "Station L"]);
 });
 
-test.serial("Media player browse returns TuneIn full menu items from NET TuneIn", async (t) => {
-  const registrarModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/entityRegistrar.js")).href);
-  const avrStateModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/avrState.js")).href);
-  const mediaBrowserModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/mediaBrowser.js")).href);
+it("Media player browse returns TuneIn full menu items from NET TuneIn", async () => {
+  const registrarModule = await import("../src/entityRegistrar.js");
+  const avrStateModule = await import("../src/avrState.js");
+  const mediaBrowserModule = await import("../src/mediaBrowser.js");
 
   const EntityRegistrar = registrarModule.default as any;
   const { avrStateManager } = avrStateModule as any;
@@ -168,18 +162,17 @@ test.serial("Media player browse returns TuneIn full menu items from NET TuneIn"
     paging: new uc.Paging(1, 10)
   });
 
-  t.true(result instanceof uc.BrowseResult);
-  t.deepEqual(
-    (result as uc.BrowseResult).media?.items?.map((item) => item.title),
-    ["Browse", "Stations", "Station A", "Station B"]
-  );
-  t.is((result as uc.BrowseResult).pagination.count, 4);
+  expect(result).toBeInstanceOf(uc.BrowseResult);
+  expect(
+    (result as uc.BrowseResult).media?.items?.map((item) => item.title)
+  ).toEqual(["Browse", "Stations", "Station A", "Station B"]);
+  expect((result as uc.BrowseResult).pagination.count).toBe(4);
 });
 
-test.serial("Media player browse hides TuneIn Login menu item", async (t) => {
-  const registrarModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/entityRegistrar.js")).href);
-  const avrStateModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/avrState.js")).href);
-  const mediaBrowserModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/mediaBrowser.js")).href);
+it("Media player browse hides TuneIn Login menu item", async () => {
+  const registrarModule = await import("../src/entityRegistrar.js");
+  const avrStateModule = await import("../src/avrState.js");
+  const mediaBrowserModule = await import("../src/mediaBrowser.js");
 
   const EntityRegistrar = registrarModule.default as any;
   const { avrStateManager } = avrStateModule as any;
@@ -204,18 +197,17 @@ test.serial("Media player browse hides TuneIn Login menu item", async (t) => {
     paging: new uc.Paging(1, 10)
   });
 
-  t.true(result instanceof uc.BrowseResult);
-  t.deepEqual(
-    (result as uc.BrowseResult).media?.items?.map((item) => item.title),
-    ["Browse", "Station A"]
-  );
-  t.is((result as uc.BrowseResult).pagination.count, 2);
+  expect(result).toBeInstanceOf(uc.BrowseResult);
+  expect(
+    (result as uc.BrowseResult).media?.items?.map((item) => item.title)
+  ).toEqual(["Browse", "Station A"]);
+  expect((result as uc.BrowseResult).pagination.count).toBe(2);
 });
 
-test.serial("TuneIn selection keeps subsource and state so browse can be repeated", async (t) => {
-  const avrStateModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/avrState.js")).href);
-  const mediaBrowserModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/mediaBrowser.js")).href);
-  const processorModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/zoneAgnosticUpdateProcessor.js")).href);
+it("TuneIn selection keeps subsource and state so browse can be repeated", async () => {
+  const avrStateModule = await import("../src/avrState.js");
+  const mediaBrowserModule = await import("../src/mediaBrowser.js");
+  const processorModule = await import("../src/zoneAgnosticUpdateProcessor.js");
 
   const { avrStateManager } = avrStateModule as any;
   const { isMediaBrowsingAvailable } = mediaBrowserModule as any;
@@ -246,15 +238,15 @@ test.serial("TuneIn selection keeps subsource and state so browse can be repeate
 
   await processor.handleFld(entityId, "WTMD (Alternative Rock)", "main");
 
-  t.is(avrStateManager.getSubSource(entityId), "tunein");
-  t.true(isMediaBrowsingAvailable(entityId));
-  t.is(capturedStates.get(entityId), uc.MediaPlayerStates.Playing);
+  expect(avrStateManager.getSubSource(entityId)).toBe("tunein");
+  expect(isMediaBrowsingAvailable(entityId)).toBe(true);
+  expect(capturedStates.get(entityId)).toBe(uc.MediaPlayerStates.Playing);
 });
 
-test.serial("TuneIn preset cache survives post-select menu updates", async (t) => {
-  const registrarModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/entityRegistrar.js")).href);
-  const avrStateModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/avrState.js")).href);
-  const mediaBrowserModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/mediaBrowser.js")).href);
+it("TuneIn preset cache survives post-select menu updates", async () => {
+  const registrarModule = await import("../src/entityRegistrar.js");
+  const avrStateModule = await import("../src/avrState.js");
+  const mediaBrowserModule = await import("../src/mediaBrowser.js");
 
   const EntityRegistrar = registrarModule.default as any;
   const { avrStateManager } = avrStateModule as any;
@@ -271,24 +263,23 @@ test.serial("TuneIn preset cache survives post-select menu updates", async (t) =
   ingestTuneInListEntry(entityId, "U1-America's Country (Country)");
 
   let result = await player.browse({ paging: new uc.Paging(1, 10) });
-  t.true(result instanceof uc.BrowseResult);
-  t.is((result as uc.BrowseResult).media?.items?.length, 2);
+  expect(result).toBeInstanceOf(uc.BrowseResult);
+  expect((result as uc.BrowseResult).media?.items?.length).toBe(2);
 
   setTuneInBrowseContext(entityId, "Now Playing");
   ingestTuneInListEntry(entityId, "U0-Search Stations");
 
   result = await player.browse({ paging: new uc.Paging(1, 10) });
-  t.true(result instanceof uc.BrowseResult);
-  t.deepEqual(
-    (result as uc.BrowseResult).media?.items?.map((item) => item.title),
-    ["America's Country (Country)", "WTMD (Alternative Rock)"]
-  );
+  expect(result).toBeInstanceOf(uc.BrowseResult);
+  expect(
+    (result as uc.BrowseResult).media?.items?.map((item) => item.title)
+  ).toEqual(["America's Country (Country)", "WTMD (Alternative Rock)"]);
 });
 
-test.serial("Media player browse returns Tidal menu entries from AVR NLS updates", async (t) => {
-  const registrarModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/entityRegistrar.js")).href);
-  const avrStateModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/avrState.js")).href);
-  const mediaBrowserModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/mediaBrowser.js")).href);
+it("Media player browse returns Tidal menu entries from AVR NLS updates", async () => {
+  const registrarModule = await import("../src/entityRegistrar.js");
+  const avrStateModule = await import("../src/avrState.js");
+  const mediaBrowserModule = await import("../src/mediaBrowser.js");
 
   const EntityRegistrar = registrarModule.default as any;
   const { avrStateManager } = avrStateModule as any;
@@ -307,22 +298,20 @@ test.serial("Media player browse returns Tidal menu entries from AVR NLS updates
 
   const result = await player.browse({ paging: new uc.Paging(1, 10) });
 
-  t.true(result instanceof uc.BrowseResult);
-  t.is((result as uc.BrowseResult).media?.title, "Tidal");
-  t.deepEqual(
-    (result as uc.BrowseResult).media?.items?.map((item) => item.title),
-    ["New", "TIDAL Rising", "Playlists"]
-  );
-  t.deepEqual(
-    (result as uc.BrowseResult).media?.items?.map((item) => item.media_id),
-    ["tidal:menu:1:New", "tidal:menu:2:TIDAL%20Rising", "tidal:menu:3:Playlists"]
-  );
+  expect(result).toBeInstanceOf(uc.BrowseResult);
+  expect((result as uc.BrowseResult).media?.title).toBe("Tidal");
+  expect(
+    (result as uc.BrowseResult).media?.items?.map((item) => item.title)
+  ).toEqual(["New", "TIDAL Rising", "Playlists"]);
+  expect(
+    (result as uc.BrowseResult).media?.items?.map((item) => item.media_id)
+  ).toEqual(["tidal:menu:1:New", "tidal:menu:2:TIDAL%20Rising", "tidal:menu:3:Playlists"]);
 });
 
-test.serial("Media player browse returns Deezer menu entries from AVR NLS updates", async (t) => {
-  const registrarModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/entityRegistrar.js")).href);
-  const avrStateModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/avrState.js")).href);
-  const mediaBrowserModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/mediaBrowser.js")).href);
+it("Media player browse returns Deezer menu entries from AVR NLS updates", async () => {
+  const registrarModule = await import("../src/entityRegistrar.js");
+  const avrStateModule = await import("../src/avrState.js");
+  const mediaBrowserModule = await import("../src/mediaBrowser.js");
 
   const EntityRegistrar = registrarModule.default as any;
   const { avrStateManager } = avrStateModule as any;
@@ -341,22 +330,20 @@ test.serial("Media player browse returns Deezer menu entries from AVR NLS update
 
   const result = await player.browse({ paging: new uc.Paging(1, 10) });
 
-  t.true(result instanceof uc.BrowseResult);
-  t.is((result as uc.BrowseResult).media?.title, "Deezer");
-  t.deepEqual(
-    (result as uc.BrowseResult).media?.items?.map((item) => item.title),
-    ["New", "Charts", "Playlists"]
-  );
-  t.deepEqual(
-    (result as uc.BrowseResult).media?.items?.map((item) => item.media_id),
-    ["deezer:menu:1:New", "deezer:menu:2:Charts", "deezer:menu:3:Playlists"]
-  );
+  expect(result).toBeInstanceOf(uc.BrowseResult);
+  expect((result as uc.BrowseResult).media?.title).toBe("Deezer");
+  expect(
+    (result as uc.BrowseResult).media?.items?.map((item) => item.title)
+  ).toEqual(["New", "Charts", "Playlists"]);
+  expect(
+    (result as uc.BrowseResult).media?.items?.map((item) => item.media_id)
+  ).toEqual(["deezer:menu:1:New", "deezer:menu:2:Charts", "deezer:menu:3:Playlists"]);
 });
 
-test.serial("Media player browse marks Deezer NLS entries without %s as playable tracks", async (t) => {
-  const registrarModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/entityRegistrar.js")).href);
-  const avrStateModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/avrState.js")).href);
-  const mediaBrowserModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/mediaBrowser.js")).href);
+it("Media player browse marks Deezer NLS entries without %s as playable tracks", async () => {
+  const registrarModule = await import("../src/entityRegistrar.js");
+  const avrStateModule = await import("../src/avrState.js");
+  const mediaBrowserModule = await import("../src/mediaBrowser.js");
 
   const EntityRegistrar = registrarModule.default as any;
   const { avrStateManager } = avrStateModule as any;
@@ -373,17 +360,17 @@ test.serial("Media player browse marks Deezer NLS entries without %s as playable
   ingestDeezerListEntry(entityId, "U1-My Song Title / Artist Name");
 
   const result = await player.browse({ paging: new uc.Paging(1, 10) });
-  t.true(result instanceof uc.BrowseResult);
+  expect(result).toBeInstanceOf(uc.BrowseResult);
 
   const items = (result as uc.BrowseResult).media?.items ?? [];
-  t.true((items[0]?.can_browse ?? false) && !(items[0]?.can_play ?? true));
-  t.true(!(items[1]?.can_browse ?? true) && (items[1]?.can_play ?? false));
+  expect((items[0]?.can_browse ?? false) && !(items[0]?.can_play ?? true)).toBe(true);
+  expect(!(items[1]?.can_browse ?? true) && (items[1]?.can_play ?? false)).toBe(true);
 });
 
-test.serial("Media player browse hides excluded Tidal menu items", async (t) => {
-  const registrarModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/entityRegistrar.js")).href);
-  const avrStateModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/avrState.js")).href);
-  const mediaBrowserModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/mediaBrowser.js")).href);
+it("Media player browse hides excluded Tidal menu items", async () => {
+  const registrarModule = await import("../src/entityRegistrar.js");
+  const avrStateModule = await import("../src/avrState.js");
+  const mediaBrowserModule = await import("../src/mediaBrowser.js");
 
   const EntityRegistrar = registrarModule.default as any;
   const { avrStateManager } = avrStateModule as any;
@@ -404,21 +391,19 @@ test.serial("Media player browse hides excluded Tidal menu items", async (t) => 
 
   const result = await player.browse({ paging: new uc.Paging(1, 10) });
 
-  t.true(result instanceof uc.BrowseResult);
-  t.deepEqual(
-    (result as uc.BrowseResult).media?.items?.map((item) => item.title),
-    ["New", "Playlists"]
-  );
-  t.deepEqual(
-    (result as uc.BrowseResult).media?.items?.map((item) => item.media_id),
-    ["tidal:menu:4:New", "tidal:menu:5:Playlists"]
-  );
+  expect(result).toBeInstanceOf(uc.BrowseResult);
+  expect(
+    (result as uc.BrowseResult).media?.items?.map((item) => item.title)
+  ).toEqual(["New", "Playlists"]);
+  expect(
+    (result as uc.BrowseResult).media?.items?.map((item) => item.media_id)
+  ).toEqual(["tidal:menu:4:New", "tidal:menu:5:Playlists"]);
 });
 
-test.serial("Media player browse defaults to 25 items per page when paging is omitted", async (t) => {
-  const registrarModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/entityRegistrar.js")).href);
-  const avrStateModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/avrState.js")).href);
-  const mediaBrowserModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/mediaBrowser.js")).href);
+it("Media player browse defaults to 25 items per page when paging is omitted", async () => {
+  const registrarModule = await import("../src/entityRegistrar.js");
+  const avrStateModule = await import("../src/avrState.js");
+  const mediaBrowserModule = await import("../src/mediaBrowser.js");
 
   const EntityRegistrar = registrarModule.default as any;
   const { avrStateManager } = avrStateModule as any;
@@ -437,17 +422,17 @@ test.serial("Media player browse defaults to 25 items per page when paging is om
 
   const result = await player.browse({} as uc.BrowseOptions);
 
-  t.true(result instanceof uc.BrowseResult);
-  t.is((result as uc.BrowseResult).media?.items?.length, 25);
-  t.is((result as uc.BrowseResult).pagination.page, 1);
-  t.is((result as uc.BrowseResult).pagination.limit, 25);
-  t.is((result as uc.BrowseResult).pagination.count, 30);
+  expect(result).toBeInstanceOf(uc.BrowseResult);
+  expect((result as uc.BrowseResult).media?.items?.length).toBe(25);
+  expect((result as uc.BrowseResult).pagination.page).toBe(1);
+  expect((result as uc.BrowseResult).pagination.limit).toBe(25);
+  expect((result as uc.BrowseResult).pagination.count).toBe(30);
 });
 
-test.serial("Tidal browse survives DAB-to-NET transition when NLT/NLS arrive early", async (t) => {
-  const registrarModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/entityRegistrar.js")).href);
-  const avrStateModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/avrState.js")).href);
-  const processorModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/zoneAgnosticUpdateProcessor.js")).href);
+it("Tidal browse survives DAB-to-NET transition when NLT/NLS arrive early", async () => {
+  const registrarModule = await import("../src/entityRegistrar.js");
+  const avrStateModule = await import("../src/avrState.js");
+  const processorModule = await import("../src/zoneAgnosticUpdateProcessor.js");
 
   const EntityRegistrar = registrarModule.default as any;
   const { avrStateManager } = avrStateModule as any;
@@ -475,18 +460,17 @@ test.serial("Tidal browse survives DAB-to-NET transition when NLT/NLS arrive ear
   avrStateManager.setSource(entityId, "net", undefined, undefined, mockDriver);
 
   const result = await player.browse({ paging: new uc.Paging(1, 10) });
-  t.true(result instanceof uc.BrowseResult);
-  t.is((result as uc.BrowseResult).media?.title, "Tidal");
-  t.deepEqual(
-    (result as uc.BrowseResult).media?.items?.map((item) => item.title),
-    ["New", "TIDAL Rising", "Playlists"]
-  );
+  expect(result).toBeInstanceOf(uc.BrowseResult);
+  expect((result as uc.BrowseResult).media?.title).toBe("Tidal");
+  expect(
+    (result as uc.BrowseResult).media?.items?.map((item) => item.title)
+  ).toEqual(["New", "TIDAL Rising", "Playlists"]);
 });
 
-test.serial("Repeated NLT tidal updates do not clear existing Tidal menu options", async (t) => {
-  const registrarModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/entityRegistrar.js")).href);
-  const avrStateModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/avrState.js")).href);
-  const processorModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/zoneAgnosticUpdateProcessor.js")).href);
+it("Repeated NLT tidal updates do not clear existing Tidal menu options", async () => {
+  const registrarModule = await import("../src/entityRegistrar.js");
+  const avrStateModule = await import("../src/avrState.js");
+  const processorModule = await import("../src/zoneAgnosticUpdateProcessor.js");
 
   const EntityRegistrar = registrarModule.default as any;
   const { avrStateManager } = avrStateModule as any;
@@ -515,16 +499,15 @@ test.serial("Repeated NLT tidal updates do not clear existing Tidal menu options
   await processor.handleNlt(entityId, "Tidal", "main");
 
   const result = await player.browse({ paging: new uc.Paging(1, 10) });
-  t.true(result instanceof uc.BrowseResult);
-  t.deepEqual(
-    (result as uc.BrowseResult).media?.items?.map((item) => item.title),
-    ["New", "TIDAL Rising", "Playlists"]
-  );
+  expect(result).toBeInstanceOf(uc.BrowseResult);
+  expect(
+    (result as uc.BrowseResult).media?.items?.map((item) => item.title)
+  ).toEqual(["New", "TIDAL Rising", "Playlists"]);
 });
 
-test.serial("TuneIn service selection preloads My Presets for browsing", async (t) => {
-  const avrStateModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/avrState.js")).href);
-  const processorModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/zoneAgnosticUpdateProcessor.js")).href);
+it("TuneIn service selection preloads My Presets for browsing", async () => {
+  const avrStateModule = await import("../src/avrState.js");
+  const processorModule = await import("../src/zoneAgnosticUpdateProcessor.js");
 
   const { avrStateManager } = avrStateModule as any;
   const { ZoneAgnosticUpdateProcessor } = processorModule as any;
@@ -547,15 +530,15 @@ test.serial("TuneIn service selection preloads My Presets for browsing", async (
 
   await processor.handleNlt(entityId, "TuneIn", "main");
 
-  t.true(rawCommands.includes("NTCTOP"));
-  t.true(rawCommands.includes("NTCSELECT"));
-  t.true(rawCommands.includes("NLSI00001"));
-  t.true(rawCommands.some((cmd) => cmd.startsWith("NLAL")));
+  expect(rawCommands.includes("NTCTOP")).toBe(true);
+  expect(rawCommands.includes("NTCSELECT")).toBe(true);
+  expect(rawCommands.includes("NLSI00001")).toBe(true);
+  expect(rawCommands.some((cmd) => cmd.startsWith("NLAL"))).toBe(true);
 });
 
-test.serial("CommandSender silently absorbs shuffle, repeat, and browse commands", async (t) => {
-  const senderModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/commandSender.js")).href);
-  const avrStateModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/avrState.js")).href);
+it("CommandSender silently absorbs shuffle, repeat, and browse commands", async () => {
+  const senderModule = await import("../src/commandSender.js");
+  const avrStateModule = await import("../src/avrState.js");
 
   const CommandSender = senderModule.CommandSender as any;
   const { avrStateManager } = avrStateModule as any;
@@ -588,14 +571,14 @@ test.serial("CommandSender silently absorbs shuffle, repeat, and browse commands
 
   const entity = new uc.MediaPlayer(entityId, { en: entityId }, {});
 
-  t.is(await sender.sharedCmdHandler(entity, uc.MediaPlayerCommands.Shuffle), uc.StatusCodes.Ok);
-  t.is(await sender.sharedCmdHandler(entity, uc.MediaPlayerCommands.Repeat), uc.StatusCodes.Ok);
-  t.is(await sender.sharedCmdHandler(entity, "browse"), uc.StatusCodes.Ok);
+  expect(await sender.sharedCmdHandler(entity, uc.MediaPlayerCommands.Shuffle)).toBe(uc.StatusCodes.Ok);
+  expect(await sender.sharedCmdHandler(entity, uc.MediaPlayerCommands.Repeat)).toBe(uc.StatusCodes.Ok);
+  expect(await sender.sharedCmdHandler(entity, "browse")).toBe(uc.StatusCodes.Ok);
 });
 
-test.serial("CommandSender play_media routes TuneIn preset IDs to tunein-preset", async (t) => {
-  const senderModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/commandSender.js")).href);
-  const avrStateModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/avrState.js")).href);
+it("CommandSender play_media routes TuneIn preset IDs to tunein-preset", async () => {
+  const senderModule = await import("../src/commandSender.js");
+  const avrStateModule = await import("../src/avrState.js");
 
   const CommandSender = senderModule.CommandSender as any;
   const { avrStateManager } = avrStateModule as any;
@@ -631,13 +614,13 @@ test.serial("CommandSender play_media routes TuneIn preset IDs to tunein-preset"
     media_type: uc.KnownMediaContentType.Radio
   } as any);
 
-  t.is(status, uc.StatusCodes.Ok);
-  t.deepEqual(eiscp.commands, ["input-selector tunein", "tunein-preset 2"]);
+  expect(status).toBe(uc.StatusCodes.Ok);
+  expect(eiscp.commands).toEqual(["input-selector tunein", "tunein-preset 2"]);
 });
 
-test.serial("CommandSender play_media routes Tidal menu IDs to NLSI", async (t) => {
-  const senderModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/commandSender.js")).href);
-  const avrStateModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/avrState.js")).href);
+it("CommandSender play_media routes Tidal menu IDs to NLSI", async () => {
+  const senderModule = await import("../src/commandSender.js");
+  const avrStateModule = await import("../src/avrState.js");
 
   const CommandSender = senderModule.CommandSender as any;
   const { avrStateManager } = avrStateModule as any;
@@ -678,14 +661,14 @@ test.serial("CommandSender play_media routes Tidal menu IDs to NLSI", async (t) 
     media_type: "tidal://menu"
   } as any);
 
-  t.is(status, uc.StatusCodes.Ok);
-  t.deepEqual(eiscp.commands, ["input-selector tidal"]);
-  t.deepEqual(eiscp.rawCommands, ["NLSI00004"]);
+  expect(status).toBe(uc.StatusCodes.Ok);
+  expect(eiscp.commands).toEqual(["input-selector tidal"]);
+  expect(eiscp.rawCommands).toEqual(["NLSI00004"]);
 });
 
-test.serial("CommandSender play_media routes Deezer menu IDs to NLSI", async (t) => {
-  const senderModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/commandSender.js")).href);
-  const avrStateModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/avrState.js")).href);
+it("CommandSender play_media routes Deezer menu IDs to NLSI", async () => {
+  const senderModule = await import("../src/commandSender.js");
+  const avrStateModule = await import("../src/avrState.js");
 
   const CommandSender = senderModule.CommandSender as any;
   const { avrStateManager } = avrStateModule as any;
@@ -726,16 +709,16 @@ test.serial("CommandSender play_media routes Deezer menu IDs to NLSI", async (t)
     media_type: "deezer://menu"
   } as any);
 
-  t.is(status, uc.StatusCodes.Ok);
-  t.deepEqual(eiscp.commands, ["input-selector deezer"]);
-  t.deepEqual(eiscp.rawCommands, ["NLSI00004"]);
+  expect(status).toBe(uc.StatusCodes.Ok);
+  expect(eiscp.commands).toEqual(["input-selector deezer"]);
+  expect(eiscp.rawCommands).toEqual(["NLSI00004"]);
 });
 
-test.serial("CommandSender Deezer track selection freezes browse list and sets now-playing title", async (t) => {
-  const senderModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/commandSender.js")).href);
-  const avrStateModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/avrState.js")).href);
-  const mediaBrowserModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/mediaBrowser.js")).href);
-  const deezerStoreModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/deezerBrowserStore.js")).href);
+it("CommandSender Deezer track selection freezes browse list and sets now-playing title", async () => {
+  const senderModule = await import("../src/commandSender.js");
+  const avrStateModule = await import("../src/avrState.js");
+  const mediaBrowserModule = await import("../src/mediaBrowser.js");
+  const deezerStoreModule = await import("../src/deezerBrowserStore.js");
 
   const CommandSender = senderModule.CommandSender as any;
   const { avrStateManager } = avrStateModule as any;
@@ -779,16 +762,16 @@ test.serial("CommandSender Deezer track selection freezes browse list and sets n
     media_type: "deezer://menu"
   } as any);
 
-  t.is(status, uc.StatusCodes.Ok);
-  t.deepEqual(eiscp.rawCommands, ["NLSI00001"]);
-  t.is(getDeezerBrowseState(entityId)?.browseListFrozen, true);
-  t.is(getDeezerBrowseState(entityId)?.nowPlayingTitle, "My Song Title / Artist Name");
+  expect(status).toBe(uc.StatusCodes.Ok);
+  expect(eiscp.rawCommands).toEqual(["NLSI00001"]);
+  expect(getDeezerBrowseState(entityId)?.browseListFrozen).toBe(true);
+  expect(getDeezerBrowseState(entityId)?.nowPlayingTitle).toBe("My Song Title / Artist Name");
 });
 
-test.serial("CommandSender remaps stale Tidal index using title encoded in media_id", async (t) => {
-  const senderModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/commandSender.js")).href);
-  const avrStateModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/avrState.js")).href);
-  const mediaBrowserModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/mediaBrowser.js")).href);
+it("CommandSender remaps stale Tidal index using title encoded in media_id", async () => {
+  const senderModule = await import("../src/commandSender.js");
+  const avrStateModule = await import("../src/avrState.js");
+  const mediaBrowserModule = await import("../src/mediaBrowser.js");
 
   const CommandSender = senderModule.CommandSender as any;
   const { avrStateManager } = avrStateModule as any;
@@ -833,15 +816,15 @@ test.serial("CommandSender remaps stale Tidal index using title encoded in media
     media_type: "tidal://menu"
   } as any);
 
-  t.is(status, uc.StatusCodes.Ok);
-  t.deepEqual(eiscp.commands, []);
-  t.deepEqual(eiscp.rawCommands, ["NLSI00001"]);
+  expect(status).toBe(uc.StatusCodes.Ok);
+  expect(eiscp.commands).toEqual([]);
+  expect(eiscp.rawCommands).toEqual(["NLSI00001"]);
 });
 
-test.serial("CommandSender first selection after Main Tidal Menu skips pre-list command", async (t) => {
-  const senderModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/commandSender.js")).href);
-  const avrStateModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/avrState.js")).href);
-  const tidalStoreModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/tidalBrowserStore.js")).href);
+it("CommandSender first selection after Main Tidal Menu skips pre-list command", async () => {
+  const senderModule = await import("../src/commandSender.js");
+  const avrStateModule = await import("../src/avrState.js");
+  const tidalStoreModule = await import("../src/tidalBrowserStore.js");
 
   const CommandSender = senderModule.CommandSender as any;
   const { avrStateManager } = avrStateModule as any;
@@ -885,15 +868,15 @@ test.serial("CommandSender first selection after Main Tidal Menu skips pre-list 
     media_type: "tidal://menu"
   } as any);
 
-  t.is(status, uc.StatusCodes.Ok);
-  t.deepEqual(eiscp.commands, []);
-  t.deepEqual(eiscp.rawCommands, ["NLSI00003"]);
+  expect(status).toBe(uc.StatusCodes.Ok);
+  expect(eiscp.commands).toEqual([]);
+  expect(eiscp.rawCommands).toEqual(["NLSI00003"]);
 });
 
-test.serial("CommandSender in-Tidal track selection uses direct NLSI when AVR is in list mode", async (t) => {
-  const senderModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/commandSender.js")).href);
-  const avrStateModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/avrState.js")).href);
-  const storeModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/tidalBrowserStore.js")).href);
+it("CommandSender in-Tidal track selection uses direct NLSI when AVR is in list mode", async () => {
+  const senderModule = await import("../src/commandSender.js");
+  const avrStateModule = await import("../src/avrState.js");
+  const storeModule = await import("../src/tidalBrowserStore.js");
 
   const CommandSender = senderModule.CommandSender as any;
   const { avrStateManager } = avrStateModule as any;
@@ -937,15 +920,15 @@ test.serial("CommandSender in-Tidal track selection uses direct NLSI when AVR is
     media_type: "tidal://menu"
   } as any);
 
-  t.is(status, uc.StatusCodes.Ok);
+  expect(status).toBe(uc.StatusCodes.Ok);
   // listModeActive flag causes pre-list to be skipped even though a song is playing
-  t.deepEqual(eiscp.commands, []);
-  t.deepEqual(eiscp.rawCommands, ["NLSI00004"]);
+  expect(eiscp.commands).toEqual([]);
+  expect(eiscp.rawCommands).toEqual(["NLSI00004"]);
 });
 
-test.serial("CommandSender in-Tidal track selection sends list before NLSI when AVR is playing", async (t) => {
-  const senderModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/commandSender.js")).href);
-  const avrStateModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/avrState.js")).href);
+it("CommandSender in-Tidal track selection sends list before NLSI when AVR is playing", async () => {
+  const senderModule = await import("../src/commandSender.js");
+  const avrStateModule = await import("../src/avrState.js");
 
   const CommandSender = senderModule.CommandSender as any;
   const { avrStateManager } = avrStateModule as any;
@@ -984,14 +967,14 @@ test.serial("CommandSender in-Tidal track selection sends list before NLSI when 
     media_type: "tidal://menu"
   } as any);
 
-  t.is(status, uc.StatusCodes.Ok);
-  t.deepEqual(eiscp.commands, ["network-usb list"]);
-  t.deepEqual(eiscp.rawCommands, ["NLSI00004"]);
+  expect(status).toBe(uc.StatusCodes.Ok);
+  expect(eiscp.commands).toEqual(["network-usb list"]);
+  expect(eiscp.rawCommands).toEqual(["NLSI00004"]);
 });
 
-test.serial("CommandSender in-Tidal menu selection uses direct NLSI even when AVR is playing", async (t) => {
-  const senderModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/commandSender.js")).href);
-  const avrStateModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/avrState.js")).href);
+it("CommandSender in-Tidal menu selection uses direct NLSI even when AVR is playing", async () => {
+  const senderModule = await import("../src/commandSender.js");
+  const avrStateModule = await import("../src/avrState.js");
 
   const CommandSender = senderModule.CommandSender as any;
   const { avrStateManager } = avrStateModule as any;
@@ -1030,14 +1013,14 @@ test.serial("CommandSender in-Tidal menu selection uses direct NLSI even when AV
     media_type: "tidal://menu"
   } as any);
 
-  t.is(status, uc.StatusCodes.Ok);
-  t.deepEqual(eiscp.commands, []);
-  t.deepEqual(eiscp.rawCommands, ["NLSI00003"]);
+  expect(status).toBe(uc.StatusCodes.Ok);
+  expect(eiscp.commands).toEqual([]);
+  expect(eiscp.rawCommands).toEqual(["NLSI00003"]);
 });
 
-test.serial("CommandSender play_media routes Main Tidal Menu to input-selector tidal", async (t) => {
-  const senderModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/commandSender.js")).href);
-  const avrStateModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/avrState.js")).href);
+it("CommandSender play_media routes Main Tidal Menu to input-selector tidal", async () => {
+  const senderModule = await import("../src/commandSender.js");
+  const avrStateModule = await import("../src/avrState.js");
 
   const CommandSender = senderModule.CommandSender as any;
   const { avrStateManager } = avrStateModule as any;
@@ -1067,13 +1050,13 @@ test.serial("CommandSender play_media routes Main Tidal Menu to input-selector t
     media_type: "tidal://menu"
   });
 
-  t.is(result, uc.StatusCodes.Ok);
-  t.deepEqual(commandCalls, ["input-selector tidal"]);
+  expect(result).toBe(uc.StatusCodes.Ok);
+  expect(commandCalls).toEqual(["input-selector tidal"]);
 });
 
-test.serial("CommandSender play_media routes TuneIn main menu to input-selector tunein", async (t) => {
-  const senderModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/commandSender.js")).href);
-  const avrStateModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/avrState.js")).href);
+it("CommandSender play_media routes TuneIn main menu to input-selector tunein", async () => {
+  const senderModule = await import("../src/commandSender.js");
+  const avrStateModule = await import("../src/avrState.js");
 
   const CommandSender = senderModule.CommandSender as any;
   const { avrStateManager } = avrStateModule as any;
@@ -1102,13 +1085,13 @@ test.serial("CommandSender play_media routes TuneIn main menu to input-selector 
     media_id: "tunein:menu-root"
   } as any);
 
-  t.is(result, uc.StatusCodes.Ok);
-  t.deepEqual(commandCalls, ["input-selector tunein"]);
+  expect(result).toBe(uc.StatusCodes.Ok);
+  expect(commandCalls).toEqual(["input-selector tunein"]);
 });
 
-test.serial("CommandSender play_media routes Tidal Back option to RETURN", async (t) => {
-  const senderModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/commandSender.js")).href);
-  const avrStateModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/avrState.js")).href);
+it("CommandSender play_media routes Tidal Back option to RETURN", async () => {
+  const senderModule = await import("../src/commandSender.js");
+  const avrStateModule = await import("../src/avrState.js");
 
   const CommandSender = senderModule.CommandSender as any;
   const { avrStateManager } = avrStateModule as any;
@@ -1138,13 +1121,13 @@ test.serial("CommandSender play_media routes Tidal Back option to RETURN", async
     media_type: "tidal://menu"
   } as any);
 
-  t.is(result, uc.StatusCodes.Ok);
-  t.deepEqual(rawCalls, ["NTCRETURN"]);
+  expect(result).toBe(uc.StatusCodes.Ok);
+  expect(rawCalls).toEqual(["NTCRETURN"]);
 });
 
-test.serial("CommandSender play_media routes TuneIn Back option to RETURN", async (t) => {
-  const senderModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/commandSender.js")).href);
-  const avrStateModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/avrState.js")).href);
+it("CommandSender play_media routes TuneIn Back option to RETURN", async () => {
+  const senderModule = await import("../src/commandSender.js");
+  const avrStateModule = await import("../src/avrState.js");
 
   const CommandSender = senderModule.CommandSender as any;
   const { avrStateManager } = avrStateModule as any;
@@ -1174,6 +1157,6 @@ test.serial("CommandSender play_media routes TuneIn Back option to RETURN", asyn
     media_type: "tunein://menu"
   } as any);
 
-  t.is(result, uc.StatusCodes.Ok);
-  t.deepEqual(rawCalls, ["NTCRETURN"]);
+  expect(result).toBe(uc.StatusCodes.Ok);
+  expect(rawCalls).toEqual(["NTCRETURN"]);
 });

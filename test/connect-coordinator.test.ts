@@ -1,9 +1,8 @@
-import test from "ava";
-import { pathToFileURL } from "url";
+import { describe, it, expect } from "vitest";
 import path from "path";
 
-test.serial("connect returns false when no avrs configured", async (t) => {
-  const mod = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/connectCoordinator.js")).href);
+it("connect returns false when no avrs configured", async () => {
+  const mod = await import("../src/connectCoordinator.js");
   const ConnectCoordinator = mod.default as any;
 
   // Stubs
@@ -29,11 +28,11 @@ test.serial("connect returns false when no avrs configured", async (t) => {
     async () => {},
     async () => {}
   );
-  t.false(res);
+  expect(res).toBe(false);
 });
 
-test.serial("connect creates physical connections and zone instances when missing", async (t) => {
-  const mod = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/connectCoordinator.js")).href);
+it("connect creates physical connections and zone instances when missing", async () => {
+  const mod = await import("../src/connectCoordinator.js");
   const ConnectCoordinator = mod.default as any;
 
   let createAndConnectCalled = false;
@@ -68,13 +67,13 @@ test.serial("connect creates physical connections and zone instances when missin
     async () => ({})
   );
 
-  t.true(createAndConnectCalled);
-  t.is(avrInstances.size, 1);
-  t.true(res);
+  expect(createAndConnectCalled).toBe(true);
+  expect(avrInstances.size).toBe(1);
+  expect(res).toBe(true);
 });
 
-test.serial("connect handles reconnection when physical connection exists but disconnected", async (t) => {
-  const mod = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/connectCoordinator.js")).href);
+it("connect handles reconnection when physical connection exists but disconnected", async () => {
+  const mod = await import("../src/connectCoordinator.js");
   const ConnectCoordinator = mod.default as any;
 
   let attemptCalled = false;
@@ -111,8 +110,8 @@ test.serial("connect handles reconnection when physical connection exists but di
     async () => ({})
   );
 
-  t.true(attemptCalled);
-  t.is(avrInstances.size, 1);
-  t.true(queryAllCalled);
-  t.true(res);
+  expect(attemptCalled).toBe(true);
+  expect(avrInstances.size).toBe(1);
+  expect(queryAllCalled).toBe(true);
+  expect(res).toBe(true);
 });

@@ -1,11 +1,10 @@
-import test from "ava";
+import { describe, it, expect } from "vitest";
 import type { IntegrationAPI } from "@unfoldedcircle/integration-api";
-import { pathToFileURL } from "url";
 import path from "path";
 
 // Tests run against compiled dist artifacts
-test.serial("createAvrSpecificConfig coerces types correctly", async (t) => {
-  const mod = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/driver.js")).href);
+it("createAvrSpecificConfig coerces types correctly", async () => {
+  const mod = await import("../src/driver.js");
   const OnkyoDriver = mod.default as any;
 
   const drv: any = Object.create(OnkyoDriver.prototype);
@@ -27,15 +26,15 @@ test.serial("createAvrSpecificConfig coerces types correctly", async (t) => {
 
   const config = drv.createAvrSpecificConfig(avrPayload) as any;
 
-  t.is(config.avrs[0].queueThreshold, 200);
-  t.is(config.avrs[0].volumeScale, 80);
-  t.is(config.avrs[0].adjustVolumeDispl, false);
-  t.is(config.avrs[0].createSensors, false);
-  t.is(config.avrs[0].netMenuDelay, 120);
-  t.is(config.avrs[0].tuneinPresetPosition, 3);
-  t.is(config.avrs[0].port, 60128);
-  t.is(config.avrs[0].albumArtURL, "album_art.cgi");
-  t.deepEqual(config.avrs[0].listeningModeOptions, ["stereo", "straight-decode"]);
+  expect(config.avrs[0].queueThreshold).toBe(200);
+  expect(config.avrs[0].volumeScale).toBe(80);
+  expect(config.avrs[0].adjustVolumeDispl).toBe(false);
+  expect(config.avrs[0].createSensors).toBe(false);
+  expect(config.avrs[0].netMenuDelay).toBe(120);
+  expect(config.avrs[0].tuneinPresetPosition).toBe(3);
+  expect(config.avrs[0].port).toBe(60128);
+  expect(config.avrs[0].albumArtURL).toBe("album_art.cgi");
+  expect(config.avrs[0].listeningModeOptions).toEqual(["stereo", "straight-decode"]);
 });
 
 // Mock eISCP for capturing raw commands
@@ -51,9 +50,9 @@ class MockEiscp {
 }
 
 import * as uc from "@unfoldedcircle/integration-api";
-test.serial("CommandSender volume conversion respects adjustVolumeDispl", async (t) => {
-  const senderModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/commandSender.js")).href);
-  const avrStateModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/avrState.js")).href);
+it("CommandSender volume conversion respects adjustVolumeDispl", async () => {
+  const senderModule = await import("../src/commandSender.js");
+  const avrStateModule = await import("../src/avrState.js");
   const CommandSender = senderModule.CommandSender as any;
   const { avrStateManager } = avrStateModule as any;
 
@@ -67,10 +66,10 @@ test.serial("CommandSender volume conversion respects adjustVolumeDispl", async 
 
   const senderTrue = new CommandSender(drv as any, configAdjTrue, eiscp as any, avrStateManager, null);
   await senderTrue.sharedCmdHandler(new uc.MediaPlayer(entityId, { en: entityId }, {}), uc.MediaPlayerCommands.Volume, { volume: 50 });
-  t.is(eiscp.lastRaw, "MVL64"); // 50 -> 50 *2 = 100 -> 0x64
+  expect(eiscp.lastRaw).toBe("MVL64"); // 50 -> 50 *2 = 100 -> 0x64
 
   const eiscp2 = new MockEiscp();
   const senderFalse = new CommandSender(drv as any, configAdjFalse, eiscp2 as any, avrStateManager, null);
   await senderFalse.sharedCmdHandler(new uc.MediaPlayer(entityId, { en: entityId }, {}), uc.MediaPlayerCommands.Volume, { volume: 50 });
-  t.is(eiscp2.lastRaw, "MVL32"); // 50 -> 50 -> 0x32
+  expect(eiscp2.lastRaw).toBe("MVL32"); // 50 -> 50 -> 0x32
 });

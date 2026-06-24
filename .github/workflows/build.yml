@@ -57,15 +57,6 @@ jobs:
       - name: Run tests
         run: |
           npm test
-        continue-on-error: false
-
-      - name: Upload test report
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: test-results
-          path: test-results.xml
-          if-no-files-found: ignore
 
       - name: Remove config.json
         run: rm -f config.json
