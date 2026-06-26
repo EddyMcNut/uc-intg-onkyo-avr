@@ -20,6 +20,7 @@ import ConnectCoordinator from "./connectCoordinator.js";
 import { AvrInstance, type AvrStateApi } from "./types.js";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { delay } from "./utils.js";
 
 const integrationName = "driver:";
@@ -380,4 +381,10 @@ export default class OnkyoDriver {
   async init() {
     log.info("%s Initializing...", integrationName);
   }
+}
+
+// Auto-instantiate when run directly (not when imported, e.g. in tests)
+if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1])) {
+  const driver = new OnkyoDriver();
+  driver.init();
 }
