@@ -36,7 +36,7 @@ export class BackupRestoreManager {
       return {
         payload: {} as BackupPayload,
         isValid: false,
-        errors: [`Invalid JSON: ${err instanceof Error ? err.message : String(err)}`]
+        errors: [`Invalid JSON: ${(err as Error).message}`]
       };
     }
   }

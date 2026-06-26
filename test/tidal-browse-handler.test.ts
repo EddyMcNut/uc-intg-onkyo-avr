@@ -8,25 +8,25 @@ vi.mock("../src/mediaBrowser.js", () => ({
   resolveTidalMenuOption: vi.fn().mockReturnValue(undefined),
   TIDAL_BACK_ID: "tidal:menu-back",
   TIDAL_ROOT_ID: "tidal:root",
-  TIDAL_ROOT_TYPE: "tidal://menu",
+  TIDAL_ROOT_TYPE: "tidal://menu"
 }));
 
 vi.mock("../src/tidalBrowserStore.js", () => ({
   listTidalMenuOptions: vi.fn(() => []),
   resetTidalBrowseState: vi.fn(),
-  getTidalBrowseState: vi.fn(() => null),
+  getTidalBrowseState: vi.fn(() => null)
 }));
 
 vi.mock("../src/configManager.js", () => ({
   ConfigManager: {
-    get: vi.fn(() => ({ avrs: [{ model: "M", ip: "1.2.3.4", zone: "main", netMenuDelay: 200 }] })),
+    get: vi.fn(() => ({ avrs: [{ model: "M", ip: "1.2.3.4", zone: "main", netMenuDelay: 200 }] }))
   },
   AVR_DEFAULTS: { netMenuDelay: 300 },
-  buildEntityId: vi.fn(() => "test-avr main"),
+  buildEntityId: vi.fn(() => "test-avr main")
 }));
 
 vi.mock("../src/loggers.js", () => ({
-  default: { info: vi.fn(), error: vi.fn(), warn: vi.fn(), debug: vi.fn() },
+  default: { info: vi.fn(), error: vi.fn(), warn: vi.fn(), debug: vi.fn() }
 }));
 
 let mediaBrowser: any;

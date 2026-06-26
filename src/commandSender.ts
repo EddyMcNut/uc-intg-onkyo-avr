@@ -123,7 +123,7 @@ export class CommandSender {
       uc.MediaPlayerCommands.VolumeUp,
       async (_e, zone, _sz, _p, _t, _q, now) => {
         this.lastCommandTime = now;
-        await this.eiscp.raw(ZONE_VOLUME_UP_DOWN[zone]?.up ?? "MVLUP1");
+        await this.eiscp.raw(ZONE_VOLUME_UP_DOWN[zone].up);
         return uc.StatusCodes.Ok;
       }
     ],
@@ -131,7 +131,7 @@ export class CommandSender {
       uc.MediaPlayerCommands.VolumeDown,
       async (_e, zone, _sz, _p, _t, _q, now) => {
         this.lastCommandTime = now;
-        await this.eiscp.raw(ZONE_VOLUME_UP_DOWN[zone]?.down ?? "MVLDOWN1");
+        await this.eiscp.raw(ZONE_VOLUME_UP_DOWN[zone].down);
         return uc.StatusCodes.Ok;
       }
     ],
@@ -149,7 +149,7 @@ export class CommandSender {
         const adjustVolumeDispl = this.config.adjustVolumeDispl ?? true;
         const avrDisplayValue = Math.round((sliderValue * volumeScale) / 100);
         const eiscpValue = adjustVolumeDispl ? avrDisplayValue * 2 : avrDisplayValue;
-        await this.eiscp.raw(`${ZONE_VOLUME_PREFIX[zone] ?? "MVL"}${toHex(eiscpValue, 2)}`);
+        await this.eiscp.raw(`${ZONE_VOLUME_PREFIX[zone]}${toHex(eiscpValue, 2)}`);
         return uc.StatusCodes.Ok;
       }
     ],

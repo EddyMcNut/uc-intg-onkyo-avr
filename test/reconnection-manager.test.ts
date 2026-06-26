@@ -7,7 +7,9 @@ function mockEiscp() {
   return {
     connect: vi.fn(),
     waitForConnect: vi.fn(),
-    get connected() { return false; },
+    get connected() {
+      return false;
+    },
     disconnect: vi.fn()
   };
 }
@@ -65,7 +67,13 @@ it("cancelScheduledReconnection returns true when timer exists", async () => {
   const rm = new ReconnectionManager({ timeouts: [100], scheduleDelay: 60000 });
   const eiscp = mockEiscp();
 
-  rm.scheduleReconnection("M 1.2.3.4", eiscp, { model: "M", host: "1.2.3.4", port: 60128 }, () => false, async () => {});
+  rm.scheduleReconnection(
+    "M 1.2.3.4",
+    eiscp,
+    { model: "M", host: "1.2.3.4", port: 60128 },
+    () => false,
+    async () => {}
+  );
   expect(rm.hasScheduledReconnection("M 1.2.3.4")).toBe(true);
   expect(rm.cancelScheduledReconnection("M 1.2.3.4")).toBe(true);
   expect(rm.hasScheduledReconnection("M 1.2.3.4")).toBe(false);
@@ -75,8 +83,20 @@ it("cancelAllScheduledReconnections clears all timers", async () => {
   const rm = new ReconnectionManager({ timeouts: [100], scheduleDelay: 60000 });
   const eiscp = mockEiscp();
 
-  rm.scheduleReconnection("avr1", eiscp, { model: "M1", host: "1.1.1.1", port: 60128 }, () => false, async () => {});
-  rm.scheduleReconnection("avr2", eiscp, { model: "M2", host: "2.2.2.2", port: 60128 }, () => false, async () => {});
+  rm.scheduleReconnection(
+    "avr1",
+    eiscp,
+    { model: "M1", host: "1.1.1.1", port: 60128 },
+    () => false,
+    async () => {}
+  );
+  rm.scheduleReconnection(
+    "avr2",
+    eiscp,
+    { model: "M2", host: "2.2.2.2", port: 60128 },
+    () => false,
+    async () => {}
+  );
 
   expect(rm.hasScheduledReconnection("avr1")).toBe(true);
   expect(rm.hasScheduledReconnection("avr2")).toBe(true);
@@ -117,13 +137,7 @@ it("scheduleReconnection calls onReconnected on success", async () => {
   eiscp.waitForConnect.mockResolvedValue(undefined);
   const onReconnected = vi.fn();
 
-  rm.scheduleReconnection(
-    "M 1.2.3.4",
-    eiscp,
-    { model: "M", host: "1.2.3.4", port: 60128 },
-    () => false,
-    onReconnected
-  );
+  rm.scheduleReconnection("M 1.2.3.4", eiscp, { model: "M", host: "1.2.3.4", port: 60128 }, () => false, onReconnected);
 
   await vi.advanceTimersByTimeAsync(6000);
 
@@ -141,13 +155,7 @@ it("scheduleReconnection reschedules on failure", async () => {
   eiscp.waitForConnect.mockRejectedValue(new Error("timeout"));
   const onReconnected = vi.fn();
 
-  rm.scheduleReconnection(
-    "M 1.2.3.4",
-    eiscp,
-    { model: "M", host: "1.2.3.4", port: 60128 },
-    () => false,
-    onReconnected
-  );
+  rm.scheduleReconnection("M 1.2.3.4", eiscp, { model: "M", host: "1.2.3.4", port: 60128 }, () => false, onReconnected);
 
   // First scheduled attempt fires
   await vi.advanceTimersByTimeAsync(6000);

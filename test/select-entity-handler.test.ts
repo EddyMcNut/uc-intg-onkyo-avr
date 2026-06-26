@@ -3,7 +3,9 @@ import * as uc from "@unfoldedcircle/integration-api";
 
 function makeMockEiscp(connected = true) {
   return {
-    get connected() { return connected; },
+    get connected() {
+      return connected;
+    },
     connect: vi.fn().mockResolvedValue({ model: "M", host: "1.2.3.4", port: 60128 }),
     waitForConnect: vi.fn().mockResolvedValue(undefined),
     command: vi.fn().mockResolvedValue(undefined)
@@ -27,12 +29,7 @@ it("constructor derives integrationName from entitySuffix", async () => {
   const mod = await import("../src/selectEntityHandler.js");
   const { SelectEntityHandler } = mod as any;
 
-  const handler = new SelectEntityHandler(
-    {}, {},
-    { get: () => undefined },
-    "_listening_mode", "listening-mode", "Listening Mode",
-    () => ["stereo"]
-  );
+  const handler = new SelectEntityHandler({}, {}, { get: () => undefined }, "_listening_mode", "listening-mode", "Listening Mode", () => ["stereo"]);
 
   expect(handler.integrationName).toBe("listeningModeHandler:");
 });
@@ -45,11 +42,7 @@ it("handle returns NotFound when no AVR instance found", async () => {
   const connMgr = { getPhysicalConnection: vi.fn() };
   const avrMgr = { get: vi.fn().mockReturnValue(undefined) };
 
-  const handler = new SelectEntityHandler(
-    driver, connMgr, avrMgr,
-    "_listening_mode", "listening-mode", "Listening Mode",
-    () => ["stereo"]
-  );
+  const handler = new SelectEntityHandler(driver, connMgr, avrMgr, "_listening_mode", "listening-mode", "Listening Mode", () => ["stereo"]);
 
   const entity = { id: "M_1.2.3.4_main_listening_mode", attributes: {} };
   const result = await handler.handle(entity, uc.SelectCommands.SelectOption, { option: "stereo" });
@@ -75,11 +68,7 @@ it("handle returns ServiceUnavailable when no physical connection found", async 
     get: vi.fn().mockReturnValue({ config: { model, ip, port: 60128, zone: "main" } })
   };
 
-  const handler = new SelectEntityHandler(
-    driver, connMgr, avrMgr,
-    "_listening_mode", "listening-mode", "Listening Mode",
-    () => ["stereo"]
-  );
+  const handler = new SelectEntityHandler(driver, connMgr, avrMgr, "_listening_mode", "listening-mode", "Listening Mode", () => ["stereo"]);
 
   const entity = { id: `${avrEntry}_listening_mode`, attributes: {} };
   const result = await handler.handle(entity, uc.SelectCommands.SelectOption, { option: "stereo" });
@@ -97,11 +86,7 @@ it("handle returns BadRequest for unknown command", async () => {
   const connMgr = { getPhysicalConnection: vi.fn().mockReturnValue({ eiscp: mockEiscp }) };
   const avrMgr = { get: vi.fn().mockReturnValue({ config: { model: "M", ip: "1.2.3.4", port: 60128, zone: "main" } }) };
 
-  const handler = new SelectEntityHandler(
-    driver, connMgr, avrMgr,
-    "_listening_mode", "listening-mode", "Listening Mode",
-    () => ["stereo", "direct"]
-  );
+  const handler = new SelectEntityHandler(driver, connMgr, avrMgr, "_listening_mode", "listening-mode", "Listening Mode", () => ["stereo", "direct"]);
 
   const entity = { id: "M_1.2.3.4_main_listening_mode", attributes: {} };
   const result = await handler.handle(entity, "unknown-command" as any, {});
@@ -119,11 +104,7 @@ it("handle returns BadRequest when SelectNext reaches end without cycle", async 
   const connMgr = { getPhysicalConnection: vi.fn().mockReturnValue({ eiscp: mockEiscp }) };
   const avrMgr = { get: vi.fn().mockReturnValue({ config: { model: "M", ip: "1.2.3.4", port: 60128, zone: "main" } }) };
 
-  const handler = new SelectEntityHandler(
-    driver, connMgr, avrMgr,
-    "_listening_mode", "listening-mode", "Listening Mode",
-    () => ["stereo", "direct"]
-  );
+  const handler = new SelectEntityHandler(driver, connMgr, avrMgr, "_listening_mode", "listening-mode", "Listening Mode", () => ["stereo", "direct"]);
 
   const entity = { id: "M_1.2.3.4_main_listening_mode", attributes: { [uc.SelectAttributes.CurrentOption]: "direct" } };
   const result = await handler.handle(entity, uc.SelectCommands.SelectNext, {});
@@ -141,11 +122,7 @@ it("handle returns Ok for SelectOption (stereo)", async () => {
   const connMgr = { getPhysicalConnection: vi.fn().mockReturnValue({ eiscp: mockEiscp }) };
   const avrMgr = { get: vi.fn().mockReturnValue({ config: { model: "M", ip: "1.2.3.4", port: 60128, zone: "main" } }) };
 
-  const handler = new SelectEntityHandler(
-    driver, connMgr, avrMgr,
-    "_listening_mode", "listening-mode", "Listening Mode",
-    () => ["stereo", "direct", "mono"]
-  );
+  const handler = new SelectEntityHandler(driver, connMgr, avrMgr, "_listening_mode", "listening-mode", "Listening Mode", () => ["stereo", "direct", "mono"]);
 
   const entity = { id: "M_1.2.3.4_main_listening_mode", attributes: { [uc.SelectAttributes.CurrentOption]: "direct" } };
   const result = await handler.handle(entity, uc.SelectCommands.SelectOption, { option: "stereo" });
@@ -164,11 +141,7 @@ it("handle returns Ok for SelectFirst", async () => {
   const connMgr = { getPhysicalConnection: vi.fn().mockReturnValue({ eiscp: mockEiscp }) };
   const avrMgr = { get: vi.fn().mockReturnValue({ config: { model: "M", ip: "1.2.3.4", port: 60128, zone: "main" } }) };
 
-  const handler = new SelectEntityHandler(
-    driver, connMgr, avrMgr,
-    "_listening_mode", "listening-mode", "Listening Mode",
-    () => ["stereo", "direct", "mono"]
-  );
+  const handler = new SelectEntityHandler(driver, connMgr, avrMgr, "_listening_mode", "listening-mode", "Listening Mode", () => ["stereo", "direct", "mono"]);
 
   const entity = { id: "M_1.2.3.4_main_listening_mode", attributes: { [uc.SelectAttributes.CurrentOption]: "direct" } };
   const result = await handler.handle(entity, uc.SelectCommands.SelectFirst, {});
@@ -186,11 +159,7 @@ it("handle returns Ok for SelectLast", async () => {
   const connMgr = { getPhysicalConnection: vi.fn().mockReturnValue({ eiscp: mockEiscp }) };
   const avrMgr = { get: vi.fn().mockReturnValue({ config: { model: "M", ip: "1.2.3.4", port: 60128, zone: "main" } }) };
 
-  const handler = new SelectEntityHandler(
-    driver, connMgr, avrMgr,
-    "_listening_mode", "listening-mode", "Listening Mode",
-    () => ["stereo", "direct", "mono"]
-  );
+  const handler = new SelectEntityHandler(driver, connMgr, avrMgr, "_listening_mode", "listening-mode", "Listening Mode", () => ["stereo", "direct", "mono"]);
 
   const entity = { id: "M_1.2.3.4_main_listening_mode", attributes: { [uc.SelectAttributes.CurrentOption]: "direct" } };
   const result = await handler.handle(entity, uc.SelectCommands.SelectLast, {});
@@ -208,11 +177,7 @@ it("handle returns Ok for SelectNext", async () => {
   const connMgr = { getPhysicalConnection: vi.fn().mockReturnValue({ eiscp: mockEiscp }) };
   const avrMgr = { get: vi.fn().mockReturnValue({ config: { model: "M", ip: "1.2.3.4", port: 60128, zone: "main" } }) };
 
-  const handler = new SelectEntityHandler(
-    driver, connMgr, avrMgr,
-    "_listening_mode", "listening-mode", "Listening Mode",
-    () => ["stereo", "direct", "mono"]
-  );
+  const handler = new SelectEntityHandler(driver, connMgr, avrMgr, "_listening_mode", "listening-mode", "Listening Mode", () => ["stereo", "direct", "mono"]);
 
   const entity = { id: "M_1.2.3.4_main_listening_mode", attributes: { [uc.SelectAttributes.CurrentOption]: "stereo" } };
   const result = await handler.handle(entity, uc.SelectCommands.SelectNext, {});
@@ -230,11 +195,7 @@ it("handle wraps around for SelectNext with cycle at end", async () => {
   const connMgr = { getPhysicalConnection: vi.fn().mockReturnValue({ eiscp: mockEiscp }) };
   const avrMgr = { get: vi.fn().mockReturnValue({ config: { model: "M", ip: "1.2.3.4", port: 60128, zone: "main" } }) };
 
-  const handler = new SelectEntityHandler(
-    driver, connMgr, avrMgr,
-    "_listening_mode", "listening-mode", "Listening Mode",
-    () => ["stereo", "direct", "mono"]
-  );
+  const handler = new SelectEntityHandler(driver, connMgr, avrMgr, "_listening_mode", "listening-mode", "Listening Mode", () => ["stereo", "direct", "mono"]);
 
   const entity = { id: "M_1.2.3.4_main_listening_mode", attributes: { [uc.SelectAttributes.CurrentOption]: "mono" } };
   const result = await handler.handle(entity, uc.SelectCommands.SelectNext, { cycle: true });
@@ -252,11 +213,7 @@ it("handle returns Ok for SelectPrevious", async () => {
   const connMgr = { getPhysicalConnection: vi.fn().mockReturnValue({ eiscp: mockEiscp }) };
   const avrMgr = { get: vi.fn().mockReturnValue({ config: { model: "M", ip: "1.2.3.4", port: 60128, zone: "main" } }) };
 
-  const handler = new SelectEntityHandler(
-    driver, connMgr, avrMgr,
-    "_listening_mode", "listening-mode", "Listening Mode",
-    () => ["stereo", "direct", "mono"]
-  );
+  const handler = new SelectEntityHandler(driver, connMgr, avrMgr, "_listening_mode", "listening-mode", "Listening Mode", () => ["stereo", "direct", "mono"]);
 
   const entity = { id: "M_1.2.3.4_main_listening_mode", attributes: { [uc.SelectAttributes.CurrentOption]: "direct" } };
   const result = await handler.handle(entity, uc.SelectCommands.SelectPrevious, {});
@@ -274,11 +231,7 @@ it("handle wraps around for SelectPrevious with cycle at beginning", async () =>
   const connMgr = { getPhysicalConnection: vi.fn().mockReturnValue({ eiscp: mockEiscp }) };
   const avrMgr = { get: vi.fn().mockReturnValue({ config: { model: "M", ip: "1.2.3.4", port: 60128, zone: "main" } }) };
 
-  const handler = new SelectEntityHandler(
-    driver, connMgr, avrMgr,
-    "_listening_mode", "listening-mode", "Listening Mode",
-    () => ["stereo", "direct", "mono"]
-  );
+  const handler = new SelectEntityHandler(driver, connMgr, avrMgr, "_listening_mode", "listening-mode", "Listening Mode", () => ["stereo", "direct", "mono"]);
 
   const entity = { id: "M_1.2.3.4_main_listening_mode", attributes: { [uc.SelectAttributes.CurrentOption]: "stereo" } };
   const result = await handler.handle(entity, uc.SelectCommands.SelectPrevious, { cycle: true });

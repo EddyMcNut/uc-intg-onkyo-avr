@@ -60,9 +60,12 @@ describe("renderZoneMedia", () => {
     await mocks.renderer.renderZoneMedia("M 1.2.3.4 main", false);
 
     expect(mocks.mediaStateStoreMock.setCurrentTrackId).toHaveBeenCalledWith("M 1.2.3.4 main", "Song|Album|Artist");
-    expect(mocks.driverMock.updateEntityAttributes).toHaveBeenCalledWith("M 1.2.3.4 main", expect.objectContaining({
-      [uc.MediaPlayerAttributes.MediaTitle]: "Song"
-    }));
+    expect(mocks.driverMock.updateEntityAttributes).toHaveBeenCalledWith(
+      "M 1.2.3.4 main",
+      expect.objectContaining({
+        [uc.MediaPlayerAttributes.MediaTitle]: "Song"
+      })
+    );
   });
 
   it("does not update attributes for net source when track unchanged and not forced", async () => {
@@ -109,9 +112,12 @@ describe("renderZoneMedia", () => {
 
     await mocks.renderer.renderZoneMedia("M 1.2.3.4 main", false);
 
-    expect(mocks.driverMock.updateEntityAttributes).toHaveBeenCalledWith("M 1.2.3.4 main", expect.objectContaining({
-      [uc.MediaPlayerAttributes.MediaImageUrl]: "http://example.com/img.jpg?hash=abc"
-    }));
+    expect(mocks.driverMock.updateEntityAttributes).toHaveBeenCalledWith(
+      "M 1.2.3.4 main",
+      expect.objectContaining({
+        [uc.MediaPlayerAttributes.MediaImageUrl]: "http://example.com/img.jpg?hash=abc"
+      })
+    );
   });
 
   it("handles tuner/fm/dab source", async () => {
@@ -125,11 +131,14 @@ describe("renderZoneMedia", () => {
 
     await mocks.renderer.renderZoneMedia("M 1.2.3.4 main", false);
 
-    expect(mocks.driverMock.updateEntityAttributes).toHaveBeenCalledWith("M 1.2.3.4 main", expect.objectContaining({
-      [uc.MediaPlayerAttributes.MediaArtist]: "FM Radio",
-      [uc.MediaPlayerAttributes.MediaTitle]: "89.7 FM",
-      [uc.MediaPlayerAttributes.MediaPosition]: 0
-    }));
+    expect(mocks.driverMock.updateEntityAttributes).toHaveBeenCalledWith(
+      "M 1.2.3.4 main",
+      expect.objectContaining({
+        [uc.MediaPlayerAttributes.MediaArtist]: "FM Radio",
+        [uc.MediaPlayerAttributes.MediaTitle]: "89.7 FM",
+        [uc.MediaPlayerAttributes.MediaPosition]: 0
+      })
+    );
   });
 
   it("handles default (unknown) source by clearing media attributes", async () => {
@@ -140,11 +149,14 @@ describe("renderZoneMedia", () => {
 
     await mocks.renderer.renderZoneMedia("M 1.2.3.4 main", false);
 
-    expect(mocks.driverMock.updateEntityAttributes).toHaveBeenCalledWith("M 1.2.3.4 main", expect.objectContaining({
-      [uc.MediaPlayerAttributes.MediaArtist]: "",
-      [uc.MediaPlayerAttributes.MediaTitle]: "",
-      [uc.MediaPlayerAttributes.MediaPosition]: 0
-    }));
+    expect(mocks.driverMock.updateEntityAttributes).toHaveBeenCalledWith(
+      "M 1.2.3.4 main",
+      expect.objectContaining({
+        [uc.MediaPlayerAttributes.MediaArtist]: "",
+        [uc.MediaPlayerAttributes.MediaTitle]: "",
+        [uc.MediaPlayerAttributes.MediaPosition]: 0
+      })
+    );
   });
 });
 

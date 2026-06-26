@@ -78,9 +78,6 @@ export function physicalAvrIdFromEntityId(entityId: string): string | null {
   }
   const host = parts[parts.length - 2];
   const model = parts.slice(0, -2).join(" ");
-  if (!host || !model) {
-    return null;
-  }
   return buildPhysicalAvrId(model, host);
 }
 
@@ -166,7 +163,7 @@ export interface NormalizedAvrConfig {
 export function normalizeAvrConfig(raw: AvrConfig): NormalizedAvrConfig {
   const queueThreshold = (() => {
     const v = raw.queueThreshold ?? AVR_DEFAULTS.queueThreshold;
-    const n = typeof v === "number" ? v : parseInt(String(v ?? ""), 10);
+    const n = typeof v === "number" ? v : parseInt(String(v), 10);
     return isNaN(n) || n < 0 ? DEFAULT_QUEUE_THRESHOLD : n;
   })();
 

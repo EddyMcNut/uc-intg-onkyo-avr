@@ -142,7 +142,15 @@ describe("handleIFV", () => {
   it("updates all three video sensors when all present", async () => {
     const { receiver, driverMock } = await makeReceiver();
 
-    const avrUpdates = { command: "IFV", argument: { videoInputValue: "HDMI1", videoOutputValue: "1080p", outputDisplay: "4K" }, zone: "main", iscpCommand: "IFV...", host: "1.2.3.4", port: 60128, model: "TX-RZ50" };
+    const avrUpdates = {
+      command: "IFV",
+      argument: { videoInputValue: "HDMI1", videoOutputValue: "1080p", outputDisplay: "4K" },
+      zone: "main",
+      iscpCommand: "IFV...",
+      host: "1.2.3.4",
+      port: 60128,
+      model: "TX-RZ50"
+    };
     const handlers = (receiver as any).eventHandlers;
     await handlers.IFV(avrUpdates, "M 1.2.3.4 main", "main");
 

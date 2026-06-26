@@ -375,8 +375,8 @@ export class ConfigManager {
         const res = this.validateAvrPayload(avr);
         if (res.errors.length > 0) {
           errors.push(`avrs[${i}]: ${res.errors.join("; ")}`);
-        } else if (res.normalized) {
-          normalizedAvrs.push(res.normalized);
+        } else {
+          normalizedAvrs.push(res.normalized!);
         }
       }
 

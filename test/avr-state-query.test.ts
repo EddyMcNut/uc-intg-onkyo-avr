@@ -58,7 +58,12 @@ it("queryAvrState sends all query commands in order", async () => {
   const { avrStateQueryService } = mod as any;
   const eid = "qa-order-" + Date.now();
   const commands: Array<{ zone: string; command: string; args: string }> = [];
-  const mock = { command: vi.fn().mockImplementation(async (cmd: any) => { commands.push(cmd); }), eiscpConfig: { sendDelay: 10 } };
+  const mock = {
+    command: vi.fn().mockImplementation(async (cmd: any) => {
+      commands.push(cmd);
+    }),
+    eiscpConfig: { sendDelay: 10 }
+  };
 
   await avrStateQueryService.queryAvrState(eid, mock, "main", "test");
 

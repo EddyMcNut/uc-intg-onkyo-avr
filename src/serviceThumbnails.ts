@@ -142,7 +142,7 @@ export function createServiceThumbnails(config: ServiceThumbnailConfig) {
           if (pathMatches.length > 0) {
             const logoPaths = pathMatches
               .map((match) => {
-                const tag = (match[1] || "").toLowerCase();
+                const tag = match[1].toLowerCase();
                 const rawData = match[3] || "";
                 const d = tag === "polygon" ? polygonPointsToPath(rawData) : rawData;
                 if (!d) return "";

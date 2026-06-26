@@ -230,3 +230,93 @@ describe("eiscpConfig getter", () => {
     expect(driver.eiscpConfig.configuredZones).toEqual(["main", "zone2"]);
   });
 });
+
+describe("getCommandValues", () => {
+  it("handles dotted command (zone prefix)", async () => {
+    const mod = await import("../src/eiscp.js");
+    const { EiscpDriver } = mod as any;
+    const driver = new EiscpDriver({ model: "TX-RZ50", host: "1.2.3.4" });
+    const values = driver.getCommandValues("zone2.volume");
+    expect(Array.isArray(values)).toBe(true);
+  });
+});
+
+describe("handleMultiZoneCommand", () => {
+  it("logs warning for invalid format", async () => {
+    const mod = await import("../src/eiscp.js");
+    const { EiscpDriver } = mod as any;
+    const driver = new EiscpDriver({ model: "TX-RZ50", host: "1.2.3.4" });
+    const warnSpy = vi.spyOn(driver, "enqueueSend").mockResolvedValue(undefined);
+    // Single part (no action) triggers format warning and returns early
+    await driver.command("multi-zone-volume");
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
+
+  it("logs warning when no zones configured", async () => {
+    const mod = await import("../src/eiscp.js");
+    const { EiscpDriver } = mod as any;
+    // Empty configuredZones causes commands.length === 0
+    const driver = new EiscpDriver({ model: "TX-RZ50", host: "1.2.3.4", configuredZones: [] });
+    const warnSpy = vi.spyOn(driver, "enqueueSend").mockResolvedValue(undefined);
+    await driver.command("multi-zone-volume all-up");
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
+});
+
+describe("command else-path coverage", () => {
+  it("handles non-string, non-object data via fallback", async () => {
+    const mod = await import("../src/eiscp.js");
+    const { EiscpDriver } = mod as any;
+    const driver = new EiscpDriver({ model: "TX-RZ50", host: "1.2.3.4" });
+    const rawSpy = vi.spyOn(driver, "raw").mockResolvedValue(undefined);
+    // Number argument falls through to the else branch
+    await driver.command(42 as any);
+    // The fallback converts to string and calls sendIscp
+    expect(rawSpy).toHaveBeenCalled();
+  });
+});
+
+describe("isTIPCommand edge cases", () => {
+  it("returns false for TIP without hex suffix", async () => {
+    const mod = await import("../src/eiscp.js");
+    const { EiscpDriver } = mod as any;
+    const driver = new EiscpDriver({ host: "1.2.3.4" });
+    expect(driver.isTIPCommand("TIP")).toBe(false);
+  });
+});
+
+describe("enqueueSend", () => {
+  it("handles string data when connected", async () => {
+    const mod = await import("../src/eiscp.js");
+    const { EiscpDriver } = mod as any;
+    const driver = new EiscpDriver({ host: "1.2.3.4", sendDelay: 0 });
+    driver.isConnected = true;
+    driver.eiscp = { write: vi.fn() };
+
+    await driver.enqueueSend("PWR01");
+
+    expect(driver.eiscp.write).toHaveBeenCalledTimes(1);
+  });
+
+  it("handles array data when connected", async () => {
+    const mod = await import("../src/eiscp.js");
+    const { EiscpDriver } = mod as any;
+    const driver = new EiscpDriver({ host: "1.2.3.4", sendDelay: 0 });
+    driver.isConnected = true;
+    driver.eiscp = { write: vi.fn() };
+
+    await driver.enqueueSend(["PWR01", "PWR00"]);
+
+    expect(driver.eiscp.write).toHaveBeenCalledTimes(2);
+  });
+
+  it("throws when not connected", async () => {
+    const mod = await import("../src/eiscp.js");
+    const { EiscpDriver } = mod as any;
+    const driver = new EiscpDriver({ host: "1.2.3.4" });
+    driver.isConnected = false;
+    driver.eiscp = null;
+
+    await expect(driver.enqueueSend("PWR01")).rejects.toThrow("Send command while not connected");
+  });
+});

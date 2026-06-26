@@ -67,4 +67,28 @@ describe("loggers", () => {
     mod.setLogLevel("debug");
     expect(mod.getLogLevel()).toBe("debug");
   });
+
+  it("debug prints when level is debug", () => {
+    mod.setLogLevel("debug");
+    const spy = vi.spyOn(console, "log").mockImplementation(() => {});
+    mod.default.debug("test debug visible");
+    expect(spy).toHaveBeenCalled();
+    spy.mockRestore();
+  });
+
+  it("error prints when level is debug", () => {
+    mod.setLogLevel("debug");
+    const spy = vi.spyOn(console, "log").mockImplementation(() => {});
+    mod.default.error("test error visible");
+    expect(spy).toHaveBeenCalled();
+    spy.mockRestore();
+  });
+
+  it("warn is suppressed when level is error", () => {
+    mod.setLogLevel("error");
+    const spy = vi.spyOn(console, "log").mockImplementation(() => {});
+    mod.default.warn("test warn suppressed");
+    expect(spy).not.toHaveBeenCalled();
+    spy.mockRestore();
+  });
 });

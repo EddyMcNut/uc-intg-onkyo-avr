@@ -1,5 +1,4 @@
 // Single source of truth for sensor/select entity ID suffixes.
-// Import these constants instead of duplicating suffix strings across files.
 
 export const SENSOR_SUFFIXES = [
   "_mute_sensor",

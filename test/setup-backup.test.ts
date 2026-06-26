@@ -27,7 +27,7 @@ it("backup flow returns backup_data JSON", async () => {
     console.log("on-disk-config (after src save):", fs.readFileSync(path.join(tmp, "config.json"), "utf-8"));
 
     // Import compiled driver using a file:// URL (required on Windows ESM loader)
-      const driverModule = await import("../src/driver.js");
+    const driverModule = await import("../src/driver.js");
     const OnkyoDriver = driverModule.default as any;
     // Ensure the compiled ConfigManager uses the same temp config dir at runtime
     const configManagerModule = await import("../src/configManager.js");
@@ -118,7 +118,7 @@ it("restore flow applies provided backup_data", async () => {
     console.log("on-disk-config (after src save - restore test):", fs.readFileSync(path.join(tmp, "config.json"), "utf-8"));
 
     // Import compiled driver using a file:// URL (required on Windows ESM loader)
-      const driverModule = await import("../src/driver.js");
+    const driverModule = await import("../src/driver.js");
     const OnkyoDriver = driverModule.default as any;
     // Ensure the compiled ConfigManager uses the same temp config dir at runtime
     const configManagerModule = await import("../src/configManager.js");
@@ -174,7 +174,7 @@ it("restore flow defaults missing TuneIn menu setting to mypresets", async () =>
 
     ConfigManager.save({ avrs: [{ model: "OLD", ip: "0.0.0.0", port: 60128, zone: "main" }] });
 
-      const driverModule = await import("../src/driver.js");
+    const driverModule = await import("../src/driver.js");
     const OnkyoDriver = driverModule.default as any;
     const configManagerModule = await import("../src/configManager.js");
     if (configManagerModule && typeof configManagerModule.setConfigDir === "function") {
@@ -220,7 +220,7 @@ it("restore flow accepts intg-manager restore_from_backup payload", async () => 
 
     ConfigManager.save({ avrs: [{ model: "OLD", ip: "0.0.0.0", port: 60128, zone: "main" }] });
 
-      const driverModule = await import("../src/driver.js");
+    const driverModule = await import("../src/driver.js");
     const OnkyoDriver = driverModule.default as any;
     const configManagerModule = await import("../src/configManager.js");
     if (configManagerModule && typeof configManagerModule.setConfigDir === "function") {
@@ -269,7 +269,7 @@ it("initial setup manual mode opens configuration form", async () => {
   try {
     setConfigDir(tmp);
 
-      const driverModule = await import("../src/driver.js");
+    const driverModule = await import("../src/driver.js");
     const OnkyoDriver = driverModule.default as any;
     const configManagerModule = await import("../src/configManager.js");
     if (configManagerModule && typeof configManagerModule.setConfigDir === "function") {

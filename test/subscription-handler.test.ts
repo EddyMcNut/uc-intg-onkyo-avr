@@ -2,7 +2,9 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 function makeMockEiscp(connected = true) {
   return {
-    get connected() { return connected; },
+    get connected() {
+      return connected;
+    },
     connect: vi.fn().mockResolvedValue({ model: "M", host: "1.2.3.4", port: 60128 }),
     waitForConnect: vi.fn().mockResolvedValue(undefined),
     command: vi.fn()
@@ -123,7 +125,9 @@ it("schedules reconnect when reconnection fails", async () => {
   const model = "M";
   const ip = "1.2.3.4";
   const mockEiscp = {
-    get connected() { return false; },
+    get connected() {
+      return false;
+    },
     connect: vi.fn().mockResolvedValue({ model, host: ip, port: 60128 }),
     waitForConnect: vi.fn().mockRejectedValue(new Error("timeout")),
     command: vi.fn()

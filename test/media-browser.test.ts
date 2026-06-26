@@ -32,9 +32,7 @@ it("Media player browse returns TuneIn presets only for NET TuneIn", async () =>
   expect(browseResult.media?.title).toBe("TuneIn");
   expect(browseResult.media?.media_id).toBe("tunein:root");
   expect(browseResult.media?.items?.length).toBe(2);
-  expect(
-    browseResult.media?.items?.map((item) => item.title)
-  ).toEqual(["America's Country (Country)", "Decibel EuroDance (Euro Hits)"]);
+  expect(browseResult.media?.items?.map((item) => item.title)).toEqual(["America's Country (Country)", "Decibel EuroDance (Euro Hits)"]);
   expect((browseResult.media?.items?.[0].thumbnail || "").startsWith("data:image/")).toBe(true);
   expect((browseResult.media?.items?.[0].thumbnail || "").length < 4000).toBe(true);
   expect(browseResult.pagination.page).toBe(1);
@@ -74,18 +72,14 @@ it("Media player browse ignores TuneIn menu entries until My Presets is active",
   let result = await player.browse({ paging: new uc.Paging(1, 10) });
 
   expect(result).toBeInstanceOf(uc.BrowseResult);
-  expect(
-    (result as uc.BrowseResult).media?.items?.map((item) => item.title)
-  ).toEqual([]);
+  expect((result as uc.BrowseResult).media?.items?.map((item) => item.title)).toEqual([]);
 
   setTuneInBrowseContext(entityId, "My Presets");
   ingestTuneInListEntry(entityId, "U0-89.7 | WTMD (Alternative Rock)");
   ingestTuneInListEntry(entityId, "U1-America's Country (Country)");
 
   result = await player.browse({ paging: new uc.Paging(1, 10) });
-  expect(
-    (result as uc.BrowseResult).media?.items?.map((item) => item.title)
-  ).toEqual(["America's Country (Country)", "WTMD (Alternative Rock)"]);
+  expect((result as uc.BrowseResult).media?.items?.map((item) => item.title)).toEqual(["America's Country (Country)", "WTMD (Alternative Rock)"]);
 });
 
 it("TuneIn browse root exposes all presets when the list is longer than 10", async () => {
@@ -122,17 +116,24 @@ it("TuneIn browse root exposes all presets when the list is longer than 10", asy
   const result = await player.browse({ paging: new uc.Paging(1, 10) });
 
   expect(result).toBeInstanceOf(uc.BrowseResult);
-  expect(
-    (result as uc.BrowseResult).media?.items?.map((item) => item.title)
-  ).toEqual(["Station A", "Station B", "Station C", "Station D", "Station E", "Station F", "Station G", "Station H", "Station I", "Station J"]);
+  expect((result as uc.BrowseResult).media?.items?.map((item) => item.title)).toEqual([
+    "Station A",
+    "Station B",
+    "Station C",
+    "Station D",
+    "Station E",
+    "Station F",
+    "Station G",
+    "Station H",
+    "Station I",
+    "Station J"
+  ]);
   expect((result as uc.BrowseResult).pagination.count).toBe(12);
 
   const pageResult = await player.browse({ paging: new uc.Paging(2, 10) });
 
   expect(pageResult).toBeInstanceOf(uc.BrowseResult);
-  expect(
-    (pageResult as uc.BrowseResult).media?.items?.map((item) => item.title)
-  ).toEqual(["Station K", "Station L"]);
+  expect((pageResult as uc.BrowseResult).media?.items?.map((item) => item.title)).toEqual(["Station K", "Station L"]);
 });
 
 it("Media player browse returns TuneIn full menu items from NET TuneIn", async () => {
@@ -163,9 +164,7 @@ it("Media player browse returns TuneIn full menu items from NET TuneIn", async (
   });
 
   expect(result).toBeInstanceOf(uc.BrowseResult);
-  expect(
-    (result as uc.BrowseResult).media?.items?.map((item) => item.title)
-  ).toEqual(["Browse", "Stations", "Station A", "Station B"]);
+  expect((result as uc.BrowseResult).media?.items?.map((item) => item.title)).toEqual(["Browse", "Stations", "Station A", "Station B"]);
   expect((result as uc.BrowseResult).pagination.count).toBe(4);
 });
 
@@ -198,9 +197,7 @@ it("Media player browse hides TuneIn Login menu item", async () => {
   });
 
   expect(result).toBeInstanceOf(uc.BrowseResult);
-  expect(
-    (result as uc.BrowseResult).media?.items?.map((item) => item.title)
-  ).toEqual(["Browse", "Station A"]);
+  expect((result as uc.BrowseResult).media?.items?.map((item) => item.title)).toEqual(["Browse", "Station A"]);
   expect((result as uc.BrowseResult).pagination.count).toBe(2);
 });
 
@@ -271,9 +268,7 @@ it("TuneIn preset cache survives post-select menu updates", async () => {
 
   result = await player.browse({ paging: new uc.Paging(1, 10) });
   expect(result).toBeInstanceOf(uc.BrowseResult);
-  expect(
-    (result as uc.BrowseResult).media?.items?.map((item) => item.title)
-  ).toEqual(["America's Country (Country)", "WTMD (Alternative Rock)"]);
+  expect((result as uc.BrowseResult).media?.items?.map((item) => item.title)).toEqual(["America's Country (Country)", "WTMD (Alternative Rock)"]);
 });
 
 it("Media player browse returns Tidal menu entries from AVR NLS updates", async () => {
@@ -300,12 +295,8 @@ it("Media player browse returns Tidal menu entries from AVR NLS updates", async 
 
   expect(result).toBeInstanceOf(uc.BrowseResult);
   expect((result as uc.BrowseResult).media?.title).toBe("Tidal");
-  expect(
-    (result as uc.BrowseResult).media?.items?.map((item) => item.title)
-  ).toEqual(["New", "TIDAL Rising", "Playlists"]);
-  expect(
-    (result as uc.BrowseResult).media?.items?.map((item) => item.media_id)
-  ).toEqual(["tidal:menu:1:New", "tidal:menu:2:TIDAL%20Rising", "tidal:menu:3:Playlists"]);
+  expect((result as uc.BrowseResult).media?.items?.map((item) => item.title)).toEqual(["New", "TIDAL Rising", "Playlists"]);
+  expect((result as uc.BrowseResult).media?.items?.map((item) => item.media_id)).toEqual(["tidal:menu:1:New", "tidal:menu:2:TIDAL%20Rising", "tidal:menu:3:Playlists"]);
 });
 
 it("Media player browse returns Deezer menu entries from AVR NLS updates", async () => {
@@ -332,12 +323,8 @@ it("Media player browse returns Deezer menu entries from AVR NLS updates", async
 
   expect(result).toBeInstanceOf(uc.BrowseResult);
   expect((result as uc.BrowseResult).media?.title).toBe("Deezer");
-  expect(
-    (result as uc.BrowseResult).media?.items?.map((item) => item.title)
-  ).toEqual(["New", "Charts", "Playlists"]);
-  expect(
-    (result as uc.BrowseResult).media?.items?.map((item) => item.media_id)
-  ).toEqual(["deezer:menu:1:New", "deezer:menu:2:Charts", "deezer:menu:3:Playlists"]);
+  expect((result as uc.BrowseResult).media?.items?.map((item) => item.title)).toEqual(["New", "Charts", "Playlists"]);
+  expect((result as uc.BrowseResult).media?.items?.map((item) => item.media_id)).toEqual(["deezer:menu:1:New", "deezer:menu:2:Charts", "deezer:menu:3:Playlists"]);
 });
 
 it("Media player browse marks Deezer NLS entries without %s as playable tracks", async () => {
@@ -392,12 +379,8 @@ it("Media player browse hides excluded Tidal menu items", async () => {
   const result = await player.browse({ paging: new uc.Paging(1, 10) });
 
   expect(result).toBeInstanceOf(uc.BrowseResult);
-  expect(
-    (result as uc.BrowseResult).media?.items?.map((item) => item.title)
-  ).toEqual(["New", "Playlists"]);
-  expect(
-    (result as uc.BrowseResult).media?.items?.map((item) => item.media_id)
-  ).toEqual(["tidal:menu:4:New", "tidal:menu:5:Playlists"]);
+  expect((result as uc.BrowseResult).media?.items?.map((item) => item.title)).toEqual(["New", "Playlists"]);
+  expect((result as uc.BrowseResult).media?.items?.map((item) => item.media_id)).toEqual(["tidal:menu:4:New", "tidal:menu:5:Playlists"]);
 });
 
 it("Media player browse defaults to 25 items per page when paging is omitted", async () => {
@@ -462,9 +445,7 @@ it("Tidal browse survives DAB-to-NET transition when NLT/NLS arrive early", asyn
   const result = await player.browse({ paging: new uc.Paging(1, 10) });
   expect(result).toBeInstanceOf(uc.BrowseResult);
   expect((result as uc.BrowseResult).media?.title).toBe("Tidal");
-  expect(
-    (result as uc.BrowseResult).media?.items?.map((item) => item.title)
-  ).toEqual(["New", "TIDAL Rising", "Playlists"]);
+  expect((result as uc.BrowseResult).media?.items?.map((item) => item.title)).toEqual(["New", "TIDAL Rising", "Playlists"]);
 });
 
 it("Repeated NLT tidal updates do not clear existing Tidal menu options", async () => {
@@ -500,9 +481,7 @@ it("Repeated NLT tidal updates do not clear existing Tidal menu options", async 
 
   const result = await player.browse({ paging: new uc.Paging(1, 10) });
   expect(result).toBeInstanceOf(uc.BrowseResult);
-  expect(
-    (result as uc.BrowseResult).media?.items?.map((item) => item.title)
-  ).toEqual(["New", "TIDAL Rising", "Playlists"]);
+  expect((result as uc.BrowseResult).media?.items?.map((item) => item.title)).toEqual(["New", "TIDAL Rising", "Playlists"]);
 });
 
 it("TuneIn service selection preloads My Presets for browsing", async () => {

@@ -8,11 +8,21 @@ describe("buildMenuSignature", () => {
     class TestHandler extends MenuBrowseHandlerBase {
       protected readonly integrationName = "test:handler";
       protected phase2HarvestEnabled = false;
-      protected getServiceLabel() { return "Test"; }
-      protected nextListSequence() { return "0001"; }
-      protected getMenuState() { return null; }
-      protected getContiguousItemCount() { return 0; }
-      protected getMenuDelay() { return 120; }
+      protected getServiceLabel() {
+        return "Test";
+      }
+      protected nextListSequence() {
+        return "0001";
+      }
+      protected getMenuState() {
+        return null;
+      }
+      protected getContiguousItemCount() {
+        return 0;
+      }
+      protected getMenuDelay() {
+        return 120;
+      }
 
       protected listMenuItems(entityId: string) {
         return [
@@ -35,13 +45,25 @@ describe("buildMenuSignature", () => {
     class TestHandler extends MenuBrowseHandlerBase {
       protected readonly integrationName = "test:handler";
       protected phase2HarvestEnabled = false;
-      protected getServiceLabel() { return "Test"; }
-      protected nextListSequence() { return "0001"; }
-      protected getMenuState() { return null; }
-      protected getContiguousItemCount() { return 0; }
-      protected getMenuDelay() { return 120; }
+      protected getServiceLabel() {
+        return "Test";
+      }
+      protected nextListSequence() {
+        return "0001";
+      }
+      protected getMenuState() {
+        return null;
+      }
+      protected getContiguousItemCount() {
+        return 0;
+      }
+      protected getMenuDelay() {
+        return 120;
+      }
 
-      protected listMenuItems() { return []; }
+      protected listMenuItems() {
+        return [];
+      }
     }
 
     const handler = new TestHandler();
@@ -56,11 +78,21 @@ describe("buildMenuSignature", () => {
     class TestHandler extends MenuBrowseHandlerBase {
       protected readonly integrationName = "test:handler";
       protected phase2HarvestEnabled = false;
-      protected getServiceLabel() { return "Test"; }
-      protected nextListSequence() { return "0001"; }
-      protected getMenuState() { return null; }
-      protected getContiguousItemCount() { return 0; }
-      protected getMenuDelay() { return 120; }
+      protected getServiceLabel() {
+        return "Test";
+      }
+      protected nextListSequence() {
+        return "0001";
+      }
+      protected getMenuState() {
+        return null;
+      }
+      protected getContiguousItemCount() {
+        return 0;
+      }
+      protected getMenuDelay() {
+        return 120;
+      }
 
       protected listMenuItems() {
         return [{ menuIndex: 0, title: "Item | with | pipes" }];
@@ -84,11 +116,21 @@ describe("waitForMenuStable", () => {
     class TestHandler extends MenuBrowseHandlerBase {
       protected readonly integrationName = "test:handler";
       protected phase2HarvestEnabled = false;
-      protected getServiceLabel() { return "Test"; }
-      protected nextListSequence() { return "0001"; }
-      protected getMenuState() { return null; }
-      protected getContiguousItemCount() { return 0; }
-      protected getMenuDelay() { return 120; }
+      protected getServiceLabel() {
+        return "Test";
+      }
+      protected nextListSequence() {
+        return "0001";
+      }
+      protected getMenuState() {
+        return null;
+      }
+      protected getContiguousItemCount() {
+        return 0;
+      }
+      protected getMenuDelay() {
+        return 120;
+      }
 
       protected listMenuItems() {
         callCount++;
@@ -116,11 +158,21 @@ describe("waitForMenuStable", () => {
     class TestHandler extends MenuBrowseHandlerBase {
       protected readonly integrationName = "test:handler";
       protected phase2HarvestEnabled = false;
-      protected getServiceLabel() { return "Test"; }
-      protected nextListSequence() { return "0001"; }
-      protected getMenuState() { return null; }
-      protected getContiguousItemCount() { return 0; }
-      protected getMenuDelay() { return 120; }
+      protected getServiceLabel() {
+        return "Test";
+      }
+      protected nextListSequence() {
+        return "0001";
+      }
+      protected getMenuState() {
+        return null;
+      }
+      protected getContiguousItemCount() {
+        return 0;
+      }
+      protected getMenuDelay() {
+        return 120;
+      }
 
       protected listMenuItems() {
         return [{ menuIndex: 0, title: "Stable" }];
@@ -145,11 +197,21 @@ describe("waitForMenuStable", () => {
     class TestHandler extends MenuBrowseHandlerBase {
       protected readonly integrationName = "test:handler";
       protected phase2HarvestEnabled = false;
-      protected getServiceLabel() { return "Test"; }
-      protected nextListSequence() { return "0001"; }
-      protected getMenuState() { return null; }
-      protected getContiguousItemCount() { return 0; }
-      protected getMenuDelay() { return 120; }
+      protected getServiceLabel() {
+        return "Test";
+      }
+      protected nextListSequence() {
+        return "0001";
+      }
+      protected getMenuState() {
+        return null;
+      }
+      protected getContiguousItemCount() {
+        return 0;
+      }
+      protected getMenuDelay() {
+        return 120;
+      }
 
       protected listMenuItems() {
         return [{ menuIndex: 0, title: "Item" }];

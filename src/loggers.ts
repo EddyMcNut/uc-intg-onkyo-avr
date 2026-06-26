@@ -29,7 +29,7 @@ const log = {
     if (LEVEL_RANK["warn"] >= LEVEL_RANK[currentLevel]) console.log("[WARN]", util.format(...args));
   },
   error: (...args: any[]) => {
-    if (LEVEL_RANK["error"] >= LEVEL_RANK[currentLevel]) console.log("[ERROR]", util.format(...args));
+    console.log("[ERROR]", util.format(...args));
   }
 };
 

@@ -20,7 +20,6 @@
   },
   "dependencies": {
     "@unfoldedcircle/integration-api": "0.5.0",
-    "async": "3.2.6",
     "debug": "4.4.3"
   },
   "repository": {
@@ -45,24 +44,19 @@
     "js-yaml": "3.14.2"
   },
   "devDependencies": {
-    "@types/async": "^3.2.25",
     "@types/debug": "^4.1.13",
-    "@types/node": "26.0.0",
+    "@types/node": "26.0.1",
     "@types/node-fetch": "^2.6.13",
     "@types/ws": "^8.18.1",
-    "@typescript-eslint/eslint-plugin": "8.61.1",
-    "@typescript-eslint/parser": "8.61.1",
+    "@typescript-eslint/eslint-plugin": "8.62.0",
+    "@typescript-eslint/parser": "8.62.0",
     "@vitest/coverage-v8": "4.1.9",
     "eslint": "10.5.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-prettier": "^5.5.6",
-    "prettier": "3.8.4",
+    "prettier": "3.8.5",
     "ts-node": "10.9.2",
     "typescript": "6.0.x",
     "vitest": "4.1.9"
-  },
-  "allowScripts": {
-    "core-js@2.6.12": true,
-    "fsevents@1.2.13": true
   }
 }

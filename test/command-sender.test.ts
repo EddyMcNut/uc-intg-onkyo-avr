@@ -230,3 +230,143 @@ it("CommandSender handles known simple commands via handleSimpleCommand fallthro
   // Unknown simple command returns NotImplemented
   expect(await sender.sharedCmdHandler(mainEntity, "INPUT_NONEXISTENT")).toBe(uc.StatusCodes.NotImplemented);
 });
+
+it("CommandSender covers connection-failure, queueThreshold-fallback, main-zone volume, and edge SelectSource branches", async () => {
+  const commandSenderModule = await import("../src/commandSender.js");
+  const { CommandSender } = commandSenderModule as { CommandSender: new (...deps: any[]) => any };
+
+  // Eiscp that fails to connect (connect does not set connected, waitForConnect throws)
+  const failEiscp: MockEiscp = {
+    connected: false,
+    eiscpConfig: { sendDelay: 50 },
+    commands: [],
+    raws: [],
+    async command(cmd: string): Promise<void> {
+      this.commands.push(cmd);
+    },
+    async raw(cmd: string): Promise<void> {
+      this.raws.push(cmd);
+    },
+    async connect(): Promise<void> {
+      /* do nothing, stays disconnected */
+    },
+    async waitForConnect(): Promise<void> {
+      throw new Error("not connected");
+    }
+  };
+
+  // Config without queueThreshold, volumeScale, adjustVolumeDispl (so fallbacks are used)
+  const cfg = {
+    volumeDisplay: "absolute",
+    avrs: [{ model: "TX-RZ50", ip: "192.168.2.103", port: 60128, zone: "main" }]
+  } as any;
+
+  const mockDriver = {} as any;
+  const mockAvrState = { getSubSource: () => "spotify", refreshAvrState: async () => undefined } as any;
+  const sender = new CommandSender(mockDriver, cfg, failEiscp as any, mockAvrState, undefined);
+
+  const mainEntity = { id: "TX-RZ50 192.168.2.103 main", attributes: { state: uc.MediaPlayerStates.Off } } as any;
+
+  // L55 — ensureEiscpConnected returns false → Timeout
+  expect(await sender.sharedCmdHandler(mainEntity, uc.MediaPlayerCommands.On)).toBe(uc.StatusCodes.Timeout);
+});
+
+it("CommandSender routes main-zone VolumeUp/Down and Volume with fallback settings", async () => {
+  const commandSenderModule = await import("../src/commandSender.js");
+  const { CommandSender } = commandSenderModule as { CommandSender: new (...deps: any[]) => any };
+
+  const eiscp: MockEiscp = {
+    connected: true,
+    eiscpConfig: { sendDelay: 1 },
+    commands: [],
+    raws: [],
+    async command(cmd: string): Promise<void> {
+      this.commands.push(cmd);
+    },
+    async raw(cmd: string): Promise<void> {
+      this.raws.push(cmd);
+    },
+    async connect(): Promise<void> {
+      this.connected = true;
+    },
+    async waitForConnect(): Promise<void> {
+      return;
+    }
+  };
+
+  const cfg = {
+    volumeDisplay: "absolute",
+    avrs: [{ model: "TX-RZ50", ip: "192.168.2.103", port: 60128, zone: "main" }]
+  } as any;
+
+  const mockDriver = {} as any;
+  const mockAvrState = { getSubSource: () => "spotify", refreshAvrState: async () => undefined } as any;
+  const sender = new CommandSender(mockDriver, cfg, eiscp as any, mockAvrState, undefined);
+
+  const mainEntity = { id: "TX-RZ50 192.168.2.103 main", attributes: { state: uc.MediaPlayerStates.On } } as any;
+
+  // Bypass throttle so queueThreshold fallback doesn't block commands
+  (sender as any).lastCommandTime = -999999;
+
+  // L126/L134 — main zone VolumeUp/VolumeDown → uses fallback "MVLUP1"/"MVLDOWN1"
+  expect(await sender.sharedCmdHandler(mainEntity, uc.MediaPlayerCommands.VolumeUp)).toBe(uc.StatusCodes.Ok);
+  expect(eiscp.raws.includes("MVLUP1")).toBe(true);
+
+  (sender as any).lastCommandTime = -999999;
+  expect(await sender.sharedCmdHandler(mainEntity, uc.MediaPlayerCommands.VolumeDown)).toBe(uc.StatusCodes.Ok);
+  expect(eiscp.raws.includes("MVLDOWN1")).toBe(true);
+
+  // L141 — Volume without volume param → returns Ok without sending
+  (sender as any).lastCommandTime = -999999;
+  expect(await sender.sharedCmdHandler(mainEntity, uc.MediaPlayerCommands.Volume)).toBe(uc.StatusCodes.Ok);
+  expect(await sender.sharedCmdHandler(mainEntity, uc.MediaPlayerCommands.Volume, {})).toBe(uc.StatusCodes.Ok);
+
+  // L148/L149/L152 — Volume with volume param uses fallback volumeScale (100), adjustVolumeDispl (true), and "MVL" prefix
+  (sender as any).lastCommandTime = -999999;
+  expect(await sender.sharedCmdHandler(mainEntity, uc.MediaPlayerCommands.Volume, { volume: 50 })).toBe(uc.StatusCodes.Ok);
+  expect(eiscp.raws.includes("MVL64")).toBe(true);
+});
+
+it("CommandSender covers SelectSource edge branches", async () => {
+  const commandSenderModule = await import("../src/commandSender.js");
+  const { CommandSender } = commandSenderModule as { CommandSender: new (...deps: any[]) => any };
+
+  const eiscp: MockEiscp = {
+    connected: true,
+    eiscpConfig: { sendDelay: 1 },
+    commands: [],
+    raws: [],
+    async command(cmd: string): Promise<void> {
+      this.commands.push(cmd);
+    },
+    async raw(cmd: string): Promise<void> {
+      this.raws.push(cmd);
+    },
+    async connect(): Promise<void> {
+      this.connected = true;
+    },
+    async waitForConnect(): Promise<void> {
+      return;
+    }
+  };
+
+  const cfg = { queueThreshold: -1, avrs: [{ model: "TX-RZ50", ip: "192.168.2.103", port: 60128, zone: "main" }] } as any;
+
+  const mockDriver = {} as any;
+  const mockAvrState = { getSubSource: () => "spotify", refreshAvrState: async () => undefined } as any;
+  const sender = new CommandSender(mockDriver, cfg, eiscp as any, mockAvrState, undefined);
+
+  const mainEntity = { id: "TX-RZ50 192.168.2.103 main", attributes: { state: uc.MediaPlayerStates.On } } as any;
+
+  // L173 — SelectSource without source param → returns Ok
+  expect(await sender.sharedCmdHandler(mainEntity, uc.MediaPlayerCommands.SelectSource)).toBe(uc.StatusCodes.Ok);
+  expect(await sender.sharedCmdHandler(mainEntity, uc.MediaPlayerCommands.SelectSource, {})).toBe(uc.StatusCodes.Ok);
+
+  // L200 — non-input-selector valid command (enters else branch)
+  expect(await sender.sharedCmdHandler(mainEntity, uc.MediaPlayerCommands.SelectSource, { source: "preset 5" })).toBe(uc.StatusCodes.Ok);
+  expect(eiscp.commands.includes("preset 5")).toBe(true);
+
+  // L189 — too long command (> USER_COMMAND = 250)
+  const longCmd = "A".repeat(251);
+  expect(await sender.sharedCmdHandler(mainEntity, uc.MediaPlayerCommands.SelectSource, { source: longCmd })).toBe(uc.StatusCodes.BadRequest);
+});

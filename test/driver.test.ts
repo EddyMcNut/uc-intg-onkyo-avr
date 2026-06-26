@@ -11,8 +11,12 @@ const h = vi.hoisted(() => {
       return obj._returnValue;
     };
     obj.fn._calls = [];
-    obj.mockReturnValue = (v: any) => { obj._returnValue = v; };
-    obj.mockReset = () => { obj._calls = []; };
+    obj.mockReturnValue = (v: any) => {
+      obj._returnValue = v;
+    };
+    obj.mockReset = () => {
+      obj._calls = [];
+    };
     // expose for assertion
     const track = vi.fn();
     obj.__track = track;
@@ -21,7 +25,10 @@ const h = vi.hoisted(() => {
       track(...args);
       return obj._returnValue;
     };
-    obj.fn.mockReset = () => { track.mockReset(); obj._calls = []; };
+    obj.fn.mockReset = () => {
+      track.mockReset();
+      obj._calls = [];
+    };
     return { obj, track };
   };
 
@@ -29,15 +36,17 @@ const h = vi.hoisted(() => {
     eventHandlers: handlers,
     mockDriver: {
       init: vi.fn(),
-      on: vi.fn((event: string, handler: (...args: any[]) => any) => { handlers[event] = handler; }),
+      on: vi.fn((event: string, handler: (...args: any[]) => any) => {
+        handlers[event] = handler;
+      }),
       getConfigDirPath: vi.fn(() => "/fake/config/dir"),
       addAvailableEntity: vi.fn(),
       setDeviceState: vi.fn(),
-      updateEntityAttributes: vi.fn(),
+      updateEntityAttributes: vi.fn()
     },
     mockAvrStateApi: {
       getAudioFormat: vi.fn(() => "unknown"),
-      isEntityOn: vi.fn(() => true),
+      isEntityOn: vi.fn(() => true)
     },
     mockEntityRegistrar: {
       createMediaPlayerEntity: vi.fn(() => ({ id: "mp_entity" })),
@@ -45,37 +54,46 @@ const h = vi.hoisted(() => {
       createListeningModeSelectEntity: vi.fn(() => ({ id: "lm_entity" })),
       createInputSelectorSelectEntity: vi.fn(() => ({ id: "is_entity" })),
       getListeningModeOptions: vi.fn(() => ["option1"]),
-      getInputSelectorOptions: vi.fn(() => ["input1"]),
+      getInputSelectorOptions: vi.fn(() => ["input1"])
     },
     mockConnectionManager: {
       getPhysicalConnection: vi.fn(() => undefined),
       disconnectAll: vi.fn(),
       clearAllConnections: vi.fn(),
-      cancelAllScheduledReconnections: vi.fn(),
+      cancelAllScheduledReconnections: vi.fn()
     },
     mockConnectCoordinator: {
-      connect: vi.fn(),
+      connect: vi.fn()
     },
     mockCommandSender: {
-      sharedCmdHandler: vi.fn(),
+      sharedCmdHandler: vi.fn()
     },
-    mockLog: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
+    mockLog: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() }
   };
 });
 
 const { eventHandlers, mockDriver, mockAvrStateApi, mockEntityRegistrar, mockConnectionManager, mockConnectCoordinator, mockCommandSender, mockLog } = h;
 
 vi.mock("@unfoldedcircle/integration-api", () => ({
-  IntegrationAPI: function () { return mockDriver; },
-  Events: { Connect: "connect", EnterStandby: "enter-standby", ExitStandby: "exit-standby", Disconnect: "disconnect", SubscribeEntities: "subscribe-entities", UnsubscribeEntities: "unsubscribe-entities" },
+  IntegrationAPI: function () {
+    return mockDriver;
+  },
+  Events: {
+    Connect: "connect",
+    EnterStandby: "enter-standby",
+    ExitStandby: "exit-standby",
+    Disconnect: "disconnect",
+    SubscribeEntities: "subscribe-entities",
+    UnsubscribeEntities: "unsubscribe-entities"
+  },
   DeviceStates: { Connected: "connected", Disconnected: "disconnected" },
   MediaPlayerAttributes: { SourceList: "sourceList" },
   StatusCodes: { Ok: 0, NotFound: 1 },
-  SelectAttributes: { Options: "options" },
+  SelectAttributes: { Options: "options" }
 }));
 
 vi.mock("node:fs", () => ({
-  readFileSync: vi.fn(() => JSON.stringify({ version: "2.0.0" })),
+  readFileSync: vi.fn(() => JSON.stringify({ version: "2.0.0" }))
 }));
 
 vi.mock("../src/configManager.js", () => {
@@ -87,26 +105,70 @@ vi.mock("../src/configManager.js", () => {
     buildEntityId: mockBuildId,
     buildPhysicalAvrId: mockBuildPhys,
     DEFAULT_QUEUE_THRESHOLD: 100,
-    normalizeAvrConfig: vi.fn((cfg: any) => ({ ...cfg, queueThreshold: cfg.queueThreshold ?? 100, volumeScale: cfg.volumeScale ?? 100, port: cfg.port ?? 60128 })),
+    normalizeAvrConfig: vi.fn((cfg: any) => ({ ...cfg, queueThreshold: cfg.queueThreshold ?? 100, volumeScale: cfg.volumeScale ?? 100, port: cfg.port ?? 60128 }))
   };
 });
 
 vi.mock("../src/loggers.js", () => ({ default: mockLog, setLogLevel: vi.fn() }));
 
 // For modules used with `new`, provide a plain function that returns the mock instance
-vi.mock("../src/eiscp.js", () => ({ default: function () { return {}; } }));
-vi.mock("../src/commandSender.js", () => ({ CommandSender: function () { return mockCommandSender; } }));
-vi.mock("../src/commandReceiver.js", () => ({ CommandReceiver: function () { return {}; } }));
-vi.mock("../src/reconnectionManager.js", () => ({ ReconnectionManager: function () { return { cancelAllScheduledReconnections: vi.fn() }; } }));
-vi.mock("../src/avrState.js", () => ({ AvrStateManager: function () { return mockAvrStateApi; } }));
+vi.mock("../src/eiscp.js", () => ({
+  default: function () {
+    return {};
+  }
+}));
+vi.mock("../src/commandSender.js", () => ({
+  CommandSender: function () {
+    return mockCommandSender;
+  }
+}));
+vi.mock("../src/commandReceiver.js", () => ({
+  CommandReceiver: function () {
+    return {};
+  }
+}));
+vi.mock("../src/reconnectionManager.js", () => ({
+  ReconnectionManager: function () {
+    return { cancelAllScheduledReconnections: vi.fn() };
+  }
+}));
+vi.mock("../src/avrState.js", () => ({
+  AvrStateManager: function () {
+    return mockAvrStateApi;
+  }
+}));
 vi.mock("../src/avrStateQuery.js", () => ({ avrStateQueryService: { queryAvrState: vi.fn(), recordQueries: vi.fn() } }));
 vi.mock("../src/mediaBrowser.js", () => ({ initMediaBrowser: vi.fn() }));
-vi.mock("../src/setupHandler.js", () => ({ default: function () { return { handle: vi.fn() }; } }));
-vi.mock("../src/entityRegistrar.js", () => ({ default: function () { return mockEntityRegistrar; } }));
-vi.mock("../src/connectionManager.js", () => ({ default: function () { return mockConnectionManager; } }));
-vi.mock("../src/selectEntityHandler.js", () => ({ SelectEntityHandler: function () { return { handle: vi.fn() }; } }));
-vi.mock("../src/subscriptionHandler.js", () => ({ default: function () { return { handle: vi.fn() }; } }));
-vi.mock("../src/connectCoordinator.js", () => ({ default: function () { return mockConnectCoordinator; } }));
+vi.mock("../src/setupHandler.js", () => ({
+  default: function () {
+    return { handle: vi.fn() };
+  }
+}));
+vi.mock("../src/entityRegistrar.js", () => ({
+  default: function () {
+    return mockEntityRegistrar;
+  }
+}));
+vi.mock("../src/connectionManager.js", () => ({
+  default: function () {
+    return mockConnectionManager;
+  }
+}));
+vi.mock("../src/selectEntityHandler.js", () => ({
+  SelectEntityHandler: function () {
+    return { handle: vi.fn() };
+  }
+}));
+vi.mock("../src/subscriptionHandler.js", () => ({
+  default: function () {
+    return { handle: vi.fn() };
+  }
+}));
+vi.mock("../src/connectCoordinator.js", () => ({
+  default: function () {
+    return mockConnectCoordinator;
+  }
+}));
 vi.mock("../src/utils.js", () => ({ delay: vi.fn() }));
 
 let OnkyoDriver: any;
@@ -136,7 +198,7 @@ describe("OnkyoDriver", () => {
       const configModule = await import("../src/configManager.js");
       (configModule.ConfigManager.load as any).mockReturnValueOnce({
         avrs: [{ model: "TX-RZ50", ip: "1.2.3.4", zone: "main", createSensors: true, listeningModeOptions: ["mode1"], inputSelectorOptions: ["input1"] }],
-        logLevel: "debug",
+        logLevel: "debug"
       });
 
       const driver = await createDriver();
@@ -147,7 +209,9 @@ describe("OnkyoDriver", () => {
 
     it("handles readFileSync failure gracefully", async () => {
       const fs = await import("node:fs");
-      (fs.readFileSync as any).mockImplementationOnce(() => { throw new Error("ENOENT"); });
+      (fs.readFileSync as any).mockImplementationOnce(() => {
+        throw new Error("ENOENT");
+      });
 
       const driver = await createDriver();
 
@@ -156,7 +220,9 @@ describe("OnkyoDriver", () => {
     });
 
     it("handles getConfigDirPath failure gracefully", async () => {
-      mockDriver.getConfigDirPath.mockImplementationOnce(() => { throw new Error("no dir"); });
+      mockDriver.getConfigDirPath.mockImplementationOnce(() => {
+        throw new Error("no dir");
+      });
 
       const driver = await createDriver();
 
@@ -351,7 +417,7 @@ describe("OnkyoDriver", () => {
       const configModule = await import("../src/configManager.js");
       (configModule.ConfigManager.load as any).mockReturnValueOnce({
         avrs: [{ model: "TX-RZ50", ip: "1.2.3.4", zone: "main", createSensors: true, listeningModeOptions: ["mode1"], inputSelectorOptions: ["input1"] }],
-        logLevel: "info",
+        logLevel: "info"
       });
 
       const driver = await createDriver();
@@ -365,7 +431,7 @@ describe("OnkyoDriver", () => {
       const configModule = await import("../src/configManager.js");
       (configModule.ConfigManager.load as any).mockReturnValueOnce({
         avrs: [{ model: "TX-RZ50", ip: "1.2.3.4", zone: "main", createSensors: false, listeningModeOptions: null, inputSelectorOptions: null }],
-        logLevel: "info",
+        logLevel: "info"
       });
 
       mockEntityRegistrar.createMediaPlayerEntity.mockReturnValueOnce({ id: "mp" });
