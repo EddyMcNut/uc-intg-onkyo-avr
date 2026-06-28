@@ -23,7 +23,7 @@ The above items are related to each other, here are some examples to explain the
 - the `Input source` in Web Configurator does not show dropdown (still accepts text commands)
 - the `Sources` button in MediaWidget is not visible
 
-_note: when you reconfigure the `Select Input Selector` the changes are applied right away, expect when you switch to `none`, then a reboot is needed. Also when you switch from `none` to something else a reboot is needed._
+_note: when you reconfigure the `Select Input Selector` the changes are applied right away, except when you switch to `none`, then a reboot is needed. Also when you switch from `none` to something else a reboot is needed._
 
 ### Manipulate MediaWidget
 
