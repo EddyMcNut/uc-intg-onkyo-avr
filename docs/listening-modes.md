@@ -1,11 +1,13 @@
 ## Listening modes
 
 ## Select from list
+
 As from v0.9.0 listening modes are available as so called `simple commands`:
 
 ![](../screenshots/listening-modes.png)
 
 ## Text input instead of selecting from list
+
 Like descibed in the Cheats section, you can send a lot of different commands which are all mentioned in the [JSON](../src/eiscp-commands.ts) file.
 
 Probably you have your AVR set to automatically select the best listening mode, but sometimes you might want to set a favorite mode, see the listening-mode section in the [JSON](../src/eiscp-commands.ts), for the correct command. A few examples from that JSON:
