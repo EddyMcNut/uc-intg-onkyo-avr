@@ -11,6 +11,7 @@ import { AvrStateManager } from "./avrState.js";
 import { avrStateQueryService } from "./avrStateQuery.js";
 import { initMediaBrowser } from "./mediaBrowser.js";
 import log, { setLogLevel } from "./loggers.js";
+import { logGeneratedCount } from "./simpleCommands.js";
 import SetupHandler from "./setupHandler.js";
 import EntityRegistrar from "./entityRegistrar.js";
 import ConnectionManager from "./connectionManager.js";
@@ -80,6 +81,7 @@ export default class OnkyoDriver {
     // Now load config from the correct path and continue setup
     this.config = ConfigManager.load();
     if (this.config.logLevel) setLogLevel(this.config.logLevel);
+    logGeneratedCount();
 
     // Create connection manager (needs reconnectionManager and query callback)
     this.connectionManager = new ConnectionManager(this.reconnectionManager, this.queryAllZonesState.bind(this), undefined, this.avrStateApi);

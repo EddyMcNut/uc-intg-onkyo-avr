@@ -1,4 +1,7 @@
 import { eiscpCommands } from "./eiscp-commands.js";
+import log from "./loggers.js";
+
+const integrationName = "simpleCommands:";
 
 interface SimpleCommandDef {
   command: string;
@@ -31,6 +34,7 @@ export const ALL_INPUT_SELECTOR_NAMES = getInputSelectorNames();
 function generateSimpleCommands(defs: SimpleCommandDef[]): Record<string, string> {
   const map: Record<string, string> = {};
   const DEFAULT_EXCLUDE = new Set(["query"]);
+  const RANGE_PATTERN = /^no-(\d+)-(\d+)$/;
 
   function toSimpleId(prefix: string, name: string): string {
     return `${prefix}_${name.replace(/-/g, "_").toUpperCase()}`;
@@ -48,6 +52,16 @@ function generateSimpleCommands(defs: SimpleCommandDef[]): Record<string, string
       const names = Array.isArray(entry.name) ? entry.name : [entry.name];
       const first = names[0];
       if (!first || exclude.has(first)) continue;
+
+      const rangeMatch = first.match(RANGE_PATTERN);
+      if (rangeMatch) {
+        const start = parseInt(rangeMatch[1], 10);
+        const end = parseInt(rangeMatch[2], 10);
+        for (let i = start; i <= end; i++) {
+          map[`${def.prefix}_${i}`] = `${def.command} ${i}`;
+        }
+        continue;
+      }
 
       const commandStr = `${def.command} ${first}`;
       for (const name of names) {
@@ -110,3 +124,7 @@ const COMMAND_DEFS: SimpleCommandDef[] = [
 
 export const SIMPLE_COMMANDS_MAP = generateSimpleCommands(COMMAND_DEFS);
 export const ALL_SIMPLE_COMMANDS = Object.keys(SIMPLE_COMMANDS_MAP);
+
+export function logGeneratedCount(): void {
+  log.info("%s generated %d simple commands", integrationName, ALL_SIMPLE_COMMANDS.length);
+}
