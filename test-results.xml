@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites tests="112" failures="0">
+  <testsuite name="ava" tests="112" failures="0">
+    <testcase classname="ava" name="avr-instance-manager › ensureZoneInstances creates zone instances when physical connection present"></testcase>
+    <testcase classname="ava" name="avr-instance-manager › ensureZoneInstances skips when no physical connection present"></testcase>
+    <testcase classname="ava" name="avr-instance-manager › ensureZoneInstances refreshes config of existing instance"></testcase>
+    <testcase classname="ava" name="listening-mode › ConfigManager validates and normalizes listeningModeOptions (semicolon string)"></testcase>
+    <testcase classname="ava" name="connect-coordinator › connect returns false when no avrs configured"></testcase>
+    <testcase classname="ava" name="connect-coordinator › connect creates physical connections and zone instances when missing"></testcase>
+    <testcase classname="ava" name="connect-coordinator › connect handles reconnection when physical connection exists but disconnected"></testcase>
+    <testcase classname="ava" name="eiscp-command-parser › IscpCommandParser handles truncated and valid NLA frames"></testcase>
+    <testcase classname="ava" name="eiscp-command-parser › IscpCommandParser parses malformed and valid NTM payloads"></testcase>
+    <testcase classname="ava" name="eiscp-command-parser › IscpCommandParser metadata flows keep raw values and support patch/get"></testcase>
+    <testcase classname="ava" name="eiscp-command-parser › IscpCommandParser maps unknown commands to null and zone commands correctly"></testcase>
+    <testcase classname="ava" name="eiscp-command-parser › IscpCommandParser handles NLS validation and NLA extraction"></testcase>
+    <testcase classname="ava" name="eiscp-command-parser › IscpCommandParser emits NLT_CONTEXT for My Presets on NET source"></testcase>
+    <testcase classname="ava" name="eiscp-command-parser › IscpCommandParser updates browse state from NLT headers per active subsource"></testcase>
+    <testcase classname="ava" name="eiscp-command-parser › IscpCommandParser FLD routing suppresses NET scrolling and handles FM/default"></testcase>
+    <testcase classname="ava" name="eiscp-command-parser › IscpCommandParser maps TuneIn NAT title to canonical service name"></testcase>
+    <testcase classname="ava" name="eiscp-command-parser › IscpCommandParser parses IFA payload into normalized audio fields"></testcase>
+    <testcase classname="ava" name="eiscp-command-parser › IscpCommandParser parses IFV payload and handles unknown resolution display"></testcase>
+    <testcase classname="ava" name="eiscp-command-parser › IscpCommandParser merges multi-frame metadata payloads"></testcase>
+    <testcase classname="ava" name="eiscp-command-parser › IscpCommandParser emits NLT when service text indicates subsource switch"></testcase>
+    <testcase classname="ava" name="connection-manager › schedule and cancel scheduled reconnection"></testcase>
+    <testcase classname="ava" name="eiscp-command-parser › IscpCommandParser decodes generic hex payloads for mapped commands without int range"></testcase>
+    <testcase classname="ava" name="eiscp-command-parser › IscpCommandParser FLD sanitizes characters and skips service text outside NET"></testcase>
+    <testcase classname="ava" name="connection-manager › attemptReconnection delegates to reconnection manager and returns result"></testcase>
+    <testcase classname="ava" name="connection-manager › clearAllConnections removes stored connections"></testcase>
+    <testcase classname="ava" name="eiscp-multi-zone › buildMultiZoneVolumeCommands filters and maps zone-specific up/down commands"></testcase>
+    <testcase classname="ava" name="eiscp-multi-zone › buildMultiZoneMuteCommands generates zone-specific mute/unmute sequences"></testcase>
+    <testcase classname="ava" name="eiscp-multi-zone › Multi-zone command generation is deterministic and repeatable"></testcase>
+    <testcase classname="ava" name="eiscp-multi-zone › Multi-zone command generation ignores unknown directions and zones"></testcase>
+    <testcase classname="ava" name="eiscp-packet › extracts concatenated ISCP frames individually"></testcase>
+    <testcase classname="ava" name="eiscp-packet › createEiscpPacket adds !1 prefix and valid ISCP header"></testcase>
+    <testcase classname="ava" name="eiscp-packet › extractAllIscpMessages falls back to single-frame extraction for malformed input"></testcase>
+    <testcase classname="ava" name="menu-browse-state › resetMenuBrowseState clears both data and runtime transient flags"></testcase>
+    <testcase classname="ava" name="menu-browse-state › Transient flags reset prevents state leaks across service switches"></testcase>
+    <testcase classname="ava" name="menu-browse-state › consumeListModeActive toggles transient flag correctly before reset"></testcase>
+    <testcase classname="ava" name="command-sender › CommandSender rejects malformed entity ids and unknown AVR targets"></testcase>
+    <testcase classname="ava" name="command-sender › CommandSender executes core command branches and zone-specific routing"></testcase>
+    <testcase classname="ava" name="command-sender › CommandSender handles relative volume ignore and throttle"></testcase>
+    <testcase classname="ava" name="command-sender › CommandSender handles known simple commands via handleSimpleCommand fallthrough"></testcase>
+    <testcase classname="ava" name="avr-state-playback-status › AvrStateManager maps NET playbackStatus paused to MediaPlayerStates.Paused"></testcase>
+    <testcase classname="ava" name="command-receiver-listening-mode › CommandReceiver preserves user-configured listeningModeOptions across IFA/source events"></testcase>
+    <testcase classname="ava" name="entity-registrar-config › EntityRegistrar returns user-configured listeningModeOptions from config"></testcase>
+    <testcase classname="ava" name="config-coercions › createAvrSpecificConfig coerces types correctly"></testcase>
+    <testcase classname="ava" name="config-coercions › CommandSender volume conversion respects adjustVolumeDispl"></testcase>
+    <testcase classname="ava" name="entity-registrar › EntityRegistrar builds entities correctly"></testcase>
+    <testcase classname="ava" name="entity-registrar › EntityRegistrar sensor names omit host from display name"></testcase>
+    <testcase classname="ava" name="entity-registrar › EntityRegistrar long entity names include host when configured"></testcase>
+    <testcase classname="ava" name="onkyo-reconfigure › registerAvailableEntities refreshes listening_mode options on reconfigure"></testcase>
+    <testcase classname="ava" name="setup-backup › backup flow returns backup_data JSON"></testcase>
+    <testcase classname="ava" name="setup-backup › restore flow applies provided backup_data"></testcase>
+    <testcase classname="ava" name="setup-backup › restore flow defaults missing TuneIn menu setting to mypresets"></testcase>
+    <testcase classname="ava" name="setup-backup › restore flow accepts intg-manager restore_from_backup payload"></testcase>
+    <testcase classname="ava" name="setup-backup › initial setup manual mode opens configuration form"></testcase>
+    <testcase classname="ava" name="media-browser › Media player browse returns TuneIn presets only for NET TuneIn"></testcase>
+    <testcase classname="ava" name="media-browser › Media player browse ignores TuneIn menu entries until My Presets is active"></testcase>
+    <testcase classname="ava" name="media-browser › TuneIn browse root exposes all presets when the list is longer than 10"></testcase>
+    <testcase classname="ava" name="media-browser › Media player browse returns TuneIn full menu items from NET TuneIn"></testcase>
+    <testcase classname="ava" name="media-browser › Media player browse hides TuneIn Login menu item"></testcase>
+    <testcase classname="ava" name="media-browser › TuneIn selection keeps subsource and state so browse can be repeated"></testcase>
+    <testcase classname="ava" name="media-browser › TuneIn preset cache survives post-select menu updates"></testcase>
+    <testcase classname="ava" name="media-browser › Media player browse returns Tidal menu entries from AVR NLS updates"></testcase>
+    <testcase classname="ava" name="media-browser › Media player browse returns Deezer menu entries from AVR NLS updates"></testcase>
+    <testcase classname="ava" name="media-browser › Media player browse marks Deezer NLS entries without %s as playable tracks"></testcase>
+    <testcase classname="ava" name="media-browser › Media player browse hides excluded Tidal menu items"></testcase>
+    <testcase classname="ava" name="media-browser › Media player browse defaults to 25 items per page when paging is omitted"></testcase>
+    <testcase classname="ava" name="media-browser › Tidal browse survives DAB-to-NET transition when NLT/NLS arrive early"></testcase>
+    <testcase classname="ava" name="media-browser › Repeated NLT tidal updates do not clear existing Tidal menu options"></testcase>
+    <testcase classname="ava" name="simple-commands › SIMPLE_COMMANDS_MAP loads and contains expected total keys"></testcase>
+    <testcase classname="ava" name="simple-commands › SIMPLE_COMMANDS_MAP contains expected known input keys"></testcase>
+    <testcase classname="ava" name="simple-commands › SIMPLE_COMMANDS_MAP includes NSS streaming sources"></testcase>
+    <testcase classname="ava" name="simple-commands › SIMPLE_COMMANDS_MAP excludes query, up, and down"></testcase>
+    <testcase classname="ava" name="simple-commands › SIMPLE_COMMANDS_MAP generates multiple keys for aliases mapping to same value"></testcase>
+    <testcase classname="ava" name="simple-commands › SIMPLE_COMMANDS_MAP includes audio-muting commands"></testcase>
+    <testcase classname="ava" name="simple-commands › SIMPLE_COMMANDS_MAP includes multi-zone-muting commands"></testcase>
+    <testcase classname="ava" name="simple-commands › SIMPLE_COMMANDS_MAP includes multi-zone-volume commands"></testcase>
+    <testcase classname="ava" name="simple-commands › SIMPLE_COMMANDS_MAP includes audio-return-channel commands"></testcase>
+    <testcase classname="ava" name="simple-commands › SIMPLE_COMMANDS_MAP includes dimmer-level commands"></testcase>
+    <testcase classname="ava" name="simple-commands › SIMPLE_COMMANDS_MAP includes dirac commands"></testcase>
+    <testcase classname="ava" name="simple-commands › SIMPLE_COMMANDS_MAP includes listening-mode commands"></testcase>
+    <testcase classname="ava" name="simple-commands › SIMPLE_COMMANDS_MAP includes late-night commands"></testcase>
+    <testcase classname="ava" name="simple-commands › SIMPLE_COMMANDS_MAP includes lfe-level commands"></testcase>
+    <testcase classname="ava" name="simple-commands › SIMPLE_COMMANDS_MAP includes loudness-management commands"></testcase>
+    <testcase classname="ava" name="simple-commands › SIMPLE_COMMANDS_MAP includes music-optimizer commands"></testcase>
+    <testcase classname="ava" name="simple-commands › SIMPLE_COMMANDS_MAP replaces hyphens with underscores in IDs"></testcase>
+    <testcase classname="ava" name="simple-commands › ALL_SIMPLE_COMMANDS is an array of all map keys"></testcase>
+    <testcase classname="ava" name="setup-handler › handleRestorePayload: applies valid payload and calls onConfigSaved"></testcase>
+    <testcase classname="ava" name="setup-handler › handleRestorePayload: invalid payload returns RequestUserInput with preserved textarea"></testcase>
+    <testcase classname="ava" name="setup-handler › handleDeleteConfigPayload: confirm=false prompts and confirm=true clears config"></testcase>
+    <testcase classname="ava" name="setup-handler › handleManualConfiguration: valid input creates AVR entries"></testcase>
+    <testcase classname="ava" name="setup-handler › handleManualConfiguration: invalid input returns RequestUserInput with errors"></testcase>
+    <testcase classname="ava" name="setup-handler › handleBackupPayload: returns backup data JSON textarea"></testcase>
+    <testcase classname="ava" name="setup-handler › handleManualConfiguration: autodiscovery should persist listeningModeOptions when supplied"></testcase>
+    <testcase classname="ava" name="command-receiver-listening-mode › CommandReceiver sets media player state to Playing only for ON+NET+album-art subsources"></testcase>
+    <testcase classname="ava" name="service-strategy-contracts › MenuBrowseHandlerBase harvest contract populates contiguous items and clears harvestMode"></testcase>
+    <testcase classname="ava" name="service-strategy-contracts › TuneIn adapter contract ingests NLS only for active TuneIn zones"></testcase>
+    <testcase classname="ava" name="service-strategy-contracts › Tidal adapter contract ingests NLA and metadata for active zones"></testcase>
+    <testcase classname="ava" name="service-strategy-contracts › Browse service contract maps service ids to activation rules and selector commands"></testcase>
+    <testcase classname="ava" name="media-browser › TuneIn service selection preloads My Presets for browsing"></testcase>
+    <testcase classname="ava" name="media-browser › CommandSender silently absorbs shuffle, repeat, and browse commands"></testcase>
+    <testcase classname="ava" name="media-browser › CommandSender play_media routes TuneIn preset IDs to tunein-preset"></testcase>
+    <testcase classname="ava" name="media-browser › CommandSender play_media routes Tidal menu IDs to NLSI"></testcase>
+    <testcase classname="ava" name="media-browser › CommandSender play_media routes Deezer menu IDs to NLSI"></testcase>
+    <testcase classname="ava" name="media-browser › CommandSender Deezer track selection freezes browse list and sets now-playing title"></testcase>
+    <testcase classname="ava" name="media-browser › CommandSender remaps stale Tidal index using title encoded in media_id"></testcase>
+    <testcase classname="ava" name="media-browser › CommandSender first selection after Main Tidal Menu skips pre-list command"></testcase>
+    <testcase classname="ava" name="media-browser › CommandSender in-Tidal track selection uses direct NLSI when AVR is in list mode"></testcase>
+    <testcase classname="ava" name="media-browser › CommandSender in-Tidal track selection sends list before NLSI when AVR is playing"></testcase>
+    <testcase classname="ava" name="media-browser › CommandSender in-Tidal menu selection uses direct NLSI even when AVR is playing"></testcase>
+    <testcase classname="ava" name="media-browser › CommandSender play_media routes Main Tidal Menu to input-selector tidal"></testcase>
+    <testcase classname="ava" name="media-browser › CommandSender play_media routes TuneIn main menu to input-selector tunein"></testcase>
+    <testcase classname="ava" name="media-browser › CommandSender play_media routes Tidal Back option to RETURN"></testcase>
+    <testcase classname="ava" name="media-browser › CommandSender play_media routes TuneIn Back option to RETURN"></testcase>
+  </testsuite>
+</testsuites>

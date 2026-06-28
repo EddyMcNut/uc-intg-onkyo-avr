@@ -43,8 +43,8 @@ export class ConfigManager {
       netMenuDelay: avr.netMenuDelay ?? AVR_DEFAULTS.netMenuDelay,
       tuneinPresetPosition: avr.tuneinPresetPosition ?? AVR_DEFAULTS.tuneinPresetPosition,
       tuneinMenuStyle: avr.tuneinMenuStyle ?? AVR_DEFAULTS.tuneinMenuStyle,
-      listeningModeOptions: avr.listeningModeOptions,
-      inputSelectorOptions: avr.inputSelectorOptions
+      listeningModeOptions: avr.listeningModeOptions !== undefined ? parseSelectOptions(avr.listeningModeOptions) : undefined,
+      inputSelectorOptions: avr.inputSelectorOptions !== undefined ? parseSelectOptions(avr.inputSelectorOptions) : undefined
     };
   }
 
@@ -375,8 +375,8 @@ export class ConfigManager {
         const res = this.validateAvrPayload(avr);
         if (res.errors.length > 0) {
           errors.push(`avrs[${i}]: ${res.errors.join("; ")}`);
-        } else if (res.normalized) {
-          normalizedAvrs.push(res.normalized);
+        } else {
+          normalizedAvrs.push(res.normalized!);
         }
       }
 

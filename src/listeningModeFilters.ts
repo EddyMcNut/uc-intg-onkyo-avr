@@ -1,18 +1,6 @@
 // Listening mode audio format compatibility mapping — maps audio format types to compatible listening modes.
 
-/** Audio format categories */
-export enum AudioFormatType {
-  Analog = "analog",
-  DTS = "dts",
-  DTSHD = "dts-hd",
-  DTSX = "dts-x",
-  DolbyAtmos = "dolby-atmos",
-  DolbyDigital = "dolby-digital",
-  DolbyTrueHD = "dolby-truehd",
-  Multichannel = "multichannel",
-  PCM = "pcm",
-  Stereo = "stereo"
-}
+import { AudioFormatType, classifyAudioFormat } from "./audioFormatClassifier.js";
 
 /** Listening modes that work with stereo sources (2.0 audio) */
 const stereoCompatibleModes = [
@@ -161,75 +149,30 @@ export function getCompatibleListeningModes(audioFormat: string | undefined): st
     return null; // No filtering if format unknown
   }
 
-  const format = audioFormat.toLowerCase();
+  const formatType = classifyAudioFormat(audioFormat);
 
-  // Dolby formats
-  if (format.includes("atmos")) {
-    return dolbyAtmosModes;
-  }
-  if (format.includes("truehd") || format.includes("true hd")) {
-    return dolbyTrueHDModes;
-  }
-  if (format.includes("dolby") || format.includes("ac3") || format.includes("dd") || format.includes("ac-3")) {
-    return dolbyDigitalModes;
-  }
-
-  // DTS formats
-  if (format.includes("dts:x") || format.includes("dts-x")) {
-    return dtsXModes;
-  }
-  if (format.includes("dts-hd") || format.includes("dts hd") || format.includes("dts-ma") || format.includes("dts ma")) {
-    return dtsHDModes;
-  }
-  if (format.includes("dts")) {
-    return dtsModes;
-  }
-
-  // PCM formats
-  if (format.includes("pcm") || format.includes("lpcm")) {
-    if (format.includes("multichannel") || format.includes("multi") || format.match(/[5-9]\.\d/)) {
+  switch (formatType) {
+    case AudioFormatType.DolbyAtmos:
+      return dolbyAtmosModes;
+    case AudioFormatType.DolbyTrueHD:
+      return dolbyTrueHDModes;
+    case AudioFormatType.DolbyDigital:
+      return dolbyDigitalModes;
+    case AudioFormatType.DTSX:
+      return dtsXModes;
+    case AudioFormatType.DTSHD:
+      return dtsHDModes;
+    case AudioFormatType.DTS:
+      return dtsModes;
+    case AudioFormatType.Multichannel:
       return multichannelPCMModes;
-    }
-    return stereoCompatibleModes;
+    case AudioFormatType.PCM:
+      return stereoCompatibleModes;
+    case AudioFormatType.Analog:
+      return analogModes;
+    case AudioFormatType.Stereo:
+      return stereoCompatibleModes;
+    default:
+      return stereoCompatibleModes;
   }
-
-  // Analog
-  if (format.includes("analog") || format.includes("analogue")) {
-    return analogModes;
-  }
-
-  // Default to stereo modes if format not recognized
-  return stereoCompatibleModes;
-}
-
-// Detect audio format type from IFA audio input string.
-export function detectAudioFormatType(audioInput: string): string {
-  if (!audioInput) {
-    return "unknown";
-  }
-
-  const input = audioInput.toLowerCase();
-
-  // Dolby formats
-  if (input.includes("atmos")) return "Dolby Atmos";
-  if (input.includes("truehd") || input.includes("true hd")) return "Dolby TrueHD";
-  if (input.includes("dolby") || input.includes("ac3") || input.includes("dd") || input.includes("ac-3")) return "Dolby Digital";
-
-  // DTS formats
-  if (input.includes("dts:x") || input.includes("dts-x")) return "DTS:X";
-  if (input.includes("dts-hd") || input.includes("dts hd") || input.includes("dts-ma") || input.includes("dts ma")) return "DTS-HD";
-  if (input.includes("dts")) return "DTS";
-
-  // PCM formats
-  if (input.includes("pcm") || input.includes("lpcm")) {
-    if (input.includes("multichannel") || input.includes("multi") || input.match(/[5-9]\.\d/)) {
-      return "Multichannel PCM";
-    }
-    return "PCM Stereo";
-  }
-
-  // Analog
-  if (input.includes("analog") || input.includes("analogue")) return "Analog";
-
-  return audioInput;
 }

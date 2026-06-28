@@ -1,15 +1,7 @@
-import test from "ava";
-import path from "path";
-import { pathToFileURL } from "url";
+import { describe, it, expect } from "vitest";
 
-type DistModule = Record<string, unknown>;
-
-async function importDist(modulePath: string): Promise<DistModule> {
-  return import(pathToFileURL(path.resolve(process.cwd(), modulePath)).href);
-}
-
-test.serial("MenuBrowseHandlerBase harvest contract populates contiguous items and clears harvestMode", async (t) => {
-  const baseModule = await importDist("dist/src/menuBrowseHandlerBase.js");
+it("MenuBrowseHandlerBase harvest contract populates contiguous items and clears harvestMode", async () => {
+  const baseModule = await import("../src/menuBrowseHandlerBase.js");
   const { MenuBrowseHandlerBase } = baseModule as { MenuBrowseHandlerBase: new () => any };
 
   class TestHandler extends MenuBrowseHandlerBase {
@@ -77,14 +69,14 @@ test.serial("MenuBrowseHandlerBase harvest contract populates contiguous items a
     }
   });
 
-  t.true(nlalCommands.length >= 1);
-  t.is(handler.getItems().length, 3);
-  t.false(handler.getHarvestMode());
+  expect(nlalCommands.length >= 1).toBe(true);
+  expect(handler.getItems().length).toBe(3);
+  expect(handler.getHarvestMode()).toBe(false);
 });
 
-test.serial("TuneIn adapter contract ingests NLS only for active TuneIn zones", async (t) => {
-  const adaptersModule = await importDist("dist/src/zoneAgnosticServiceAdapters.js");
-  const tuneInStoreModule = await importDist("dist/src/tuneInMenuStore.js");
+it("TuneIn adapter contract ingests NLS only for active TuneIn zones", async () => {
+  const adaptersModule = await import("../src/zoneAgnosticServiceAdapters.js");
+  const tuneInStoreModule = await import("../src/tuneInMenuStore.js");
 
   const { TuneInZoneAgnosticAdapter } = adaptersModule as { TuneInZoneAgnosticAdapter: new (deps: any) => any };
   const { listTuneInMenuOptions } = tuneInStoreModule as { listTuneInMenuOptions: (entityId: string) => unknown[] };
@@ -117,13 +109,13 @@ test.serial("TuneIn adapter contract ingests NLS only for active TuneIn zones", 
 
   adapter.handleNls(activeZone, "U0-Browse");
 
-  t.is(listTuneInMenuOptions(activeZone).length, 1);
-  t.is(listTuneInMenuOptions(controlZone).length, 0);
+  expect(listTuneInMenuOptions(activeZone).length).toBe(1);
+  expect(listTuneInMenuOptions(controlZone).length).toBe(0);
 });
 
-test.serial("Tidal adapter contract ingests NLA and metadata for active zones", async (t) => {
-  const adaptersModule = await importDist("dist/src/zoneAgnosticServiceAdapters.js");
-  const tidalStoreModule = await importDist("dist/src/tidalBrowserStore.js");
+it("Tidal adapter contract ingests NLA and metadata for active zones", async () => {
+  const adaptersModule = await import("../src/zoneAgnosticServiceAdapters.js");
+  const tidalStoreModule = await import("../src/tidalBrowserStore.js");
 
   const { TidalZoneAgnosticAdapter } = adaptersModule as { TidalZoneAgnosticAdapter: new (deps: any) => any };
   const { listTidalMenuOptions, getTidalBrowseState } = tidalStoreModule as {
@@ -158,13 +150,13 @@ test.serial("Tidal adapter contract ingests NLA and metadata for active zones", 
   adapter.handleNla(activeZone, '<?xml version="1.0" encoding="UTF-8"?><response status="ok"><items offset="0000"><item iconid="2F" title="Track A" url="0"/></items></response>');
   adapter.handleMetadata(activeZone, "Artist A");
 
-  t.is(listTidalMenuOptions(activeZone).length, 1);
-  t.is(listTidalMenuOptions(controlZone).length, 0);
-  t.is(getTidalBrowseState(activeZone)?.nowPlayingTitle, "Artist A");
+  expect(listTidalMenuOptions(activeZone).length).toBe(1);
+  expect(listTidalMenuOptions(controlZone).length).toBe(0);
+  expect(getTidalBrowseState(activeZone)?.nowPlayingTitle).toBe("Artist A");
 });
 
-test.serial("Browse service contract maps service ids to activation rules and selector commands", async (t) => {
-  const contractModule = await importDist("dist/src/browseServiceContract.js");
+it("Browse service contract maps service ids to activation rules and selector commands", async () => {
+  const contractModule = await import("../src/browseServiceContract.js");
   const { TUNEIN_SERVICE_ID, TIDAL_SERVICE_ID, DEEZER_SERVICE_ID, isBrowseServiceId, isBrowseServiceActive, getBrowseServiceSelectSourceCommand } = contractModule as {
     TUNEIN_SERVICE_ID: string;
     TIDAL_SERVICE_ID: string;
@@ -174,17 +166,17 @@ test.serial("Browse service contract maps service ids to activation rules and se
     getBrowseServiceSelectSourceCommand: (serviceId: string) => string;
   };
 
-  t.true(isBrowseServiceId(TUNEIN_SERVICE_ID));
-  t.true(isBrowseServiceId(TIDAL_SERVICE_ID));
-  t.true(isBrowseServiceId(DEEZER_SERVICE_ID));
-  t.false(isBrowseServiceId("spotify"));
+  expect(isBrowseServiceId(TUNEIN_SERVICE_ID)).toBe(true);
+  expect(isBrowseServiceId(TIDAL_SERVICE_ID)).toBe(true);
+  expect(isBrowseServiceId(DEEZER_SERVICE_ID)).toBe(true);
+  expect(isBrowseServiceId("spotify")).toBe(false);
 
-  t.true(isBrowseServiceActive("net", "tunein", TUNEIN_SERVICE_ID));
-  t.false(isBrowseServiceActive("net", "tidal", TUNEIN_SERVICE_ID));
-  t.false(isBrowseServiceActive("dab", "tunein", TUNEIN_SERVICE_ID));
-  t.true(isBrowseServiceActive("net", "deezer", DEEZER_SERVICE_ID));
+  expect(isBrowseServiceActive("net", "tunein", TUNEIN_SERVICE_ID)).toBe(true);
+  expect(isBrowseServiceActive("net", "tidal", TUNEIN_SERVICE_ID)).toBe(false);
+  expect(isBrowseServiceActive("dab", "tunein", TUNEIN_SERVICE_ID)).toBe(false);
+  expect(isBrowseServiceActive("net", "deezer", DEEZER_SERVICE_ID)).toBe(true);
 
-  t.is(getBrowseServiceSelectSourceCommand(TUNEIN_SERVICE_ID), "input-selector tunein");
-  t.is(getBrowseServiceSelectSourceCommand(TIDAL_SERVICE_ID), "input-selector tidal");
-  t.is(getBrowseServiceSelectSourceCommand(DEEZER_SERVICE_ID), "input-selector deezer");
+  expect(getBrowseServiceSelectSourceCommand(TUNEIN_SERVICE_ID)).toBe("input-selector tunein");
+  expect(getBrowseServiceSelectSourceCommand(TIDAL_SERVICE_ID)).toBe("input-selector tidal");
+  expect(getBrowseServiceSelectSourceCommand(DEEZER_SERVICE_ID)).toBe("input-selector deezer");
 });

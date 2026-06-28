@@ -191,7 +191,7 @@ export const eiscpCommands = {
         BDOWN: { name: "bass-down", description: "sets Center Bass down(2 step)" },
         TUP: { name: "treble-up", description: "sets Center Treble up(2 step)" },
         TDOWN: { name: "treble-down", description: "sets Center Treble down(2 step)" },
-        QSTN: { name: "query", description: 'gets Cetner Tone ("BxxTxx")' }
+        QSTN: { name: "query", description: 'gets Center Tone ("BxxTxx")' }
       }
     },
     TSR: {
@@ -399,7 +399,7 @@ export const eiscpCommands = {
         "08": { name: "video9", description: "sets VIDEO9" },
         "09": { name: "video10", description: "sets VIDEO10" },
         "10": { name: ["bd", "dvd"], description: "sets DVD, BD/DVD" },
-        "11": { name: "stm", description: "sets STM, STMBOX" },
+        "11": { name: ["stm", "stmbox"], description: "sets STM, STMBOX" },
         "12": { name: "tv", description: "sets TV" },
         "20": { name: ["tape", "tape1"], description: "sets TAPE(1), TV/TAPE" },
         "21": { name: "tape2", description: "sets TAPE2" },
@@ -520,8 +520,8 @@ export const eiscpCommands = {
         "01": { name: ["yes", "out"], description: "sets Yes/Out Main, HDMI Main" },
         "02": { name: ["out-sub", "sub"], description: "sets Out Sub, HDMI Sub" },
         "03": { name: ["both"], description: "sets, Both" },
-        "04": { name: ["both"], description: "sets, Both(Main)" },
-        "05": { name: ["both"], description: "sets, Both(Sub)" },
+        "04": { name: ["both-main"], description: "sets, Both(Main)" },
+        "05": { name: ["both-sub"], description: "sets, Both(Sub)" },
         UP: { name: "up", description: "sets HDMI Out Selector Wrap-Around Up" },
         QSTN: { name: "query", description: "gets The HDMI Out Selector" }
       }

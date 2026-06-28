@@ -1,6 +1,7 @@
 /*jslint node:true nomen:true*/
 "use strict";
 
+import * as uc from "@unfoldedcircle/integration-api";
 import { EiscpDriver, EiscpConfig } from "./eiscp.js";
 import { CommandSender as CommandSenderClass } from "./commandSender.js";
 import { CommandReceiver as CommandReceiverClass } from "./commandReceiver.js";
@@ -64,15 +65,15 @@ export interface AvrStateApi {
 
   // State mutation methods
   setAudioFormat(entityId: string, audioFormat: string): boolean;
-  setPowerState(entityId: string, powerState: string, driver?: any): boolean;
+  setPowerState(entityId: string, powerState: string, driver?: uc.IntegrationAPI): boolean;
   setVolume(entityId: string, volume: number): boolean;
-  setSource(entityId: string, source: string, eiscpInstance?: any, zone?: string, _driver?: any): boolean;
-  setSubSource(entityId: string, subSource: string, eiscpInstance?: any, zone?: string, _driver?: any): boolean;
-  setPlaybackStatus(entityId: string, playbackStatus: string, driver?: any): boolean;
+  setSource(entityId: string, source: string, eiscpInstance?: EiscpDriver, zone?: string, _driver?: uc.IntegrationAPI): boolean;
+  setSubSource(entityId: string, subSource: string, eiscpInstance?: EiscpDriver, zone?: string, _driver?: uc.IntegrationAPI): boolean;
+  setPlaybackStatus(entityId: string, playbackStatus: string, driver?: uc.IntegrationAPI): boolean;
 
   // Utility methods
   clearState(entityId: string): void;
   clearAllState(): void;
-  applyMediaPlayerState(entityId: string, driver?: any): void;
-  refreshAvrState(entityId: string, eiscpInstance?: any, zone?: string, driver?: any, queueThreshold?: number, commandReceiver?: ICommandReceiver): Promise<void>;
+  applyMediaPlayerState(entityId: string, driver?: uc.IntegrationAPI): void;
+  refreshAvrState(entityId: string, eiscpInstance?: EiscpDriver, zone?: string, driver?: uc.IntegrationAPI, queueThreshold?: number, commandReceiver?: ICommandReceiver): Promise<void>;
 }

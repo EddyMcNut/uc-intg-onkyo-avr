@@ -1,4 +1,4 @@
-import test from "ava";
+import { describe, it, expect } from "vitest";
 import fs from "fs";
 import os from "os";
 import path from "path";
@@ -14,7 +14,7 @@ function mkTmpDir(prefix = "onkyo-test-") {
 // NOTE: We dynamically import the compiled driver (dist/driver.js) at runtime
 // so the tests run against the build artifact (matching CI: build then test).
 
-test.serial("backup flow returns backup_data JSON", async (t) => {
+it("backup flow returns backup_data JSON", async () => {
   const tmp = mkTmpDir();
   try {
     setConfigDir(tmp);
@@ -27,11 +27,10 @@ test.serial("backup flow returns backup_data JSON", async (t) => {
     console.log("on-disk-config (after src save):", fs.readFileSync(path.join(tmp, "config.json"), "utf-8"));
 
     // Import compiled driver using a file:// URL (required on Windows ESM loader)
-    const { pathToFileURL } = await import("url");
-    const driverModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/driver.js")).href);
+    const driverModule = await import("../src/driver.js");
     const OnkyoDriver = driverModule.default as any;
     // Ensure the compiled ConfigManager uses the same temp config dir at runtime
-    const configManagerModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/configManager.js")).href);
+    const configManagerModule = await import("../src/configManager.js");
     if (configManagerModule && typeof configManagerModule.setConfigDir === "function") {
       configManagerModule.setConfigDir(tmp);
       console.log("dist config path set to", configManagerModule.getConfigPath && configManagerModule.getConfigPath());
@@ -58,23 +57,23 @@ test.serial("backup flow returns backup_data JSON", async (t) => {
 
     // Step 1: start reconfigure (manager would do this)
     const startResp = await drv.handleDriverSetup?.(new uc.DriverSetupRequest(true, {}));
-    t.true(startResp instanceof uc.RequestUserInput);
+    expect(startResp).toBeInstanceOf(uc.RequestUserInput);
 
     // Step 2a: ask for backup action (no placeholder)
     const backupResp = await drv.handleDriverSetup?.(new uc.UserDataResponse({ action: "backup" }));
-    t.true(backupResp instanceof uc.RequestUserInput);
+    expect(backupResp instanceof uc.RequestUserInput).toBe(true);
 
     // Also simulate manager's PUT with action=backup and placeholder backup_data
     const managerReqResp = await drv.handleDriverSetup?.(new uc.UserDataResponse({ action: "backup", backup_data: "[]" }));
-    t.true(managerReqResp instanceof uc.RequestUserInput);
+    expect(managerReqResp instanceof uc.RequestUserInput).toBe(true);
 
     // Function to extract backup_data field from RequestUserInput
     function extractBackup(resp: uc.RequestUserInput): string {
       const settings = resp.settings as Array<{ id: string; field?: { textarea?: { value: string } } }>;
       const backupSetting = settings.find((s) => s.id === "backup_data");
-      t.truthy(backupSetting);
-      t.truthy(backupSetting);
-      t.truthy(backupSetting?.field?.textarea?.value);
+      expect(backupSetting).toBeTruthy();
+      expect(backupSetting).toBeTruthy();
+      expect(backupSetting?.field?.textarea?.value).toBeTruthy();
       return backupSetting!.field!.textarea!.value;
     }
 
@@ -87,29 +86,29 @@ test.serial("backup flow returns backup_data JSON", async (t) => {
     const parsed = JSON.parse(backupString);
     const parsedManager = JSON.parse(backupStringManager);
 
-    t.truthy(parsed.meta);
-    t.truthy(parsedManager.meta);
+    expect(parsed.meta).toBeTruthy();
+    expect(parsedManager.meta).toBeTruthy();
     const driverJson = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), "driver.json"), "utf-8"));
-    t.is(parsed.meta.driver_id, driverJson.driver_id);
-    t.is(parsedManager.meta.driver_id, driverJson.driver_id);
-    t.truthy(parsed.config);
-    t.truthy(parsedManager.config);
-    t.is(parsed.config.avrs?.[0].model, sampleConfig.avrs?.[0].model);
-    t.is(parsed.config.avrs?.[0].ip, sampleConfig.avrs?.[0].ip);
-    t.is(parsed.config.avrs?.[0].port, sampleConfig.avrs?.[0].port);
-    t.is(parsed.config.avrs?.[0].zone, sampleConfig.avrs?.[0].zone);
-    t.is(parsed.config.avrs?.[0].entityNameStyle, sampleConfig.avrs?.[0].entityNameStyle);
-    t.is(parsedManager.config.avrs?.[0].model, sampleConfig.avrs?.[0].model);
-    t.is(parsedManager.config.avrs?.[0].ip, sampleConfig.avrs?.[0].ip);
-    t.is(parsedManager.config.avrs?.[0].port, sampleConfig.avrs?.[0].port);
-    t.is(parsedManager.config.avrs?.[0].zone, sampleConfig.avrs?.[0].zone);
-    t.is(parsedManager.config.avrs?.[0].entityNameStyle, sampleConfig.avrs?.[0].entityNameStyle);
+    expect(parsed.meta.driver_id).toBe(driverJson.driver_id);
+    expect(parsedManager.meta.driver_id).toBe(driverJson.driver_id);
+    expect(parsed.config).toBeTruthy();
+    expect(parsedManager.config).toBeTruthy();
+    expect(parsed.config.avrs?.[0].model).toBe(sampleConfig.avrs?.[0].model);
+    expect(parsed.config.avrs?.[0].ip).toBe(sampleConfig.avrs?.[0].ip);
+    expect(parsed.config.avrs?.[0].port).toBe(sampleConfig.avrs?.[0].port);
+    expect(parsed.config.avrs?.[0].zone).toBe(sampleConfig.avrs?.[0].zone);
+    expect(parsed.config.avrs?.[0].entityNameStyle).toBe(sampleConfig.avrs?.[0].entityNameStyle);
+    expect(parsedManager.config.avrs?.[0].model).toBe(sampleConfig.avrs?.[0].model);
+    expect(parsedManager.config.avrs?.[0].ip).toBe(sampleConfig.avrs?.[0].ip);
+    expect(parsedManager.config.avrs?.[0].port).toBe(sampleConfig.avrs?.[0].port);
+    expect(parsedManager.config.avrs?.[0].zone).toBe(sampleConfig.avrs?.[0].zone);
+    expect(parsedManager.config.avrs?.[0].entityNameStyle).toBe(sampleConfig.avrs?.[0].entityNameStyle);
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
   }
 });
 
-test.serial("restore flow applies provided backup_data", async (t) => {
+it("restore flow applies provided backup_data", async () => {
   const tmp = mkTmpDir();
   try {
     setConfigDir(tmp);
@@ -119,11 +118,10 @@ test.serial("restore flow applies provided backup_data", async (t) => {
     console.log("on-disk-config (after src save - restore test):", fs.readFileSync(path.join(tmp, "config.json"), "utf-8"));
 
     // Import compiled driver using a file:// URL (required on Windows ESM loader)
-    const { pathToFileURL } = await import("url");
-    const driverModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/driver.js")).href);
+    const driverModule = await import("../src/driver.js");
     const OnkyoDriver = driverModule.default as any;
     // Ensure the compiled ConfigManager uses the same temp config dir at runtime
-    const configManagerModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/configManager.js")).href);
+    const configManagerModule = await import("../src/configManager.js");
     if (configManagerModule && typeof configManagerModule.setConfigDir === "function") {
       configManagerModule.setConfigDir(tmp);
       console.log("dist config path set to", configManagerModule.getConfigPath && configManagerModule.getConfigPath());
@@ -156,30 +154,29 @@ test.serial("restore flow applies provided backup_data", async (t) => {
 
     // Perform restore via setup input
     const restoreResp = await drv.handleDriverSetup?.(new uc.UserDataResponse({ action: "restore", backup_data: payloadString }));
-    t.true(restoreResp instanceof uc.SetupComplete);
+    expect(restoreResp).toBeInstanceOf(uc.SetupComplete);
 
     // Verify config applied
     const reloaded = ConfigManager.load();
-    t.truthy(reloaded.avrs);
-    t.is(reloaded.avrs?.[0].model, targetConfig.avrs![0].model);
-    t.is(reloaded.avrs?.[0].ip, targetConfig.avrs![0].ip);
-    t.is(reloaded.avrs?.[0].entityNameStyle, targetConfig.avrs![0].entityNameStyle);
+    expect(reloaded.avrs).toBeTruthy();
+    expect(reloaded.avrs?.[0].model).toBe(targetConfig.avrs![0].model);
+    expect(reloaded.avrs?.[0].ip).toBe(targetConfig.avrs![0].ip);
+    expect(reloaded.avrs?.[0].entityNameStyle).toBe(targetConfig.avrs![0].entityNameStyle);
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
   }
 });
 
-test.serial("restore flow defaults missing TuneIn menu setting to mypresets", async (t) => {
+it("restore flow defaults missing TuneIn menu setting to mypresets", async () => {
   const tmp = mkTmpDir();
   try {
     setConfigDir(tmp);
 
     ConfigManager.save({ avrs: [{ model: "OLD", ip: "0.0.0.0", port: 60128, zone: "main" }] });
 
-    const { pathToFileURL } = await import("url");
-    const driverModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/driver.js")).href);
+    const driverModule = await import("../src/driver.js");
     const OnkyoDriver = driverModule.default as any;
-    const configManagerModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/configManager.js")).href);
+    const configManagerModule = await import("../src/configManager.js");
     if (configManagerModule && typeof configManagerModule.setConfigDir === "function") {
       configManagerModule.setConfigDir(tmp);
     }
@@ -203,30 +200,29 @@ test.serial("restore flow defaults missing TuneIn menu setting to mypresets", as
     const payloadString = JSON.stringify(payload);
 
     const restoreResp = await drv.handleDriverSetup?.(new uc.UserDataResponse({ action: "restore", backup_data: payloadString }));
-    t.true(restoreResp instanceof uc.SetupComplete);
+    expect(restoreResp).toBeInstanceOf(uc.SetupComplete);
 
     const reloaded = ConfigManager.load();
-    t.truthy(reloaded.avrs);
-    t.is(reloaded.avrs?.[0].model, targetConfig.avrs![0].model);
-    t.is(reloaded.avrs?.[0].ip, targetConfig.avrs![0].ip);
-    t.is(reloaded.avrs?.[0].entityNameStyle, targetConfig.avrs![0].entityNameStyle);
-    t.is(reloaded.avrs?.[0].tuneinMenuStyle, "mypresets");
+    expect(reloaded.avrs).toBeTruthy();
+    expect(reloaded.avrs?.[0].model).toBe(targetConfig.avrs![0].model);
+    expect(reloaded.avrs?.[0].ip).toBe(targetConfig.avrs![0].ip);
+    expect(reloaded.avrs?.[0].entityNameStyle).toBe(targetConfig.avrs![0].entityNameStyle);
+    expect(reloaded.avrs?.[0].tuneinMenuStyle).toBe("mypresets");
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
   }
 });
 
-test.serial("restore flow accepts intg-manager restore_from_backup payload", async (t) => {
+it("restore flow accepts intg-manager restore_from_backup payload", async () => {
   const tmp = mkTmpDir();
   try {
     setConfigDir(tmp);
 
     ConfigManager.save({ avrs: [{ model: "OLD", ip: "0.0.0.0", port: 60128, zone: "main" }] });
 
-    const { pathToFileURL } = await import("url");
-    const driverModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/driver.js")).href);
+    const driverModule = await import("../src/driver.js");
     const OnkyoDriver = driverModule.default as any;
-    const configManagerModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/configManager.js")).href);
+    const configManagerModule = await import("../src/configManager.js");
     if (configManagerModule && typeof configManagerModule.setConfigDir === "function") {
       configManagerModule.setConfigDir(tmp);
     }
@@ -250,33 +246,32 @@ test.serial("restore flow accepts intg-manager restore_from_backup payload", asy
     const payloadString = JSON.stringify(payload);
 
     const startResp = await drv.handleDriverSetup?.(new uc.DriverSetupRequest(false, {}));
-    t.true(startResp instanceof uc.RequestUserInput);
+    expect(startResp).toBeInstanceOf(uc.RequestUserInput);
 
     const promptResp = await drv.handleDriverSetup?.(new uc.UserDataResponse({ restore_from_backup: "true" }));
-    t.true(promptResp instanceof uc.RequestUserInput);
+    expect(promptResp instanceof uc.RequestUserInput).toBe(true);
 
     const restoreResp = await drv.handleDriverSetup?.(new uc.UserDataResponse({ restore_from_backup: "true", restore_data: payloadString }));
-    t.true(restoreResp instanceof uc.SetupComplete);
+    expect(restoreResp).toBeInstanceOf(uc.SetupComplete);
 
     const reloaded = ConfigManager.load();
-    t.truthy(reloaded.avrs);
-    t.is(reloaded.avrs?.[0].model, targetConfig.avrs![0].model);
-    t.is(reloaded.avrs?.[0].ip, targetConfig.avrs![0].ip);
-    t.is(reloaded.avrs?.[0].entityNameStyle, targetConfig.avrs![0].entityNameStyle);
+    expect(reloaded.avrs).toBeTruthy();
+    expect(reloaded.avrs?.[0].model).toBe(targetConfig.avrs![0].model);
+    expect(reloaded.avrs?.[0].ip).toBe(targetConfig.avrs![0].ip);
+    expect(reloaded.avrs?.[0].entityNameStyle).toBe(targetConfig.avrs![0].entityNameStyle);
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
   }
 });
 
-test.serial("initial setup manual mode opens configuration form", async (t) => {
+it("initial setup manual mode opens configuration form", async () => {
   const tmp = mkTmpDir();
   try {
     setConfigDir(tmp);
 
-    const { pathToFileURL } = await import("url");
-    const driverModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/driver.js")).href);
+    const driverModule = await import("../src/driver.js");
     const OnkyoDriver = driverModule.default as any;
-    const configManagerModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/configManager.js")).href);
+    const configManagerModule = await import("../src/configManager.js");
     if (configManagerModule && typeof configManagerModule.setConfigDir === "function") {
       configManagerModule.setConfigDir(tmp);
     }
@@ -295,13 +290,13 @@ test.serial("initial setup manual mode opens configuration form", async (t) => {
     drv.registerAvailableEntities = (OnkyoDriver.prototype as any).registerAvailableEntities.bind(drv);
 
     const startResp = await drv.handleDriverSetup?.(new uc.DriverSetupRequest(false, {}));
-    t.true(startResp instanceof uc.RequestUserInput);
+    expect(startResp).toBeInstanceOf(uc.RequestUserInput);
 
     const manualResp = await drv.handleDriverSetup?.(new uc.UserDataResponse({ restore_from_backup: "false" }));
-    t.true(manualResp instanceof uc.RequestUserInput);
+    expect(manualResp instanceof uc.RequestUserInput).toBe(true);
     const settings = (manualResp as uc.RequestUserInput).settings as Array<{ id: string }>;
-    t.truthy(settings.find((s) => s.id === "model"));
-    t.truthy(settings.find((s) => s.id === "ipAddress"));
+    expect(settings.find((s) => s.id === "model")).toBeTruthy();
+    expect(settings.find((s) => s.id === "ipAddress")).toBeTruthy();
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
   }

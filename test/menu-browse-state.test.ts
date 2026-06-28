@@ -1,13 +1,7 @@
-import test from "ava";
-import path from "path";
-import { pathToFileURL } from "url";
+import { describe, it, expect } from "vitest";
 
-async function importDist(modulePath: string): Promise<Record<string, unknown>> {
-  return import(pathToFileURL(path.resolve(process.cwd(), modulePath)).href);
-}
-
-test.serial("resetMenuBrowseState clears both data and runtime transient flags", async (t) => {
-  const browseStateModule = await importDist("dist/src/menuBrowseState.js");
+it("resetMenuBrowseState clears both data and runtime transient flags", async () => {
+  const browseStateModule = await import("../src/menuBrowseState.js");
   const { createMenuBrowseState, resetMenuBrowseState, upsertMenuOption } = browseStateModule as {
     createMenuBrowseState: () => any;
     resetMenuBrowseState: (state: any) => void;
@@ -27,37 +21,37 @@ test.serial("resetMenuBrowseState clears both data and runtime transient flags",
   state.browseListFrozen = true;
   state.nowPlayingTitle = "Now Playing";
 
-  t.is(state.optionsByMenuIndex.size, 2);
-  t.is(state.totalListItemCount, 5);
-  t.is(state.nlsLayerNumber, 2);
-  t.true(state.showMainMenuShortcut);
-  t.true(state.traceNextSelectionAfterMainMenu);
-  t.true(state.listModeActive);
-  t.true(state.browseListFrozen);
+  expect(state.optionsByMenuIndex.size).toBe(2);
+  expect(state.totalListItemCount).toBe(5);
+  expect(state.nlsLayerNumber).toBe(2);
+  expect(state.showMainMenuShortcut).toBe(true);
+  expect(state.traceNextSelectionAfterMainMenu).toBe(true);
+  expect(state.listModeActive).toBe(true);
+  expect(state.browseListFrozen).toBe(true);
 
   // Reset the state
   resetMenuBrowseState(state);
 
   // Verify all data is cleared
-  t.is(state.optionsByMenuIndex.size, 0);
-  t.is(state.totalListItemCount, 0);
-  t.is(state.nlsLayerNumber, 0);
+  expect(state.optionsByMenuIndex.size).toBe(0);
+  expect(state.totalListItemCount).toBe(0);
+  expect(state.nlsLayerNumber).toBe(0);
 
   // Verify all transient flags are cleared to false (crucial for service re-entry)
-  t.false(state.showMainMenuShortcut);
-  t.false(state.traceNextSelectionAfterMainMenu);
-  t.false(state.listModeActive);
-  t.false(state.browseListFrozen);
+  expect(state.showMainMenuShortcut).toBe(false);
+  expect(state.traceNextSelectionAfterMainMenu).toBe(false);
+  expect(state.listModeActive).toBe(false);
+  expect(state.browseListFrozen).toBe(false);
 
   // Verify thumbnails are also cleared
-  t.is(state.thumbnailByTitle.size, 0);
+  expect(state.thumbnailByTitle.size).toBe(0);
 
   // nowPlayingTitle is NOT cleared by reset (it's service-specific data)
-  t.is(state.nowPlayingTitle, "Now Playing");
+  expect(state.nowPlayingTitle).toBe("Now Playing");
 });
 
-test.serial("Transient flags reset prevents state leaks across service switches", async (t) => {
-  const browseStateModule = await importDist("dist/src/menuBrowseState.js");
+it("Transient flags reset prevents state leaks across service switches", async () => {
+  const browseStateModule = await import("../src/menuBrowseState.js");
   const { createMenuBrowseState, resetMenuBrowseState } = browseStateModule as {
     createMenuBrowseState: () => any;
     resetMenuBrowseState: (state: any) => void;
@@ -70,21 +64,21 @@ test.serial("Transient flags reset prevents state leaks across service switches"
   state.traceNextSelectionAfterMainMenu = false;
   state.showMainMenuShortcut = true;
 
-  t.true(state.listModeActive);
-  t.false(state.traceNextSelectionAfterMainMenu);
-  t.true(state.showMainMenuShortcut);
+  expect(state.listModeActive).toBe(true);
+  expect(state.traceNextSelectionAfterMainMenu).toBe(false);
+  expect(state.showMainMenuShortcut).toBe(true);
 
   // Simulate service switch: reset
   resetMenuBrowseState(state);
 
   // Verify transient flags start fresh (so first non-browsable selection on new service doesn't skip prep)
-  t.false(state.listModeActive, "listModeActive should be reset to prevent stale skip on service re-entry");
-  t.false(state.traceNextSelectionAfterMainMenu, "traceNextSelectionAfterMainMenu should be reset");
-  t.false(state.showMainMenuShortcut, "showMainMenuShortcut should be reset");
+  expect(state.listModeActive).toBe(false);
+  expect(state.traceNextSelectionAfterMainMenu).toBe(false);
+  expect(state.showMainMenuShortcut).toBe(false);
 });
 
-test.serial("consumeListModeActive toggles transient flag correctly before reset", async (t) => {
-  const browseStateModule = await importDist("dist/src/menuBrowseState.js");
+it("consumeListModeActive toggles transient flag correctly before reset", async () => {
+  const browseStateModule = await import("../src/menuBrowseState.js");
   const { createMenuBrowseState, consumeListModeActive } = browseStateModule as {
     createMenuBrowseState: () => any;
     consumeListModeActive: (state: any) => boolean;
@@ -93,17 +87,17 @@ test.serial("consumeListModeActive toggles transient flag correctly before reset
   const state = createMenuBrowseState();
 
   // Initially false
-  t.is(consumeListModeActive(state), false);
-  t.false(state.listModeActive);
+  expect(consumeListModeActive(state)).toBe(false);
+  expect(state.listModeActive).toBe(false);
 
   // Set it
   state.listModeActive = true;
 
   // First consume returns true and clears it
-  t.is(consumeListModeActive(state), true);
-  t.false(state.listModeActive);
+  expect(consumeListModeActive(state)).toBe(true);
+  expect(state.listModeActive).toBe(false);
 
   // Second consume returns false (already consumed)
-  t.is(consumeListModeActive(state), false);
-  t.false(state.listModeActive);
+  expect(consumeListModeActive(state)).toBe(false);
+  expect(state.listModeActive).toBe(false);
 });

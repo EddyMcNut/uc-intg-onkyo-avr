@@ -1,5 +1,6 @@
 import EiscpDriver from "./eiscp.js";
 import log from "./loggers.js";
+import { CONNECTION_TIMEOUT } from "./constants.js";
 
 /** Helper to create a delay promise */
 export const delay = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
@@ -15,7 +16,7 @@ export async function ensureEiscpConnected(eiscp: EiscpDriver, connectOptions: {
     log.info("%s [%s] Command received while disconnected, triggering reconnection...", integrationName, entityId);
     try {
       await eiscp.connect(connectOptions);
-      await eiscp.waitForConnect(3000);
+      await eiscp.waitForConnect(CONNECTION_TIMEOUT);
       log.info("%s [%s] Reconnected on command", integrationName, entityId);
     } catch (connectErr) {
       log.warn("%s [%s] Failed to reconnect on command: %s", integrationName, entityId, connectErr);

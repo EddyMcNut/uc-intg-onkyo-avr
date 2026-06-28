@@ -1,4 +1,4 @@
-import test from "ava";
+import { describe, it, expect } from "vitest";
 import fs from "fs";
 import os from "os";
 import path from "path";
@@ -10,16 +10,12 @@ function mkTmpDir(prefix = "onkyo-test-") {
 }
 
 // We import compiled modules from dist to match runtime behavior
-async function importDistModule(relPath: string) {
-  const { pathToFileURL } = await import("url");
-  return await import(pathToFileURL(path.resolve(process.cwd(), relPath)).href);
-}
 
-test.serial("handleRestorePayload: applies valid payload and calls onConfigSaved", async (t) => {
+it("handleRestorePayload: applies valid payload and calls onConfigSaved", async () => {
   const tmp = mkTmpDir();
   try {
-    const configModule = await importDistModule("dist/src/configManager.js");
-    const SetupHandlerModule = await importDistModule("dist/src/setupHandler.js");
+    const configModule = await import("../src/configManager.js");
+    const SetupHandlerModule = await import("../src/setupHandler.js");
     const ConfigManager = configModule.ConfigManager;
     if (typeof configModule.setConfigDir === "function") configModule.setConfigDir(tmp);
 
@@ -45,24 +41,24 @@ test.serial("handleRestorePayload: applies valid payload and calls onConfigSaved
     const payloadString = JSON.stringify(payload);
 
     const res = await (setup as any).handleRestorePayload(payloadString);
-    t.true(res instanceof uc.SetupComplete);
+    expect(res).toBeInstanceOf(uc.SetupComplete);
 
     const reloaded = ConfigManager.load();
-    t.truthy(reloaded.avrs);
-    t.is(reloaded.avrs[0].model, targetConfig.avrs[0].model);
-    t.is(reloaded.avrs[0].ip, targetConfig.avrs[0].ip);
-    t.is(reloaded.avrs[0].entityNameStyle, "short");
-    t.true(saved);
+    expect(reloaded.avrs).toBeTruthy();
+    expect(reloaded.avrs[0].model).toBe(targetConfig.avrs[0].model);
+    expect(reloaded.avrs[0].ip).toBe(targetConfig.avrs[0].ip);
+    expect(reloaded.avrs[0].entityNameStyle).toBe("short");
+    expect(saved).toBe(true);
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
   }
 });
 
-test.serial("handleRestorePayload: invalid payload returns RequestUserInput with preserved textarea", async (t) => {
+it("handleRestorePayload: invalid payload returns RequestUserInput with preserved textarea", async () => {
   const tmp = mkTmpDir();
   try {
-    const configModule = await importDistModule("dist/src/configManager.js");
-    const SetupHandlerModule = await importDistModule("dist/src/setupHandler.js");
+    const configModule = await import("../src/configManager.js");
+    const SetupHandlerModule = await import("../src/setupHandler.js");
     if (typeof configModule.setConfigDir === "function") configModule.setConfigDir(tmp);
 
     const host: any = {
@@ -80,23 +76,23 @@ test.serial("handleRestorePayload: invalid payload returns RequestUserInput with
     const raw = JSON.stringify(payload);
 
     const res = await (setup as any).handleRestorePayload(raw);
-    t.true(res instanceof uc.RequestUserInput);
+    expect(res).toBeInstanceOf(uc.RequestUserInput);
     const settings = (res as uc.RequestUserInput).settings as any[];
     const info = settings.find((s: any) => s.id === "info");
     const textarea = settings.find((s: any) => s.id === "restore_data");
-    t.truthy(info);
-    t.truthy(textarea);
-    t.is((textarea.field as any).textarea.value, raw);
+    expect(info).toBeTruthy();
+    expect(textarea).toBeTruthy();
+    expect((textarea.field as any).textarea.value).toBe(raw);
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
   }
 });
 
-test.serial("handleDeleteConfigPayload: confirm=false prompts and confirm=true clears config", async (t) => {
+it("handleDeleteConfigPayload: confirm=false prompts and confirm=true clears config", async () => {
   const tmp = mkTmpDir();
   try {
-    const configModule = await importDistModule("dist/src/configManager.js");
-    const SetupHandlerModule = await importDistModule("dist/src/setupHandler.js");
+    const configModule = await import("../src/configManager.js");
+    const SetupHandlerModule = await import("../src/setupHandler.js");
     const ConfigManager = configModule.ConfigManager;
     if (typeof configModule.setConfigDir === "function") configModule.setConfigDir(tmp);
 
@@ -116,24 +112,24 @@ test.serial("handleDeleteConfigPayload: confirm=false prompts and confirm=true c
     const setup = new SetupHandlerModule.default(host);
 
     const prompt = await (setup as any).handleDeleteConfigPayload(false, false);
-    t.true(prompt instanceof uc.RequestUserInput);
+    expect(prompt).toBeInstanceOf(uc.RequestUserInput);
 
     const res = await (setup as any).handleDeleteConfigPayload(true, false);
-    t.true(res instanceof uc.SetupComplete);
+    expect(res).toBeInstanceOf(uc.SetupComplete);
 
     const reloaded = ConfigManager.load();
     // After clearing, avrs should be undefined or empty
-    t.true(!reloaded.avrs || reloaded.avrs.length === 0);
+    expect(!reloaded.avrs || reloaded.avrs.length === 0).toBe(true);
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
   }
 });
 
-test.serial("handleManualConfiguration: valid input creates AVR entries", async (t) => {
+it("handleManualConfiguration: valid input creates AVR entries", async () => {
   const tmp = mkTmpDir();
   try {
-    const configModule = await importDistModule("dist/src/configManager.js");
-    const SetupHandlerModule = await importDistModule("dist/src/setupHandler.js");
+    const configModule = await import("../src/configManager.js");
+    const SetupHandlerModule = await import("../src/setupHandler.js");
     const ConfigManager = configModule.ConfigManager;
     if (typeof configModule.setConfigDir === "function") configModule.setConfigDir(tmp);
 
@@ -165,24 +161,24 @@ test.serial("handleManualConfiguration: valid input creates AVR entries", async 
     };
 
     const res = await (setup as any).handleManualConfiguration(input);
-    t.true(res instanceof uc.SetupComplete);
-    t.true(saved);
+    expect(res).toBeInstanceOf(uc.SetupComplete);
+    expect(saved).toBe(true);
 
     const reloaded = ConfigManager.load();
-    t.truthy(reloaded.avrs);
-    t.is(reloaded.avrs.length, 2);
-    t.is(reloaded.avrs[0].model, "TX-RZ50");
-    t.is(reloaded.avrs[0].entityNameStyle, "short");
+    expect(reloaded.avrs).toBeTruthy();
+    expect(reloaded.avrs.length).toBe(2);
+    expect(reloaded.avrs[0].model).toBe("TX-RZ50");
+    expect(reloaded.avrs[0].entityNameStyle).toBe("short");
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
   }
 });
 
-test.serial("handleManualConfiguration: invalid input returns RequestUserInput with errors", async (t) => {
+it("handleManualConfiguration: invalid input returns RequestUserInput with errors", async () => {
   const tmp = mkTmpDir();
   try {
-    const configModule = await importDistModule("dist/src/configManager.js");
-    const SetupHandlerModule = await importDistModule("dist/src/setupHandler.js");
+    const configModule = await import("../src/configManager.js");
+    const SetupHandlerModule = await import("../src/setupHandler.js");
     if (typeof configModule.setConfigDir === "function") configModule.setConfigDir(tmp);
 
     const host: any = {
@@ -203,20 +199,20 @@ test.serial("handleManualConfiguration: invalid input returns RequestUserInput w
     };
 
     const res = await (setup as any).handleManualConfiguration(input);
-    t.true(res instanceof uc.RequestUserInput);
+    expect(res).toBeInstanceOf(uc.RequestUserInput);
     const settings = (res as uc.RequestUserInput).settings as any[];
     const info = settings.find((s: any) => s.id === "info");
-    t.truthy(info);
+    expect(info).toBeTruthy();
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
   }
 });
 
-test.serial("handleBackupPayload: returns backup data JSON textarea", async (t) => {
+it("handleBackupPayload: returns backup data JSON textarea", async () => {
   const tmp = mkTmpDir();
   try {
-    const configModule = await importDistModule("dist/src/configManager.js");
-    const SetupHandlerModule = await importDistModule("dist/src/setupHandler.js");
+    const configModule = await import("../src/configManager.js");
+    const SetupHandlerModule = await import("../src/setupHandler.js");
     const ConfigManager = configModule.ConfigManager;
     if (typeof configModule.setConfigDir === "function") configModule.setConfigDir(tmp);
 
@@ -233,26 +229,71 @@ test.serial("handleBackupPayload: returns backup data JSON textarea", async (t) 
 
     const setup = new SetupHandlerModule.default(host);
     const res = await (setup as any).handleBackupPayload();
-    t.true(res instanceof uc.RequestUserInput);
+    expect(res).toBeInstanceOf(uc.RequestUserInput);
     const settings = (res as uc.RequestUserInput).settings as any[];
     const backup = settings.find((s: any) => s.id === "backup_data");
-    t.truthy(backup);
+    expect(backup).toBeTruthy();
     const raw = (backup.field as any).textarea.value as string;
     const parsed = JSON.parse(raw);
-    t.truthy(parsed.meta);
-    t.truthy(parsed.config);
+    expect(parsed.meta).toBeTruthy();
+    expect(parsed.config).toBeTruthy();
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
   }
 });
 
+it("handle: returns SetupComplete for non-matching message", async () => {
+  const configModule = await import("../src/configManager.js");
+  const SetupHandlerModule = await import("../src/setupHandler.js");
+  const host: any = {
+    driver: {},
+    getConfigDirPath: () => "/tmp",
+    onConfigSaved: async () => {},
+    onConfigCleared: async () => {},
+    log: console
+  };
+  const setup = new SetupHandlerModule.default(host);
+  const res = await setup.handle({ customData: "no-match" });
+  expect(res).toBeInstanceOf(uc.SetupComplete);
+});
+
+it("handleDriverSetupReconfigure: returns undefined for unknown choice", async () => {
+  const configModule = await import("../src/configManager.js");
+  const SetupHandlerModule = await import("../src/setupHandler.js");
+  const host: any = {
+    driver: {},
+    getConfigDirPath: () => "/tmp",
+    onConfigSaved: async () => {},
+    onConfigCleared: async () => {},
+    log: console
+  };
+  const setup = new SetupHandlerModule.default(host);
+  const msg: any = { reconfigure: true, setupData: { choice: "unknown_option" } };
+  const res = await (setup as any).handleDriverSetupReconfigure(msg);
+  expect(res).toBeUndefined();
+});
+
+it("handleRestorePayload: returns restore form for undefined payload", async () => {
+  const SetupHandlerModule = await import("../src/setupHandler.js");
+  const host: any = {
+    driver: {},
+    getConfigDirPath: () => "/tmp",
+    onConfigSaved: async () => {},
+    onConfigCleared: async () => {},
+    log: console
+  };
+  const setup = new SetupHandlerModule.default(host);
+  const res = await (setup as any).handleRestorePayload(undefined);
+  expect(res).toBeInstanceOf(uc.RequestUserInput);
+});
+
 // Ensure listeningModeOptions provided during initial setup + autodiscovery are persisted
-test.serial("handleManualConfiguration: autodiscovery should persist listeningModeOptions when supplied", async (t) => {
+it("handleManualConfiguration: autodiscovery should persist listeningModeOptions when supplied", async () => {
   const tmp = mkTmpDir();
   try {
-    const configModule = await importDistModule("dist/src/configManager.js");
-    const SetupHandlerModule = await importDistModule("dist/src/setupHandler.js");
-    const EiscpModule = await importDistModule("dist/src/eiscp.js");
+    const configModule = await import("../src/configManager.js");
+    const SetupHandlerModule = await import("../src/setupHandler.js");
+    const EiscpModule = await import("../src/eiscp.js");
 
     const ConfigManager = configModule.ConfigManager;
     if (typeof configModule.setConfigDir === "function") configModule.setConfigDir(tmp);
@@ -282,13 +323,13 @@ test.serial("handleManualConfiguration: autodiscovery should persist listeningMo
     };
 
     const res = await (setup as any).handleManualConfiguration(input);
-    t.true(res instanceof uc.SetupComplete);
-    t.true(saved);
+    expect(res).toBeInstanceOf(uc.SetupComplete);
+    expect(saved).toBe(true);
 
     const reloaded = ConfigManager.load();
-    t.truthy(reloaded.avrs && reloaded.avrs[0].listeningModeOptions);
-    t.deepEqual(reloaded.avrs![0].listeningModeOptions, ["stereo", "straight-decode"]);
-    t.is(reloaded.avrs![0].entityNameStyle, "short");
+    expect(reloaded.avrs && reloaded.avrs[0].listeningModeOptions).toBeTruthy();
+    expect(reloaded.avrs![0].listeningModeOptions).toEqual(["stereo", "straight-decode"]);
+    expect(reloaded.avrs![0].entityNameStyle).toBe("short");
 
     // restore stub
     EiscpModule.default.prototype.discover = originalDiscover;

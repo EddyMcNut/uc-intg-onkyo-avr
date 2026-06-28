@@ -1,0 +1,132 @@
+TAP version 13
+ok 1 - avr-instance-manager › ensureZoneInstances creates zone instances when physical connection present
+ok 2 - avr-instance-manager › ensureZoneInstances skips when no physical connection present
+ok 3 - avr-instance-manager › ensureZoneInstances refreshes config of existing instance
+ok 4 - connect-coordinator › connect returns false when no avrs configured
+ok 5 - connect-coordinator › connect creates physical connections and zone instances when missing
+ok 6 - connect-coordinator › connect handles reconnection when physical connection exists but disconnected
+ok 7 - eiscp-command-parser › IscpCommandParser handles truncated and valid NLA frames
+ok 8 - eiscp-command-parser › IscpCommandParser parses malformed and valid NTM payloads
+ok 9 - eiscp-command-parser › IscpCommandParser metadata flows keep raw values and support patch/get
+ok 10 - eiscp-command-parser › IscpCommandParser maps unknown commands to null and zone commands correctly
+ok 11 - eiscp-command-parser › IscpCommandParser handles NLS validation and NLA extraction
+ok 12 - eiscp-command-parser › IscpCommandParser emits NLT_CONTEXT for My Presets on NET source
+ok 13 - eiscp-command-parser › IscpCommandParser updates browse state from NLT headers per active subsource
+ok 14 - eiscp-command-parser › IscpCommandParser FLD routing suppresses NET scrolling and handles FM/default
+ok 15 - eiscp-command-parser › IscpCommandParser maps TuneIn NAT title to canonical service name
+ok 16 - eiscp-command-parser › IscpCommandParser parses IFA payload into normalized audio fields
+ok 17 - eiscp-command-parser › IscpCommandParser parses IFV payload and handles unknown resolution display
+ok 18 - eiscp-command-parser › IscpCommandParser merges multi-frame metadata payloads
+ok 19 - eiscp-command-parser › IscpCommandParser emits NLT when service text indicates subsource switch
+ok 20 - eiscp-packet › extracts concatenated ISCP frames individually
+ok 21 - eiscp-packet › createEiscpPacket adds !1 prefix and valid ISCP header
+ok 22 - eiscp-packet › extractAllIscpMessages falls back to single-frame extraction for malformed input
+ok 23 - listening-mode › ConfigManager validates and normalizes listeningModeOptions (semicolon string)
+ok 24 - eiscp-command-parser › IscpCommandParser decodes generic hex payloads for mapped commands without int range
+ok 25 - eiscp-command-parser › IscpCommandParser FLD sanitizes characters and skips service text outside NET
+ok 26 - eiscp-multi-zone › buildMultiZoneVolumeCommands filters and maps zone-specific up/down commands
+ok 27 - eiscp-multi-zone › buildMultiZoneMuteCommands generates zone-specific mute/unmute sequences
+ok 28 - eiscp-multi-zone › Multi-zone command generation is deterministic and repeatable
+ok 29 - eiscp-multi-zone › Multi-zone command generation ignores unknown directions and zones
+ok 30 - menu-browse-state › resetMenuBrowseState clears both data and runtime transient flags
+ok 31 - menu-browse-state › Transient flags reset prevents state leaks across service switches
+ok 32 - menu-browse-state › consumeListModeActive toggles transient flag correctly before reset
+ok 33 - connection-manager › schedule and cancel scheduled reconnection
+ok 34 - connection-manager › attemptReconnection delegates to reconnection manager and returns result
+ok 35 - connection-manager › clearAllConnections removes stored connections
+ok 36 - avr-state-playback-status › AvrStateManager maps NET playbackStatus paused to MediaPlayerStates.Paused
+ok 37 - command-sender › CommandSender rejects malformed entity ids and unknown AVR targets
+ok 38 - command-sender › CommandSender executes core command branches and zone-specific routing
+ok 39 - command-sender › CommandSender handles relative volume ignore and throttle
+ok 40 - command-sender › CommandSender handles known simple commands via handleSimpleCommand fallthrough
+ok 41 - entity-registrar › EntityRegistrar builds entities correctly
+ok 42 - entity-registrar › EntityRegistrar sensor names omit host from display name
+ok 43 - entity-registrar › EntityRegistrar long entity names include host when configured
+ok 44 - media-browser › Media player browse returns TuneIn presets only for NET TuneIn
+ok 45 - media-browser › Media player browse ignores TuneIn menu entries until My Presets is active
+ok 46 - entity-registrar-config › EntityRegistrar returns user-configured listeningModeOptions from config
+ok 47 - media-browser › TuneIn browse root exposes all presets when the list is longer than 10
+ok 48 - media-browser › Media player browse returns TuneIn full menu items from NET TuneIn
+ok 49 - media-browser › Media player browse hides TuneIn Login menu item
+ok 50 - media-browser › TuneIn selection keeps subsource and state so browse can be repeated
+ok 51 - media-browser › TuneIn preset cache survives post-select menu updates
+ok 52 - media-browser › Media player browse returns Tidal menu entries from AVR NLS updates
+ok 53 - command-receiver-listening-mode › CommandReceiver preserves user-configured listeningModeOptions across IFA/source events
+ok 54 - media-browser › Media player browse returns Deezer menu entries from AVR NLS updates
+ok 55 - setup-backup › backup flow returns backup_data JSON
+ok 56 - media-browser › Media player browse marks Deezer NLS entries without %s as playable tracks
+ok 57 - onkyo-reconfigure › registerAvailableEntities refreshes listening_mode options on reconfigure
+ok 58 - media-browser › Media player browse hides excluded Tidal menu items
+ok 59 - media-browser › Media player browse defaults to 25 items per page when paging is omitted
+ok 60 - media-browser › Tidal browse survives DAB-to-NET transition when NLT/NLS arrive early
+ok 61 - setup-backup › restore flow applies provided backup_data
+ok 62 - media-browser › Repeated NLT tidal updates do not clear existing Tidal menu options
+ok 63 - setup-backup › restore flow defaults missing TuneIn menu setting to mypresets
+ok 64 - setup-backup › restore flow accepts intg-manager restore_from_backup payload
+ok 65 - setup-backup › initial setup manual mode opens configuration form
+ok 66 - config-coercions › createAvrSpecificConfig coerces types correctly
+ok 67 - config-coercions › CommandSender volume conversion respects adjustVolumeDispl
+not ok 68 - simple-commands › SIMPLE_COMMANDS_MAP loads and contains expected total keys
+  ---
+    name: AssertionError
+    assertion: t.is()
+    details:
+      'Difference (- actual, + expected):': |-
+        - 345
+        + 343
+    message: ''
+    at: >-
+      ExecutionContext.is
+      (file:///Users/ednootebos/Repos/uc-intg-onkyo-avr/node_modules/ava/lib/assert.js:310:16)
+  ...
+ok 69 - simple-commands › SIMPLE_COMMANDS_MAP contains expected known input keys
+ok 70 - simple-commands › SIMPLE_COMMANDS_MAP includes NSS streaming sources
+ok 71 - simple-commands › SIMPLE_COMMANDS_MAP excludes query, up, and down
+ok 72 - simple-commands › SIMPLE_COMMANDS_MAP generates multiple keys for aliases mapping to same value
+ok 73 - simple-commands › SIMPLE_COMMANDS_MAP includes audio-muting commands
+ok 74 - simple-commands › SIMPLE_COMMANDS_MAP includes multi-zone-muting commands
+ok 75 - simple-commands › SIMPLE_COMMANDS_MAP includes multi-zone-volume commands
+ok 76 - simple-commands › SIMPLE_COMMANDS_MAP includes audio-return-channel commands
+ok 77 - simple-commands › SIMPLE_COMMANDS_MAP includes dimmer-level commands
+ok 78 - simple-commands › SIMPLE_COMMANDS_MAP includes dirac commands
+ok 79 - simple-commands › SIMPLE_COMMANDS_MAP includes listening-mode commands
+ok 80 - simple-commands › SIMPLE_COMMANDS_MAP includes late-night commands
+ok 81 - simple-commands › SIMPLE_COMMANDS_MAP includes lfe-level commands
+ok 82 - simple-commands › SIMPLE_COMMANDS_MAP includes loudness-management commands
+ok 83 - simple-commands › SIMPLE_COMMANDS_MAP includes music-optimizer commands
+ok 84 - simple-commands › SIMPLE_COMMANDS_MAP replaces hyphens with underscores in IDs
+ok 85 - simple-commands › ALL_SIMPLE_COMMANDS is an array of all map keys
+ok 86 - simple-commands › ALL_INPUT_SELECTOR_NAMES contains canonical input names from eiscpCommands
+ok 87 - setup-handler › handleRestorePayload: applies valid payload and calls onConfigSaved
+ok 88 - setup-handler › handleRestorePayload: invalid payload returns RequestUserInput with preserved textarea
+ok 89 - setup-handler › handleDeleteConfigPayload: confirm=false prompts and confirm=true clears config
+ok 90 - setup-handler › handleManualConfiguration: valid input creates AVR entries
+ok 91 - setup-handler › handleManualConfiguration: invalid input returns RequestUserInput with errors
+ok 92 - setup-handler › handleBackupPayload: returns backup data JSON textarea
+ok 93 - setup-handler › handleManualConfiguration: autodiscovery should persist listeningModeOptions when supplied
+ok 94 - command-receiver-listening-mode › CommandReceiver sets media player state to Playing only for ON+NET+album-art subsources
+ok 95 - service-strategy-contracts › MenuBrowseHandlerBase harvest contract populates contiguous items and clears harvestMode
+ok 96 - service-strategy-contracts › TuneIn adapter contract ingests NLS only for active TuneIn zones
+ok 97 - service-strategy-contracts › Tidal adapter contract ingests NLA and metadata for active zones
+ok 98 - service-strategy-contracts › Browse service contract maps service ids to activation rules and selector commands
+ok 99 - media-browser › TuneIn service selection preloads My Presets for browsing
+ok 100 - media-browser › CommandSender silently absorbs shuffle, repeat, and browse commands
+ok 101 - media-browser › CommandSender play_media routes TuneIn preset IDs to tunein-preset
+ok 102 - media-browser › CommandSender play_media routes Tidal menu IDs to NLSI
+ok 103 - media-browser › CommandSender play_media routes Deezer menu IDs to NLSI
+ok 104 - media-browser › CommandSender Deezer track selection freezes browse list and sets now-playing title
+ok 105 - media-browser › CommandSender remaps stale Tidal index using title encoded in media_id
+ok 106 - media-browser › CommandSender first selection after Main Tidal Menu skips pre-list command
+ok 107 - media-browser › CommandSender in-Tidal track selection uses direct NLSI when AVR is in list mode
+ok 108 - media-browser › CommandSender in-Tidal track selection sends list before NLSI when AVR is playing
+ok 109 - media-browser › CommandSender in-Tidal menu selection uses direct NLSI even when AVR is playing
+ok 110 - media-browser › CommandSender play_media routes Main Tidal Menu to input-selector tidal
+ok 111 - media-browser › CommandSender play_media routes TuneIn main menu to input-selector tunein
+ok 112 - media-browser › CommandSender play_media routes Tidal Back option to RETURN
+ok 113 - media-browser › CommandSender play_media routes TuneIn Back option to RETURN
+
+1..113
+# tests 113
+# pass 112
+# fail 1
+

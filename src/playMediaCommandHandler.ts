@@ -42,13 +42,13 @@ function isBackRequest(mediaId: string | undefined, mediaType: string | undefine
 }
 
 function isValidPlayMediaRequest(
-  preset: any,
+  preset: unknown,
   tuneInRootRequest: boolean,
-  tuneInMenuOption: any,
+  tuneInMenuOption: unknown,
   tidalMainMenu: boolean,
   deezerMainMenu: boolean,
-  tidalOption: any,
-  deezerOption: any,
+  tidalOption: unknown,
+  deezerOption: unknown,
   tuneInBackRequest: boolean,
   tidalBackRequest: boolean,
   deezerBackRequest: boolean

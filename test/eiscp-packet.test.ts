@@ -1,32 +1,31 @@
-import test from "ava";
-import { pathToFileURL } from "url";
+import { describe, it, expect } from "vitest";
 import path from "path";
 
-test("extracts concatenated ISCP frames individually", async (t) => {
-  const packetModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/eiscp-packet.js")).href);
+it("extracts concatenated ISCP frames individually", async () => {
+  const packetModule = await import("../src/eiscp-packet.js");
   const { createEiscpPacket, extractAllIscpMessages } = packetModule;
 
   const packet = Buffer.concat([createEiscpPacket("NLSC0P"), createEiscpPacket("NLSU0-89.7 | WTMD (Alternative Rock)"), createEiscpPacket("NLSU1-America's Country (Country)")]);
 
   const messages = extractAllIscpMessages(packet);
 
-  t.deepEqual(messages, ["NLSC0P", "NLSU0-89.7 | WTMD (Alternative Rock)", "NLSU1-America's Country (Country)"]);
+  expect(messages).toEqual(["NLSC0P", "NLSU0-89.7 | WTMD (Alternative Rock)", "NLSU1-America's Country (Country)"]);
 });
 
-test("createEiscpPacket adds !1 prefix and valid ISCP header", async (t) => {
-  const packetModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/eiscp-packet.js")).href);
+it("createEiscpPacket adds !1 prefix and valid ISCP header", async () => {
+  const packetModule = await import("../src/eiscp-packet.js");
   const { createEiscpPacket, extractIscpMessage } = packetModule;
 
   const packet = createEiscpPacket("PWRQSTN");
 
-  t.is(packet.toString("ascii", 0, 4), "ISCP");
-  t.is(packet.readUInt32BE(4), 16);
+  expect(packet.toString("ascii", 0, 4)).toBe("ISCP");
+  expect(packet.readUInt32BE(4)).toBe(16);
   // extractIscpMessage strips the "!1" prefix and returns the logical command body.
-  t.is(extractIscpMessage(packet), "PWRQSTN");
+  expect(extractIscpMessage(packet)).toBe("PWRQSTN");
 });
 
-test("extractAllIscpMessages falls back to single-frame extraction for malformed input", async (t) => {
-  const packetModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/eiscp-packet.js")).href);
+it("extractAllIscpMessages falls back to single-frame extraction for malformed input", async () => {
+  const packetModule = await import("../src/eiscp-packet.js");
   const { createEiscpPacket, extractAllIscpMessages } = packetModule;
 
   const validPacket = createEiscpPacket("NATSong");
@@ -35,6 +34,6 @@ test("extractAllIscpMessages falls back to single-frame extraction for malformed
   corrupted.writeUInt32BE(1, 4);
 
   const messages = extractAllIscpMessages(corrupted);
-  t.is(messages.length, 1);
-  t.true(typeof messages[0] === "string");
+  expect(messages.length).toBe(1);
+  expect(typeof messages[0] === "string").toBe(true);
 });

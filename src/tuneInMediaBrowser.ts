@@ -55,7 +55,7 @@ export const TUNEIN_MENU_ROOT_ID = "tunein:menu-root";
 export const TUNEIN_MENU_ROOT_TYPE = "tunein://menu";
 export const TUNEIN_MENU_BACK_ID = "tunein:menu-back";
 
-const TUNEIN_EXCLUDED_MENU_TITLES = new Set(["search", "login", "logout", "all stations"]);
+const TUNEIN_EXCLUDED_MENU_TITLES = new Set(["search", "login", "logout", "log out", "all stations"]);
 
 export class TuneInMediaBrowser {
   setBrowseContext(entityId: string, title: string): void {

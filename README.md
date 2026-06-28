@@ -55,8 +55,6 @@ Users report it also to work with:
 
 [Backup and Restore](./docs/backup-restore.md)
 
-[Migrate from pre-v.0.7.0 to v.0.7.0+](./docs/v070-migration.md)
-
 Example activities:
 
 - [Spotify](./docs/spotify.md)

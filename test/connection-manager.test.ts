@@ -1,5 +1,4 @@
-import test from "ava";
-import { pathToFileURL } from "url";
+import { describe, it, expect } from "vitest";
 import path from "path";
 
 // Helpers
@@ -15,10 +14,10 @@ function mkConn(connected = false) {
   } as any;
 }
 
-test.serial("schedule and cancel scheduled reconnection", async (t) => {
-  const module = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/connectionManager.js")).href);
+it("schedule and cancel scheduled reconnection", async () => {
+  const module = await import("../src/connectionManager.js");
   const ConnectionManager = module.default as any;
-  const reconModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/reconnectionManager.js")).href);
+  const reconModule = await import("../src/reconnectionManager.js");
   const ReconnectionManager = reconModule.ReconnectionManager as any;
 
   const reconMgr = new ReconnectionManager();
@@ -35,15 +34,15 @@ test.serial("schedule and cancel scheduled reconnection", async (t) => {
 
   cm.scheduleReconnect(physicalAVR, fakeConn, avrCfg);
   // ReconnectionManager tracks timers; ensure it's scheduled
-  t.true(reconMgr.hasScheduledReconnection(physicalAVR));
+  expect(reconMgr.hasScheduledReconnection(physicalAVR)).toBe(true);
 
   // Cancel
   cm.cancelScheduledReconnection(physicalAVR);
-  t.false(reconMgr.hasScheduledReconnection(physicalAVR));
+  expect(reconMgr.hasScheduledReconnection(physicalAVR)).toBe(false);
 });
 
-test.serial("attemptReconnection delegates to reconnection manager and returns result", async (t) => {
-  const module = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/connectionManager.js")).href);
+it("attemptReconnection delegates to reconnection manager and returns result", async () => {
+  const module = await import("../src/connectionManager.js");
   const ConnectionManager = module.default as any;
 
   // Stubbed reconnection manager with controlled response
@@ -68,13 +67,13 @@ test.serial("attemptReconnection delegates to reconnection manager and returns r
   cm.setPhysicalConnection(physicalAVR, { eiscp: fakeEiscp, commandReceiver: {}, avrConfig: avrCfg });
 
   const res = await cm.attemptReconnection(physicalAVR);
-  t.deepEqual(res, { success: true });
+  expect(res).toEqual({ success: true });
 });
 
-test.serial("clearAllConnections removes stored connections", async (t) => {
-  const module = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/connectionManager.js")).href);
+it("clearAllConnections removes stored connections", async () => {
+  const module = await import("../src/connectionManager.js");
   const ConnectionManager = module.default as any;
-  const reconModule = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/reconnectionManager.js")).href);
+  const reconModule = await import("../src/reconnectionManager.js");
   const ReconnectionManager = reconModule.ReconnectionManager as any;
 
   const reconMgr = new ReconnectionManager();
@@ -89,7 +88,7 @@ test.serial("clearAllConnections removes stored connections", async (t) => {
   const fakeEiscp = mkConn(false);
   cm.setPhysicalConnection(physicalAVR, { eiscp: fakeEiscp, commandReceiver: {}, avrConfig: avrCfg });
 
-  t.truthy(cm.getPhysicalConnection(physicalAVR));
+  expect(cm.getPhysicalConnection(physicalAVR)).toBeTruthy();
   cm.clearAllConnections();
-  t.falsy(cm.getPhysicalConnection(physicalAVR));
+  expect(cm.getPhysicalConnection(physicalAVR)).toBeFalsy();
 });

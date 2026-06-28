@@ -11,6 +11,7 @@ import { AvrStateManager } from "./avrState.js";
 import { avrStateQueryService } from "./avrStateQuery.js";
 import { initMediaBrowser } from "./mediaBrowser.js";
 import log, { setLogLevel } from "./loggers.js";
+import { logGeneratedCount } from "./simpleCommands.js";
 import SetupHandler from "./setupHandler.js";
 import EntityRegistrar from "./entityRegistrar.js";
 import ConnectionManager from "./connectionManager.js";
@@ -20,6 +21,7 @@ import ConnectCoordinator from "./connectCoordinator.js";
 import { AvrInstance, type AvrStateApi } from "./types.js";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { delay } from "./utils.js";
 
 const integrationName = "driver:";
@@ -79,6 +81,7 @@ export default class OnkyoDriver {
     // Now load config from the correct path and continue setup
     this.config = ConfigManager.load();
     if (this.config.logLevel) setLogLevel(this.config.logLevel);
+    logGeneratedCount();
 
     // Create connection manager (needs reconnectionManager and query callback)
     this.connectionManager = new ConnectionManager(this.reconnectionManager, this.queryAllZonesState.bind(this), undefined, this.avrStateApi);
@@ -150,7 +153,12 @@ export default class OnkyoDriver {
       // ── Media player — always registered ───────────────────────────────────
       {
         enabled: () => true,
-        create: () => this.entityRegistrar.createMediaPlayerEntity(avrEntry, avrConfig.volumeScale ?? 100, this.sharedCmdHandler.bind(this), rawSend)
+        create: () => this.entityRegistrar.createMediaPlayerEntity(avrEntry, avrConfig.volumeScale ?? 100, this.sharedCmdHandler.bind(this), rawSend),
+        afterRegister: () => {
+          if (typeof this.driver.updateEntityAttributes === "function") {
+            this.driver.updateEntityAttributes(avrEntry, { [uc.MediaPlayerAttributes.SourceList]: this.entityRegistrar.getInputSelectorOptions(avrEntry) });
+          }
+        }
       },
 
       // ── Sensor entities — conditional on createSensors flag ────────────────
@@ -229,16 +237,7 @@ export default class OnkyoDriver {
   private setupDriverEvents() {
     this.driver.on(uc.Events.Connect, async () => {
       log.info(`${integrationName} ===== CONNECT EVENT RECEIVED =====`);
-      // Log current version from driver.json
-      try {
-        const driverJsonPath = resolve(process.cwd(), "driver.json");
-        const driverJsonRaw = readFileSync(driverJsonPath, "utf-8");
-        const driverJson = JSON.parse(driverJsonRaw);
-        this.driverVersion = driverJson.version || "unknown";
-        log.info(`${integrationName} Driver version: ${this.driverVersion}`);
-      } catch (err) {
-        log.warn(`${integrationName} Could not read driver version from driver.json:`, err);
-      }
+      log.info(`${integrationName} Driver version: ${this.driverVersion}`);
       await this.handleConnect();
     });
     this.driver.on(uc.Events.EnterStandby, async () => {
@@ -352,8 +351,13 @@ export default class OnkyoDriver {
     this.driver.on(uc.Events.SubscribeEntities, async (entityIds: string[]) => {
       log.info("%s Entities subscribed: %s", integrationName, entityIds.join(", "));
 
-      // Delegate each subscription to handler
+      // Push source list for MediaPlayer entities
       for (const entityId of entityIds) {
+        if (this.avrInstances.has(entityId)) {
+          if (typeof this.driver.updateEntityAttributes === "function") {
+            this.driver.updateEntityAttributes(entityId, { [uc.MediaPlayerAttributes.SourceList]: this.entityRegistrar.getInputSelectorOptions(entityId) });
+          }
+        }
         await this.subscriptionHandler.handle(entityId);
       }
     });
@@ -379,4 +383,10 @@ export default class OnkyoDriver {
   async init() {
     log.info("%s Initializing...", integrationName);
   }
+}
+
+// Auto-instantiate when run directly (not when imported, e.g. in tests)
+if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1])) {
+  const driver = new OnkyoDriver();
+  driver.init();
 }

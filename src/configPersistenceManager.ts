@@ -88,8 +88,8 @@ export class ConfigPersistenceManager {
       const res = ConfigManager.validateAvrPayload({ ...basePayload, zone });
       if (res.errors.length > 0) {
         errors.push(`zone ${zone}: ${res.errors.join("; ")}`);
-      } else if (res.normalized) {
-        normalizedAvrs.push(res.normalized);
+      } else {
+        normalizedAvrs.push(res.normalized!);
       }
     }
 

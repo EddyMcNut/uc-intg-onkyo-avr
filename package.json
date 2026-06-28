@@ -1,9 +1,9 @@
 {
   "name": "uc-intg-onkyo-avr",
   "type": "module",
-  "version": "0.8.11",
+  "version": "0.9.0",
   "description": "Onkyo/Pioneer/Integra AVR custom integration for Unfolded Circle Remotes",
-  "main": "dist/src/index.js",
+  "main": "dist/driver.js",
   "engines": {
     "node": "^22.20 || ^24.12 || >=26"
   },
@@ -13,14 +13,13 @@
     "code-check": "prettier --check . && eslint .",
     "lint": "eslint --fix",
     "build": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\" && tsc",
-    "test:ava": "ava dist/test/**/*.test.js --tap --timeout=60s > test.tap && node ./scripts/tap-to-junit.cjs test.tap test-results.xml",
-    "test": "npm run build && npm run test:ava",
-    "coverage": "npm run build && node -e \"require('fs').rmSync('.coverage',{recursive:true,force:true}); require('fs').rmSync('coverage',{recursive:true,force:true})\" && NODE_V8_COVERAGE=.coverage npm run test:ava && node ./scripts/coverage-report.cjs",
-    "start": "npm run build && node dist/src/index.js"
+    "test": "npm run build && vitest run",
+    "test:watch": "vitest",
+    "coverage": "npm run build && vitest run --coverage",
+    "start": "npm run build && node dist/driver.js"
   },
   "dependencies": {
     "@unfoldedcircle/integration-api": "0.5.0",
-    "async": "3.2.6",
     "debug": "4.4.3"
   },
   "repository": {
@@ -45,25 +44,19 @@
     "js-yaml": "3.14.2"
   },
   "devDependencies": {
-    "@ava/typescript": "^7.0.0",
-    "@types/async": "^3.2.25",
     "@types/debug": "^4.1.13",
-    "@types/node": "26.0.0",
+    "@types/node": "26.0.1",
     "@types/node-fetch": "^2.6.13",
     "@types/ws": "^8.18.1",
-    "@typescript-eslint/eslint-plugin": "8.61.1",
-    "@typescript-eslint/parser": "8.61.1",
-    "ava": "8.0.1",
-    "c8": "11.0.0",
-    "eslint": "10.5.0",
+    "@typescript-eslint/eslint-plugin": "8.62.0",
+    "@typescript-eslint/parser": "8.62.0",
+    "@vitest/coverage-v8": "4.1.9",
+    "eslint": "10.6.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-prettier": "^5.5.6",
-    "prettier": "3.8.4",
+    "prettier": "3.9.1",
     "ts-node": "10.9.2",
-    "typescript": "6.0.x"
-  },
-  "allowScripts": {
-    "core-js@2.6.12": true,
-    "fsevents@1.2.13": true
+    "typescript": "6.0.x",
+    "vitest": "4.1.9"
   }
 }

@@ -1,9 +1,8 @@
-import test from "ava";
-import { pathToFileURL } from "url";
+import { describe, it, expect } from "vitest";
 import path from "path";
 
-test.serial("ensureZoneInstances creates zone instances when physical connection present", async (t) => {
-  const mod = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/connectCoordinator.js")).href);
+it("ensureZoneInstances creates zone instances when physical connection present", async () => {
+  const mod = await import("../src/connectCoordinator.js");
   const ensureZoneInstances = mod.ensureZoneInstances as (...args: any[]) => Promise<void>;
 
   const instances = new Map<string, any>();
@@ -23,16 +22,16 @@ test.serial("ensureZoneInstances creates zone instances when physical connection
   await ensureZoneInstances(instances, avrs, getPhysicalConnection, createAvrSpecificConfig, createCommandSender);
 
   const entries = Array.from(instances.entries());
-  t.is(entries.length, 1);
+  expect(entries.length).toBe(1);
   const [entryId, instance] = entries[0] as any;
-  t.truthy(String(entryId).includes("M"));
-  t.truthy(instance);
-  t.truthy(instance.commandSender);
-  t.truthy(instance.commandSender.eiscp.connected);
+  expect(String(entryId).includes("M")).toBeTruthy();
+  expect(instance).toBeTruthy();
+  expect(instance.commandSender).toBeTruthy();
+  expect(instance.commandSender.eiscp.connected).toBeTruthy();
 });
 
-test.serial("ensureZoneInstances skips when no physical connection present", async (t) => {
-  const mod = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/connectCoordinator.js")).href);
+it("ensureZoneInstances skips when no physical connection present", async () => {
+  const mod = await import("../src/connectCoordinator.js");
   const ensureZoneInstances = mod.ensureZoneInstances as (...args: any[]) => Promise<void>;
 
   const instances = new Map<string, any>();
@@ -45,11 +44,11 @@ test.serial("ensureZoneInstances skips when no physical connection present", asy
 
   await ensureZoneInstances(instances, avrs, getPhysicalConnection, createAvrSpecificConfig, createCommandSender);
 
-  t.is(instances.size, 0);
+  expect(instances.size).toBe(0);
 });
 
-test.serial("ensureZoneInstances refreshes config of existing instance", async (t) => {
-  const mod = await import(pathToFileURL(path.resolve(process.cwd(), "dist/src/connectCoordinator.js")).href);
+it("ensureZoneInstances refreshes config of existing instance", async () => {
+  const mod = await import("../src/connectCoordinator.js");
   const ensureZoneInstances = mod.ensureZoneInstances as (...args: any[]) => Promise<void>;
 
   const instances = new Map<string, any>();
@@ -65,13 +64,13 @@ test.serial("ensureZoneInstances refreshes config of existing instance", async (
 
   // First call creates the instance
   await ensureZoneInstances(instances, avrs, getPhysicalConnection, createAvrSpecificConfig, createCommandSender);
-  t.is(instances.size, 1);
+  expect(instances.size).toBe(1);
 
   // Second call with updated config should refresh without creating a new instance
   const updatedAvrs = [{ model: "M3", ip: "3.3.3.3", port: 60128, zone: "main", queueThreshold: 999 }];
   await ensureZoneInstances(instances, updatedAvrs, getPhysicalConnection, createAvrSpecificConfig, createCommandSender);
-  t.is(instances.size, 1);
-  t.is(updateConfigCalls.length, 1);
+  expect(instances.size).toBe(1);
+  expect(updateConfigCalls.length).toBe(1);
   const entry = instances.values().next().value;
-  t.is(entry.config.queueThreshold, 999);
+  expect(entry.config.queueThreshold).toBe(999);
 });

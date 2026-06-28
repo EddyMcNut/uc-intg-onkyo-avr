@@ -98,10 +98,8 @@ function matchesAnyPreset(state: TuneInBrowseState, candidate: string): boolean 
   return false;
 }
 
-/**
- * Update the nowPlayingStation only when the candidate matches a known preset.
- * This prevents track/show titles (which NTI also sends) from overwriting the station name.
- */
+// Update the nowPlayingStation only when the candidate matches a known preset.
+// This prevents track/show titles (which NTI also sends) from overwriting the station name.
 export function updateNowPlayingStation(entityId: string, candidate: string): void {
   const state = getTuneInBrowseState(entityId);
   if (!state) return;
