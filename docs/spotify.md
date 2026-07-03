@@ -12,7 +12,7 @@ To set up an Activity for Spotify, have a look at these screenshots:
 
   ![](../screenshots/prevent-sleep.png)
 
-- On sequence, Input source: `input-selector spotify`
+- On sequence, Input source: `spotify`
 
   ![](../screenshots/spotify-on.png)
 
@@ -30,7 +30,8 @@ To set up an Activity for Spotify, have a look at these screenshots:
 
 Previous/Next on the remote will only work if you can also use previous/next directly in your Spotify app, that depends on the subscription you have for Spotify.
 
-If `input-selector spotify` does not work, check the manual of your AVR to see if Spotify is even available as selectable input on the AVR:
+If selecting `spotify` as Input source does not work, check the manual of your AVR to see if Spotify is even available as selectable input on the AVR:
 
 - your AVR _does_ have a Spotify input: run setup of this integration again and increase the value for 'NET sub-source selection delay'
-- your AVR does _not_ have a Spotify input, just try `input-selector net`, see [input-selector](./input-selector.md#net) for more info
+- your AVR does _not_ have a Spotify input, just try `net`, see [input-selector](./input-selector.md#net) for more info
+- your AVR does _not_ have a `net` input, this setup is not possible, in that case you can use the Spotify app on your phone and if the Spotify app allows then send music to your AVR using Bluetooth, Airplay or ChromeCast

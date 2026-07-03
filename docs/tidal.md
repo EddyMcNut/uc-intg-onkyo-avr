@@ -29,7 +29,7 @@ To set up an Activity for Tidal, have a look at these screenshots:
 
   ![](../screenshots/prevent-sleep.png)
 
-- On sequence, Input source: `input-selector tidal`
+- On sequence, Input source: select `tidal`
 
   ![](../screenshots/tidal-on.png)
 
@@ -73,7 +73,8 @@ Some screenshots:
 
 ### Note
 
-If `input-selector tidal` does not work, check the manual of your AVR to see if Tidal is even available as selectable input on the AVR:
+If selecting `tidal` as Input source does not work, check the manual of your AVR to see if Tidal is even available as selectable input on the AVR:
 
 - your AVR _does_ have a Tidal input: run setup of this integration again and increase the value for 'NET sub-source selection delay'
-- your AVR does _not_ have a Tidal input, this setup is not possible, in that case you can use the Tidal app on your phone and if the Tidal app allowes then send music to your AVR using Bluetooth, Airplay or ChromeCast
+- your AVR does _not_ have a Tidal input, just try `net`, see [input-selector](./input-selector.md#net) for more info
+- your AVR does _not_ have a `net` input, this setup is not possible, in that case you can use the Tidal app on your phone and if the Tidal app allows then send music to your AVR using Bluetooth, Airplay or ChromeCast

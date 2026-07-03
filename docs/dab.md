@@ -8,7 +8,7 @@ To set up an Activity for DAB, have a look at these screenshots:
 
   ![](../screenshots/prevent-sleep.png)
 
-- On sequence, Input source: `input-selector dab`.
+- On sequence, Input source: `dab`.
 
   ![](../screenshots/dab-on.png)
 

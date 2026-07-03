@@ -8,7 +8,7 @@ To set up an Activity for AppleTV, have a look at these screenshots:
 
   ![](../screenshots/prevent-sleep.png)
 
-- On sequence, Input source: `input-selector stm` (or whatever input you have assigned in your AVR for Apple TV)
+- On sequence, Input source: `stm` (or whatever input you have assigned in your AVR for Apple TV)
 
   ![](../screenshots/appletv-on.png)
 

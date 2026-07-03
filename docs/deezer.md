@@ -16,7 +16,7 @@ To set up an Activity for Deezer, have a look at these screenshots:
 
   ![](../screenshots/prevent-sleep.png)
 
-- On sequence, Input source: `input-selector deezer`
+- On sequence, Input source: `deezer`
 
   ![](../screenshots/deezer-on.png)
 
@@ -58,7 +58,8 @@ Some screenshots:
 
 ### Note
 
-If `input-selector deezer` does not work, check the manual of your AVR to see if Deezer is even available as selectable input on the AVR:
+If selecting `deezer` as Input source does not work, check the manual of your AVR to see if Deezer is even available as selectable input on the AVR:
 
 - your AVR _does_ have a Deezer input: run setup of this integration again and increase the value for 'NET sub-source selection delay'
-- your AVR does _not_ have a Deezer input, this setup is not possible, in that case you can use the Deezer app on your phone and if the Deezer app allows then send music to your AVR using Bluetooth, Airplay or ChromeCast
+- your AVR does _not_ have a Deezer input, just try `net`, see [input-selector](./input-selector.md#net) for more info
+- your AVR does _not_ have a `net` input, this setup is not possible, in that case you can use the Deezer app on your phone and if the Deezer app allows then send music to your AVR using Bluetooth, Airplay or ChromeCast
