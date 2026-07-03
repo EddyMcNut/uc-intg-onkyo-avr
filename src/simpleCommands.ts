@@ -117,6 +117,7 @@ const COMMAND_DEFS: SimpleCommandDef[] = [
   { command: "tone-subwoofer", prefix: "TONE_SUBWOOFER", excludeValues: ["b-xx"] },
   { command: "tone-surround", prefix: "TONE_SURROUND", excludeValues: ["b-xx", "t-xx"] },
   { command: "tone-surround-back", prefix: "TONE_SURROUND_BACK", excludeValues: ["b-xx", "t-xx"] },
+  { command: "tunein-preset", prefix: "TUNEIN_PRESET" },
   { command: "tuning", prefix: "TUNING" },
   { command: "video-picture-mode", prefix: "VIDEO_PICTURE_MODE", excludeValues: ["up"] },
   { command: "video-wide-mode", prefix: "VIDEO_WIDE_MODE", excludeValues: ["up"] }
