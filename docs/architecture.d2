@@ -1,0 +1,46 @@
+direction: right
+
+app: Application Layer {
+  shape: circle
+  style.stroke: "#2A5A9A"
+  style.fill: "#4A7FC7"
+  style.font-color: "#fff"
+  style.stroke-width: 3
+  label: Application Layer\nGoal: Expose UC Integration API\nMain class: OnkyoDriver
+
+  conn: Connection / Infrastructure {
+    shape: circle
+    style.stroke: "#1E6B3A"
+    style.fill: "#2D8A4A"
+    style.font-color: "#fff"
+    style.stroke-width: 3
+    label: Connection / Infrastructure\nGoal: Manage AVR connection lifecycle\nMain class: ConnectionManager
+
+    domain: Domain Layer {
+      shape: circle
+      style.stroke: "#6B4F12"
+      style.fill: "#8B6914"
+      style.font-color: "#fff"
+      style.stroke-width: 3
+      label: Domain Layer\nGoal: Model AVR state & commands\nClasses: AvrStateManager, ConfigManager
+
+      proto: Protocol Layer {
+        shape: circle
+        style.stroke: "#3E1A5C"
+        style.fill: "#5B2D8A"
+        style.font-color: "#fff"
+        style.stroke-width: 3
+        label: Protocol Layer\nGoal: Communicate via eISCP\nMain class: EiscpDriver
+
+        avr: Physical AVR {
+          shape: circle
+          style.stroke: "#922B21"
+          style.fill: "#C0392B"
+          style.font-color: "#fff"
+          style.stroke-width: 3
+          label: Physical AVR\nOnkyo / Pioneer / Integra\nTCP :60128
+        }
+      }
+    }
+  }
+}
