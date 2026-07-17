@@ -12,7 +12,7 @@ export const WAIT_FOR_CONNECT_TIMEOUT = 5000;
 export const ALBUM_ART = ["tunein", "spotify", "deezer", "tidal", "amazonmusic", "dts-play-fi"];
 
 /** Network services that support media browsing */
-export const MEDIA_BROWSING = ["tunein", "tidal", "deezer"];
+export const MEDIA_BROWSING = ["tunein", "tidal", "deezer", "music-server"];
 
 /** Network services that support song metadata */
 export const SONG_INFO = ["tunein", "spotify", "deezer", "tidal", "amazonmusic", "dts-play-fi", "airplay"];

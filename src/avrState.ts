@@ -6,6 +6,7 @@ import { delay } from "./utils.js";
 import { ALBUM_ART, SONG_INFO, QUERY_DEFAULT_DELAY } from "./constants.js";
 import type { ICommandReceiver } from "./types.js";
 import { resetDeezerBrowseState } from "./deezerBrowserStore.js";
+import { resetMusicServerBrowseState } from "./musicServerBrowserStore.js";
 import { resetTidalBrowseState } from "./tidalBrowserStore.js";
 
 const integrationName = "avrState:";
@@ -173,7 +174,7 @@ export class AvrStateManager {
   /** Set sub-source for an entity, returns true if changed */
   setSubSource(entityId: string, subSource: string, eiscpInstance?: EiscpDriver, zone?: string, _driver?: uc.IntegrationAPI): boolean {
     const state = this.getState(entityId);
-    const normalizedSubSource = subSource.toLowerCase();
+    const normalizedSubSource = subSource.toLowerCase().replace(/\s+/g, "-");
 
     if (state.subSource !== normalizedSubSource) {
       log.info("%s [%s] sub-source changed from '%s' to '%s'", integrationName, entityId, state.subSource, subSource);
@@ -308,13 +309,15 @@ export class AvrStateManager {
       await eiscpInstance.raw("NSTQSTN"); // Query play/pause status
     }
 
-    // For Tidal/Deezer, reset browse state and re-request the NLS list so the media browser stays fresh
-    if (currentSubSource === "tidal" || currentSubSource === "deezer") {
+    // For Tidal/Deezer/Music Server, reset browse state and re-request the NLS list so the media browser stays fresh
+    if (currentSubSource === "tidal" || currentSubSource === "deezer" || currentSubSource === "music-server") {
       log.info("%s [%s] refreshing %s browse state via NTCTOP + NTCSELECT", integrationName, entityId, currentSubSource);
       if (currentSubSource === "tidal") {
         resetTidalBrowseState(entityId);
-      } else {
+      } else if (currentSubSource === "deezer") {
         resetDeezerBrowseState(entityId);
+      } else {
+        resetMusicServerBrowseState(entityId);
       }
       await eiscpInstance.raw("NTCTOP");
       await eiscpInstance.raw("NTCSELECT");

@@ -3,6 +3,7 @@ import { eiscpMappings } from "./eiscp-mappings.js";
 import { NO_TITLE } from "./constants.js";
 import { detectServiceFromText, detectServiceFromAsciiPrefix, getCanonicalServiceName } from "./serviceDetector.js";
 import type { DeezerBrowseState } from "./deezerBrowserStore.js";
+import type { MusicServerBrowseState } from "./musicServerBrowserStore.js";
 import type { TidalBrowseState } from "./tidalBrowserStore.js";
 import type { TuneInMenuBrowseState } from "./tuneInMenuStore.js";
 
@@ -25,6 +26,10 @@ export interface DeezerStoreApi {
 
 export interface TidalStoreApi {
   getBrowseState(entityId: string): TidalBrowseState | null;
+}
+
+export interface MusicServerStoreApi {
+  getBrowseState(entityId: string): MusicServerBrowseState | null;
 }
 
 export interface TuneInMenuStoreApi {
@@ -56,7 +61,8 @@ export class IscpCommandParser {
     private readonly stateReader: AvrStateReader,
     private readonly deezerStore: DeezerStoreApi,
     private readonly tidalStore: TidalStoreApi,
-    private readonly tuneInMenuStore: TuneInMenuStoreApi
+    private readonly tuneInMenuStore: TuneInMenuStoreApi,
+    private readonly musicServerStore: MusicServerStoreApi
   ) {
     this.commandHandlers = {
       NTM: (value, _cmd, result) => this.handleNTM(value, result),
@@ -400,6 +406,15 @@ export class IscpCommandParser {
             if (!tuneInMenuState.harvestMode) tuneInMenuState.nlsCursorOffset = cursorOffset;
             tuneInMenuState.totalListItemCount = totalCount;
             if (layerNumber > 0) tuneInMenuState.nlsLayerNumber = layerNumber;
+          }
+        }
+
+        if (this.stateReader.getSubSource(entityId) === "music-server") {
+          const musicServerState = this.musicServerStore.getBrowseState(entityId);
+          if (musicServerState) {
+            if (!musicServerState.harvestMode) musicServerState.nlsCursorOffset = cursorOffset;
+            musicServerState.totalListItemCount = totalCount;
+            if (layerNumber > 0) musicServerState.nlsLayerNumber = layerNumber;
           }
         }
       }

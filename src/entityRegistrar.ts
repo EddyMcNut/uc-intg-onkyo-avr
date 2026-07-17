@@ -8,6 +8,7 @@ import { getCompatibleListeningModes } from "./listeningModeFilters.js";
 import { ConfigManager, buildEntityId } from "./configManager.js";
 import { browseMedia } from "./mediaBrowser.js";
 import { DeezerBrowseHandler } from "./deezerBrowseHandler.js";
+import { MusicServerBrowseHandler } from "./musicServerBrowseHandler.js";
 import { TidalBrowseHandler } from "./tidalBrowseHandler.js";
 import { TuneInBrowseHandler } from "./tuneInBrowseHandler.js";
 import { SELECT_SUFFIXES } from "./sensorSuffixes.js";
@@ -30,7 +31,7 @@ export default class EntityRegistrar {
   private readonly browseHandlers: EntityBrowseHandler[];
 
   constructor(avrStateApi: AvrStateApi) {
-    this.browseHandlers = [new TuneInBrowseHandler(avrStateApi), new TidalBrowseHandler(), new DeezerBrowseHandler()];
+    this.browseHandlers = [new TuneInBrowseHandler(avrStateApi), new TidalBrowseHandler(), new DeezerBrowseHandler(), new MusicServerBrowseHandler()];
   }
 
   // Build a user-facing base name from an AVR entry id. Input format is typically: "MODEL HOST ZONE". Long style keeps the full entry, short style omits HOST (IP/hostname).

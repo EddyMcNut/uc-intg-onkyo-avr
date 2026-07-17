@@ -10,6 +10,7 @@ import { IscpCommandParser, type CommandResult } from "./eiscp-command-parser.js
 import { createEiscpPacket, extractIscpMessage, extractAllIscpMessages } from "./eiscp-packet.js";
 import { buildMultiZoneVolumeCommands, buildMultiZoneMuteCommands } from "./eiscp-multi-zone.js";
 import { getDeezerBrowseState } from "./deezerBrowserStore.js";
+import { getMusicServerBrowseState } from "./musicServerBrowserStore.js";
 import { getTidalBrowseState } from "./tidalBrowserStore.js";
 import { getTuneInMenuBrowseState } from "./tuneInMenuStore.js";
 import { getZonePrefix } from "./zoneMappings.js";
@@ -125,6 +126,9 @@ export class EiscpDriver extends EventEmitter {
       },
       {
         getBrowseState: getTuneInMenuBrowseState
+      },
+      {
+        getBrowseState: getMusicServerBrowseState
       }
     );
     if (this.listenerCount("error") === 0) {
@@ -289,7 +293,7 @@ export class EiscpDriver extends EventEmitter {
           let command = iscpMessage.slice(0, 3);
           let value = iscpMessage.slice(3);
 
-          // log.info("%s RAW (0) RECEIVE: [%s] %s %s", integrationName, command, value);
+          log.info("%s RAW (0) RECEIVE: [%s] %s %s", integrationName, command, value);
 
           if (IGNORED_COMMANDS.has(command)) {
             continue;

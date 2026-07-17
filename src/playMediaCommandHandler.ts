@@ -8,21 +8,34 @@ import {
   DEEZER_ROOT_TYPE,
   isTidalMainMenuRequest,
   isDeezerMainMenuRequest,
+  isMusicServerMainMenuRequest,
   isTuneInMenuRootRequest,
   resolveDeezerMenuOption,
+  resolveMusicServerMenuOption,
   resolveTidalMenuOption,
   resolveTuneInMenuOption,
   resolveTuneInPreset,
   TIDAL_BACK_ID,
   TIDAL_ROOT_TYPE,
+  MUSIC_SERVER_BACK_ID,
+  MUSIC_SERVER_ROOT_TYPE,
   TUNEIN_MENU_BACK_ID,
   TUNEIN_MENU_ROOT_TYPE
 } from "./mediaBrowser.js";
 import { consumeTidalListModeActive, consumeTraceNextTidalSelectionAfterMainMenu, getTidalBrowseState, listTidalMenuOptions } from "./tidalBrowserStore.js";
 import { consumeDeezerListModeActive, consumeTraceNextDeezerSelectionAfterMainMenu, getDeezerBrowseState, listDeezerMenuOptions } from "./deezerBrowserStore.js";
+import { consumeMusicServerListModeActive, consumeTraceNextMusicServerSelectionAfterMainMenu, getMusicServerBrowseState, listMusicServerMenuOptions } from "./musicServerBrowserStore.js";
 import { consumeTuneInListModeActive, setTuneInMenuBrowseFrozen, setTuneInMenuNowPlayingStation } from "./tuneInMenuStore.js";
 import { DEFAULT_QUEUE_THRESHOLD } from "./configManager.js";
-import { DEEZER_SERVICE_ID, getBrowseServiceSelectSourceCommand, isBrowseServiceActive, TIDAL_SERVICE_ID, TUNEIN_SERVICE_ID, type BrowseServiceId } from "./browseServiceContract.js";
+import {
+  DEEZER_SERVICE_ID,
+  getBrowseServiceSelectSourceCommand,
+  isBrowseServiceActive,
+  TIDAL_SERVICE_ID,
+  MUSIC_SERVER_SERVICE_ID,
+  TUNEIN_SERVICE_ID,
+  type BrowseServiceId
+} from "./browseServiceContract.js";
 
 const integrationName = "playMediaCommandHandler:";
 
@@ -47,13 +60,30 @@ function isValidPlayMediaRequest(
   tuneInMenuOption: unknown,
   tidalMainMenu: boolean,
   deezerMainMenu: boolean,
+  musicServerMainMenu: boolean,
   tidalOption: unknown,
   deezerOption: unknown,
+  musicServerOption: unknown,
   tuneInBackRequest: boolean,
   tidalBackRequest: boolean,
-  deezerBackRequest: boolean
+  deezerBackRequest: boolean,
+  musicServerBackRequest: boolean
 ): boolean {
-  return !!(preset || tuneInRootRequest || tuneInMenuOption || tidalMainMenu || deezerMainMenu || tidalOption || deezerOption || tuneInBackRequest || tidalBackRequest || deezerBackRequest);
+  return !!(
+    preset ||
+    tuneInRootRequest ||
+    tuneInMenuOption ||
+    tidalMainMenu ||
+    deezerMainMenu ||
+    musicServerMainMenu ||
+    tidalOption ||
+    deezerOption ||
+    musicServerOption ||
+    tuneInBackRequest ||
+    tidalBackRequest ||
+    deezerBackRequest ||
+    musicServerBackRequest
+  );
 }
 
 export class PlayMediaCommandHandler {
@@ -92,17 +122,36 @@ export class PlayMediaCommandHandler {
     const tuneInRootRequest = isTuneInMenuRootRequest(mediaId, mediaType);
     const tidalMainMenu = isTidalMainMenuRequest(mediaId, mediaType);
     const deezerMainMenu = isDeezerMainMenuRequest(mediaId, mediaType);
+    const musicServerMainMenu = isMusicServerMainMenuRequest(mediaId, mediaType);
     const tidalOption = resolveTidalMenuOption(mediaId, mediaType);
     const deezerOption = resolveDeezerMenuOption(mediaId, mediaType);
+    const musicServerOption = resolveMusicServerMenuOption(mediaId, mediaType);
     const tuneInBackRequest = isBackRequest(mediaId, mediaType, TUNEIN_MENU_BACK_ID, TUNEIN_MENU_ROOT_TYPE);
     const tidalBackRequest = isBackRequest(mediaId, mediaType, TIDAL_BACK_ID, TIDAL_ROOT_TYPE);
     const deezerBackRequest = isBackRequest(mediaId, mediaType, DEEZER_BACK_ID, DEEZER_ROOT_TYPE);
+    const musicServerBackRequest = isBackRequest(mediaId, mediaType, MUSIC_SERVER_BACK_ID, MUSIC_SERVER_ROOT_TYPE);
 
-    if (!isValidPlayMediaRequest(preset, tuneInRootRequest, tuneInMenuOption, tidalMainMenu, deezerMainMenu, tidalOption, deezerOption, tuneInBackRequest, tidalBackRequest, deezerBackRequest)) {
+    if (
+      !isValidPlayMediaRequest(
+        preset,
+        tuneInRootRequest,
+        tuneInMenuOption,
+        tidalMainMenu,
+        deezerMainMenu,
+        musicServerMainMenu,
+        tidalOption,
+        deezerOption,
+        musicServerOption,
+        tuneInBackRequest,
+        tidalBackRequest,
+        deezerBackRequest,
+        musicServerBackRequest
+      )
+    ) {
       return uc.StatusCodes.NotFound;
     }
 
-    if (tuneInBackRequest || tidalBackRequest || deezerBackRequest) {
+    if (tuneInBackRequest || tidalBackRequest || deezerBackRequest || musicServerBackRequest) {
       await this.eiscp.raw("NTCRETURN");
       return uc.StatusCodes.Ok;
     }
@@ -154,16 +203,27 @@ export class PlayMediaCommandHandler {
       return uc.StatusCodes.Ok;
     }
 
-    const activeServiceId = tidalOption ? TIDAL_SERVICE_ID : deezerOption ? DEEZER_SERVICE_ID : undefined;
-    const activeOption = tidalOption ?? deezerOption;
-    const activeLabel = activeServiceId === TIDAL_SERVICE_ID ? "Tidal" : "Deezer";
+    if (musicServerMainMenu) {
+      await this.selectBrowseService(entityId, MUSIC_SERVER_SERVICE_ID, setZonePrefix, netMenuDelay, { force: true });
+      return uc.StatusCodes.Ok;
+    }
+
+    const activeServiceId = tidalOption ? TIDAL_SERVICE_ID : deezerOption ? DEEZER_SERVICE_ID : musicServerOption ? MUSIC_SERVER_SERVICE_ID : undefined;
+    const activeOption = tidalOption ?? deezerOption ?? musicServerOption;
+    const activeLabel = activeServiceId === TIDAL_SERVICE_ID ? "Tidal" : activeServiceId === DEEZER_SERVICE_ID ? "Deezer" : "Music Server";
 
     if (!activeOption || !activeServiceId) {
       return uc.StatusCodes.NotFound;
     }
 
-    const shouldTraceSelection = activeServiceId === TIDAL_SERVICE_ID ? consumeTraceNextTidalSelectionAfterMainMenu(entityId) : consumeTraceNextDeezerSelectionAfterMainMenu(entityId);
-    const activeOptions = activeServiceId === TIDAL_SERVICE_ID ? listTidalMenuOptions(entityId) : listDeezerMenuOptions(entityId);
+    const shouldTraceSelection =
+      activeServiceId === TIDAL_SERVICE_ID
+        ? consumeTraceNextTidalSelectionAfterMainMenu(entityId)
+        : activeServiceId === DEEZER_SERVICE_ID
+          ? consumeTraceNextDeezerSelectionAfterMainMenu(entityId)
+          : consumeTraceNextMusicServerSelectionAfterMainMenu(entityId);
+    const activeOptions =
+      activeServiceId === TIDAL_SERVICE_ID ? listTidalMenuOptions(entityId) : activeServiceId === DEEZER_SERVICE_ID ? listDeezerMenuOptions(entityId) : listMusicServerMenuOptions(entityId);
 
     const requestedTitle = /^Menu \d+$/.test(activeOption.title) ? activeOptions.find((item) => item.menuIndex === activeOption.menuIndex)?.title : activeOption.title;
     if (shouldTraceSelection) {
@@ -183,7 +243,12 @@ export class PlayMediaCommandHandler {
     if (!isBrowseServiceActive(currentSource, currentSubSource, activeServiceId)) {
       await this.selectBrowseService(entityId, activeServiceId, setZonePrefix, netMenuDelay, { delayAfterSelect: true });
     } else if (!selectedIsBrowsable) {
-      const alreadyInListMode = activeServiceId === TIDAL_SERVICE_ID ? consumeTidalListModeActive(entityId) : consumeDeezerListModeActive(entityId);
+      const alreadyInListMode =
+        activeServiceId === TIDAL_SERVICE_ID
+          ? consumeTidalListModeActive(entityId)
+          : activeServiceId === DEEZER_SERVICE_ID
+            ? consumeDeezerListModeActive(entityId)
+            : consumeMusicServerListModeActive(entityId);
       if (!alreadyInListMode) {
         const playbackStatus = this.avrStateApi.getPlaybackStatus(entityId);
         if (playbackStatus === "playing" || playbackStatus === "paused" || playbackStatus === "ff" || playbackStatus === "fr") {
@@ -214,12 +279,20 @@ export class PlayMediaCommandHandler {
           tidalState.nowPlayingTitle = selectedTitle;
         }
       }
-    } else {
+    } else if (activeServiceId === DEEZER_SERVICE_ID) {
       const deezerState = getDeezerBrowseState(entityId);
       if (deezerState) {
         deezerState.browseListFrozen = !selectedIsBrowsable;
         if (!selectedIsBrowsable) {
           deezerState.nowPlayingTitle = selectedTitle;
+        }
+      }
+    } else {
+      const musicServerState = getMusicServerBrowseState(entityId);
+      if (musicServerState) {
+        musicServerState.browseListFrozen = !selectedIsBrowsable;
+        if (!selectedIsBrowsable) {
+          musicServerState.nowPlayingTitle = selectedTitle;
         }
       }
     }
