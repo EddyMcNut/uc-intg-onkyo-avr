@@ -33,7 +33,6 @@ let mediaBrowser: any;
 let deezerStore: any;
 
 describe("DeezerBrowseHandler", () => {
-  let DeezerBrowseHandler: any;
   let handler: any;
   let cmdHandler: any;
   let rawSend: any;
@@ -43,11 +42,25 @@ describe("DeezerBrowseHandler", () => {
   beforeAll(async () => {
     mediaBrowser = await import("../src/mediaBrowser.js");
     deezerStore = await import("../src/deezerBrowserStore.js");
-    const mod = await import("../src/deezerBrowseHandler.js");
-    DeezerBrowseHandler = mod.DeezerBrowseHandler;
+    const { createMenuBrowseHandler } = await import("../src/menuBrowseHandler.js");
+    handler = createMenuBrowseHandler({
+      providerLabel: "Deezer",
+      integrationName: "deezerBrowseHandler:",
+      rootId: "deezer:root",
+      rootType: "deezer://menu",
+      backId: "deezer:menu-back",
+      browseMedia: mediaBrowser.browseMedia,
+      isMainMenuRequest: mediaBrowser.isDeezerMainMenuRequest,
+      isBackRequest: mediaBrowser.isDeezerBackRequest,
+      resolveMenuOption: mediaBrowser.resolveDeezerMenuOption,
+      resetState: deezerStore.resetDeezerBrowseState,
+      getBrowseState: deezerStore.getDeezerBrowseState,
+      listMenuItems: deezerStore.listDeezerMenuOptions
+    });
   });
 
   beforeEach(() => {
+    vi.clearAllMocks();
     mediaBrowser.isDeezerBackRequest.mockReturnValue(false);
     mediaBrowser.isDeezerMainMenuRequest.mockReturnValue(false);
     mediaBrowser.resolveDeezerMenuOption.mockReturnValue(undefined);
@@ -56,7 +69,6 @@ describe("DeezerBrowseHandler", () => {
     deezerStore.listDeezerMenuOptions.mockReturnValue([]);
     cmdHandler = vi.fn().mockResolvedValue(uc.StatusCodes.Ok);
     rawSend = vi.fn().mockResolvedValue(undefined);
-    handler = new DeezerBrowseHandler();
     vi.spyOn(handler, "waitForMenuStable" as any).mockResolvedValue(undefined);
     vi.spyOn(handler, "harvestListItems" as any).mockResolvedValue(undefined);
   });

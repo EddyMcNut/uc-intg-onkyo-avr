@@ -1,102 +1,65 @@
-import { physicalAvrIdFromEntityId } from "./configManager.js";
-import {
-  consumeListModeActive,
-  createMenuBrowseState,
-  getContiguousMenuItemCount,
-  listMenuOptions,
-  resetMenuBrowseState,
-  upsertMenuOption,
-  type MenuBrowseOption,
-  type MenuBrowseState
-} from "./menuBrowseState.js";
+import { createMenuBrowseStore, type MenuBrowseStore } from "./menuBrowseStore.js";
+import type { MenuBrowseOption, MenuBrowseState } from "./menuBrowseState.js";
+import { delay } from "./utils.js";
+
+const NLA_INGEST_POLL_INTERVAL_MS = 300;
+const NLA_INGEST_TIMEOUT_MS = 3000;
 
 export type MusicServerMenuOption = MenuBrowseOption;
 
 export type MusicServerBrowseState = MenuBrowseState<MusicServerMenuOption>;
 
-const musicServerBrowseStateByPhysicalAvr = new Map<string, MusicServerBrowseState>();
-
-function buildMusicServerMenuMediaId(menuIndex: number, title: string): string {
-  return `music-server:menu:${menuIndex}:${encodeURIComponent(title)}`;
-}
+export const musicServerStore: MenuBrowseStore = createMenuBrowseStore({
+  mediaIdPrefix: "music-server",
+  isBrowsableRule: (title) => !title.includes(" - ")
+});
 
 export function getMusicServerBrowseState(entityId: string): MusicServerBrowseState | null {
-  const physicalAvrId = physicalAvrIdFromEntityId(entityId);
-  if (!physicalAvrId) {
-    return null;
-  }
-
-  const existing = musicServerBrowseStateByPhysicalAvr.get(physicalAvrId);
-  if (existing) {
-    return existing;
-  }
-
-  const created = createMenuBrowseState<MusicServerMenuOption>();
-  musicServerBrowseStateByPhysicalAvr.set(physicalAvrId, created);
-  return created;
+  return musicServerStore.getBrowseState(entityId);
 }
 
 export function addMusicServerMenuOption(entityId: string, menuIndex: number, title: string, thumbnailResolver?: (state: MusicServerBrowseState, title: string) => string): void {
-  const state = getMusicServerBrowseState(entityId);
-  if (!state) {
-    return;
-  }
-
-  const isBrowsable = !title.includes(" - ");
-
-  upsertMenuOption(state, menuIndex, () => ({
-    menuIndex,
-    title,
-    mediaId: buildMusicServerMenuMediaId(menuIndex, title),
-    thumbnail: thumbnailResolver ? thumbnailResolver(state, title) : undefined,
-    isBrowsable
-  }));
+  musicServerStore.addMenuOption(entityId, menuIndex, title, thumbnailResolver);
 }
 
 export function listMusicServerMenuOptions(entityId: string): MusicServerMenuOption[] {
-  const state = getMusicServerBrowseState(entityId);
-  if (!state) {
-    return [];
-  }
-
-  return listMenuOptions(state);
+  return musicServerStore.listOptions(entityId);
 }
 
 export function getContiguousItemCount(entityId: string): number {
-  const state = getMusicServerBrowseState(entityId);
-  if (!state || state.optionsByMenuIndex.size === 0) return 0;
-  return getContiguousMenuItemCount(state);
+  return musicServerStore.getContiguousItemCount(entityId);
 }
 
 export function resetMusicServerBrowseState(entityId: string): void {
-  const state = getMusicServerBrowseState(entityId);
-  if (!state) {
-    return;
-  }
-
-  resetMenuBrowseState(state);
+  musicServerStore.resetState(entityId);
 }
 
 export function consumeTraceNextMusicServerSelectionAfterMainMenu(entityId: string): boolean {
-  const state = getMusicServerBrowseState(entityId);
-  if (!state || !state.traceNextSelectionAfterMainMenu) {
-    return false;
-  }
-
-  state.traceNextSelectionAfterMainMenu = false;
-  return true;
+  return musicServerStore.consumeTraceNextSelectionAfterMainMenu(entityId);
 }
 
 export function consumeMusicServerListModeActive(entityId: string): boolean {
-  const state = getMusicServerBrowseState(entityId);
-  if (!state) return false;
-  return consumeListModeActive(state);
+  return musicServerStore.consumeListModeActive(entityId);
 }
 
 export function getMusicServerThumbnailForTitle(entityId: string, title: string, resolver: (state: MusicServerBrowseState, title: string) => string): string {
+  return musicServerStore.thumbnailForTitle(entityId, title, resolver);
+}
+
+export async function waitForNlaIngestion(entityId: string): Promise<void> {
   const state = getMusicServerBrowseState(entityId);
-  if (!state) {
-    return "";
+  const totalExpected = state?.totalListItemCount ?? 0;
+  const currentCount = listMusicServerMenuOptions(entityId).length;
+  if (totalExpected > 0 && currentCount >= totalExpected) {
+    return;
   }
-  return resolver(state, title);
+
+  const deadline = Date.now() + NLA_INGEST_TIMEOUT_MS;
+  while (Date.now() < deadline) {
+    const count = listMusicServerMenuOptions(entityId).length;
+    if (count > currentCount) {
+      return;
+    }
+    await delay(NLA_INGEST_POLL_INTERVAL_MS);
+  }
 }

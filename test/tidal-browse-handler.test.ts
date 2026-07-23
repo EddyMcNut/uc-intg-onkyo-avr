@@ -33,7 +33,6 @@ let mediaBrowser: any;
 let tidalStore: any;
 
 describe("TidalBrowseHandler", () => {
-  let TidalBrowseHandler: any;
   let handler: any;
   let cmdHandler: any;
   let rawSend: any;
@@ -43,11 +42,25 @@ describe("TidalBrowseHandler", () => {
   beforeAll(async () => {
     mediaBrowser = await import("../src/mediaBrowser.js");
     tidalStore = await import("../src/tidalBrowserStore.js");
-    const mod = await import("../src/tidalBrowseHandler.js");
-    TidalBrowseHandler = mod.TidalBrowseHandler;
+    const { createMenuBrowseHandler } = await import("../src/menuBrowseHandler.js");
+    handler = createMenuBrowseHandler({
+      providerLabel: "Tidal",
+      integrationName: "tidalBrowseHandler:",
+      rootId: "tidal:root",
+      rootType: "tidal://menu",
+      backId: "tidal:menu-back",
+      browseMedia: mediaBrowser.browseMedia,
+      isMainMenuRequest: mediaBrowser.isTidalMainMenuRequest,
+      isBackRequest: mediaBrowser.isTidalBackRequest,
+      resolveMenuOption: mediaBrowser.resolveTidalMenuOption,
+      resetState: tidalStore.resetTidalBrowseState,
+      getBrowseState: tidalStore.getTidalBrowseState,
+      listMenuItems: tidalStore.listTidalMenuOptions
+    });
   });
 
   beforeEach(() => {
+    vi.clearAllMocks();
     mediaBrowser.isTidalBackRequest.mockReturnValue(false);
     mediaBrowser.isTidalMainMenuRequest.mockReturnValue(false);
     mediaBrowser.resolveTidalMenuOption.mockReturnValue(undefined);
@@ -56,7 +69,6 @@ describe("TidalBrowseHandler", () => {
     tidalStore.listTidalMenuOptions.mockReturnValue([]);
     cmdHandler = vi.fn().mockResolvedValue(uc.StatusCodes.Ok);
     rawSend = vi.fn().mockResolvedValue(undefined);
-    handler = new TidalBrowseHandler();
     vi.spyOn(handler, "waitForMenuStable" as any).mockResolvedValue(undefined);
     vi.spyOn(handler, "harvestListItems" as any).mockResolvedValue(undefined);
   });
