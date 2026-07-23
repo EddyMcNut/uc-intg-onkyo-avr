@@ -161,7 +161,11 @@ export class MusicServerMediaBrowser {
   }
 
   private normalizeForComparison(title: string): string {
-    return title.replace(/^\d+\.\s*/, "").replace(/^\d+\s*-\s*/, "").toLowerCase().trim();
+    return title
+      .replace(/^\d+\.\s*/, "")
+      .replace(/^\d+\s*-\s*/, "")
+      .toLowerCase()
+      .trim();
   }
 
   private titlesMatch(titleA: string, titleB: string): boolean {
