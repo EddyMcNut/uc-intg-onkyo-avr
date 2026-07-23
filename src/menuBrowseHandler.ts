@@ -99,6 +99,7 @@ export function createMenuBrowseHandler(cfg: MenuBrowseHandlerConfig): MenuBrows
       const selection = cfg.resolveMenuOption(options.media_id, options.media_type);
 
       if (backRequest && cmdHandler) {
+        cfg.resetState(entityId);
         const beforeSignature = this.buildMenuSignature(entityId);
         const menuDelay = this.getMenuDelay(entityId);
         log.info("%s [%s] sending %s Back command to AVR", integrationName, entityId, cfg.providerLabel);
