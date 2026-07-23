@@ -2,16 +2,19 @@ import * as uc from "@unfoldedcircle/integration-api";
 import { TuneInMediaBrowser } from "./tuneInMediaBrowser.js";
 import { TidalMediaBrowser } from "./tidalMediaBrowser.js";
 import { DeezerMediaBrowser } from "./deezerMediaBrowser.js";
+import { MusicServerMediaBrowser } from "./musicServerMediaBrowser.js";
 
 // Re-export service constants
 export { TUNEIN_ROOT_ID, TUNEIN_ROOT_TYPE, TUNEIN_MENU_ROOT_ID, TUNEIN_MENU_ROOT_TYPE, TUNEIN_MENU_BACK_ID } from "./tuneInMediaBrowser.js";
 export { TIDAL_ROOT_ID, TIDAL_ROOT_TYPE, TIDAL_MENU_ROOT_ID, TIDAL_BACK_ID } from "./tidalMediaBrowser.js";
 export { DEEZER_ROOT_ID, DEEZER_ROOT_TYPE, DEEZER_MENU_ROOT_ID, DEEZER_BACK_ID } from "./deezerMediaBrowser.js";
+export { MUSIC_SERVER_ROOT_ID, MUSIC_SERVER_ROOT_TYPE, MUSIC_SERVER_MENU_ROOT_ID, MUSIC_SERVER_BACK_ID } from "./musicServerMediaBrowser.js";
 
 // Service browser instances
 const tuneInBrowser = new TuneInMediaBrowser();
 const tidalBrowser = new TidalMediaBrowser();
 const deezerBrowser = new DeezerMediaBrowser();
+const musicServerBrowser = new MusicServerMediaBrowser();
 
 // TuneIn service delegation
 export function setTuneInBrowseContext(entityId: string, title: string): void {
@@ -114,4 +117,29 @@ export function isDeezerBackRequest(mediaId?: string, mediaType?: string): boole
 
 export async function browseDeezerMedia(entityId: string, options: uc.BrowseOptions): Promise<uc.StatusCodes | uc.BrowseResult> {
   return deezerBrowser.browse(entityId, options);
+}
+
+// Music Server service delegation
+export function ingestMusicServerXmlEntries(entityId: string, xmlPayload: string): void {
+  musicServerBrowser.ingestXmlEntries(entityId, xmlPayload);
+}
+
+export function ingestMusicServerListEntry(entityId: string, entry: string): void {
+  musicServerBrowser.ingestListEntry(entityId, entry);
+}
+
+export function resolveMusicServerMenuOption(mediaId?: string, mediaType?: string) {
+  return musicServerBrowser.resolveMenuOption(mediaId, mediaType);
+}
+
+export function isMusicServerMainMenuRequest(mediaId?: string, mediaType?: string): boolean {
+  return musicServerBrowser.isMainMenuRequest(mediaId, mediaType);
+}
+
+export function isMusicServerBackRequest(mediaId?: string, mediaType?: string): boolean {
+  return musicServerBrowser.isBackRequest(mediaId, mediaType);
+}
+
+export async function browseMusicServerMedia(entityId: string, options: uc.BrowseOptions): Promise<uc.StatusCodes | uc.BrowseResult> {
+  return musicServerBrowser.browse(entityId, options);
 }

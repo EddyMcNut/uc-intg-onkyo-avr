@@ -6,7 +6,7 @@ import { SONG_INFO } from "./constants.js";
 import { TuneInPreloader } from "./tuneInPreloader.js";
 import { ZoneAgnosticMediaStateStore } from "./zoneAgnosticMediaState.js";
 import { ZoneMediaRenderer } from "./zoneMediaRenderer.js";
-import { DeezerZoneAgnosticAdapter, TidalZoneAgnosticAdapter, TuneInZoneAgnosticAdapter, type ZoneAgnosticServiceAdapter } from "./zoneAgnosticServiceAdapters.js";
+import { DeezerZoneAgnosticAdapter, MusicServerZoneAgnosticAdapter, TidalZoneAgnosticAdapter, TuneInZoneAgnosticAdapter, type ZoneAgnosticServiceAdapter } from "./zoneAgnosticServiceAdapters.js";
 import { ZoneAgnosticServiceCommandRouter } from "./zoneAgnosticServiceCommandRouter.js";
 import { ZoneAgnosticFrontPanelRouter } from "./zoneAgnosticFrontPanelRouter.js";
 import type { AvrStateApi } from "./types.js";
@@ -43,6 +43,10 @@ export class ZoneAgnosticUpdateProcessor {
         getPhysicalAvrId: (entityId) => this.getPhysicalAvrId(entityId)
       }),
       new DeezerZoneAgnosticAdapter({
+        state: this.state,
+        getPhysicalAvrId: (entityId) => this.getPhysicalAvrId(entityId)
+      }),
+      new MusicServerZoneAgnosticAdapter({
         state: this.state,
         getPhysicalAvrId: (entityId) => this.getPhysicalAvrId(entityId)
       })
@@ -194,7 +198,7 @@ export class ZoneAgnosticUpdateProcessor {
   async handleNlt(sourceEntityId: string, serviceName: string, eventZone: string): Promise<void> {
     const netZones = this.getNetZones(sourceEntityId);
     const affectedZones = this.ensureNonEmpty(netZones, sourceEntityId);
-    const normalizedService = serviceName.toLowerCase();
+    const normalizedService = serviceName.toLowerCase().replace(/\s+/g, "-");
     const enteringZones: string[] = [];
 
     for (const zoneEntityId of affectedZones) {

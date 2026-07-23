@@ -2,6 +2,8 @@ import {
   hasTuneInPresets,
   ingestDeezerListEntry,
   ingestDeezerXmlEntries,
+  ingestMusicServerListEntry,
+  ingestMusicServerXmlEntries,
   ingestTidalListEntry,
   ingestTidalXmlEntries,
   ingestTuneInListEntry,
@@ -11,10 +13,11 @@ import {
   setTuneInBrowseContext
 } from "./mediaBrowser.js";
 import { getDeezerBrowseState, resetDeezerBrowseState } from "./deezerBrowserStore.js";
+import { getMusicServerBrowseState, resetMusicServerBrowseState } from "./musicServerBrowserStore.js";
 import { getTidalBrowseState, resetTidalBrowseState } from "./tidalBrowserStore.js";
 import { updateNowPlayingStation } from "./tuneInBrowserStore.js";
 import { resetTuneInMenuBrowseState, updateTuneInMenuNowPlayingStation } from "./tuneInMenuStore.js";
-import { DEEZER_SERVICE_ID, TIDAL_SERVICE_ID, TUNEIN_SERVICE_ID } from "./browseServiceContract.js";
+import { DEEZER_SERVICE_ID, MUSIC_SERVER_SERVICE_ID, TIDAL_SERVICE_ID, TUNEIN_SERVICE_ID } from "./browseServiceContract.js";
 
 type SubSourceStateApi = {
   getSubSource(entityId: string): string;
@@ -172,5 +175,38 @@ export class DeezerZoneAgnosticAdapter implements ZoneAgnosticServiceAdapter {
   handleMetadata(zoneEntityId: string, artist: string): void {
     const deezerState = getDeezerBrowseState(zoneEntityId);
     if (deezerState) deezerState.nowPlayingTitle = artist;
+  }
+}
+
+export class MusicServerZoneAgnosticAdapter implements ZoneAgnosticServiceAdapter {
+  readonly service = MUSIC_SERVER_SERVICE_ID;
+
+  constructor(private readonly deps: AdapterDeps) {}
+
+  getActiveZones(sourceEntityId: string): string[] {
+    return getServiceZones(sourceEntityId, this.service, this.deps);
+  }
+
+  async onServiceEntered(_sourceEntityId: string, _affectedZones: string[], enteringZones: string[]): Promise<void> {
+    for (const zoneEntityId of enteringZones) {
+      resetMusicServerBrowseState(zoneEntityId);
+    }
+  }
+
+  handleNls(sourceEntityId: string, entry: string): void {
+    for (const zoneEntityId of this.getActiveZones(sourceEntityId)) {
+      ingestMusicServerListEntry(zoneEntityId, entry);
+    }
+  }
+
+  handleNla(sourceEntityId: string, xmlPayload: string): void {
+    for (const zoneEntityId of this.getActiveZones(sourceEntityId)) {
+      ingestMusicServerXmlEntries(zoneEntityId, xmlPayload);
+    }
+  }
+
+  handleMetadata(zoneEntityId: string, artist: string): void {
+    const musicServerState = getMusicServerBrowseState(zoneEntityId);
+    if (musicServerState) musicServerState.nowPlayingTitle = artist;
   }
 }

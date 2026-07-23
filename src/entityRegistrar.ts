@@ -6,9 +6,11 @@ import { eiscpMappings } from "./eiscp-mappings.js";
 import { ALL_SIMPLE_COMMANDS } from "./simpleCommands.js";
 import { getCompatibleListeningModes } from "./listeningModeFilters.js";
 import { ConfigManager, buildEntityId } from "./configManager.js";
-import { browseMedia } from "./mediaBrowser.js";
-import { DeezerBrowseHandler } from "./deezerBrowseHandler.js";
-import { TidalBrowseHandler } from "./tidalBrowseHandler.js";
+import { browseMedia, isTidalMainMenuRequest, isTidalBackRequest, resolveTidalMenuOption, TIDAL_BACK_ID, TIDAL_ROOT_ID, TIDAL_ROOT_TYPE, isDeezerMainMenuRequest, isDeezerBackRequest, resolveDeezerMenuOption, DEEZER_BACK_ID, DEEZER_ROOT_ID, DEEZER_ROOT_TYPE, isMusicServerMainMenuRequest, isMusicServerBackRequest, resolveMusicServerMenuOption, MUSIC_SERVER_BACK_ID, MUSIC_SERVER_ROOT_ID, MUSIC_SERVER_ROOT_TYPE } from "./mediaBrowser.js";
+import { createMenuBrowseHandler } from "./menuBrowseHandler.js";
+import { listTidalMenuOptions, resetTidalBrowseState, getTidalBrowseState } from "./tidalBrowserStore.js";
+import { listDeezerMenuOptions, resetDeezerBrowseState, getDeezerBrowseState } from "./deezerBrowserStore.js";
+import { listMusicServerMenuOptions, resetMusicServerBrowseState, getMusicServerBrowseState, waitForNlaIngestion } from "./musicServerBrowserStore.js";
 import { TuneInBrowseHandler } from "./tuneInBrowseHandler.js";
 import { SELECT_SUFFIXES } from "./sensorSuffixes.js";
 import type { AvrStateApi } from "./types.js";
@@ -30,7 +32,55 @@ export default class EntityRegistrar {
   private readonly browseHandlers: EntityBrowseHandler[];
 
   constructor(avrStateApi: AvrStateApi) {
-    this.browseHandlers = [new TuneInBrowseHandler(avrStateApi), new TidalBrowseHandler(), new DeezerBrowseHandler()];
+    this.browseHandlers = [
+      new TuneInBrowseHandler(avrStateApi),
+      createMenuBrowseHandler({
+        providerLabel: "Tidal",
+        integrationName: "tidalBrowseHandler:",
+        rootId: TIDAL_ROOT_ID,
+        rootType: TIDAL_ROOT_TYPE,
+        backId: TIDAL_BACK_ID,
+        browseMedia,
+        isMainMenuRequest: isTidalMainMenuRequest,
+        isBackRequest: isTidalBackRequest,
+        resolveMenuOption: (mediaId, mediaType) => resolveTidalMenuOption(mediaId, mediaType),
+        resetState: resetTidalBrowseState,
+        getBrowseState: getTidalBrowseState,
+        listMenuItems: listTidalMenuOptions
+      }),
+      createMenuBrowseHandler({
+        providerLabel: "Deezer",
+        integrationName: "deezerBrowseHandler:",
+        rootId: DEEZER_ROOT_ID,
+        rootType: DEEZER_ROOT_TYPE,
+        backId: DEEZER_BACK_ID,
+        browseMedia,
+        isMainMenuRequest: isDeezerMainMenuRequest,
+        isBackRequest: isDeezerBackRequest,
+        resolveMenuOption: (mediaId, mediaType) => resolveDeezerMenuOption(mediaId, mediaType),
+        resetState: resetDeezerBrowseState,
+        getBrowseState: getDeezerBrowseState,
+        listMenuItems: listDeezerMenuOptions
+      }),
+      createMenuBrowseHandler({
+        providerLabel: "Music Server",
+        integrationName: "musicServerBrowseHandler:",
+        rootId: MUSIC_SERVER_ROOT_ID,
+        rootType: MUSIC_SERVER_ROOT_TYPE,
+        backId: MUSIC_SERVER_BACK_ID,
+        browseMedia,
+        isMainMenuRequest: isMusicServerMainMenuRequest,
+        isBackRequest: isMusicServerBackRequest,
+        resolveMenuOption: (mediaId, mediaType) => resolveMusicServerMenuOption(mediaId, mediaType),
+        resetState: resetMusicServerBrowseState,
+        getBrowseState: getMusicServerBrowseState,
+        listMenuItems: listMusicServerMenuOptions,
+        afterHarvest: async (entityId, rawSend) => {
+          void rawSend;
+          await waitForNlaIngestion(entityId);
+        }
+      })
+    ];
   }
 
   // Build a user-facing base name from an AVR entry id. Input format is typically: "MODEL HOST ZONE". Long style keeps the full entry, short style omits HOST (IP/hostname).

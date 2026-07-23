@@ -803,7 +803,7 @@ export const eiscpCommands = {
       description: "Preset Command for TuneIn",
       values: {
         "1,999": {
-          name: "no-1-999",
+          name: "no-1-99",
           description: "sets Preset No. 1 - 999 (custom for UCR3 Onkyo integration)"
         }
       }

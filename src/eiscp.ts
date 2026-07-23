@@ -10,6 +10,7 @@ import { IscpCommandParser, type CommandResult } from "./eiscp-command-parser.js
 import { createEiscpPacket, extractIscpMessage, extractAllIscpMessages } from "./eiscp-packet.js";
 import { buildMultiZoneVolumeCommands, buildMultiZoneMuteCommands } from "./eiscp-multi-zone.js";
 import { getDeezerBrowseState } from "./deezerBrowserStore.js";
+import { getMusicServerBrowseState } from "./musicServerBrowserStore.js";
 import { getTidalBrowseState } from "./tidalBrowserStore.js";
 import { getTuneInMenuBrowseState } from "./tuneInMenuStore.js";
 import { getZonePrefix } from "./zoneMappings.js";
@@ -125,6 +126,9 @@ export class EiscpDriver extends EventEmitter {
       },
       {
         getBrowseState: getTuneInMenuBrowseState
+      },
+      {
+        getBrowseState: getMusicServerBrowseState
       }
     );
     if (this.listenerCount("error") === 0) {
