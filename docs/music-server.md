@@ -1,8 +1,8 @@
 ## Music-server
 
-If your AVR has the option to browse and select songs from a `music server`, this integration van be used to browse that server through your AVR.
+If your AVR has the option to browse and select songs from a `music server`, this integration can be used to browse that server through your AVR.
 
-This integration will try to collect the album art, artist, title and album. All this is collected from the AVR, this integration does not communicate with your Music Server directly. All commands, like `browse`, `play/pause`, `next` and `previous`, will be send to the AVR, the AVR will handle the communication with your Music Server
+This integration will try to collect the artist, title and album. All this is collected from the AVR, this integration does not communicate with your Music Server directly. All commands, like `browse`, `play/pause`, `next` and `previous`, will be send to the AVR, the AVR will handle the communication with your Music Server
 
 ### Music-server activity
 
