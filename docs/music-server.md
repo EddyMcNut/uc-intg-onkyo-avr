@@ -38,7 +38,7 @@ It's recommended to _disable_ the setting `Coverflow in media browser` to get th
 
 ### Browse Music-server
 
-The mediabrowser of Unfolded Circle combined with your AVR being able to browse the Music-server service make it possibe to scroll through the Music Server menu just like you would do with the Controller app of your AVR or navigating the menu on you AVR using your TV.
+The mediabrowser of Unfolded Circle combined with your AVR being able to browse the Music-server service make it possibe to scroll through the Music Server menu just like you would do with the Controller app of your AVR or navigating the menu on your AVR using your TV.
 
 Some screenshots:
 
