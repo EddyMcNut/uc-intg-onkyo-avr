@@ -26,58 +26,61 @@ function isMusicServerTrackTitle(title: string): boolean {
   return title.includes(" - ");
 }
 
-const browser: MediaBrowserApi = createMediaBrowser({
-  providerLabel: "Music Server",
-  mediaIdPrefix: "music-server",
-  mediaIdPrefixRegex: "music-server",
-  rootId: MUSIC_SERVER_ROOT_ID,
-  rootType: MUSIC_SERVER_ROOT_TYPE,
-  menuRootId: MUSIC_SERVER_MENU_ROOT_ID,
-  backId: MUSIC_SERVER_BACK_ID,
-  mainMenuLabel: "Music Server Main Menu",
-  rootLabel: "Music Server",
-  excludedPrefixes: ["search", "login", "logout", "log out"],
-  isTrackTitle: isMusicServerTrackTitle,
-  titlesMatch: titlesMatchFuzzy,
-  thumbnails: {
-    service: {
-      svgFileName: "music-server.svg",
-      logoTransform: "translate(180 240) scale(5)",
-      logoPathAttrs: 'fill="#ffffff"',
-      backgroundColor: "#00bfff",
-      fallbackLabel: "MUSIC SERVER",
-      fallbackLabelColor: "#ffffff",
-      fallbackBgOpacity: ".15",
-      textColor: "#ffffff",
-      fallbackIcon: "icon://uc:music",
-      logName: "MusicServer"
-    },
-    menu: {
-      svgFileName: "menu.svg",
-      logoTransform: "translate(180 40) scale(5)",
-      logoPathAttrs: 'fill="#ffffff"',
-      backgroundColor: "#00bfff",
-      fallbackLabel: "MENU",
-      fallbackLabelColor: "#ffffff",
-      fallbackBgOpacity: ".15",
-      textColor: "#ffffff",
-      fallbackIcon: "icon://uc:music",
-      logName: "MusicServerMainMenu"
-    },
-    back: {
-      svgFileName: "back.svg",
-      logoTransform: "translate(140 1) scale(0.7)",
-      logoPathAttrs: 'fill="#ffffff"',
-      backgroundColor: "#00bfff",
-      fallbackLabel: "BACK",
-      fallbackLabelColor: "#ffffff",
-      fallbackBgOpacity: ".15",
-      textColor: "#ffffff",
-      fallbackIcon: "icon://uc:music",
-      logName: "MusicServerMenuBack"
+const browser: MediaBrowserApi = createMediaBrowser(
+  {
+    providerLabel: "Music Server",
+    mediaIdPrefix: "music-server",
+    mediaIdPrefixRegex: "music-server",
+    rootId: MUSIC_SERVER_ROOT_ID,
+    rootType: MUSIC_SERVER_ROOT_TYPE,
+    menuRootId: MUSIC_SERVER_MENU_ROOT_ID,
+    backId: MUSIC_SERVER_BACK_ID,
+    mainMenuLabel: "Music Server Main Menu",
+    rootLabel: "Music Server",
+    excludedPrefixes: ["search", "login", "logout", "log out"],
+    isTrackTitle: isMusicServerTrackTitle,
+    titlesMatch: titlesMatchFuzzy,
+    thumbnails: {
+      service: {
+        svgFileName: "music-server.svg",
+        logoTransform: "translate(180 240) scale(5)",
+        logoPathAttrs: 'fill="#ffffff"',
+        backgroundColor: "#00bfff",
+        fallbackLabel: "MUSIC SERVER",
+        fallbackLabelColor: "#ffffff",
+        fallbackBgOpacity: ".15",
+        textColor: "#ffffff",
+        fallbackIcon: "icon://uc:music",
+        logName: "MusicServer"
+      },
+      menu: {
+        svgFileName: "menu.svg",
+        logoTransform: "translate(180 40) scale(5)",
+        logoPathAttrs: 'fill="#ffffff"',
+        backgroundColor: "#00bfff",
+        fallbackLabel: "MENU",
+        fallbackLabelColor: "#ffffff",
+        fallbackBgOpacity: ".15",
+        textColor: "#ffffff",
+        fallbackIcon: "icon://uc:music",
+        logName: "MusicServerMainMenu"
+      },
+      back: {
+        svgFileName: "back.svg",
+        logoTransform: "translate(140 1) scale(0.7)",
+        logoPathAttrs: 'fill="#ffffff"',
+        backgroundColor: "#00bfff",
+        fallbackLabel: "BACK",
+        fallbackLabelColor: "#ffffff",
+        fallbackBgOpacity: ".15",
+        textColor: "#ffffff",
+        fallbackIcon: "icon://uc:music",
+        logName: "MusicServerMenuBack"
+      }
     }
-  }
-}, musicServerStore);
+  },
+  musicServerStore
+);
 
 export class MusicServerMediaBrowser {
   ingestXmlEntries(entityId: string, xmlPayload: string): void {

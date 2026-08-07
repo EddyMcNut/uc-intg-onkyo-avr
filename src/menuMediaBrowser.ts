@@ -2,7 +2,7 @@ import * as uc from "@unfoldedcircle/integration-api";
 import log from "./loggers.js";
 import { createServiceThumbnails } from "./serviceThumbnails.js";
 import { parseIndexedMenuEntry, getXmlOffset, parseXmlItems } from "./menuEntryParser.js";
-import { type MenuBrowseOption, type MenuBrowseState } from "./menuBrowseState.js";
+import { type MenuBrowseOption } from "./menuBrowseState.js";
 import { type MenuBrowseStore } from "./menuBrowseStore.js";
 
 const NOW_PLAYING_LABEL = "▶ Now Playing";
@@ -21,9 +21,42 @@ export type MediaBrowserConfig = {
   isTrackTitle: (title: string) => boolean;
   titlesMatch: (titleA: string, titleB: string) => boolean;
   thumbnails: {
-    service: { svgFileName: string; logoTransform: string; logoPathAttrs: string; backgroundColor: string; fallbackLabel: string; fallbackLabelColor: string; fallbackBgOpacity: string; textColor: string; fallbackIcon: string; logName: string };
-    menu: { svgFileName: string; logoTransform: string; logoPathAttrs: string; backgroundColor: string; fallbackLabel: string; fallbackLabelColor: string; fallbackBgOpacity: string; textColor: string; fallbackIcon: string; logName: string };
-    back: { svgFileName: string; logoTransform: string; logoPathAttrs: string; backgroundColor: string; fallbackLabel: string; fallbackLabelColor: string; fallbackBgOpacity: string; textColor: string; fallbackIcon: string; logName: string };
+    service: {
+      svgFileName: string;
+      logoTransform: string;
+      logoPathAttrs: string;
+      backgroundColor: string;
+      fallbackLabel: string;
+      fallbackLabelColor: string;
+      fallbackBgOpacity: string;
+      textColor: string;
+      fallbackIcon: string;
+      logName: string;
+    };
+    menu: {
+      svgFileName: string;
+      logoTransform: string;
+      logoPathAttrs: string;
+      backgroundColor: string;
+      fallbackLabel: string;
+      fallbackLabelColor: string;
+      fallbackBgOpacity: string;
+      textColor: string;
+      fallbackIcon: string;
+      logName: string;
+    };
+    back: {
+      svgFileName: string;
+      logoTransform: string;
+      logoPathAttrs: string;
+      backgroundColor: string;
+      fallbackLabel: string;
+      fallbackLabelColor: string;
+      fallbackBgOpacity: string;
+      textColor: string;
+      fallbackIcon: string;
+      logName: string;
+    };
   };
 };
 

@@ -3,7 +3,6 @@ import { ConfigManager, AVR_DEFAULTS, buildEntityId } from "./configManager.js";
 import log from "./loggers.js";
 import { MenuBrowseHandlerBase, type MenuSignatureItem } from "./menuBrowseHandlerBase.js";
 import type { MenuBrowseState, MenuBrowseOption } from "./menuBrowseState.js";
-import { delay } from "./utils.js";
 
 export type CmdHandlerFn = (entity: uc.Entity, cmdId: string, params?: { [key: string]: string | number | boolean }) => Promise<uc.StatusCodes>;
 type RawSendFn = (cmd: string) => Promise<void>;

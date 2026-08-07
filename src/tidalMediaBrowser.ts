@@ -16,58 +16,61 @@ function titlesMatchExact(a: string, b: string): boolean {
   return a.toLowerCase() === b.toLowerCase();
 }
 
-const browser: MediaBrowserApi = createMediaBrowser({
-  providerLabel: "Tidal",
-  mediaIdPrefix: "tidal",
-  mediaIdPrefixRegex: "tidal",
-  rootId: TIDAL_ROOT_ID,
-  rootType: TIDAL_ROOT_TYPE,
-  menuRootId: TIDAL_MENU_ROOT_ID,
-  backId: TIDAL_BACK_ID,
-  mainMenuLabel: "Tidal Main Menu",
-  rootLabel: "Tidal",
-  excludedPrefixes: ["search", "login", "logout", "log out", "all stations"],
-  isTrackTitle: isTidalTrackTitle,
-  titlesMatch: titlesMatchExact,
-  thumbnails: {
-    service: {
-      svgFileName: "tidal.svg",
-      logoTransform: "translate(245 248) scale(.103275)",
-      logoPathAttrs: 'fill="#ffffff"',
-      backgroundColor: "#000000",
-      fallbackLabel: "TIDAL",
-      fallbackLabelColor: "#00fecc",
-      fallbackBgOpacity: ".15",
-      textColor: "#00fecc",
-      fallbackIcon: "icon://uc:music",
-      logName: "Tidal"
-    },
-    menu: {
-      svgFileName: "menu.svg",
-      logoTransform: "translate(180 40) scale(5)",
-      logoPathAttrs: 'fill="#00fecc"',
-      backgroundColor: "#000000",
-      fallbackLabel: "MENU",
-      fallbackLabelColor: "#00fecc",
-      fallbackBgOpacity: ".15",
-      textColor: "#00fecc",
-      fallbackIcon: "icon://uc:music",
-      logName: "TidalMainMenu"
-    },
-    back: {
-      svgFileName: "back.svg",
-      logoTransform: "translate(140 1) scale(0.7)",
-      logoPathAttrs: 'fill="#00fecc"',
-      backgroundColor: "#000000",
-      fallbackLabel: "BACK",
-      fallbackLabelColor: "#00fecc",
-      fallbackBgOpacity: ".15",
-      textColor: "#00fecc",
-      fallbackIcon: "icon://uc:music",
-      logName: "TidalMenuBack"
+const browser: MediaBrowserApi = createMediaBrowser(
+  {
+    providerLabel: "Tidal",
+    mediaIdPrefix: "tidal",
+    mediaIdPrefixRegex: "tidal",
+    rootId: TIDAL_ROOT_ID,
+    rootType: TIDAL_ROOT_TYPE,
+    menuRootId: TIDAL_MENU_ROOT_ID,
+    backId: TIDAL_BACK_ID,
+    mainMenuLabel: "Tidal Main Menu",
+    rootLabel: "Tidal",
+    excludedPrefixes: ["search", "login", "logout", "log out", "all stations"],
+    isTrackTitle: isTidalTrackTitle,
+    titlesMatch: titlesMatchExact,
+    thumbnails: {
+      service: {
+        svgFileName: "tidal.svg",
+        logoTransform: "translate(245 248) scale(.103275)",
+        logoPathAttrs: 'fill="#ffffff"',
+        backgroundColor: "#000000",
+        fallbackLabel: "TIDAL",
+        fallbackLabelColor: "#00fecc",
+        fallbackBgOpacity: ".15",
+        textColor: "#00fecc",
+        fallbackIcon: "icon://uc:music",
+        logName: "Tidal"
+      },
+      menu: {
+        svgFileName: "menu.svg",
+        logoTransform: "translate(180 40) scale(5)",
+        logoPathAttrs: 'fill="#00fecc"',
+        backgroundColor: "#000000",
+        fallbackLabel: "MENU",
+        fallbackLabelColor: "#00fecc",
+        fallbackBgOpacity: ".15",
+        textColor: "#00fecc",
+        fallbackIcon: "icon://uc:music",
+        logName: "TidalMainMenu"
+      },
+      back: {
+        svgFileName: "back.svg",
+        logoTransform: "translate(140 1) scale(0.7)",
+        logoPathAttrs: 'fill="#00fecc"',
+        backgroundColor: "#000000",
+        fallbackLabel: "BACK",
+        fallbackLabelColor: "#00fecc",
+        fallbackBgOpacity: ".15",
+        textColor: "#00fecc",
+        fallbackIcon: "icon://uc:music",
+        logName: "TidalMenuBack"
+      }
     }
-  }
-}, tidalStore);
+  },
+  tidalStore
+);
 
 export class TidalMediaBrowser {
   ingestXmlEntries(entityId: string, xmlPayload: string): void {
