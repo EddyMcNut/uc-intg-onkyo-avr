@@ -19,6 +19,7 @@ it("createAvrSpecificConfig coerces types correctly", async () => {
     volumeScale: "80",
     adjustVolumeDispl: "false",
     createSensors: "false",
+    createRemoteEntity: "true",
     netMenuDelay: "120",
     tuneinPresetPosition: "3",
     listeningModeOptions: ["stereo", "straight-decode"]
@@ -30,6 +31,7 @@ it("createAvrSpecificConfig coerces types correctly", async () => {
   expect(config.avrs[0].volumeScale).toBe(80);
   expect(config.avrs[0].adjustVolumeDispl).toBe(false);
   expect(config.avrs[0].createSensors).toBe(false);
+  expect(config.avrs[0].createRemoteEntity).toBe(true);
   expect(config.avrs[0].netMenuDelay).toBe(120);
   expect(config.avrs[0].tuneinPresetPosition).toBe(3);
   expect(config.avrs[0].port).toBe(60128);

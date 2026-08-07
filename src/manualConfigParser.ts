@@ -14,6 +14,7 @@ export interface ManualConfigInput {
   adjustVolumeDispl?: unknown;
   zoneCount?: unknown;
   createSensors?: unknown;
+  createRemoteEntity?: unknown;
   netMenuDelay?: unknown;
   tuneinPresetPosition?: unknown;
   tuneinMenuStyle?: unknown;
@@ -35,6 +36,7 @@ export interface ParsedManualConfig {
   entityNameStyleValue: "long" | "short";
   zoneCountValue: number;
   createSensorsValue: boolean;
+  createRemoteEntityValue: boolean;
   netMenuDelayValue: number;
   tuneinPresetPositionValue: number;
   tuneinMenuStyleValue: "mypresets" | "full";
@@ -57,6 +59,7 @@ export class ManualConfigParser {
       adjustVolumeDisplValue: parseBoolean(input.adjustVolumeDispl, true),
       entityNameStyleValue: this.parseEntityNameStyle(input.entityNameStyle),
       createSensorsValue: parseBoolean(input.createSensors, AVR_DEFAULTS.createSensors),
+      createRemoteEntityValue: parseBoolean(input.createRemoteEntity, AVR_DEFAULTS.createRemoteEntity),
       netMenuDelayValue: this.parseNetMenuDelay(input.netMenuDelay),
       tuneinPresetPositionValue: this.parseTuneInPresetPosition(input.tuneinPresetPosition),
       tuneinMenuStyleValue: this.parseTuneInMenuStyle(input.tuneinMenuStyle),

@@ -75,5 +75,6 @@ export interface AvrStateApi {
   clearState(entityId: string): void;
   clearAllState(): void;
   applyMediaPlayerState(entityId: string, driver?: uc.IntegrationAPI): void;
+  applyRemoteState(entityId: string, driver?: uc.IntegrationAPI): void;
   refreshAvrState(entityId: string, eiscpInstance?: EiscpDriver, zone?: string, driver?: uc.IntegrationAPI, queueThreshold?: number, commandReceiver?: ICommandReceiver): Promise<void>;
 }

@@ -8,6 +8,7 @@ import type { ICommandReceiver } from "./types.js";
 import { resetDeezerBrowseState } from "./deezerBrowserStore.js";
 import { resetMusicServerBrowseState } from "./musicServerBrowserStore.js";
 import { resetTidalBrowseState } from "./tidalBrowserStore.js";
+import { REMOTE_SUFFIX } from "./sensorSuffixes.js";
 
 const integrationName = "avrState:";
 
@@ -86,11 +87,13 @@ export class AvrStateManager {
       log.info("%s [%s] power state changed from '%s' to '%s'", integrationName, entityId, state.powerState, powerState);
       state.powerState = normalizedPowerState;
       this.applyMediaPlayerState(entityId, driver);
+      this.applyRemoteState(entityId, driver);
       return true;
     }
 
     // Keep entity state in sync even if power event is duplicated.
     this.applyMediaPlayerState(entityId, driver);
+    this.applyRemoteState(entityId, driver);
     return false;
   }
 
@@ -242,6 +245,29 @@ export class AvrStateManager {
 
     driver.updateEntityAttributes(entityId, {
       [uc.MediaPlayerAttributes.State]: this.resolveMediaPlayerState(entityId)
+    });
+  }
+
+  private resolveRemoteState(entityId: string): uc.RemoteStates {
+    const state = this.getState(entityId);
+
+    if (state.powerState === "on") {
+      return uc.RemoteStates.On;
+    }
+    if (state.powerState === "standby") {
+      return uc.RemoteStates.Off;
+    }
+    return uc.RemoteStates.Unknown;
+  }
+
+  /** Push the AVR power state onto the remote entity (if registered). */
+  public applyRemoteState(entityId: string, driver?: uc.IntegrationAPI): void {
+    if (!driver) {
+      return;
+    }
+
+    driver.updateEntityAttributes(`${entityId}${REMOTE_SUFFIX}`, {
+      [uc.RemoteAttributes.State]: this.resolveRemoteState(entityId)
     });
   }
 

@@ -90,6 +90,7 @@ export const AVR_DEFAULTS = {
   adjustVolumeDispl: true,
   entityNameStyle: "short",
   createSensors: true,
+  createRemoteEntity: false,
   netMenuDelay: 500,
   tuneinPresetPosition: 1,
   tuneinMenuStyle: "mypresets",
@@ -113,6 +114,7 @@ export interface AvrConfig {
   adjustVolumeDispl?: boolean; // true = use 0.5 dB steps (×2 / ÷2), false = direct EISCP value
   entityNameStyle?: EntityNameStyle; // long = include host/ip in visible names, short = omit host/ip
   createSensors?: boolean; // true = create sensor entities for this AVR
+  createRemoteEntity?: boolean; // true = create a remote entity for this AVR
   netMenuDelay?: number; // delay in ms for NET menu to load (default 2500)
   tuneinPresetPosition?: number; // position of "My Presets" in TuneIn menu (1-9, default 1)
   tuneinMenuStyle?: TuneInMenuStyle; // choose TuneIn navigation mode: mypresets or full
@@ -132,6 +134,7 @@ export interface OnkyoConfig {
   adjustVolumeDispl?: boolean; // true = use 0.5 dB steps (×2 / ÷2), false = direct EISCP value
   entityNameStyle?: EntityNameStyle;
   createSensors?: boolean; // true = create sensor entities
+  createRemoteEntity?: boolean; // true = create a remote entity
   // Legacy fields for backward compatibility
   model?: string;
   ip?: string;
@@ -152,6 +155,7 @@ export interface NormalizedAvrConfig {
   adjustVolumeDispl: boolean;
   entityNameStyle: EntityNameStyle;
   createSensors: boolean;
+  createRemoteEntity: boolean;
   netMenuDelay: number;
   tuneinPresetPosition: number;
   tuneinMenuStyle: TuneInMenuStyle;
@@ -181,6 +185,8 @@ export function normalizeAvrConfig(raw: AvrConfig): NormalizedAvrConfig {
   const entityNameStyle: EntityNameStyle = String(raw.entityNameStyle ?? AVR_DEFAULTS.entityNameStyle).toLowerCase() === "short" ? "short" : "long";
 
   const createSensors = parseBoolean(raw.createSensors, AVR_DEFAULTS.createSensors);
+
+  const createRemoteEntity = parseBoolean(raw.createRemoteEntity, AVR_DEFAULTS.createRemoteEntity);
 
   const netMenuDelay = (() => {
     const v = typeof raw.netMenuDelay === "number" ? raw.netMenuDelay : parseInt(String(raw.netMenuDelay ?? ""), 10);
@@ -212,6 +218,7 @@ export function normalizeAvrConfig(raw: AvrConfig): NormalizedAvrConfig {
     adjustVolumeDispl,
     entityNameStyle,
     createSensors,
+    createRemoteEntity,
     netMenuDelay,
     tuneinPresetPosition,
     tuneinMenuStyle,

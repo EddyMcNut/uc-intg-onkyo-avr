@@ -151,6 +151,7 @@ export default class SetupHandler {
       input.adjustVolumeDispl ||
       input.zoneCount ||
       input.createSensors ||
+      input.createRemoteEntity ||
       input.netMenuDelay ||
       input.tuneinPresetPosition ||
       input.tuneinMenuStyle ||
@@ -177,6 +178,7 @@ export default class SetupHandler {
         entityNameStyle: currentAvr?.entityNameStyle,
         zoneCount: currentAvr && cfg.avrs ? cfg.avrs.filter((a) => a.model === currentAvr.model && a.ip === currentAvr.ip).length : 1,
         createSensors: currentAvr?.createSensors,
+        createRemoteEntity: currentAvr?.createRemoteEntity,
         netMenuDelay: currentAvr?.netMenuDelay,
         tuneinPresetPosition: currentAvr?.tuneinPresetPosition,
         tuneinMenuStyle: currentAvr?.tuneinMenuStyle,

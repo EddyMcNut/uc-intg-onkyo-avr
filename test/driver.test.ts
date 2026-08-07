@@ -53,6 +53,7 @@ const h = vi.hoisted(() => {
       createSensorEntities: vi.fn(() => [{ id: "sensor_1" }]),
       createListeningModeSelectEntity: vi.fn(() => ({ id: "lm_entity" })),
       createInputSelectorSelectEntity: vi.fn(() => ({ id: "is_entity" })),
+      createRemoteEntity: vi.fn(() => ({ id: "remote_entity" })),
       getListeningModeOptions: vi.fn(() => ["option1"]),
       getInputSelectorOptions: vi.fn(() => ["input1"])
     },
@@ -156,6 +157,11 @@ vi.mock("../src/connectionManager.js", () => ({
 }));
 vi.mock("../src/selectEntityHandler.js", () => ({
   SelectEntityHandler: function () {
+    return { handle: vi.fn() };
+  }
+}));
+vi.mock("../src/remoteCommandHandler.js", () => ({
+  RemoteCommandHandler: function () {
     return { handle: vi.fn() };
   }
 }));
@@ -441,6 +447,31 @@ describe("OnkyoDriver", () => {
       expect(mockEntityRegistrar.createSensorEntities).not.toHaveBeenCalled();
       expect(mockEntityRegistrar.createListeningModeSelectEntity).not.toHaveBeenCalled();
       expect(mockEntityRegistrar.createInputSelectorSelectEntity).not.toHaveBeenCalled();
+    });
+
+    it("registers remote entity when createRemoteEntity is true", async () => {
+      const configModule = await import("../src/configManager.js");
+      (configModule.ConfigManager.load as any).mockReturnValueOnce({
+        avrs: [{ model: "TX-RZ50", ip: "1.2.3.4", zone: "main", createRemoteEntity: true }],
+        logLevel: "info"
+      });
+
+      const driver = await createDriver();
+
+      expect(mockEntityRegistrar.createRemoteEntity).toHaveBeenCalled();
+      expect(mockDriver.addAvailableEntity).toHaveBeenCalledWith({ id: "remote_entity" });
+    });
+
+    it("skips remote entity when createRemoteEntity is false or absent", async () => {
+      const configModule = await import("../src/configManager.js");
+      (configModule.ConfigManager.load as any).mockReturnValueOnce({
+        avrs: [{ model: "TX-RZ50", ip: "1.2.3.4", zone: "main", createRemoteEntity: false }],
+        logLevel: "info"
+      });
+
+      const driver = await createDriver();
+
+      expect(mockEntityRegistrar.createRemoteEntity).not.toHaveBeenCalled();
     });
   });
 

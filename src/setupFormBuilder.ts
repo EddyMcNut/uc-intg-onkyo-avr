@@ -125,6 +125,20 @@ export class SetupFormBuilder {
         }
       },
       {
+        id: "createRemoteEntity",
+        label: { en: "Create remote entity?" },
+        field: {
+          dropdown: {
+            value: String(values.createRemoteEntityValue),
+            items: [
+              { id: "false", label: { en: "No (default)" } },
+              { id: "true", label: { en: "Yes" } }
+            ]
+          }
+        },
+        description: { en: "Creates a remote entity with physical button mapping and a command page to send AVR commands, e.g. power, volume, mute, navigation, input and sleep timers." }
+      },
+      {
         id: "logLevel",
         label: { en: "Log level" },
         field: {

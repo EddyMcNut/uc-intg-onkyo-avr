@@ -84,11 +84,13 @@ Example activities:
 
 [Slider](./docs/volume.md#slider)
 
-## Sensors and Selects
+## Sensor, Select and Remote entities
 
 [Sensors](./docs/sensor.md)
 
 [Selects](./docs/select.md)
+
+[Remote](./docs/remote.md)
 
 ## Listening modes
 

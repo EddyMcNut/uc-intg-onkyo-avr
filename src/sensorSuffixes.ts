@@ -14,5 +14,8 @@ export const SENSOR_SUFFIXES = [
 
 export const SELECT_SUFFIXES = ["_listening_mode", "_input_selector"] as const;
 
+/** Suffix used for the optional remote entity. */
+export const REMOTE_SUFFIX = "_remote";
+
 /** All sensor/select suffixes (for use in regex construction, etc.) */
-export const ALL_SUFFIXES = [...SENSOR_SUFFIXES, ...SELECT_SUFFIXES] as readonly string[];
+export const ALL_SUFFIXES = [...SENSOR_SUFFIXES, ...SELECT_SUFFIXES, REMOTE_SUFFIX] as readonly string[];

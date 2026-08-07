@@ -121,3 +121,40 @@ it("EntityRegistrar long entity names include host when configured", async () =>
     fs.rmSync(tmp, { recursive: true, force: true });
   }
 });
+
+it("EntityRegistrar builds remote entity with features, buttons, pages and simple commands", async () => {
+  const tmp = mkTmpDir();
+  try {
+    const cfgModule = await import("../src/configManager.js");
+    if (typeof (cfgModule as any).setConfigDir === "function") {
+      (cfgModule as any).setConfigDir(tmp);
+    }
+    (cfgModule as any).ConfigManager.save({ avrs: [{ model: "TX-RZ50", ip: "192.168.1.2", port: 60128, zone: "main", entityNameStyle: "short" }] });
+
+    const module = await import("../src/entityRegistrar.js");
+    const EntityRegistrar = module.default as any;
+    const avrStateModule = await import("../src/avrState.js");
+    const { avrStateManager } = avrStateModule as any;
+    const registrar = new EntityRegistrar(avrStateManager);
+    const avrEntry = "TX-RZ50 192.168.1.2 main";
+
+    const remote = registrar.createRemoteEntity(avrEntry, async () => 0);
+    expect(remote).toBeTruthy();
+    expect(remote.id.endsWith("_remote")).toBe(true);
+    expect((remote as any).name?.en).toBe("TX-RZ50 Main Remote");
+
+    expect(Array.isArray((remote as any).features)).toBe(true);
+    expect((remote as any).features).toContain("on_off");
+    expect((remote as any).features).toContain("toggle");
+
+    const options = (remote as any).options || {};
+    expect(Array.isArray(options.simple_commands)).toBe(true);
+    expect(options.simple_commands.length > 0).toBe(true);
+    expect(Array.isArray(options.button_mapping)).toBe(true);
+    expect(Array.isArray(options.user_interface?.pages)).toBe(true);
+    expect(options.user_interface.pages.length).toBeGreaterThan(0);
+    expect((remote as any).attributes?.state).toBe("UNKNOWN");
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});

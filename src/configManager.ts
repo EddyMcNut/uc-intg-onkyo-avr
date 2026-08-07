@@ -40,6 +40,7 @@ export class ConfigManager {
       adjustVolumeDispl: avr.adjustVolumeDispl ?? AVR_DEFAULTS.adjustVolumeDispl,
       entityNameStyle: avr.entityNameStyle ?? AVR_DEFAULTS.entityNameStyle,
       createSensors: avr.createSensors ?? AVR_DEFAULTS.createSensors,
+      createRemoteEntity: avr.createRemoteEntity ?? AVR_DEFAULTS.createRemoteEntity,
       netMenuDelay: avr.netMenuDelay ?? AVR_DEFAULTS.netMenuDelay,
       tuneinPresetPosition: avr.tuneinPresetPosition ?? AVR_DEFAULTS.tuneinPresetPosition,
       tuneinMenuStyle: avr.tuneinMenuStyle ?? AVR_DEFAULTS.tuneinMenuStyle,
@@ -263,6 +264,11 @@ export class ConfigManager {
       errors.push("createSensors must be boolean");
     }
 
+    // createRemoteEntity
+    if (avr.createRemoteEntity !== undefined && typeof avr.createRemoteEntity !== "boolean" && !(typeof avr.createRemoteEntity === "string")) {
+      errors.push("createRemoteEntity must be boolean");
+    }
+
     // netMenuDelay
     if (avr.netMenuDelay !== undefined) {
       const nm = typeof avr.netMenuDelay === "number" ? avr.netMenuDelay : parseInt(String(avr.netMenuDelay), 10);
@@ -329,6 +335,7 @@ export class ConfigManager {
       adjustVolumeDispl: parseBoolean(avr.adjustVolumeDispl, AVR_DEFAULTS.adjustVolumeDispl),
       entityNameStyle: (String(avr.entityNameStyle ?? AVR_DEFAULTS.entityNameStyle).toLowerCase() === "short" ? "short" : "long") as EntityNameStyle,
       createSensors: parseBoolean(avr.createSensors, AVR_DEFAULTS.createSensors),
+      createRemoteEntity: parseBoolean(avr.createRemoteEntity, AVR_DEFAULTS.createRemoteEntity),
       netMenuDelay: typeof avr.netMenuDelay === "string" ? parseInt(avr.netMenuDelay, 10) : avr.netMenuDelay,
       tuneinPresetPosition: typeof avr.tuneinPresetPosition === "string" ? parseInt(avr.tuneinPresetPosition, 10) : avr.tuneinPresetPosition,
       tuneinMenuStyle: String(avr.tuneinMenuStyle ?? AVR_DEFAULTS.tuneinMenuStyle).toLowerCase() === "full" ? "full" : "mypresets",

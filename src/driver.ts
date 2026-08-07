@@ -16,6 +16,7 @@ import SetupHandler from "./setupHandler.js";
 import EntityRegistrar from "./entityRegistrar.js";
 import ConnectionManager from "./connectionManager.js";
 import { SelectEntityHandler } from "./selectEntityHandler.js";
+import { RemoteCommandHandler } from "./remoteCommandHandler.js";
 import SubscriptionHandler from "./subscriptionHandler.js";
 import ConnectCoordinator from "./connectCoordinator.js";
 import { AvrInstance, type AvrStateApi } from "./types.js";
@@ -52,6 +53,7 @@ export default class OnkyoDriver {
   private entityRegistrar: EntityRegistrar;
   private listeningModeHandler: SelectEntityHandler;
   private inputSelectorHandler: SelectEntityHandler;
+  private remoteCommandHandler: RemoteCommandHandler;
   private subscriptionHandler: SubscriptionHandler;
   private connectCoordinator: ConnectCoordinator;
 
@@ -100,6 +102,7 @@ export default class OnkyoDriver {
     this.inputSelectorHandler = new SelectEntityHandler(this.driver, this.connectionManager, this.avrInstances, "_input_selector", "input-selector", "Input Selector", (avrEntry) =>
       this.entityRegistrar.getInputSelectorOptions(avrEntry)
     );
+    this.remoteCommandHandler = new RemoteCommandHandler(this.driver, this.connectionManager, this.avrInstances, this.avrStateApi);
     this.subscriptionHandler = new SubscriptionHandler(this.connectionManager, this.avrInstances);
 
     // Create connect coordinator — orchestrates physical connections, zone instances, and initial queries
@@ -166,6 +169,16 @@ export default class OnkyoDriver {
         enabled: (cfg) => cfg.createSensors !== false,
         create: () => this.entityRegistrar.createSensorEntities(avrEntry),
         disabledMessage: `${integrationName} [${avrEntry}] Sensor entities disabled by user preference`
+      },
+
+      // ── Remote entity — conditional on createRemoteEntity flag ─────────────
+      {
+        enabled: (cfg) => cfg.createRemoteEntity === true,
+        create: () => {
+          const handler = this.remoteCommandHandler?.handle.bind(this.remoteCommandHandler) ?? (async () => uc.StatusCodes.Ok);
+          return this.entityRegistrar.createRemoteEntity(avrEntry, handler);
+        },
+        disabledMessage: `${integrationName} [${avrEntry}] Remote entity disabled by user preference`
       },
 
       // ── Listening Mode select — conditional on listeningModeOptions ─────────
