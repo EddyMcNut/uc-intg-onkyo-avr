@@ -264,6 +264,95 @@ it("restore flow accepts intg-manager restore_from_backup payload", async () => 
   }
 });
 
+it("restore flow applies restore_data submitted from the restore form", async () => {
+  const tmp = mkTmpDir();
+  try {
+    setConfigDir(tmp);
+
+    ConfigManager.save({ avrs: [{ model: "OLD", ip: "0.0.0.0", port: 60128, zone: "main" }] });
+
+    const driverModule = await import("../src/driver.js");
+    const OnkyoDriver = driverModule.default as any;
+    const configManagerModule = await import("../src/configManager.js");
+    if (configManagerModule && typeof configManagerModule.setConfigDir === "function") {
+      configManagerModule.setConfigDir(tmp);
+    }
+
+    interface DriverLike {
+      driver?: Partial<IntegrationAPI>;
+      config?: any;
+      handleConnect?: () => Promise<void>;
+      registerAvailableEntities?: () => Promise<void>;
+      handleDriverSetup?: Function;
+    }
+    const drv = Object.create(OnkyoDriver.prototype) as DriverLike;
+    drv.driver = { addAvailableEntity: () => {}, getConfigDirPath: () => tmp, setDeviceState: async () => {}, getConfiguredEntities: () => ({}) } as unknown as Partial<IntegrationAPI>;
+    drv.config = ConfigManager.load();
+    drv.handleConnect = async () => {};
+    drv.registerAvailableEntities = (OnkyoDriver.prototype as any).registerAvailableEntities.bind(drv);
+
+    const driverJson = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), "driver.json"), "utf-8"));
+    const targetConfig = { avrs: [{ model: "TX-RZ50", ip: "192.168.2.103", port: 60128, zone: "main", entityNameStyle: "short" }] } as Partial<import("../src/configManager.js").OnkyoConfig>;
+    const payload = { meta: { driver_id: driverJson.driver_id, version: driverJson.version }, config: targetConfig };
+    const payloadString = JSON.stringify(payload);
+
+    const restoreResp = await drv.handleDriverSetup?.(new uc.UserDataResponse({ restore_data: payloadString }));
+    expect(restoreResp).toBeInstanceOf(uc.SetupComplete);
+
+    const reloaded = ConfigManager.load();
+    expect(reloaded.avrs).toBeTruthy();
+    expect(reloaded.avrs?.[0].model).toBe(targetConfig.avrs![0].model);
+    expect(reloaded.avrs?.[0].ip).toBe(targetConfig.avrs![0].ip);
+    expect(reloaded.avrs?.[0].entityNameStyle).toBe(targetConfig.avrs![0].entityNameStyle);
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+it("backup flow exits setup when the backup form is submitted", async () => {
+  const tmp = mkTmpDir();
+  try {
+    setConfigDir(tmp);
+
+    ConfigManager.save({ avrs: [{ model: "TX-RZ50", ip: "192.168.2.103", port: 60128, zone: "main", entityNameStyle: "short" }] });
+
+    const driverModule = await import("../src/driver.js");
+    const OnkyoDriver = driverModule.default as any;
+    const configManagerModule = await import("../src/configManager.js");
+    if (configManagerModule && typeof configManagerModule.setConfigDir === "function") {
+      configManagerModule.setConfigDir(tmp);
+    }
+
+    interface DriverLike {
+      driver?: Partial<IntegrationAPI>;
+      config?: any;
+      handleConnect?: () => Promise<void>;
+      registerAvailableEntities?: () => Promise<void>;
+      handleDriverSetup?: Function;
+    }
+    const drv = Object.create(OnkyoDriver.prototype) as DriverLike;
+    drv.driver = { addAvailableEntity: () => {}, getConfigDirPath: () => tmp, setDeviceState: async () => {}, getConfiguredEntities: () => ({}) } as unknown as Partial<IntegrationAPI>;
+    drv.config = ConfigManager.load();
+    drv.handleConnect = async () => {};
+    drv.registerAvailableEntities = (OnkyoDriver.prototype as any).registerAvailableEntities.bind(drv);
+
+    const startResp = await drv.handleDriverSetup?.(new uc.DriverSetupRequest(true, {}));
+    expect(startResp).toBeInstanceOf(uc.RequestUserInput);
+
+    const backupForm = await drv.handleDriverSetup?.(new uc.UserDataResponse({ action: "backup" }));
+    expect(backupForm instanceof uc.RequestUserInput).toBe(true);
+    const settings = (backupForm as uc.RequestUserInput).settings as Array<{ id: string; field?: { textarea?: { value: string } } }>;
+    const backupSetting = settings.find((s) => s.id === "backup_data");
+    expect(backupSetting).toBeTruthy();
+    const backupString = backupSetting!.field!.textarea!.value;
+
+    const submitResp = await drv.handleDriverSetup?.(new uc.UserDataResponse({ backup_data: backupString }));
+    expect(submitResp).toBeInstanceOf(uc.SetupComplete);
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
 it("initial setup manual mode opens configuration form", async () => {
   const tmp = mkTmpDir();
   try {

@@ -80,8 +80,9 @@ export default class SetupHandler {
     const input = (msg as uc.UserDataResponse).inputValues || {};
     const action = String(input.action ?? input.choice ?? "").toLowerCase();
     const restoreModeSelected = parseBoolean(input.restore_from_backup, false);
-    const restoreRequested = action === "restore" || restoreModeSelected;
-    const restoreData = typeof input.restore_data === "string" && input.restore_data.trim() ? input.restore_data : input.backup_data;
+    const hasRestoreData = typeof input.restore_data === "string" && input.restore_data.trim();
+    const restoreData = hasRestoreData ? input.restore_data : input.backup_data;
+    const restoreRequested = action === "restore" || restoreModeSelected || !!hasRestoreData;
 
     if (restoreRequested) {
       if (!restoreData) {
@@ -105,6 +106,8 @@ export default class SetupHandler {
     }
 
     if (!action) {
+      const providedBackup = typeof input.backup_data === "string" ? String(input.backup_data).trim() : "";
+      if (providedBackup && providedBackup !== "[]") return new uc.SetupComplete();
       return this.formBuilder.buildReconfigureForm();
     }
 
