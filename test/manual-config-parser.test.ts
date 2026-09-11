@@ -40,6 +40,16 @@ describe("ManualConfigParser", () => {
     expect(result.logLevelValue).toBe("debug");
   });
 
+  it("parses learningEnabled flag", async () => {
+    const mod = await import("../src/manualConfigParser.js");
+    const { ManualConfigParser } = mod as { ManualConfigParser: new () => any };
+    const parser = new ManualConfigParser();
+    expect(parser.parse({ learningEnabled: false }).learningEnabledValue).toBe(false);
+    expect(parser.parse({ learningEnabled: "false" }).learningEnabledValue).toBe(false);
+    expect(parser.parse({ learningEnabled: "true" }).learningEnabledValue).toBe(true);
+    expect(parser.parse({}).learningEnabledValue).toBe(true);
+  });
+
   it("applies defaults for missing or invalid values", async () => {
     const mod = await import("../src/manualConfigParser.js");
     const { ManualConfigParser } = mod as { ManualConfigParser: new () => any };

@@ -22,3 +22,11 @@ export const NETWORK_SERVICES = ["TuneIn", "Spotify", "Deezer", "Tidal", "Amazon
 
 /** Network services that don't provide title metadata */
 export const NO_TITLE = ["TuneIn"];
+
+/** Learning subsystem defaults */
+/** Cooldown per learning code to avoid repeated FLD trigger re-sends (ms) */
+export const LEARNING_COOLDOWN_MS = 60_000;
+/** Window after trigger to accept an FLD capture (ms) */
+export const LEARNING_FLD_WINDOW_MS = 5_000;
+/** Max length of a plausible FLD display name */
+export const FLD_DISPLAY_MAX_LENGTH = 48;

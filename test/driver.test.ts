@@ -496,6 +496,44 @@ describe("OnkyoDriver", () => {
     });
   });
 
+  describe("capabilityLearner attach to physical connection", () => {
+    it("attaches the learner to an existing physical connection on connect", async () => {
+      const configModule = await import("../src/configManager.js");
+      const avrConfig = { avrs: [{ model: "TX-RZ50", ip: "1.2.3.4", zone: "main", listeningModeOptions: ["stereo"], inputSelectorOptions: ["dab"] }], logLevel: "info" };
+      (configModule.ConfigManager.load as any).mockImplementation(() => avrConfig);
+      const fakeEiscp = { on: vi.fn(), connected: true, raw: vi.fn() };
+      mockConnectionManager.getPhysicalConnection.mockReturnValue({ eiscp: fakeEiscp, avrConfig: {}, commandReceiver: {} });
+
+      await createDriver();
+      await eventHandlers["connect"]();
+
+      expect(fakeEiscp.on).toHaveBeenCalledWith("data", expect.any(Function));
+      expect(mockLog.info).toHaveBeenCalledWith(expect.stringContaining("Capability learner attached"), expect.any(String), "TX-RZ50_1.2.3.4");
+
+      (configModule.ConfigManager.load as any).mockImplementation(() => ({ avrs: [], logLevel: "info" }));
+      mockConnectionManager.getPhysicalConnection.mockImplementation(() => undefined);
+    });
+
+    it("does not re-attach the learner on repeated connects", async () => {
+      const configModule = await import("../src/configManager.js");
+      const avrConfig = { avrs: [{ model: "TX-RZ50", ip: "1.2.3.4", zone: "main", listeningModeOptions: ["stereo"], inputSelectorOptions: ["dab"] }], logLevel: "info" };
+      (configModule.ConfigManager.load as any).mockImplementation(() => avrConfig);
+      const fakeEiscp = { on: vi.fn(), connected: true, raw: vi.fn() };
+      mockConnectionManager.getPhysicalConnection.mockReturnValue({ eiscp: fakeEiscp, avrConfig: {}, commandReceiver: {} });
+
+      const driver = await createDriver();
+      await eventHandlers["connect"]();
+      await eventHandlers["connect"]();
+
+      expect(mockConnectionManager.getPhysicalConnection).toHaveBeenCalledTimes(2);
+      expect(fakeEiscp.on).toHaveBeenCalledWith("data", expect.any(Function));
+      expect(fakeEiscp.on).toHaveBeenCalledTimes(1);
+
+      (configModule.ConfigManager.load as any).mockImplementation(() => ({ avrs: [], logLevel: "info" }));
+      mockConnectionManager.getPhysicalConnection.mockImplementation(() => undefined);
+    });
+  });
+
   describe("init", () => {
     it("logs initialization message", async () => {
       const driver = await createDriver();

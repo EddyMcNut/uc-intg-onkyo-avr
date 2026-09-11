@@ -174,6 +174,68 @@ it("handleManualConfiguration: valid input creates AVR entries", async () => {
   }
 });
 
+it("handleManualConfiguration: persists learningEnabled from the toggle", async () => {
+  const tmp = mkTmpDir();
+  try {
+    const configModule = await import("../src/configManager.js");
+    const SetupHandlerModule = await import("../src/setupHandler.js");
+    const ConfigManager = configModule.ConfigManager;
+    if (typeof configModule.setConfigDir === "function") configModule.setConfigDir(tmp);
+
+    const host: any = {
+      driver: {},
+      getConfigDirPath: () => tmp,
+      onConfigSaved: async () => {},
+      onConfigCleared: async () => {},
+      log: console
+    };
+
+    const setup = new SetupHandlerModule.default(host);
+
+    const input = {
+      model: "TX-RZ50",
+      ipAddress: "192.168.2.103",
+      port: 60128,
+      zoneCount: 1,
+      learningEnabled: "false"
+    };
+
+    const res = await (setup as any).handleManualConfiguration(input);
+    expect(res).toBeInstanceOf(uc.SetupComplete);
+
+    const reloaded = ConfigManager.load();
+    expect(reloaded.learningEnabled).toBe(false);
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+it("handleManualConfiguration: defaults learningEnabled to true when absent", async () => {
+  const tmp = mkTmpDir();
+  try {
+    const configModule = await import("../src/configManager.js");
+    const SetupHandlerModule = await import("../src/setupHandler.js");
+    const ConfigManager = configModule.ConfigManager;
+    if (typeof configModule.setConfigDir === "function") configModule.setConfigDir(tmp);
+
+    const host: any = {
+      driver: {},
+      getConfigDirPath: () => tmp,
+      onConfigSaved: async () => {},
+      onConfigCleared: async () => {},
+      log: console
+    };
+
+    const setup = new SetupHandlerModule.default(host);
+    const input = { model: "TX-RZ50", ipAddress: "192.168.2.103", port: 60128, zoneCount: 1 };
+    await (setup as any).handleManualConfiguration(input);
+
+    expect(ConfigManager.load().learningEnabled).toBe(true);
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
 it("handleManualConfiguration: invalid input returns RequestUserInput with errors", async () => {
   const tmp = mkTmpDir();
   try {

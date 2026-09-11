@@ -167,6 +167,60 @@ it("restore flow applies provided backup_data", async () => {
   }
 });
 
+it("restore flow preserves the learning catalog from a backup payload", async () => {
+  const tmp = mkTmpDir();
+  try {
+    setConfigDir(tmp);
+
+    ConfigManager.save({ avrs: [{ model: "OLD", ip: "0.0.0.0", port: 60128, zone: "main" }] });
+
+    const driverModule = await import("../src/driver.js");
+    const OnkyoDriver = driverModule.default as any;
+    const configManagerModule = await import("../src/configManager.js");
+    if (configManagerModule && typeof configManagerModule.setConfigDir === "function") {
+      configManagerModule.setConfigDir(tmp);
+    }
+
+    interface DriverLike {
+      driver?: Partial<IntegrationAPI>;
+      config?: any;
+      handleConnect?: () => Promise<void>;
+      registerAvailableEntities?: () => Promise<void>;
+      handleDriverSetup?: Function;
+    }
+    const drv = Object.create(OnkyoDriver.prototype) as DriverLike;
+    drv.driver = { addAvailableEntity: () => {}, getConfigDirPath: () => tmp, setDeviceState: async () => {}, getConfiguredEntities: () => ({}) } as unknown as Partial<IntegrationAPI>;
+    drv.config = ConfigManager.load();
+    drv.handleConnect = async () => {};
+    drv.registerAvailableEntities = (OnkyoDriver.prototype as any).registerAvailableEntities.bind(drv);
+
+    const driverJson = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), "driver.json"), "utf-8"));
+    const learned = {
+      "TX-RZ50 192.168.2.103": {
+        LMD: { "08": { names: ["orchestra", "dolby-surround-classical"], displayName: "Dolby-Surr", updated: true } },
+        SLI: { "33": { names: ["dab"], displayName: "DAB", updated: true } }
+      }
+    };
+    const targetConfig = {
+      avrs: [{ model: "TX-RZ50", ip: "192.168.2.103", port: 60128, zone: "main" }],
+      learning: learned
+    } as Partial<import("../src/configManager.js").OnkyoConfig>;
+    const payload = { meta: { driver_id: driverJson.driver_id, version: driverJson.version }, config: targetConfig };
+    const payloadString = JSON.stringify(payload);
+
+    const restoreResp = await drv.handleDriverSetup?.(new uc.UserDataResponse({ action: "restore", backup_data: payloadString }));
+    expect(restoreResp).toBeInstanceOf(uc.SetupComplete);
+
+    const reloaded = ConfigManager.load();
+    expect(reloaded.learning).toBeDefined();
+    expect(reloaded.learning?.["TX-RZ50 192.168.2.103"].LMD["08"].displayName).toBe("Dolby-Surr");
+    expect(reloaded.learning?.["TX-RZ50 192.168.2.103"].LMD["08"].updated).toBe(true);
+    expect(reloaded.learning?.["TX-RZ50 192.168.2.103"].SLI["33"].displayName).toBe("DAB");
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
 it("restore flow defaults missing TuneIn menu setting to mypresets", async () => {
   const tmp = mkTmpDir();
   try {

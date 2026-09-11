@@ -1,6 +1,6 @@
 import * as uc from "@unfoldedcircle/integration-api";
 import { SelectAttributes } from "@unfoldedcircle/integration-api";
-import { OnkyoConfig, buildEntityId } from "./configManager.js";
+import { OnkyoConfig, buildEntityId, buildPhysicalAvrId } from "./configManager.js";
 import { EiscpDriver } from "./eiscp.js";
 import { getCompatibleListeningModes } from "./listeningModeFilters.js";
 import { classifyAudioFormat, formatAudioTypeName } from "./audioFormatClassifier.js";
@@ -10,6 +10,7 @@ import { ZoneAgnosticUpdateProcessor } from "./zoneAgnosticUpdateProcessor.js";
 import { SENSOR_SUFFIXES } from "./sensorSuffixes.js";
 import { diracServiceKeyToOption } from "./diracSelect.js";
 import { AV_INFO_REQUERY_DELAY } from "./constants.js";
+import { learningStore, extractIscpCode } from "./learningStore.js";
 import type { AvrStateApi } from "./types.js";
 
 const integrationName = "commandReceiver:";
@@ -119,6 +120,19 @@ export class CommandReceiver {
         [SelectAttributes.Options]: cfgAvr.listeningModeOptions
       });
       return;
+    }
+
+    // Prefer learned display labels when the learning catalog is present for this physical AVR.
+    if (cfgAvr) {
+      const physicalAVR = buildPhysicalAvrId(cfgAvr.model, cfgAvr.ip);
+      const learnedLabels = learningStore.listLabels(physicalAVR, "LMD", compatibleModes);
+      if (learnedLabels) {
+        log.info("%s [%s] updating listening mode options for format: %s via learning store (%d modes)", integrationName, zoneEntityId, audioFormatType, learnedLabels.length);
+        this.driver.updateEntityAttributes(selectEntityId, {
+          [SelectAttributes.Options]: learnedLabels
+        });
+        return;
+      }
     }
 
     const lmdMappings = eiscpMappings.value_mappings.LMD;
@@ -236,12 +250,14 @@ export class CommandReceiver {
   private async handleInputSelector(avrUpdates: AvrUpdateEvent, entityId: string, eventZone: string): Promise<void> {
     const source = avrUpdates.argument.toString().split(",")[0];
     this.avrStateApi.setSource(entityId, source, this.eiscpInstance, eventZone, this.driver);
+    const physicalAVR = buildPhysicalAvrId(avrUpdates.model, avrUpdates.host);
+    const displayLabel = learningStore.getDisplayLabel(physicalAVR, "SLI", extractIscpCode(avrUpdates.iscpCommand), source);
     this.driver.updateEntityAttributes(entityId, {
-      [uc.MediaPlayerAttributes.Source]: source
+      [uc.MediaPlayerAttributes.Source]: displayLabel
     });
-    log.info("%s [%s] input-selector (source) set to: %s", integrationName, entityId, source);
+    log.info("%s [%s] input-selector (source) set to: %s", integrationName, entityId, displayLabel);
     this.driver.updateEntityAttributes(`${entityId}_input_selector`, {
-      [SelectAttributes.CurrentOption]: source
+      [SelectAttributes.CurrentOption]: displayLabel
     });
     this.zoneAgnosticProcessor.resetZone(entityId);
     await this.zoneAgnosticProcessor.renderEntity(entityId);
@@ -262,9 +278,11 @@ export class CommandReceiver {
       log.info("%s [%s] listening-mode '%s', keeping current value (no re-query)", integrationName, entityId, listeningMode);
       return;
     }
-    log.info("%s [%s] listening-mode set to: %s", integrationName, entityId, listeningMode);
+    const physicalAVR = buildPhysicalAvrId(avrUpdates.model, avrUpdates.host);
+    const displayLabel = learningStore.getDisplayLabel(physicalAVR, "LMD", extractIscpCode(avrUpdates.iscpCommand), listeningMode);
+    log.info("%s [%s] listening-mode set to: %s", integrationName, entityId, displayLabel);
     this.driver.updateEntityAttributes(`${entityId}_listening_mode`, {
-      [SelectAttributes.CurrentOption]: listeningMode
+      [SelectAttributes.CurrentOption]: displayLabel
     });
     log.info("%s [%s] querying AV info after listening-mode update", integrationName, entityId);
     this.eiscpInstance.command({ zone: eventZone, command: "audio-information", args: "query" }).catch((err) => {

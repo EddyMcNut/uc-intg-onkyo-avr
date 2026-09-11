@@ -167,6 +167,22 @@ export class SetupFormBuilder {
           }
         },
         description: { en: "Lower levels log more, which costs slightly more CPU. Warn is recommended for normal use." }
+      },
+      {
+        id: "learningEnabled",
+        label: { en: "Enable name learning?" },
+        field: {
+          dropdown: {
+            value: String(values.learningEnabledValue),
+            items: [
+              { id: "true", label: { en: "Yes (default)" } },
+              { id: "false", label: { en: "No" } }
+            ]
+          }
+        },
+        description: {
+          en: "Learn the AVR's exact front-panel names for listening modes and inputs over time. When disabled, configured names already learned are reverted to their standard names and learning data is removed."
+        }
       }
     ]);
   }

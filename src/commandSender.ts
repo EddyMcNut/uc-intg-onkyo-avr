@@ -1,11 +1,12 @@
 import * as uc from "@unfoldedcircle/integration-api";
 import { EiscpDriver } from "./eiscp.js";
-import { buildEntityId, DEFAULT_QUEUE_THRESHOLD, OnkyoConfig } from "./configManager.js";
+import { buildEntityId, buildPhysicalAvrId, DEFAULT_QUEUE_THRESHOLD, OnkyoConfig } from "./configManager.js";
 import { MAX_LENGTHS, PATTERNS } from "./configConstants.js";
 import { ICommandReceiver, AvrStateApi } from "./types.js";
 import { ZONE_VOLUME_PREFIX, ZONE_VOLUME_UP_DOWN } from "./zoneMappings.js";
 import { SIMPLE_COMMANDS_MAP, ALL_INPUT_SELECTOR_NAMES } from "./simpleCommands.js";
 const INPUT_NAMES_SET = new Set(ALL_INPUT_SELECTOR_NAMES);
+import learningStore from "./learningStore.js";
 import log from "./loggers.js";
 import { toHex, ensureEiscpConnected } from "./utils.js";
 import { browseMedia, isMediaBrowsingAvailable } from "./mediaBrowser.js";
@@ -169,9 +170,9 @@ export class CommandSender {
     ],
     [
       uc.MediaPlayerCommands.SelectSource,
-      async (_e, _zone, sz, params) => {
+      async (_e, _zone, sz, params, targetAvr) => {
         if (!params?.source || typeof params.source !== "string") return uc.StatusCodes.Ok;
-        const request = params.source.toLowerCase();
+        let request = params.source.toLowerCase();
         if (request.startsWith("raw ")) {
           const rawCmd = request.substring(3).trim().toUpperCase();
           if (rawCmd.length > MAX_LENGTHS.RAW_COMMAND) {
@@ -197,10 +198,15 @@ export class CommandSender {
 
         if (request.startsWith("multi-zone")) {
           await this.eiscp.command(request);
-        } else if (INPUT_NAMES_SET.has(request)) {
-          await this.eiscp.command(sz(`input-selector ${request}`));
         } else {
-          await this.eiscp.command(sz(request));
+          // Resolve a learned display label (e.g. "DAB") back to the canonical ISCP source name before sending.
+          const physicalAVR = buildPhysicalAvrId(targetAvr.model, targetAvr.ip);
+          request = learningStore.resolveSendName(physicalAVR, "SLI", request);
+          if (INPUT_NAMES_SET.has(request)) {
+            await this.eiscp.command(sz(`input-selector ${request}`));
+          } else {
+            await this.eiscp.command(sz(request));
+          }
         }
         return uc.StatusCodes.Ok;
       }

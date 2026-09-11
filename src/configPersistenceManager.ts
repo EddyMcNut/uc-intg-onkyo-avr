@@ -54,7 +54,7 @@ export class ConfigPersistenceManager {
     }
 
     ConfigManager.addAvr(discoveredAvr);
-    ConfigManager.save({ logLevel: parsedConfig.logLevelValue });
+    ConfigManager.save({ logLevel: parsedConfig.logLevelValue, learningEnabled: parsedConfig.learningEnabledValue ?? true });
     setLogLevel(parsedConfig.logLevelValue);
     await this.onConfigSaved();
   }
@@ -105,7 +105,7 @@ export class ConfigPersistenceManager {
       ConfigManager.addAvr(avrCfg);
     }
 
-    ConfigManager.save({ logLevel: parsedConfig.logLevelValue });
+    ConfigManager.save({ logLevel: parsedConfig.logLevelValue, learningEnabled: parsedConfig.learningEnabledValue ?? true });
     setLogLevel(parsedConfig.logLevelValue);
     await this.onConfigSaved();
     return { errors: [], success: true };

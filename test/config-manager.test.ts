@@ -384,6 +384,167 @@ describe("ConfigManager static methods", () => {
     });
   });
 
+  describe("learning enable/disable policy", () => {
+    const PHYSICAL = "TX-RZ50 1.2.3.4";
+    const catalogWithLearned = () => ({
+      [PHYSICAL]: {
+        LMD: { "08": { names: ["orchestra", "dolby-surround-classical"], displayName: "Dolby-Surr", updated: true } },
+        SLI: { "33": { names: ["dab", "digital-audio-broadcast"], displayName: "DAB", updated: true } }
+      }
+    });
+
+    beforeEach(() => {
+      mockExistsSync.mockReset();
+      mockReadFileSync.mockReset();
+      mockWriteFileSync.mockReset();
+      ConfigManager.config = {};
+    });
+
+    it("rewinds learned labels to canonical names and purges learning on disable", () => {
+      ConfigManager.config = {
+        learningEnabled: true,
+        learning: catalogWithLearned(),
+        avrs: [{ model: "TX-RZ50", ip: "1.2.3.4", port: 60128, zone: "main", listeningModeOptions: ["Dolby-Surr", "stereo"], inputSelectorOptions: ["DAB", "cd"] }]
+      };
+
+      ConfigManager.save({ learningEnabled: false });
+
+      const cfg = ConfigManager.get();
+      expect(cfg.learningEnabled).toBe(false);
+      expect(cfg.learning).toBeUndefined();
+      const avr = cfg.avrs![0];
+      expect(avr.listeningModeOptions).toEqual(["orchestra", "stereo"]);
+      expect(avr.inputSelectorOptions).toEqual(["dab", "cd"]);
+    });
+
+    it("dedupes when a canonical name is already present after rewind", () => {
+      ConfigManager.config = {
+        learningEnabled: true,
+        learning: catalogWithLearned(),
+        avrs: [{ model: "TX-RZ50", ip: "1.2.3.4", port: 60128, zone: "main", listeningModeOptions: ["Dolby-Surr", "orchestra", "stereo"] }]
+      };
+
+      ConfigManager.save({ learningEnabled: false });
+
+      expect(ConfigManager.get().avrs![0].listeningModeOptions).toEqual(["orchestra", "stereo"]);
+    });
+
+    it("leaves unlearned options and 'all'/'none' lists untouched on disable", () => {
+      ConfigManager.config = {
+        learningEnabled: true,
+        learning: catalogWithLearned(),
+        avrs: [
+          {
+            model: "TX-RZ50",
+            ip: "1.2.3.4",
+            port: 60128,
+            zone: "main",
+            listeningModeOptions: "all",
+            inputSelectorOptions: ["stereo-something", "cd"]
+          }
+        ]
+      };
+
+      ConfigManager.save({ learningEnabled: false });
+
+      const avr = ConfigManager.get().avrs![0];
+      expect(avr.listeningModeOptions).toBe("all");
+      expect(avr.inputSelectorOptions).toEqual(["stereo-something", "cd"]);
+    });
+
+    it("does not purge learning when re-saving while enabled", () => {
+      ConfigManager.config = { learningEnabled: true, learning: catalogWithLearned() };
+      ConfigManager.save({ logLevel: "debug" });
+
+      const cfg = ConfigManager.get();
+      expect(cfg.learning?.[PHYSICAL].LMD["08"].displayName).toBe("Dolby-Surr");
+      expect(cfg.learning?.[PHYSICAL].LMD["08"].updated).toBe(true);
+    });
+
+    it("resets all updated flags on the disabled -> enabled transition", () => {
+      ConfigManager.config = {
+        learningEnabled: false,
+        learning: catalogWithLearned()
+      };
+
+      ConfigManager.save({ learningEnabled: true });
+
+      const catalog = ConfigManager.get().learning![PHYSICAL];
+      expect(catalog.LMD["08"].updated).toBe(false);
+      expect(catalog.LMD["08"].displayName).toBeUndefined();
+      expect(catalog.SLI["33"].updated).toBe(false);
+      expect(catalog.SLI["33"].displayName).toBeUndefined();
+    });
+
+    it("keeps learning intact on an enabled restore (no reset)", () => {
+      ConfigManager.config = {
+        learningEnabled: true,
+        learning: catalogWithLearned()
+      };
+      ConfigManager.save({ avrs: [{ model: "TX-RZ50", ip: "1.2.3.4", port: 60128, zone: "main" }] });
+
+      const catalog = ConfigManager.get().learning![PHYSICAL];
+      expect(catalog.LMD["08"].updated).toBe(true);
+      expect(catalog.LMD["08"].displayName).toBe("Dolby-Surr");
+    });
+
+    it("defaults learningEnabled to true when absent", () => {
+      mockExistsSync.mockReturnValue(true);
+      mockReadFileSync.mockReturnValue(JSON.stringify({ avrs: [{ model: "TX-RZ50", ip: "1.2.3.4", port: 60128 }] }));
+      const result = ConfigManager.load();
+      expect(result.learningEnabled).toBe(true);
+    });
+
+    it("purges learning on load when disabled (handles manual config.json edit)", () => {
+      mockExistsSync.mockReturnValue(true);
+      mockReadFileSync.mockReturnValue(
+        JSON.stringify({
+          avrs: [{ model: "TX-RZ50", ip: "1.2.3.4", port: 60128, listeningModeOptions: ["Dolby-Surr", "stereo"] }],
+          learningEnabled: false,
+          learning: catalogWithLearned()
+        })
+      );
+      const result = ConfigManager.load();
+      expect(result.learningEnabled).toBe(false);
+      expect(result.learning).toBeUndefined();
+      expect(result.avrs![0].listeningModeOptions).toEqual(["orchestra", "stereo"]);
+    });
+
+    it("keeps learning data intact on load when enabled", () => {
+      mockExistsSync.mockReturnValue(true);
+      mockReadFileSync.mockReturnValue(
+        JSON.stringify({
+          avrs: [],
+          learningEnabled: true,
+          learning: catalogWithLearned()
+        })
+      );
+      const result = ConfigManager.load();
+      expect(result.learning![PHYSICAL].LMD["08"].displayName).toBe("Dolby-Surr");
+    });
+
+    it("preserves learningEnabled through validateConfigPayload", () => {
+      const res = ConfigManager.validateConfigPayload({
+        avrs: [{ model: "TX-RZ50", ip: "1.2.3.4", port: 60128 }],
+        learningEnabled: false
+      });
+      expect(res.errors).toEqual([]);
+      expect(res.normalized!.learningEnabled).toBe(false);
+
+      const invalid = ConfigManager.validateConfigPayload({
+        avrs: [{ model: "TX-RZ50", ip: "1.2.3.4", port: 60128 }],
+        learningEnabled: "bogus"
+      });
+      expect(invalid.normalized!.learningEnabled).toBe(false);
+
+      const junk = ConfigManager.validateConfigPayload({
+        avrs: [{ model: "TX-RZ50", ip: "1.2.3.4", port: 60128 }],
+        learningEnabled: 42
+      });
+      expect(junk.normalized!.learningEnabled).toBe(true);
+    });
+  });
+
   describe("setConfigDir", () => {
     it("handles empty dir by falling back to env", async () => {
       const mod = await import("../src/configManager.js");

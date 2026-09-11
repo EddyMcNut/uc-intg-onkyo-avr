@@ -5,7 +5,8 @@ import { Select, SelectStates } from "@unfoldedcircle/integration-api";
 import { eiscpMappings } from "./eiscp-mappings.js";
 import { ALL_SIMPLE_COMMANDS } from "./simpleCommands.js";
 import { getCompatibleListeningModes } from "./listeningModeFilters.js";
-import { ConfigManager, buildEntityId } from "./configManager.js";
+import { ConfigManager, buildEntityId, physicalAvrIdFromEntityId } from "./configManager.js";
+import learningStore from "./learningStore.js";
 import {
   browseMedia,
   isTidalMainMenuRequest,
@@ -154,6 +155,18 @@ export default class EntityRegistrar {
     const excludeKeys = ["up", "down", "movie", "music", "game", "query"];
     const allModes = Object.keys(lmdMappings).filter((key) => !excludeKeys.includes(key));
     const compatibleModes = getCompatibleListeningModes(audioFormat);
+
+    // Prefer learned display labels when the learning catalog is present for this physical AVR.
+    if (avrEntry) {
+      const physicalAvr = physicalAvrIdFromEntityId(avrEntry);
+      if (physicalAvr) {
+        const learnedLabels = learningStore.listLabels(physicalAvr, "LMD", compatibleModes);
+        if (learnedLabels) {
+          return learnedLabels;
+        }
+      }
+    }
+
     if (compatibleModes) {
       return allModes.filter((mode) => compatibleModes.includes(mode)).sort();
     }
@@ -297,6 +310,18 @@ export default class EntityRegistrar {
     }
     const sliMappings = eiscpMappings.value_mappings.SLI;
     const excludeKeys = ["up", "down", "query"];
+
+    // Prefer learned display labels when the learning catalog is present for this physical AVR.
+    if (avrEntry) {
+      const physicalAvr = physicalAvrIdFromEntityId(avrEntry);
+      if (physicalAvr) {
+        const learnedLabels = learningStore.listLabels(physicalAvr, "SLI");
+        if (learnedLabels) {
+          return learnedLabels;
+        }
+      }
+    }
+
     return Object.keys(sliMappings)
       .filter((key) => !excludeKeys.includes(key))
       .sort();

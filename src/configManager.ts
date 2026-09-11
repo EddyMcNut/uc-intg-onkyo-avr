@@ -4,7 +4,23 @@ import log, { setLogLevel } from "./loggers.js";
 
 // Re-export everything from configConstants so existing imports via configManager continue to work.
 export * from "./configConstants.js";
-import { MAX_LENGTHS, PATTERNS, parseSelectOptions, parseBoolean, AvrZone, AvrConfig, OnkyoConfig, AVR_DEFAULTS, EntityNameStyle, LogLevel, ALL_OPTIONS, SelectOptions } from "./configConstants.js";
+import {
+  MAX_LENGTHS,
+  PATTERNS,
+  parseSelectOptions,
+  parseBoolean,
+  AvrZone,
+  AvrConfig,
+  OnkyoConfig,
+  AVR_DEFAULTS,
+  EntityNameStyle,
+  LogLevel,
+  ALL_OPTIONS,
+  SelectOptions,
+  LearningCatalog,
+  LearnedEntry,
+  buildPhysicalAvrId
+} from "./configConstants.js";
 
 const integrationName = "configManager:";
 
@@ -115,15 +131,94 @@ export class ConfigManager {
     if (this.config.logLevel) {
       setLogLevel(this.config.logLevel as LogLevel);
     }
+    if (this.config.learningEnabled === undefined) {
+      this.config.learningEnabled = true;
+    }
+    this.applyLearningPolicy(true);
     return this.config;
   }
 
   static save(newConfig: Partial<OnkyoConfig>) {
-    this.config = { ...this.config, ...newConfig };
+    const previous = this.config;
+    const prevEnabled = previous.learningEnabled !== false;
+    this.config = { ...(this.config ?? this.load()), ...newConfig };
+    this.applyLearningPolicy(prevEnabled);
     try {
       fs.writeFileSync(CONFIG_PATH, JSON.stringify(this.config, null, 2), "utf-8");
     } catch (err) {
       log.error(`${integrationName} Failed to save config:`, err);
+    }
+  }
+
+  /**
+   * Enforce the learning enable/disable policy on the in-memory config.
+   * - Disabled: first rewind any learned labels that were applied to the configured Select Entity
+   *   options back to their canonical seed names, then purge the entire learning catalog.
+   * - Enabled after being disabled: reset all learned entries to a fresh (not-updated) state.
+   */
+  private static applyLearningPolicy(prevEnabled: boolean): void {
+    const enabled = this.config.learningEnabled !== false;
+    if (!enabled) {
+      this.rewindLearnedConfigLabels();
+      delete this.config.learning;
+    } else if (!prevEnabled) {
+      this.resetLearnedFresh();
+    }
+  }
+
+  /**
+   * Reverse the label rewrite done by the learning store: for each configured Select Entity option
+   * that equals a learned display name, put back the first (canonical) alias of that option's code,
+   * so the user's configured lists keep working even after learning is disabled.
+   */
+  private static rewindLearnedConfigLabels(): void {
+    const cfg = this.config;
+    if (!cfg.learning || !Array.isArray(cfg.avrs)) return;
+
+    for (const avr of cfg.avrs) {
+      const catalog = cfg.learning[buildPhysicalAvrId(avr.model, avr.ip)];
+      if (!catalog) continue;
+
+      const rewind = new Map<string, string>();
+      const collect = (entries: Record<string, LearnedEntry> | undefined): void => {
+        for (const entry of Object.values(entries ?? {})) {
+          if (entry.updated && entry.displayName) rewind.set(entry.displayName, entry.names[0] ?? entry.displayName);
+        }
+      };
+      collect(catalog.LMD);
+      collect(catalog.SLI);
+
+      for (const field of ["listeningModeOptions", "inputSelectorOptions"] as const) {
+        const options = avr[field];
+        if (!Array.isArray(options)) continue;
+
+        const replaced = options.map((opt) => rewind.get(opt) ?? opt);
+        const deduped: string[] = [];
+        for (const opt of replaced) {
+          if (!deduped.includes(opt)) deduped.push(opt);
+        }
+        const changed = deduped.length !== options.length || deduped.some((v, i) => v !== options[i]);
+        if (changed) {
+          avr[field] = deduped;
+          log.info("%s Rewound %s for %s %s to canonical names: %s", integrationName, field, avr.model, avr.ip, deduped.join("; "));
+        }
+      }
+    }
+  }
+
+  /** Fresh start: clear all learned display names and updated flags so the catalog reseeds from scratch. */
+  private static resetLearnedFresh(): void {
+    const learning = this.config.learning;
+    if (!learning) return;
+    for (const catalog of Object.values(learning)) {
+      const clear = (entries: Record<string, LearnedEntry> | undefined): void => {
+        for (const entry of Object.values(entries ?? {})) {
+          entry.updated = false;
+          delete entry.displayName;
+        }
+      };
+      clear(catalog.LMD);
+      clear(catalog.SLI);
     }
   }
 
@@ -355,6 +450,57 @@ export class ConfigManager {
   }
 
   /**
+   * Validate the learning catalog inside a restored payload. Returns the normalized (sanitized) learning data and any errors.
+   */
+  private static validateLearningPayload(learning: any): { normalized: Record<string, LearningCatalog>; errors: string[] } {
+    const errors: string[] = [];
+    const normalized: Record<string, LearningCatalog> = {};
+
+    if (!learning || typeof learning !== "object") {
+      return { normalized, errors: ["learning must be an object"] };
+    }
+
+    const validateKind = (raw: any, kind: string, key: string): Record<string, LearnedEntry> => {
+      const out: Record<string, LearnedEntry> = {};
+      if (!raw || typeof raw !== "object") {
+        errors.push(`${key}.${kind} must be an object`);
+        return out;
+      }
+      for (const [code, entryRaw] of Object.entries<any>(raw)) {
+        if (!entryRaw || typeof entryRaw !== "object") {
+          errors.push(`${key}.${kind}.${code} must be an object`);
+          continue;
+        }
+        const names = Array.isArray(entryRaw.names) ? entryRaw.names.filter((n: unknown) => typeof n === "string") : [];
+        const updated = entryRaw.updated === true;
+        if (names.length === 0) {
+          errors.push(`${key}.${kind}.${code}.names must be a non-empty array of strings`);
+          continue;
+        }
+        const entry: LearnedEntry = { names: names as string[], updated };
+        if (typeof entryRaw.displayName === "string" && entryRaw.displayName.trim() !== "") {
+          entry.displayName = entryRaw.displayName;
+        }
+        out[code] = entry;
+      }
+      return out;
+    };
+
+    for (const [physicalAvr, catalogRaw] of Object.entries<any>(learning)) {
+      if (!catalogRaw || typeof catalogRaw !== "object") {
+        errors.push(`learning.${physicalAvr} must be an object`);
+        continue;
+      }
+      normalized[physicalAvr] = {
+        LMD: validateKind(catalogRaw.LMD, "LMD", physicalAvr),
+        SLI: validateKind(catalogRaw.SLI, "SLI", physicalAvr)
+      };
+    }
+
+    return { normalized, errors };
+  }
+
+  /**
    * Validate an entire restored config payload. Returns errors if any and a normalized OnkyoConfig when valid.
    */
   static validateConfigPayload(payload: any): { errors: string[]; normalized?: OnkyoConfig } {
@@ -381,6 +527,11 @@ export class ConfigManager {
       if (validLogLevels.includes(level)) {
         normalizedConfig.logLevel = level as LogLevel;
       }
+    }
+
+    // Preserve global learningEnabled if present
+    if (cfg.learningEnabled !== undefined) {
+      normalizedConfig.learningEnabled = parseBoolean(cfg.learningEnabled, true);
     }
 
     if (Array.isArray(cfg.avrs)) {
@@ -413,6 +564,15 @@ export class ConfigManager {
       return { errors };
     }
 
-    return { errors: [], normalized: normalizedConfig };
+    // Preserve and validate the learning catalog (backup/restore round-trip)
+    if (cfg.learning !== undefined) {
+      const learningResult = this.validateLearningPayload(cfg.learning);
+      errors.push(...learningResult.errors);
+      if (learningResult.errors.length === 0) {
+        normalizedConfig.learning = learningResult.normalized;
+      }
+    }
+
+    return { errors, normalized: normalizedConfig };
   }
 }

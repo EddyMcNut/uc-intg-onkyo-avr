@@ -21,6 +21,7 @@ export interface ManualConfigInput {
   tuneinMenuStyle?: unknown;
   entityNameStyle?: unknown;
   logLevel?: unknown;
+  learningEnabled?: unknown;
 }
 
 export interface ParsedManualConfig {
@@ -43,6 +44,7 @@ export interface ParsedManualConfig {
   tuneinPresetPositionValue: number;
   tuneinMenuStyleValue: "mypresets" | "full";
   logLevelValue: LogLevel;
+  learningEnabledValue: boolean;
   errorMessage?: string;
 }
 
@@ -67,6 +69,7 @@ export class ManualConfigParser {
       tuneinPresetPositionValue: this.parseTuneInPresetPosition(input.tuneinPresetPosition),
       tuneinMenuStyleValue: this.parseTuneInMenuStyle(input.tuneinMenuStyle),
       logLevelValue: this.parseLogLevel(input.logLevel, fallbackLogLevel),
+      learningEnabledValue: parseBoolean(input.learningEnabled, true),
       zoneCountValue: this.parseZoneCount(input.zoneCount)
     };
   }

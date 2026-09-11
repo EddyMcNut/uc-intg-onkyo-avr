@@ -574,6 +574,8 @@ export const eiscpMappings = {
       "s2-music": { value: "98" },
       "s2-games": { value: "99" },
       stereo: { value: "00" },
+      whatever: { value: "00" },
+      testeo: { value: "00" },
       direct: { value: "01" },
       surround: { value: "02" },
       film: { value: "03" },

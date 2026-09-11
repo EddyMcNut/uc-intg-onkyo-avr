@@ -1,4 +1,21 @@
 import { describe, it, expect, vi } from "vitest";
+import net from "net";
+
+vi.mock("net", () => {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const { EventEmitter } = require("events") as typeof import("events");
+  class FakeSocket extends EventEmitter {
+    connect(): this {
+      return this;
+    }
+    destroy(): void {}
+    write(_data: unknown): boolean {
+      return true;
+    }
+  }
+  const connect = vi.fn(() => new FakeSocket());
+  return { default: { connect }, connect };
+});
 
 it("constructor sets default config values", async () => {
   const mod = await import("../src/eiscp.js");
@@ -135,4 +152,33 @@ it("waitForConnect rejects on timeout when not connected", async () => {
   const driver = new EiscpDriver({ host: "1.2.3.4" });
 
   await expect(driver.waitForConnect(50)).rejects.toThrow("Timeout waiting for AVR connection");
+});
+
+it("cleanses trailing control chars from iscpCommand received from the AVR", async () => {
+  const mod = await import("../src/eiscp.js");
+  const { EiscpDriver } = mod as any;
+  const { createEiscpPacket } = await import("../src/eiscp-packet.js");
+  const { extractIscpCode } = await import("../src/learningStore.js");
+
+  const driver = new EiscpDriver({ model: "TX-RZ50", host: "1.2.3.4" });
+  const received: any[] = [];
+  driver.on("data", (payload: any) => received.push(payload));
+
+  await driver.connect();
+  const sock = (net.connect as any).mock.results[0].value;
+
+  sock.emit("connect");
+  // Onkyo receivers interleave a 0x1A (SUB) byte before the frame terminator.
+  sock.emit("data", createEiscpPacket("LMD00\x1A"));
+  sock.emit("data", createEiscpPacket("SLI33\x1A"));
+  sock.emit("data", createEiscpPacket("LMD00"));
+
+  expect(received).toHaveLength(3);
+  expect(received[0].iscpCommand).toBe("LMD00");
+  expect(received[1].iscpCommand).toBe("SLI33");
+  expect(received[2].iscpCommand).toBe("LMD00");
+
+  // extractIscpCode on the cleansed command yields pristine codes for catalog lookups.
+  expect(extractIscpCode(received[0].iscpCommand)).toBe("00");
+  expect(extractIscpCode(received[1].iscpCommand)).toBe("33");
 });

@@ -316,7 +316,8 @@ export class EiscpDriver extends EventEmitter {
             command: parsed.command,
             argument: parsed.argument,
             zone: parsed.zone,
-            iscpCommand: iscpMessage,
+            // Use the cleansed command+value so code lookups (e.g. extractIscpCode) don't trip on control chars.
+            iscpCommand: command + value,
             host: this.config.host,
             port: this.config.port,
             model: this.config.model

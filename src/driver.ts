@@ -20,6 +20,8 @@ import { DIRAC_OPTION_LABELS, diracOptionToServiceKey } from "./diracSelect.js";
 import { remoteEntityCommandHandler } from "./remoteEntityCommandHandler.js";
 import SubscriptionHandler from "./subscriptionHandler.js";
 import ConnectCoordinator from "./connectCoordinator.js";
+import learningStore from "./learningStore.js";
+import { learnerFor } from "./capabilityLearner.js";
 import { AvrInstance, type AvrStateApi } from "./types.js";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -58,6 +60,7 @@ export default class OnkyoDriver {
   private remoteEntityCommandHandler: remoteEntityCommandHandler;
   private subscriptionHandler: SubscriptionHandler;
   private connectCoordinator: ConnectCoordinator;
+  private readonly attachedLearners = new WeakSet<EiscpDriver>();
 
   constructor() {
     this.driver = new uc.IntegrationAPI();
@@ -97,12 +100,28 @@ export default class OnkyoDriver {
     initMediaBrowser(this.avrStateApi);
 
     // initialize helpers
-    this.listeningModeHandler = new SelectEntityHandler(this.driver, this.connectionManager, this.avrInstances, "_listening_mode", "listening-mode", "Listening Mode", (avrEntry) => {
-      const audioFormat = this.avrStateApi.getAudioFormat(avrEntry);
-      return this.entityRegistrar.getListeningModeOptions(audioFormat !== "unknown" ? audioFormat : undefined, avrEntry);
-    });
-    this.inputSelectorHandler = new SelectEntityHandler(this.driver, this.connectionManager, this.avrInstances, "_input_selector", "input-selector", "Input Selector", (avrEntry) =>
-      this.entityRegistrar.getInputSelectorOptions(avrEntry)
+    this.listeningModeHandler = new SelectEntityHandler(
+      this.driver,
+      this.connectionManager,
+      this.avrInstances,
+      "_listening_mode",
+      "listening-mode",
+      "Listening Mode",
+      (avrEntry) => {
+        const audioFormat = this.avrStateApi.getAudioFormat(avrEntry);
+        return this.entityRegistrar.getListeningModeOptions(audioFormat !== "unknown" ? audioFormat : undefined, avrEntry);
+      },
+      (option, _avrEntry, physicalAVR) => learningStore.resolveSendName(physicalAVR, "LMD", option)
+    );
+    this.inputSelectorHandler = new SelectEntityHandler(
+      this.driver,
+      this.connectionManager,
+      this.avrInstances,
+      "_input_selector",
+      "input-selector",
+      "Input Selector",
+      (avrEntry) => this.entityRegistrar.getInputSelectorOptions(avrEntry),
+      (option, _avrEntry, physicalAVR) => learningStore.resolveSendName(physicalAVR, "SLI", option)
     );
     this.diracHandler = new SelectEntityHandler(this.driver, this.connectionManager, this.avrInstances, "_dirac", "dirac", "Dirac", () => [...DIRAC_OPTION_LABELS], diracOptionToServiceKey);
     this.remoteEntityCommandHandler = new remoteEntityCommandHandler(this.driver, this.connectionManager, this.avrInstances, this.avrStateApi);
@@ -240,6 +259,7 @@ export default class OnkyoDriver {
     for (const avrConfig of this.config.avrs!) {
       const avrEntry = buildEntityId(avrConfig.model, avrConfig.ip, avrConfig.zone);
       const physicalAVR = buildPhysicalAvrId(avrConfig.model, avrConfig.ip);
+      learningStore.ensureSeed(physicalAVR);
       const rawSend = async (cmd: string): Promise<void> => {
         const conn = this.connectionManager.getPhysicalConnection(physicalAVR);
         await conn?.eiscp?.raw(cmd);
@@ -362,10 +382,28 @@ export default class OnkyoDriver {
       this.config,
       (avrConfig) => (eiscpInstance) => {
         const avrSpecificConfig = this.createAvrSpecificConfig(avrConfig);
+        const physicalAVR = buildPhysicalAvrId(avrConfig.model, avrConfig.ip);
+        learningStore.ensureSeed(physicalAVR);
+        if (!this.attachedLearners.has(eiscpInstance)) {
+          learnerFor(eiscpInstance, physicalAVR).attach();
+          this.attachedLearners.add(eiscpInstance);
+        }
         return new CommandReceiver(this.driver, avrSpecificConfig, eiscpInstance, this.avrStateApi, this.driverVersion);
       },
       (avrSpecificConfig, eiscp, commandReceiver) => new CommandSender(this.driver, avrSpecificConfig, eiscp, this.avrStateApi, commandReceiver)
     );
+
+    for (const avrConfig of this.config.avrs ?? []) {
+      const physicalAVR = buildPhysicalAvrId(avrConfig.model, avrConfig.ip);
+      const connection = this.connectionManager.getPhysicalConnection(physicalAVR);
+      if (!connection) continue;
+      learningStore.ensureSeed(physicalAVR);
+      if (!this.attachedLearners.has(connection.eiscp)) {
+        learnerFor(connection.eiscp, physicalAVR).attach();
+        this.attachedLearners.add(connection.eiscp);
+        log.info("%s [%s] Capability learner attached to physical connection", integrationName, physicalAVR);
+      }
+    }
 
     if (hasInstances) {
       await this.driver.setDeviceState(uc.DeviceStates.Connected);

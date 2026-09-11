@@ -657,7 +657,7 @@ export const eiscpCommands = {
         "97": { name: ["s2-cinema"], description: "sets S2 Cinema" },
         "98": { name: ["s2-music"], description: "sets S2 Music" },
         "99": { name: ["s2-games"], description: "sets S2 Games" },
-        "00": { name: "stereo", description: "sets STEREO" },
+        "00": { name: ["stereo","whatever","testeo"], description: "sets STEREO" },
         "01": { name: "direct", description: "sets DIRECT" },
         "02": { name: "surround", description: "sets SURROUND" },
         "03": { name: ["film", "game-rpg"], description: "sets FILM, Game-RPG" },

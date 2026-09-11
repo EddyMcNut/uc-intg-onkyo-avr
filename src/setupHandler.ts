@@ -160,7 +160,8 @@ export default class SetupHandler {
       input.tuneinPresetPosition ||
       input.tuneinMenuStyle ||
       input.entityNameStyle ||
-      input.logLevel
+      input.logLevel ||
+      input.learningEnabled
     );
   }
 
@@ -199,7 +200,8 @@ export default class SetupHandler {
         netMenuDelay: currentAvr?.netMenuDelay,
         tuneinPresetPosition: currentAvr?.tuneinPresetPosition,
         tuneinMenuStyle: currentAvr?.tuneinMenuStyle,
-        logLevel: cfg.logLevel ?? "warn"
+        logLevel: cfg.logLevel ?? "warn",
+        learningEnabled: cfg.learningEnabled ?? true
       },
       (cfg.logLevel ?? "warn") as LogLevel
     );

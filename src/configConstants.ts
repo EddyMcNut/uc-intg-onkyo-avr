@@ -137,9 +137,27 @@ export interface AvrConfig {
   inputSelectorOptions?: SelectOptions;
 }
 
+// Learned capability entry. `names` are the canonical/alias names from eiscp-mappings.ts (seed).
+// Once the AVR's exact front-panel name is captured (via FLD), `displayName` is set and `updated` becomes true.
+export interface LearnedEntry {
+  names: string[];
+  displayName?: string;
+  updated: boolean;
+}
+
+// Learning catalog for one physical AVR: LMD (listening modes) and SLI (input selectors), keyed by ISCP code (e.g. "08", "33").
+export type LearningCatalog = {
+  LMD: Record<string, LearnedEntry>;
+  SLI: Record<string, LearnedEntry>;
+};
+
 export interface OnkyoConfig {
   avrs?: AvrConfig[];
   logLevel?: LogLevel;
+  // true (default) = learn the AVR's exact front-panel names over time; false = use canonical mapping names only.
+  learningEnabled?: boolean;
+  // Per-physical-AVR learning data, keyed by physical AVR id (see buildPhysicalAvrId). Survives reboots and is part of backup/restore.
+  learning?: Record<string, LearningCatalog>;
   queueThreshold?: number;
   albumArtURL?: string;
   volumeScale?: number; // 80 or 100
