@@ -58,6 +58,23 @@ jobs:
         run: |
           npm test
 
+      - name: Generate simple commands doc
+        run: |
+          node scripts/generate-simplecommands-doc.mjs
+
+      - name: Commit generated doc
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/heads/')
+        run: |
+          if git diff --quiet docs/generated-simplecommands.md; then
+            echo "No changes to docs/generated-simplecommands.md"
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add docs/generated-simplecommands.md
+            git commit -m "docs: update generated simple commands"
+            git push origin HEAD:${GITHUB_REF_NAME}
+          fi
+
       - name: Remove config.json
         run: rm -f config.json
 

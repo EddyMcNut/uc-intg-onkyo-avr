@@ -10,6 +10,7 @@
   "scripts": {
     "format": "prettier --write .",
     "generate-diagram": "npx @mermaid-js/mermaid-cli -i docs/architecture.mmd -o docs/architecture.svg",
+    "generate-simplecommands-doc": "npm run build && node scripts/generate-simplecommands-doc.mjs",
     "code-check": "prettier --check . && eslint .",
     "lint": "eslint --fix",
     "build": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\" && tsc",
