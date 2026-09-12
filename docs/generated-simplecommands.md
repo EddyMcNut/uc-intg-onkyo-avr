@@ -2,7 +2,7 @@
 
 This integration creates a list of simple commands which are available for you in Web Configurator.
 
-These are the available `simple commands` in `v0.9.4` (619 commands):
+These are the available `simple commands` in `v0.9.4` (621 commands):
 
 - `ACCUEQ_OFF`
 - `ACCUEQ_ON_EX_FRONT_L_R`
@@ -249,6 +249,7 @@ These are the available `simple commands` in `v0.9.4` (619 commands):
 - `LISTENING_MODE_S_CINEMA`
 - `LISTENING_MODE_S_GAMES`
 - `LISTENING_MODE_S_MUSIC`
+- `LISTENING_MODE_TESTEO`
 - `LISTENING_MODE_THEATER_DIMENSIONAL`
 - `LISTENING_MODE_THX`
 - `LISTENING_MODE_THX_CINEMA`
@@ -260,6 +261,7 @@ These are the available `simple commands` in `v0.9.4` (619 commands):
 - `LISTENING_MODE_TV_LOGIC`
 - `LISTENING_MODE_UNPLUGGED`
 - `LISTENING_MODE_UP`
+- `LISTENING_MODE_WHATEVER`
 - `LISTENING_MODE_WHOLE_HOUSE`
 - `LOUDNESS_MANAGEMENT_OFF`
 - `LOUDNESS_MANAGEMENT_ON`
