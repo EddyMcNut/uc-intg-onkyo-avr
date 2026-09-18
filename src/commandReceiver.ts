@@ -257,10 +257,18 @@ export class CommandReceiver {
   }
 
   private async handleListeningMode(avrUpdates: AvrUpdateEvent, entityId: string, eventZone: string): Promise<void> {
-    const listeningMode = Array.isArray(avrUpdates.argument) ? avrUpdates.argument[0] : (avrUpdates.argument as string);
-    if (listeningMode === "undefined" || listeningMode === "unknown") {
-      log.info("%s [%s] listening-mode '%s', keeping current value (no re-query)", integrationName, entityId, listeningMode);
+    const aliases = Array.isArray(avrUpdates.argument) ? avrUpdates.argument : [avrUpdates.argument as string];
+    if (aliases[0] === "undefined" || aliases[0] === "unknown") {
+      log.info("%s [%s] listening-mode '%s', keeping current value (no re-query)", integrationName, entityId, aliases[0]);
       return;
+    }
+    let listeningMode = aliases[0];
+    const cfgAvr = this.config.avrs ? this.config.avrs.find((a) => a.model === avrUpdates.model && a.ip === avrUpdates.host) : undefined;
+    if (cfgAvr && Array.isArray(cfgAvr.listeningModeOptions) && cfgAvr.listeningModeOptions.length > 0) {
+      const match = aliases.find((alias) => cfgAvr.listeningModeOptions?.includes(alias));
+      if (match) {
+        listeningMode = match;
+      }
     }
     log.info("%s [%s] listening-mode set to: %s", integrationName, entityId, listeningMode);
     this.driver.updateEntityAttributes(`${entityId}_listening_mode`, {

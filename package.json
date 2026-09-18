@@ -17,7 +17,7 @@
     "test": "npm run build && vitest run",
     "test:watch": "vitest",
     "coverage": "npm run build && vitest run --coverage",
-    "start": "npm run build && node dist/driver.js"
+    "start": "npm run build && node scripts/generate-simplecommands-doc.mjs && node dist/driver.js"
   },
   "dependencies": {
     "@unfoldedcircle/integration-api": "0.5.0",
