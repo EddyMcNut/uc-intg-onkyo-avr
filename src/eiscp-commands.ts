@@ -637,7 +637,7 @@ export const eiscpCommands = {
         "50": { name: ["thx-u2", "s-cinema", "cinema2"], description: "sets THX U2/S2/I/S Cinema/Cinema2" },
         "51": { name: ["thx-musicmode", "s-music"], description: "sets THX MusicMode, S Music" },
         "52": { name: ["thx-games", "thx-u2", "s2", "i", "s-games"], description: "sets THX Games Mode,THX U2/S2/I/S Games" },
-        "80": { name: ["pliix-movie", "dolby-surround", "Dolby-PLIIx-Movie"], description: "sets PLII/PLIIx Movie" }, 
+        "80": { name: ["pliix-movie", "dolby-surround", "Dolby-PLIIx-Movie"], description: "sets PLII/PLIIx Movie" },
         "81": { name: ["pliix-music", "Dolby-PLIIx-Music"], description: "sets PLII/PLIIx Music" },
         "82": { name: ["neo-6-cinema", "neo-x-cinema", "dts-neural:x"], description: "sets Neo:6 Cinema/Neo:X Cinema" },
         "83": { name: ["neo-6-music", "neo-x-music"], description: "sets Neo:6 Music/Neo:X Music" },

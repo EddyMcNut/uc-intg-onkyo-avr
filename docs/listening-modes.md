@@ -2,24 +2,9 @@
 
 ## Select from list
 
-As from v0.9.0 listening modes are available as so called `simple commands`:
+As from v0.9.0 listening modes are available as so called [simple commands](generated-simplecommands.md):
 
 ![](../screenshots/listening-modes.png)
-
-## Text input instead of selecting from list
-
-Like descibed in the Cheats section, you can send a lot of different commands which are all mentioned in the [JSON](../src/eiscp-commands.ts) file.
-
-Probably you have your AVR set to automatically select the best listening mode, but sometimes you might want to set a favorite mode, see the listening-mode section in the [JSON](../src/eiscp-commands.ts), for the correct command. A few examples from that JSON:
-
-| Listening mode (selectable)         | text alternative: value in `Input source`          |
-| ----------------------------------- | -------------------------------------------------- |
-| Stereo                              | listening-mode stereo                              |
-| Straight Decode                     | listening-mode straight-decode                     |
-| Neo:6/Neo:X THX Cinema              | listening-mode thx-cinema                          |
-| Neo:6 Cinema DTS Surround Sensation | listening-mode neo-6-cinema-dts-surround-sensation |
-
-![](../screenshots/stereo.png)
 
 ## What about `Dolby Atmos`, `DTS:X`, `Auro-3D`, `IMAX Enhanced`?
 
@@ -34,17 +19,13 @@ However, most models `auto-select` the correct mode when the input signal is `Do
 | Auro-3D        | straight-decode |
 | IMAX Enhanced  | straight-decode |
 
-![](../screenshots/straight-decode2.png)
-
-or as text alternative:
-
 ![](../screenshots/straight-decode.png)
 
 ## Select widget
 
 As from version 0.8.0, the integration offers a `select` widget for listening modes, see [this doc](select-listening-mode.md).
 
-Different models sometimes use different names for a single listening mode, You can use that functionality to quickly discover which listening modes are accepted by your AVR model.
+Different models sometimes use different names for a single listening mode.
 
 ## Example of known Pioneer listening modes
 

@@ -234,7 +234,15 @@ export class CommandReceiver {
   }
 
   private async handleInputSelector(avrUpdates: AvrUpdateEvent, entityId: string, eventZone: string): Promise<void> {
-    const source = avrUpdates.argument.toString().split(",")[0];
+    const aliases = Array.isArray(avrUpdates.argument) ? (avrUpdates.argument as string[]) : [avrUpdates.argument.toString()];
+    let source = aliases[0];
+    const cfgAvr = this.config.avrs ? this.config.avrs.find((a) => a.model === avrUpdates.model && a.ip === avrUpdates.host) : undefined;
+    if (cfgAvr && Array.isArray(cfgAvr.inputSelectorOptions) && cfgAvr.inputSelectorOptions.length > 0) {
+      const match = aliases.find((alias) => cfgAvr.inputSelectorOptions?.includes(alias));
+      if (match) {
+        source = match;
+      }
+    }
     this.avrStateApi.setSource(entityId, source, this.eiscpInstance, eventZone, this.driver);
     this.driver.updateEntityAttributes(entityId, {
       [uc.MediaPlayerAttributes.Source]: source

@@ -2,7 +2,7 @@
 
 This integration creates a list of simple commands which are available for you in Web Configurator.
 
-These are the available `simple commands` in `v0.9.4` (630 commands):
+These are the available `simple commands` in `v0.9.4` (631 commands):
 
 - `ACCUEQ_OFF`
 - `ACCUEQ_ON_EX_FRONT_L_R`
@@ -122,6 +122,7 @@ These are the available `simple commands` in `v0.9.4` (630 commands):
 - `INPUT_SPOTIFY`
 - `INPUT_STM`
 - `INPUT_STMBOX`
+- `INPUT_STRMBOX`
 - `INPUT_TAPE`
 - `INPUT_TAPE1`
 - `INPUT_TAPE2`
