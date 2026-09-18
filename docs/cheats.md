@@ -2,7 +2,7 @@
 
 ## Simple commands
 
-As from v0.9.0 this integration creates a list of `simple commands` (like PRESET_15, DIRAC_SLOT1, LISTENING_MODE_STEREO, INPUT_FM) which are available for you in Web Configurator.
+As from v0.9.0 this integration creates a list of [simple commands](generated-simplecommands.md) (like PRESET_15, DIRAC_SLOT1, LISTENING_MODE_STEREO, INPUT_FM) which are available for you in Web Configurator.
 
 ## Text commands
 

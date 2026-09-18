@@ -1,7 +1,7 @@
 {
   "name": "uc-intg-onkyo-avr",
   "type": "module",
-  "version": "0.9.3",
+  "version": "0.9.4",
   "description": "Onkyo/Pioneer/Integra AVR custom integration for Unfolded Circle Remotes",
   "main": "dist/driver.js",
   "engines": {
@@ -10,13 +10,14 @@
   "scripts": {
     "format": "prettier --write .",
     "generate-diagram": "npx @mermaid-js/mermaid-cli -i docs/architecture.mmd -o docs/architecture.svg",
+    "generate-simplecommands-doc": "npm run build && node scripts/generate-simplecommands-doc.mjs",
     "code-check": "prettier --check . && eslint .",
     "lint": "eslint --fix",
     "build": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\" && tsc",
     "test": "npm run build && vitest run",
     "test:watch": "vitest",
     "coverage": "npm run build && vitest run --coverage",
-    "start": "npm run build && node dist/driver.js"
+    "start": "npm run build && node scripts/generate-simplecommands-doc.mjs && node dist/driver.js"
   },
   "dependencies": {
     "@unfoldedcircle/integration-api": "0.5.0",
@@ -45,18 +46,18 @@
   },
   "devDependencies": {
     "@types/debug": "^4.1.13",
-    "@types/node": "26.4.1",
+    "@types/node": "26.6.1",
     "@types/node-fetch": "^2.6.13",
     "@types/ws": "^8.18.1",
-    "@typescript-eslint/eslint-plugin": "8.69.0",
-    "@typescript-eslint/parser": "8.69.0",
-    "@vitest/coverage-v8": "5.0.0",
-    "eslint": "10.9.1",
+    "@typescript-eslint/eslint-plugin": "8.70.0",
+    "@typescript-eslint/parser": "8.70.0",
+    "@vitest/coverage-v8": "5.0.1",
+    "eslint": "10.10.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-prettier": "^5.5.6",
-    "prettier": "3.9.6",
+    "prettier": "3.9.8",
     "ts-node": "10.9.2",
     "typescript": "6.0.x",
-    "vitest": "5.0.0"
+    "vitest": "5.0.1"
   }
 }

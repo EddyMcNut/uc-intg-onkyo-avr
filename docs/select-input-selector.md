@@ -26,5 +26,3 @@ As the list of all known options is very long, you can configure which options y
 _note: this impacts both `input-selector` and the list of `Input source` in Web Configurator!_
 
 [How this selector impacts the Remote](./source-webconfigurator-mediawidget.md)
-
-[Input Selector](./input-selector.md)

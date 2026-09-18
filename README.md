@@ -70,9 +70,13 @@ Example activities:
 
 [Album art](./docs/album-art.md)
 
-## Input source and Cheats
+## Commands
+
+[Simple Commands](./docs/generated-simplecommands.md)
 
 [Input source](./docs/input-selector.md)
+
+[Listening modes](./docs/listening-modes.md)
 
 [Cheats](./docs/cheats.md)
 
@@ -89,10 +93,6 @@ Example activities:
 [Selects](./docs/select.md)
 
 [Remote](./docs/remote.md)
-
-## Listening modes
-
-[Listening modes](./docs/listening-modes.md)
 
 ## Multiple AVRs and Zones
 
