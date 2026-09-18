@@ -14,7 +14,7 @@ describe("simpleCommands", () => {
 
     const spacedId = "LISTENING_MODE_DOLBY_PLIIX_GAME";
     expect(spacedId in SIMPLE_COMMANDS_MAP).toBe(true);
-    expect(SIMPLE_COMMANDS_MAP[spacedId]).toBe("listening-mode pliix-game");
+    expect(SIMPLE_COMMANDS_MAP[spacedId]).toBe("listening-mode Dolby-PLIIx-Game");
 
     for (const cmd of ALL_SIMPLE_COMMANDS) {
       expect(cmd).not.toMatch(/[\s-]/);
