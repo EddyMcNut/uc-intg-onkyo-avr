@@ -14,8 +14,14 @@ class AvrStateQueryService {
 
   /** Returns true when enough time has passed since the last query for this entity. */
   shouldQuery(entityId: string): boolean {
+    const now = Date.now();
     const last = this.lastQueries.get(entityId) ?? 0;
-    return Date.now() - last > QUERY_TTL;
+    if (now - last > QUERY_TTL) {
+      // Prune stale entries so the map stays bounded over long sessions.
+      this.lastQueries.delete(entityId);
+      return true;
+    }
+    return false;
   }
 
   /** Record that the given entity was just queried. */

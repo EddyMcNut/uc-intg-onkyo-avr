@@ -14,7 +14,7 @@ import { getMusicServerBrowseState } from "./musicServerBrowserStore.js";
 import { getTidalBrowseState } from "./tidalBrowserStore.js";
 import { getTuneInMenuBrowseState } from "./tuneInMenuStore.js";
 import { getZonePrefix } from "./zoneMappings.js";
-import { WAIT_FOR_CONNECT_TIMEOUT } from "./constants.js";
+import { WAIT_FOR_CONNECT_TIMEOUT, CONNECTION_TIMEOUT } from "./constants.js";
 import type { AvrStateReader } from "./eiscp-command-parser.js";
 
 export interface EiscpConfig {
@@ -95,6 +95,8 @@ export class EiscpDriver extends EventEmitter {
   private isConnected = false;
   private sendQueue: Promise<void> = Promise.resolve();
   private receiveQueue: Promise<void> = Promise.resolve();
+  private readonly pendingIncoming = new Map<string, DataPayload>();
+  private incomingDrainScheduled = false;
   private tcpBuffer: Buffer = Buffer.alloc(0);
   private readonly commandParser: IscpCommandParser;
 
@@ -232,13 +234,22 @@ export class EiscpDriver extends EventEmitter {
     }
     // If socket exists, try to connect
     if (this.eiscp) {
+      this.eiscp.setTimeout(CONNECTION_TIMEOUT);
       this.eiscp.connect(port, this.config.host!);
       return { model: this.config.model!, host: this.config.host!, port };
     }
     // Create new socket and connect
     this.eiscp = net.connect(port, this.config.host!);
+    // Bound connection establishment so failed attempts fail fast instead of hanging on
+    // the OS-level TCP timeout. Disabled once the connection is established.
+    this.eiscp.setTimeout(CONNECTION_TIMEOUT);
     this.eiscp
+      .on("timeout", () => {
+        this.isConnected = false;
+        this.eiscp?.destroy();
+      })
       .on("connect", () => {
+        this.eiscp?.setTimeout(0); // no inactivity timeout on a live connection
         this.tcpBuffer = Buffer.alloc(0); // Clear any stale bytes from a previous connection.
         this.isConnected = true;
         this.emit("connect"); // Emit connect event for waitForConnect()
@@ -365,13 +376,27 @@ export class EiscpDriver extends EventEmitter {
 
   /** Enqueue an incoming message to be emitted with throttle delay */
   private enqueueIncoming(data: DataPayload): void {
+    // Coalesce throttled stream commands: only the latest value per command matters,
+    // so stale intermediate frames (e.g. FLD scroll text) are dropped. This reduces
+    // memory pressure and wasted work without losing the final state.
+    this.pendingIncoming.set(data.command ?? data.iscpCommand, data);
+    if (this.incomingDrainScheduled) {
+      return;
+    }
+    this.incomingDrainScheduled = true;
     const prevQueue = this.receiveQueue;
     this.receiveQueue = (async () => {
       await prevQueue;
       try {
-        await delay(this.config.receiveDelay! ?? DEFAULT_QUEUE_THRESHOLD);
-        this.emit("data", data);
+        await delay(this.config.receiveDelay ?? DEFAULT_QUEUE_THRESHOLD);
+        this.incomingDrainScheduled = false;
+        const batch = [...this.pendingIncoming.values()];
+        this.pendingIncoming.clear();
+        for (const payload of batch) {
+          this.emit("data", payload);
+        }
       } catch (err) {
+        this.incomingDrainScheduled = false;
         log.error("%s Error processing queued incoming message:", integrationName, err);
       }
     })();
@@ -590,16 +615,31 @@ export class EiscpDriver extends EventEmitter {
         return;
       }
       let timer: NodeJS.Timeout;
-      const onConnect = () => {
+      const cleanup = () => {
         clearTimeout(timer);
         this.off("connect", onConnect);
+        this.off("close", onClose);
+        this.off("error", onError);
+      };
+      const onConnect = () => {
+        cleanup();
         resolve();
       };
+      const onClose = () => {
+        cleanup();
+        reject(new Error("Connection closed before AVR responded"));
+      };
+      const onError = (err: Error) => {
+        cleanup();
+        reject(err instanceof Error ? err : new Error(String(err)));
+      };
       timer = setTimeout(() => {
-        this.off("connect", onConnect);
+        cleanup();
         reject(new Error("Timeout waiting for AVR connection"));
       }, timeoutMs);
       this.on("connect", onConnect);
+      this.on("close", onClose);
+      this.on("error", onError);
     });
   }
 }
