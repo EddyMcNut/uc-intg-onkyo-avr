@@ -100,6 +100,10 @@ jobs:
 
           cp package.json artifacts/bin/
           mv node_modules artifacts/bin/
+
+          # Drop runtime-unused build outputs from shipped dependencies to keep the tarball small
+          node scripts/prune-node_modules.mjs artifacts/bin/node_modules
+
           cp driver.json artifacts/
 
           # Copy the custom driver pictogram to the archive root so the
@@ -107,12 +111,13 @@ jobs:
           cp eiscp.png artifacts/
 
           # Include runtime logo assets used by generated media thumbnails.
-          # Copy them both next to the package root and next to the runtime bin
-          # so the integration can resolve them in either installation layout.
+          # Per UC driver-installation docs, only ./bin, ./config and ./data are accessible
+          # at runtime (archive root is limited to driver.json + custom driver icon), and the
+          # working directory is the binary directory. So logos must live next to the driver:
+          # serviceThumbnails.ts resolves them via cwd/logos and <bin-dir>/logos.
           if [ -d logos ]; then
-            cp -R logos artifacts/
             cp -R logos artifacts/bin/
-            echo "Packaged logo assets:" && ls -la artifacts/logos artifacts/bin/logos || true
+            echo "Packaged logo assets:" && ls -la artifacts/bin/logos || true
           fi
 
           ARTIFACT_NAME="uc-intg-${{ env.INTG_NAME }}-${{ steps.pkg.outputs.version }}"

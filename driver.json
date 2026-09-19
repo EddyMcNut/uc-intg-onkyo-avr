@@ -1,6 +1,6 @@
 {
   "driver_id": "onkyo_avr_custom_driver",
-  "version": "0.9.5",
+  "version": "0.9.5.1",
   "min_core_api": "0.20.0",
   "name": { "en": "Onkyo/Pioneer/Integra AVR (eISCP)" },
   "icon": "custom:eiscp.png",
