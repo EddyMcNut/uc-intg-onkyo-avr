@@ -47,7 +47,7 @@ When the EISCP protocol sends `40`, your AVR display may show `20`, this setting
 
 ### Set specific level
 
-Most models allow to set a standard volume level per input source. For example when you select DAB, the volume is set to 35. If your model does not support that you can use the Unfolded Remote and this integration to set the volume to a specific level by adding a command in the on-sequence of an activity or as a button on the user interface with the simple command `volume 35` (or whatever level you like of course):
+Most models allow to set a standard volume level per input source. For example when you select DAB, the volume is set to 35. If your model does not support that you can use the Unfolded Remote and this integration to set the volume to a specific level by adding a command in the on-sequence of an activity or as a button on the user interface with the cheat for `Input source` by just typing `volume 35` (or whatever level you like of course):
 
 ![](../screenshots/volume35-sequence.png)
 
@@ -89,7 +89,7 @@ _Note: multi-zone-volume does **not** support the use of the slider._
 
 As from v0.8.3 this integration supports controlling muting for multiple zones with just a single command.
 
-Assign `multi-zone-muting all-toggle` to the muting button to mute all comfigured zones in one action:
+Assign `multi-zone-mute-all-toggle` to the muting button to mute all comfigured zones in one action:
 
 ![](../screenshots/muting-multi.png)
 
