@@ -67,18 +67,57 @@ it("queryAvrState sends all query commands in order", async () => {
 
   await avrStateQueryService.queryAvrState(eid, mock, "main", "test");
 
+  // Receiver information leads because it carries the preset list.
+  expect(commands.length).toBe(12);
+  expect(commands[0]).toEqual({ zone: "main", command: "avr-info", args: "query" });
+  expect(commands[1]).toEqual({ zone: "main", command: "system-power", args: "query" });
+  expect(commands[2]).toEqual({ zone: "main", command: "input-selector", args: "query" });
+  expect(commands[3]).toEqual({ zone: "main", command: "volume", args: "query" });
+  expect(commands[4]).toEqual({ zone: "main", command: "audio-muting", args: "query" });
+  expect(commands[5]).toEqual({ zone: "main", command: "listening-mode", args: "query" });
+  expect(commands[6]).toEqual({ zone: "main", command: "fp-display", args: "query" });
+  expect(commands[7]).toEqual({ zone: "main", command: "tone-front", args: "query" });
+  expect(commands[8]).toEqual({ zone: "main", command: "vocal", args: "query" });
+  expect(commands[9]).toEqual({ zone: "main", command: "center-temporary-level", args: "query" });
+  expect(commands[10]).toEqual({ zone: "main", command: "subwoofer-temporary-level", args: "query" });
+  expect(commands[11]).toEqual({ zone: "main", command: "dirac", args: "query" });
+});
+
+it("queryAvrState skips avr-info while the snapshot is fresh", async () => {
+  const queryMod = await import("../src/avrStateQuery.js");
+  const store = await import("../src/avrInfoStore.js");
+  const { avrStateQueryService } = queryMod as any;
+
+  // A well-formed entity id so the receiver info store can key on it.
+  const eid = `TX-RZ50 10.0.0.${Math.floor(Math.random() * 250) + 1} main`;
+
+  const commands: Array<{ command: string }> = [];
+  const mock = {
+    command: vi.fn().mockImplementation(async (cmd: any) => {
+      commands.push(cmd);
+    }),
+    eiscpConfig: { sendDelay: 10 }
+  };
+
+  // Nothing collected yet, so receiver information is requested.
+  await avrStateQueryService.queryAvrState(eid, mock, "main", "stale");
+  expect(commands.some((c) => c.command === "avr-info")).toBe(true);
+
+  // Pretend a snapshot was just collected, then force past the state debounce.
+  store.setAvrInfo(
+    eid,
+    store.parseAvrInfo(
+      '<?xml version="1.0"?><response status="ok"><device id="X"><model>M</model><friendlyname></friendlyname><firmwareversion>v</firmwareversion><presetlist count="0"></presetlist></device></response>'
+    )!
+  );
+  avrStateQueryService["lastQueries"].delete(eid);
+
+  commands.length = 0;
+  await avrStateQueryService.queryAvrState(eid, mock, "main", "fresh");
+  expect(commands.some((c) => c.command === "avr-info")).toBe(false);
   expect(commands.length).toBe(11);
-  expect(commands[0]).toEqual({ zone: "main", command: "system-power", args: "query" });
-  expect(commands[1]).toEqual({ zone: "main", command: "input-selector", args: "query" });
-  expect(commands[2]).toEqual({ zone: "main", command: "volume", args: "query" });
-  expect(commands[3]).toEqual({ zone: "main", command: "audio-muting", args: "query" });
-  expect(commands[4]).toEqual({ zone: "main", command: "listening-mode", args: "query" });
-  expect(commands[5]).toEqual({ zone: "main", command: "fp-display", args: "query" });
-  expect(commands[6]).toEqual({ zone: "main", command: "tone-front", args: "query" });
-  expect(commands[7]).toEqual({ zone: "main", command: "vocal", args: "query" });
-  expect(commands[8]).toEqual({ zone: "main", command: "center-temporary-level", args: "query" });
-  expect(commands[9]).toEqual({ zone: "main", command: "subwoofer-temporary-level", args: "query" });
-  expect(commands[10]).toEqual({ zone: "main", command: "dirac", args: "query" });
+
+  store.resetAvrInfo(eid);
 });
 
 it("queryAvrState skips redundant query", async () => {

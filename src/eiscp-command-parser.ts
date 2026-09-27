@@ -3,6 +3,8 @@ import { eiscpMappings } from "./eiscp-mappings.js";
 import { diracResponseToCommandValue } from "./diracSelect.js";
 import { NO_TITLE } from "./constants.js";
 import { detectServiceFromText, detectServiceFromAsciiPrefix, getCanonicalServiceName } from "./serviceDetector.js";
+import { parseAvrInfo, setAvrInfo, listDabPresets, listFmPresets, PRESET_BAND_EMPTY } from "./avrInfoStore.js";
+import log, { getLogLevel } from "./loggers.js";
 import type { DeezerBrowseState } from "./deezerBrowserStore.js";
 import type { MusicServerBrowseState } from "./musicServerBrowserStore.js";
 import type { TidalBrowseState } from "./tidalBrowserStore.js";
@@ -10,6 +12,7 @@ import type { TuneInMenuBrowseState } from "./tuneInMenuStore.js";
 
 const COMMANDS = eiscpCommands.commands;
 const VALUE_MAPPINGS = eiscpMappings.value_mappings;
+const integrationName = "eiscpCommandParser:";
 
 // Zone-specific command codes → main-zone equivalent (for incoming command parsing)
 const ZONE2_REVERSE_MAP: Record<string, string> = { ZVL: "MVL", ZPW: "PWR", ZMT: "AMT", SLZ: "SLI", TUZ: "TUN" };
@@ -81,7 +84,9 @@ export class IscpCommandParser {
       SWL: (value, _cmd, result) => this.handleSubwooferLevel(value, result),
       NLT: (value, _cmd, result) => this.handleNLT(value, result),
       NLS: (value, _cmd, result) => this.handleNLS(value, result),
-      NLA: (value, _cmd, result) => this.handleNLA(value, result)
+      NRI: (value, _cmd, result) => this.handleNRI(value, result),
+      NLA: (value, _cmd, result) => this.handleNLA(value, result),
+      NJA: (value, _cmd, result) => this.handleNJA(value, result)
     };
   }
 
@@ -474,6 +479,81 @@ export class IscpCommandParser {
 
     result.command = "NLS";
     result.argument = entry;
+    return result;
+  }
+
+  // NRI returns a single XML document describing the AVR: model, zones, inputs, network services,
+  // the DAB/FM preset lists, capability flags and tuner ranges. The value is consumed here into
+  // the AVR info store, so everything the AVR reports can be read from there instead of scraping
+  // the on-screen menu.
+  private handleNRI(value: string, result: CommandResult): CommandResult {
+    const xmlStart = value.indexOf("<?xml");
+    if (xmlStart === -1) {
+      return result;
+    }
+
+    const entityId = this.getEntityId(result.zone);
+    const xml = value.substring(xmlStart);
+    const info = parseAvrInfo(xml);
+    if (!info) {
+      return result;
+    }
+
+    // Dump the full payload only at debug ("Debug (all)") level. Formatting the 9 KB document is
+    // not free, and the reply repeats forever, so it is kept out of the normal debug stream where
+    // it would drown out everything else. Newlines go in at element boundaries only, and are
+    // collapsed again inside empty elements, so the dump stays valid XML. The AVR terminates the
+    // frame with SUB (0x1A), which is not XML and is stripped.
+    if (getLogLevel() === "debug") {
+      const dumpable = xml.replace(/\x1a+$/, "");
+      log.debug("%s [%s] Complete NRI payload (%d chars):\n%s", integrationName, entityId, dumpable.length, dumpable.replace(/></g, ">\n<").replace(/>\n<\//g, "></"));
+    }
+
+    setAvrInfo(entityId, info);
+    const dabPresets = listDabPresets(entityId);
+    const fmPresets = listFmPresets(entityId);
+    const emptyPresets = info.presets.filter((preset) => preset.band === PRESET_BAND_EMPTY);
+    log.debug("%s [%s] Collected AVR info: %d DAB preset(s), %d FM preset(s) of %d slot(s)", integrationName, entityId, dabPresets.length, fmPresets.length, info.presetCount);
+    if (dabPresets.length > 0) {
+      log.debug("%s [%s] DAB presets (band=2, no frequency):\n%s", integrationName, entityId, dabPresets.map((preset) => `  slot ${String(preset.slot).padStart(2, " ")}: ${preset.name}`).join("\n"));
+    }
+    if (fmPresets.length > 0) {
+      log.debug(
+        "%s [%s] FM presets (band=1, carries a frequency):\n%s",
+        integrationName,
+        entityId,
+        fmPresets.map((preset) => `  slot ${String(preset.slot).padStart(2, " ")}: ${preset.name} @ ${preset.freq} MHz`).join("\n")
+      );
+    }
+    if (emptyPresets.length > 0) {
+      log.debug("%s [%s] Empty slots (band=0): %d (slots %s)", integrationName, entityId, emptyPresets.length, emptyPresets.map((preset) => preset.slot).join(", "));
+    }
+
+    // Use the command name, not the raw NRI opcode, so the command receiver can dispatch it.
+    result.command = "avr-info";
+    result.argument = String(info.presets.length);
+    return result;
+  }
+
+  // NJA is pushed by the AVR whenever jacket art changes. The leading digit is the image type:
+  // 0 = BMP, 1 = JPEG, 2 = URL, and the second character is only a packet flag for the inline forms.
+  //
+  // Album art is already polled from the configured album_art.cgi endpoint, so nothing here needs to
+  // act on the payload. It is recognised purely so the message is not reported as an unknown command
+  // type, and dropped by leaving result.command as "undefined".
+  private handleNJA(value: string, result: CommandResult): CommandResult {
+    const imageType = value.charAt(0);
+    const entityId = this.getEntityId(result.zone);
+
+    if (imageType === "2") {
+      // The URL form. AVRs commonly report a link-local address, which is not reachable from the
+      // UC host, so the link is logged rather than followed.
+      log.debug("%s [%s] AVR offered jacket art by URL: %s", integrationName, entityId, value.substring(1).trim());
+    } else {
+      const inlineBytes = Math.floor(value.length / 2);
+      log.debug("%s [%s] AVR sent inline jacket art data (image type %s, %d bytes) which is not used", integrationName, entityId, imageType || "n", inlineBytes);
+    }
+
     return result;
   }
 

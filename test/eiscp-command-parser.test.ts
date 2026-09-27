@@ -1,4 +1,10 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
+import { readFileSync } from "fs";
+import { fileURLToPath } from "url";
+import { dirname, resolve } from "path";
+
+const here = dirname(fileURLToPath(import.meta.url));
+const realResponseXml = readFileSync(resolve(here, "fixtures/nri-response.xml"), "utf-8");
 
 function toHex(text: string): string {
   return Buffer.from(text, "ascii").toString("hex");
@@ -411,4 +417,140 @@ it("IscpCommandParser decodes SWL subwoofer-temporary-level responses in 0.5 dB 
 
   const zero = parser.parse("SWL", "00");
   expect(zero?.argument).toBe(0);
+});
+
+describe("IscpCommandParser NJA handling", () => {
+  async function makeParser() {
+    const parserModule = await import("../src/eiscp-command-parser.js");
+    const { IscpCommandParser } = parserModule as { IscpCommandParser: new (...deps: any) => any };
+    const h = makeParserHarness();
+    return new IscpCommandParser(h.getEntityId, h.stateReader, h.deezerStoreApi, h.tidalStoreApi, h.tuneInStoreApi);
+  }
+
+  it("drops jacket art pushes in both documented forms instead of reporting them as unknown", async () => {
+    const parser = await makeParser();
+
+    // The URL form, as pushed by a TX-RZ50 while playing.
+    expect(parser.parse("NJA", "2-http://fe80::209:b0ff:fe60:5e06/album_art.cgi")).toBe(null);
+    // The inline forms: image type 0 = BMP, 1 = JPEG, followed by a packet flag.
+    expect(parser.parse("NJA", "00ffd8ffe000104a464946")).toBe(null);
+    expect(parser.parse("NJA", "11ffd8ffe000104a464946")).toBe(null);
+    // "No Image" form.
+    expect(parser.parse("NJA", "n-")).toBe(null);
+  });
+
+  it("logs the pushed jacket art URL at debug level only", async () => {
+    const loggers = await import("../src/loggers.js");
+    const spy = vi.spyOn(console, "log").mockImplementation(() => {});
+    try {
+      const parser = await makeParser();
+      for (const level of ["warn", "info", "error"] as const) {
+        loggers.setLogLevel(level);
+        spy.mockClear();
+        parser.parse("NJA", "2-http://192.168.2.103/album_art.cgi");
+        expect(
+          spy.mock.calls.some((call) => String(call[1]).includes("jacket art")),
+          `no jacket art log expected at ${level}`
+        ).toBe(false);
+      }
+
+      loggers.setLogLevel("debug");
+      spy.mockClear();
+      parser.parse("NJA", "2-http://192.168.2.103/album_art.cgi");
+      const logged = spy.mock.calls.find((call) => String(call[1]).includes("jacket art by URL"));
+      expect(String(logged?.[1])).toContain("http://192.168.2.103/album_art.cgi");
+    } finally {
+      loggers.setLogLevel("warn");
+      spy.mockRestore();
+    }
+  });
+});
+
+describe("IscpCommandParser NRI handling", () => {
+  const entityId = "TX-RZ50 1.2.3.4 main";
+
+  async function makeNriParser() {
+    const parserModule = await import("../src/eiscp-command-parser.js");
+    const { IscpCommandParser } = parserModule as { IscpCommandParser: new (...deps: any) => any };
+    const store = await import("../src/avrInfoStore.js");
+    const h = makeParserHarness();
+    h.getEntityId = () => entityId;
+    const parser = new IscpCommandParser(h.getEntityId, h.stateReader, h.deezerStoreApi, h.tidalStoreApi, h.tuneInStoreApi);
+    return { parser, store };
+  }
+
+  it("stores the preset list from an NRI reply and reports it as handled", async () => {
+    const { parser, store } = await makeNriParser();
+    store.resetAvrInfo(entityId);
+
+    const result = parser.parse("NRI", realResponseXml);
+
+    // The command name must be used, not the raw NRI opcode: the command receiver dispatches on
+    // the name, and logging the opcode made every reply show up as an unknown command type.
+    expect(result?.command).toBe("avr-info");
+    expect(result?.argument).toBe("40");
+
+    const dabPresets = store.listDabPresets(entityId);
+    expect(dabPresets).toHaveLength(25);
+    expect(dabPresets[0]).toMatchObject({ slot: 1, name: "R10 80s" });
+
+    store.resetAvrInfo(entityId);
+  });
+
+  it("dumps the full NRI payload only at debug log level", async () => {
+    const loggers = await import("../src/loggers.js");
+    const spy = vi.spyOn(console, "log").mockImplementation(() => {});
+    try {
+      for (const level of ["warn", "info", "error"] as const) {
+        loggers.setLogLevel(level);
+        spy.mockClear();
+        const { parser, store } = await makeNriParser();
+        store.resetAvrInfo(entityId);
+        parser.parse("NRI", realResponseXml);
+        const dumped = spy.mock.calls.some((call) => String(call[1]).includes("Complete NRI payload"));
+        expect(dumped, `payload should not be dumped at log level ${level}`).toBe(false);
+      }
+
+      loggers.setLogLevel("debug");
+      spy.mockClear();
+      const { parser, store } = await makeNriParser();
+      store.resetAvrInfo(entityId);
+      parser.parse("NRI", realResponseXml);
+      const dumped = spy.mock.calls.some((call) => String(call[1]).includes("Complete NRI payload"));
+      expect(dumped, "payload should be dumped at log level debug").toBe(true);
+
+      // The dump must be the whole document, formatted but otherwise lossless. util.format has
+      // already collapsed the arguments into a single string by the time console.log is called.
+      const dumpedLine = String(spy.mock.calls.find((call) => String(call[1]).includes("Complete NRI payload"))?.[1]);
+      const dumpedXml = dumpedLine.split("chars):\n")[1];
+      expect(dumpedXml.replace(/\n/g, "")).toBe(realResponseXml.replace(/\x1a+$/, ""));
+
+      store.resetAvrInfo(entityId);
+    } finally {
+      loggers.setLogLevel("warn");
+      spy.mockRestore();
+    }
+  });
+
+  it("ignores NRI replies that carry no XML", async () => {
+    const { parser, store } = await makeNriParser();
+    store.resetAvrInfo(entityId);
+
+    expect(parser.parse("NRI", "")).toBe(null);
+    expect(parser.parse("NRI", "X----")).toBe(null);
+    expect(store.getAvrInfo(entityId)).toBeNull();
+  });
+
+  it("does not overwrite a good snapshot with an unparsable payload", async () => {
+    const { parser, store } = await makeNriParser();
+    store.resetAvrInfo(entityId);
+
+    parser.parse("NRI", realResponseXml);
+    const before = store.getAvrInfo(entityId);
+
+    expect(parser.parse("NRI", '<?xml version="1.0"?><response status="ok"><popup/></response>')).toBe(null);
+    expect(store.getAvrInfo(entityId)).toBe(before);
+
+    store.resetAvrInfo(entityId);
+  });
 });

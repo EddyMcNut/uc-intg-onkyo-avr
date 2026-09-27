@@ -15,7 +15,7 @@ import type { AvrStateApi } from "./types.js";
 const integrationName = "zoneAgnosticUpdateProcessor:";
 
 export class ZoneAgnosticUpdateProcessor {
-  public static readonly ZONE_AGNOSTIC_COMMANDS = new Set<string>(["IFA", "DSN", "NST", "NLT", "NLT_CONTEXT", "NLS", "NLA", "FLD", "NTM", "metadata"]);
+  public static readonly ZONE_AGNOSTIC_COMMANDS = new Set<string>(["IFA", "DSN", "NST", "NLT", "NLT_CONTEXT", "NLS", "NLA", "FLD", "NTM", "metadata", "avr-info"]);
 
   private readonly mediaStateStore = new ZoneAgnosticMediaStateStore();
   private readonly tuneInPreloader: TuneInPreloader;

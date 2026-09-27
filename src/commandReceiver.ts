@@ -85,7 +85,10 @@ export class CommandReceiver {
       metadata: async (avrUpdates, entityId) => {
         const metadata = extractMetadataArgument(avrUpdates.argument);
         await this.zoneAgnosticProcessor.handleMetadata(entityId, metadata);
-      }
+      },
+      // The NRI payload is already parsed and stored by the command parser. All that is left is to
+      // re-render, so the entity picks up presets, zones and services without another AVR query.
+      "avr-info": async () => {}
     };
   }
 

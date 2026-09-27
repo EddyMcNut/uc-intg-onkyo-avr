@@ -1177,7 +1177,7 @@ export const eiscpCommands = {
         "tp{xx}{xx}{xx}{xx}{xx}{xx}": {
           name: "tp-xx-xx-xx-xx-xx-xx",
           description:
-            "NET/USB Jacket Art/Album Art Data\nt-> Image type 0:BMP,1:JPEG\np-> Packet flag 0:Start, 1:Next, 2:End\nxxxxxxxxxxxxxx -> Jacket/Album Art Data (valiable length, 1024 ASCII HEX letters max)"
+            "NET/USB Jacket Art/Album Art Data\nt-> Image type 0:BMP,1:JPEG, 2:URL, n:No Image\np-> Packet flag 0:Start, 1:Next, 2:End, -:not used\nxxxxxxxxxxxxxx -> Jacket/Album Art Data (valiable length, 1024 ASCII HEX letters max)"
         }
       }
     },
@@ -1319,13 +1319,14 @@ export const eiscpCommands = {
       }
     },
     NRI: {
-      name: "internet-radio-info",
-      description: "Internet Radio Info",
+      name: "avr-info",
+      description: "AVR Information (for Network Control Only)",
       values: {
-        nnnnnnnn: {
-          description: "Internet Radio Info (variable-length, 64 Unicode letters [UTF-8 encoded] max)"
+        xml: {
+          name: "xml",
+          description: "XML Data <?xml...>, a full snapshot of the AVR: model, zones, inputs, network services, DAB/FM presets, capability flags and tuner ranges"
         },
-        QSTN: { name: "query", description: "gets Internet Radio Info" }
+        QSTN: { name: "query", description: "gets the AVR Information Status" }
       }
     },
     NCP: {
@@ -1386,21 +1387,22 @@ export const eiscpCommands = {
       }
     },
     NAF: {
-      name: "album-art-format",
-      description: "Album Art Format",
+      name: "net-usb-add-favorite-list",
+      description: "NET/USB Add Favorite List in List View",
       values: {
-        "0": { name: "bmp", description: "BMP" },
-        "1": { name: "jpeg", description: "JPEG" },
-        "2": { name: "url", description: "URL" },
-        n: { name: "no-image", description: "No Image" }
+        xxxx: {
+          name: "index",
+          description: "Add Favorite List in List View (from Network Control Only)\nxxxx -> index number (0000-FFFF : 1st to 65536th Item [4 HEX digits])"
+        }
       }
     },
     NRF: {
-      name: "reference-info",
-      description: "Reference Info",
+      name: "net-usb-remove-favorite-list",
+      description: "NET/USB Remove Favorite List",
       values: {
-        nnnnnnnn: {
-          description: "Reference Info (variable-length, 128 Unicode letters [UTF-8 encoded] max)"
+        "01-28": {
+          name: "no-1-40",
+          description: "Remove Item from Favorite List (In hexadecimal representation)"
         }
       }
     },
