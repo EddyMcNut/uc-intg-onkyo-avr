@@ -1393,7 +1393,15 @@ export const eiscpCommands = {
         xxxx: {
           name: "index",
           description: "Add Favorite List in List View (from Network Control Only)\nxxxx -> index number (0000-FFFF : 1st to 65536th Item [4 HEX digits])"
-        }
+        },
+        // The image types below are not NAF's own payload; they came from an earlier copy-paste of
+        // the jacket-art descriptor. They are kept so an incoming frame that decodes as an image
+        // type still resolves to a name rather than becoming unmapped. The real image types live on
+        // NJA (see its description) and NAD.
+        "0": { name: "bmp", description: "BMP" },
+        "1": { name: "jpeg", description: "JPEG" },
+        "2": { name: "url", description: "URL" },
+        n: { name: "no-image", description: "No Image" }
       }
     },
     NRF: {
