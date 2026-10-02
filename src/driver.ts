@@ -149,6 +149,9 @@ export default class OnkyoDriver {
           if (this.config.logLevel) setLogLevel(this.config.logLevel);
           this.registerAvailableEntities();
           await this.handleConnect();
+          // A saved config can change what the AVR has to be asked for (a volume scale put back on
+          // "auto", changed entity options), so collect the AVR info again for every AVR.
+          await this.triggerAvrInfoQuery();
         },
         onConfigCleared: async () => {
           ConfigManager.clear();
@@ -301,6 +304,37 @@ export default class OnkyoDriver {
       const conn = this.connectionManager.getPhysicalConnection(physicalAVR);
       await conn?.eiscp?.raw(cmd);
     };
+  }
+
+  /**
+   * Ask every configured AVR for its info document (NRI), once per AVR.
+   *
+   * This is a deliberate collection on every setup save: the AVR info carries the presets, inputs,
+   * services and the maximum display volume, all of which can be relevant to a config the user just
+   * changed. It deliberately bypasses the staleness check of the regular state query.
+   */
+  private async triggerAvrInfoQuery(): Promise<void> {
+    const queried = new Set<string>();
+    for (const avrConfig of this.config.avrs ?? []) {
+      const physicalAVR = buildPhysicalAvrId(avrConfig.model, avrConfig.ip);
+      if (queried.has(physicalAVR)) {
+        continue;
+      }
+      queried.add(physicalAVR);
+
+      const eiscp = this.connectionManager?.getPhysicalConnection(physicalAVR)?.eiscp;
+      if (!eiscp) {
+        log.debug("%s [%s] Not connected, cannot collect the AVR info", integrationName, buildEntityId(avrConfig.model, avrConfig.ip, avrConfig.zone));
+        continue;
+      }
+
+      log.info("%s [%s] Collecting the AVR info after the config was saved...", integrationName, physicalAVR);
+      try {
+        await eiscp.command({ zone: avrConfig.zone, command: "avr-info", args: "query" });
+      } catch (err) {
+        log.warn("%s [%s] Failed to collect the AVR info after the config was saved:", integrationName, physicalAVR, err);
+      }
+    }
   }
 
   /**

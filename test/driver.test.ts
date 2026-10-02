@@ -75,11 +75,12 @@ const h = vi.hoisted(() => {
       sharedCmdHandler: vi.fn()
     },
     mockResolveAutoVolumeScale: vi.fn(),
+    mockSetupHost: { current: undefined as any },
     mockLog: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() }
   };
 });
 
-const { eventHandlers, mockDriver, mockAvrStateApi, mockEntityRegistrar, mockConnectionManager, mockConnectCoordinator, mockCommandSender, mockLog, mockResolveAutoVolumeScale } = h;
+const { eventHandlers, mockDriver, mockAvrStateApi, mockEntityRegistrar, mockConnectionManager, mockConnectCoordinator, mockCommandSender, mockLog, mockResolveAutoVolumeScale, mockSetupHost } = h;
 
 vi.mock("@unfoldedcircle/integration-api", () => ({
   IntegrationAPI: function () {
@@ -151,7 +152,8 @@ vi.mock("../src/avrState.js", () => ({
 vi.mock("../src/avrStateQuery.js", () => ({ avrStateQueryService: { queryAvrState: vi.fn(), recordQueries: vi.fn() } }));
 vi.mock("../src/mediaBrowser.js", () => ({ initMediaBrowser: vi.fn() }));
 vi.mock("../src/setupHandler.js", () => ({
-  default: function () {
+  default: function (host: any) {
+    mockSetupHost.current = host;
     return { handle: vi.fn() };
   }
 }));
@@ -618,6 +620,42 @@ describe("OnkyoDriver", () => {
       driver.handleAvrInfo("TX-NR860 5.6.7.8 main");
 
       expect(configModule.ConfigManager.patchAvr).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("config save", () => {
+    const savedConfig = {
+      avrs: [
+        { model: "TX-RZ50", ip: "1.2.3.4", zone: "main", volumeScale: "auto", createSensors: false },
+        { model: "TX-RZ50", ip: "1.2.3.4", zone: "zone2", volumeScale: "auto", createSensors: false }
+      ],
+      logLevel: "info"
+    };
+
+    it("collects the AVR info again for every AVR", async () => {
+      const configModule = await import("../src/configManager.js");
+      (configModule.ConfigManager.load as any).mockReturnValue(savedConfig);
+      const driver = await createDriver();
+      await driver.handleDriverSetup({ command: "start" } as any);
+
+      const command = vi.fn();
+      mockConnectionManager.getPhysicalConnection.mockImplementation((physicalAVR: string) => ({ eiscp: { command } }));
+
+      await mockSetupHost.current.onConfigSaved();
+
+      // NRI is a device-wide document: one query per AVR, not per zone.
+      expect(command).toHaveBeenCalledTimes(1);
+      expect(command).toHaveBeenCalledWith({ zone: "main", command: "avr-info", args: "query" });
+    });
+
+    it("does not fail when an AVR is not connected", async () => {
+      const configModule = await import("../src/configManager.js");
+      (configModule.ConfigManager.load as any).mockReturnValue(savedConfig);
+      const driver = await createDriver();
+      await driver.handleDriverSetup({ command: "start" } as any);
+      mockConnectionManager.getPhysicalConnection.mockReturnValue(undefined);
+
+      await expect(mockSetupHost.current.onConfigSaved()).resolves.not.toThrow();
     });
   });
 
