@@ -3,7 +3,7 @@
 
 import * as uc from "@unfoldedcircle/integration-api";
 import { SelectAttributes, SelectCommands } from "@unfoldedcircle/integration-api";
-import { IPhysicalConnectionLookup, IAvrInstanceLookup } from "./types.js";
+import { EiscpInstance, IPhysicalConnectionLookup, IAvrInstanceLookup } from "./types.js";
 import { buildPhysicalAvrId } from "./configManager.js";
 import { ensureEiscpConnected } from "./utils.js";
 import log from "./loggers.js";
@@ -24,7 +24,12 @@ export class SelectEntityHandler {
     /** Returns the ordered list of valid option strings for the given AVR entry. */
     private readonly getOptions: (avrEntry: string) => string[],
     /** Optional: translate a UI option label to the eiscp argument sent to the AVR (default: identity). */
-    private readonly optionToArg: (option: string) => string = (o) => o
+    private readonly optionToArg: (option: string) => string = (o) => o,
+    /**
+     * Optional: send a selection to the AVR in a way the command table cannot express. Defaults to
+     * `eiscp.command()` with the configured command and `optionToArg`.
+     */
+    private readonly sendOptionToAvr?: (eiscp: EiscpInstance, avrEntry: string, zone: string, option: string) => Promise<void>
   ) {
     // Derive "listeningModeHandler:" / "inputSelectorHandler:" from the suffix.
     this.integrationName = entitySuffix.slice(1).replace(/_(\w)/g, (_, c: string) => c.toUpperCase()) + "Handler:";
@@ -91,11 +96,15 @@ export class SelectEntityHandler {
       }
 
       log.info("%s [%s] Setting %s to: %s", this.integrationName, entity.id, this.logLabel.toLowerCase(), newOption);
-      await physicalConnection.eiscp.command({
-        zone: instance.config.zone,
-        command: this.eiscpCommand,
-        args: this.optionToArg(newOption)
-      });
+      if (this.sendOptionToAvr) {
+        await this.sendOptionToAvr(physicalConnection.eiscp, avrEntry, instance.config.zone, newOption);
+      } else {
+        await physicalConnection.eiscp.command({
+          zone: instance.config.zone,
+          command: this.eiscpCommand,
+          args: this.optionToArg(newOption)
+        });
+      }
 
       this.driver.updateEntityAttributes(entity.id, {
         [SelectAttributes.CurrentOption]: newOption

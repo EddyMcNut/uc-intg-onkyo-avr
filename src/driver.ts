@@ -32,10 +32,12 @@ import { DIRAC_OPTION_LABELS, diracOptionToServiceKey } from "./diracSelect.js";
 import { remoteEntityCommandHandler } from "./remoteEntityCommandHandler.js";
 import SubscriptionHandler from "./subscriptionHandler.js";
 import ConnectCoordinator from "./connectCoordinator.js";
-import { AvrInstance, type AvrStateApi } from "./types.js";
+import { AvrInstance, EiscpInstance, type AvrStateApi } from "./types.js";
 import { resolveAutoVolumeScale } from "./volumeScaleResolver.js";
 import { resolveInputSourceList } from "./inputSourceResolver.js";
 import { setAvrInputs, clearAvrInputs, hasAvrInputs } from "./inputSourceStore.js";
+import { findTunerPresetByName, getTunerPresetNames, setTunerPresets, tunerPresetCommandValue } from "./tunerPresetStore.js";
+import { listNamedPresets } from "./avrInfoStore.js";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -69,6 +71,7 @@ export default class OnkyoDriver {
   private entityRegistrar: EntityRegistrar;
   private listeningModeHandler: SelectEntityHandler;
   private inputSelectorHandler: SelectEntityHandler;
+  private tunerPresetsHandler: SelectEntityHandler;
   private diracHandler: SelectEntityHandler;
   private remoteEntityCommandHandler: remoteEntityCommandHandler;
   private subscriptionHandler: SubscriptionHandler;
@@ -118,6 +121,17 @@ export default class OnkyoDriver {
     });
     this.inputSelectorHandler = new SelectEntityHandler(this.driver, this.connectionManager, this.avrInstances, "_input_selector", "input-selector", "Input Selector", (avrEntry) =>
       this.entityRegistrar.getInputSelectorOptions(avrEntry)
+    );
+    this.tunerPresetsHandler = new SelectEntityHandler(
+      this.driver,
+      this.connectionManager,
+      this.avrInstances,
+      "_tuner_presets",
+      "preset",
+      "Tuner Presets",
+      (avrEntry) => this.entityRegistrar.getTunerPresetOptions(avrEntry),
+      undefined,
+      this.sendTunerPreset.bind(this)
     );
     this.diracHandler = new SelectEntityHandler(this.driver, this.connectionManager, this.avrInstances, "_dirac", "dirac", "Dirac", () => [...DIRAC_OPTION_LABELS], diracOptionToServiceKey);
     this.remoteEntityCommandHandler = new remoteEntityCommandHandler(this.driver, this.connectionManager, this.avrInstances, this.avrStateApi);
@@ -232,6 +246,22 @@ export default class OnkyoDriver {
         disabledMessage: `${integrationName} [${avrEntry}] Input Selector select entity disabled by user preference (none)`
       },
 
+      // ── Tuner Presets select — conditional on createTunerPresets flag ──────
+      {
+        enabled: (cfg) => cfg.createTunerPresets !== false,
+        create: () => {
+          const handler = this.tunerPresetsHandler?.handle.bind(this.tunerPresetsHandler) ?? (async () => uc.StatusCodes.Ok);
+          return this.entityRegistrar.createTunerPresetsSelectEntity(avrEntry, handler);
+        },
+        afterRegister: () => {
+          // The station names arrive with the first NRI reply, so push whatever was collected so far.
+          if (typeof this.driver.updateEntityAttributes === "function") {
+            this.driver.updateEntityAttributes(`${avrEntry}_tuner_presets`, { [SelectAttributes.Options]: this.entityRegistrar.getTunerPresetOptions(avrEntry) });
+          }
+        },
+        disabledMessage: `${integrationName} [${avrEntry}] Tuner Presets select entity disabled by user preference`
+      },
+
       // ── Dirac select — conditional on createDiracSelectEntity flag ─────────
       {
         enabled: (cfg) => cfg.createDiracSelectEntity !== false,
@@ -304,6 +334,27 @@ export default class OnkyoDriver {
     for (const entity of entities) {
       this.registerEntity(entity, avrEntry);
     }
+  }
+
+  /**
+   * Recall a tuner preset slot: the station name from the select entity is mapped back to the slot
+   * number the AVR reported it in, and sent as `PRS<slot in hex>`.
+   *
+   * The raw command is used on purpose: `PRS` is documented as "Preset No. 1-40 in hexadecimal", so
+   * the value has to be exactly that hex slot. Presets are a property of the AVR, not of a zone, so
+   * the command is sent for the main zone.
+   */
+  private async sendTunerPreset(eiscp: EiscpInstance, avrEntry: string, _zone: string, option: string): Promise<void> {
+    const physicalAVR = physicalAvrIdFromEntityId(avrEntry);
+    const preset = physicalAVR ? findTunerPresetByName(physicalAVR, option) : undefined;
+    if (!preset) {
+      log.warn("%s Tuner preset '%s' is not one of the stations the AVR reported, nothing sent", integrationName, option);
+      throw new Error(`Unknown tuner preset: ${option}`);
+    }
+
+    const value = tunerPresetCommandValue(preset.slot);
+    log.debug("%s [%s] Selecting tuner preset '%s': slot %d (band %s) -> PRS%s", integrationName, physicalAVR, preset.name, preset.slot, preset.band, value);
+    await eiscp.raw(`PRS${value}`);
   }
 
   private registerEntity(entity: uc.Entity, avrEntry: string): void {
@@ -383,9 +434,12 @@ export default class OnkyoDriver {
     }
 
     // The input list belongs to the AVR, not to a single zone: it is stored once, and every zone of
-    // this AVR has to rebuild the entities that list the inputs.
+    // this AVR has to rebuild the entities that list the inputs. The same holds for the tuner
+    // presets, which are also AVR-wide.
     let inputsChanged = false;
     let inputsDecided = false;
+    let presetsChanged = false;
+    let presetsCollected = false;
 
     const resolvedZones: AvrConfig[] = [];
     let configChanged = false;
@@ -431,7 +485,16 @@ export default class OnkyoDriver {
         }
       }
 
-      if (changed || inputsChanged) {
+      if (avrConfig.createTunerPresets !== false && !presetsCollected) {
+        presetsCollected = true;
+        presetsChanged = setTunerPresets(physicalAVR, listNamedPresets(entityId));
+        if (presetsChanged) {
+          const names = getTunerPresetNames(physicalAVR);
+          log.debug("%s [%s] Tuner presets collected from the AVR: %d station(s): %s", integrationName, zoneEntry, names.length, names.join(", "));
+        }
+      }
+
+      if (changed || inputsChanged || presetsChanged) {
         resolvedZones.push(avrConfig);
       }
     }
@@ -446,8 +509,21 @@ export default class OnkyoDriver {
       const updatedConfig = this.config.avrs?.find((a) => a.ip === resolvedZone.ip && a.zone === resolvedZone.zone) ?? resolvedZone;
       this.registerMediaPlayer(updatedConfig);
       this.registerInputSelector(updatedConfig);
+      if (presetsChanged) {
+        // Only the option list changed, so the existing select entity is updated instead of replaced:
+        // replacing it would drop the station the user has selected.
+        this.updateTunerPresetsOptions(updatedConfig);
+      }
       this.refreshZoneRuntimeConfig(updatedConfig);
     }
+  }
+
+  /** Push the stations the AVR reported into the existing tuner presets select entity. */
+  private updateTunerPresetsOptions(avrConfig: AvrConfig): void {
+    const avrEntry = buildEntityId(avrConfig.model, avrConfig.ip, avrConfig.zone);
+    const options = this.entityRegistrar.getTunerPresetOptions(avrEntry);
+    log.debug("%s [%s] Updating Tuner Presets select with %d station(s)", integrationName, avrEntry, options.length);
+    this.driver.updateEntityAttributes(`${avrEntry}_tuner_presets`, { [SelectAttributes.Options]: options });
   }
 
   /** Push a refreshed per-zone runtime config into the live command handlers after a config change. */

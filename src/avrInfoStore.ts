@@ -331,6 +331,20 @@ export function listFmPresets(entityId: string): AvrPreset[] {
   return info.presets.filter((preset) => preset.band === PRESET_BAND_FM).sort((a, b) => a.slot - b.slot);
 }
 
+/**
+ * Every preset slot the AVR has a station name for, on any band, ordered by AVR slot number.
+ *
+ * Empty slots (band=0, no name) are dropped: there is nothing to select there. The slot number is
+ * kept because that is what `PRS` takes to recall a station.
+ */
+export function listNamedPresets(entityId: string): AvrPreset[] {
+  const info = getAvrInfo(entityId);
+  if (!info) {
+    return [];
+  }
+  return info.presets.filter((preset) => preset.name !== "").sort((a, b) => a.slot - b.slot);
+}
+
 /** Inputs the AVR actually has, e.g. DAB, FM, NET, Bluetooth. */
 export function listSelectors(entityId: string): AvrSelector[] {
   return getAvrInfo(entityId)?.selectors ?? [];

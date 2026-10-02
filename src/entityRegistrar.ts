@@ -7,6 +7,7 @@ import { ALL_SIMPLE_COMMANDS } from "./simpleCommands.js";
 import { getCompatibleListeningModes } from "./listeningModeFilters.js";
 import { ConfigManager, buildEntityId, buildPhysicalAvrId, INPUT_SOURCE_LIST_AUTO } from "./configManager.js";
 import { getAvrInputs } from "./inputSourceStore.js";
+import { getTunerPresetNames } from "./tunerPresetStore.js";
 import {
   browseMedia,
   isTidalMainMenuRequest,
@@ -325,6 +326,42 @@ export default class EntityRegistrar {
           state: SelectStates.On,
           current_option: "",
           options: options
+        }
+      }
+    );
+    if (cmdHandler) selectEntity.setCmdHandler(cmdHandler);
+    return selectEntity;
+  }
+
+  // Station names of the tuner presets the AVR reported, in AVR slot order.
+  //
+  // Empty until the first NRI reply arrives, which is also what an AVR without a tuner preset list
+  // leaves the select with: an empty option list rather than a made-up set of stations.
+  getTunerPresetOptions(avrEntry: string): string[] {
+    try {
+      const cfg = ConfigManager.get();
+      const match = cfg?.avrs?.find((a) => buildEntityId(a.model, a.ip, a.zone) === avrEntry);
+      if (match) {
+        return getTunerPresetNames(buildPhysicalAvrId(match.model, match.ip));
+      }
+    } catch {
+      // ignore and show no options
+    }
+    return [];
+  }
+
+  // Tuner presets select entity — optional (createTunerPresets config). Lists the station names the
+  // AVR reported; selecting one recalls that preset slot on the AVR.
+  createTunerPresetsSelectEntity(avrEntry: string, cmdHandler?: CmdHandlerFn): Select {
+    const displayBaseName = this.getDisplayBaseName(avrEntry);
+    const selectEntity = new Select(
+      `${avrEntry}${SELECT_SUFFIXES.tunerPresets}`,
+      { en: `${displayBaseName} Tuner Presets` },
+      {
+        attributes: {
+          state: SelectStates.On,
+          current_option: "",
+          options: this.getTunerPresetOptions(avrEntry)
         }
       }
     );

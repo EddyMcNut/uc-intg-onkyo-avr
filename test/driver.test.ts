@@ -57,10 +57,12 @@ const h = vi.hoisted(() => {
       createSensorEntities: vi.fn(() => [{ id: "sensor_1" }]),
       createListeningModeSelectEntity: vi.fn(() => ({ id: "lm_entity" })),
       createInputSelectorSelectEntity: vi.fn(() => ({ id: "is_entity" })),
+      createTunerPresetsSelectEntity: vi.fn(() => ({ id: "tuner_presets_entity" })),
       createDiracSelectEntity: vi.fn(() => ({ id: "dirac_entity" })),
       createRemoteEntity: vi.fn(() => ({ id: "remote_entity" })),
       getListeningModeOptions: vi.fn(() => ["option1"]),
-      getInputSelectorOptions: vi.fn(() => ["input1"])
+      getInputSelectorOptions: vi.fn(() => ["input1"]),
+      getTunerPresetOptions: vi.fn(() => ["R10 80s", "STRKSTAD"])
     },
     mockConnectionManager: {
       getPhysicalConnection: vi.fn(() => undefined),
@@ -754,6 +756,129 @@ describe("OnkyoDriver", () => {
       expect(configModule.ConfigManager.patchAvr).not.toHaveBeenCalled();
       expect(mockClearAvrInputs).not.toHaveBeenCalled();
       expect(mockEntityRegistrar.createInputSelectorSelectEntity).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("handleAvrInfo with tuner presets", () => {
+    const presetsConfig = {
+      avrs: [
+        { model: "TX-RZ50", ip: "1.2.3.4", zone: "main", volumeScale: 100, createSensors: false },
+        { model: "TX-RZ50", ip: "1.2.3.4", zone: "zone2", volumeScale: 100, createSensors: false }
+      ],
+      logLevel: "info"
+    };
+
+    // A NRI payload with two DAB stations and one FM station, like the AVR reports them.
+    const presetPayload = [
+      `<?xml version="1.0" encoding="UTF-8" ?><response><device><model>TX-RZ50</model>`,
+      `<zonelist count="2"><zone id="1" value="1" name="Main" volmax="100" /><zone id="2" value="2" name="Zone2" volmax="100" /></zonelist>`,
+      `<presetlist count="4">`,
+      `<preset id="01" band="2" freq="0" name="R10 80s   " />`,
+      `<preset id="0c" band="2" freq="0" name="NPO FunX  " />`,
+      `<preset id="0d" band="0" freq="0" name="" />`,
+      `<preset id="1c" band="1" freq="107.20" name="STRKSTAD " /></presetlist>`,
+      `</device></response>`
+    ].join("");
+
+    async function createDriverWithPresets(saved = presetsConfig) {
+      const configModule = await import("../src/configManager.js");
+      (configModule.ConfigManager.load as any).mockReturnValue(saved);
+      const avrInfoStore = (await import("../src/avrInfoStore.js")) as any;
+      avrInfoStore.setAvrInfo("TX-RZ50_1.2.3.4_main", avrInfoStore.parseAvrInfo(presetPayload));
+      return createDriver();
+    }
+
+    beforeEach(() => {
+      mockResolveAutoVolumeScale.mockReturnValue(undefined);
+      mockResolveInputSourceList.mockReturnValue(undefined);
+      mockDriver.updateEntityAttributes.mockClear();
+    });
+
+    it("collects the stations the AVR reported and updates the select of every zone", async () => {
+      const driver = await createDriverWithPresets();
+
+      driver.handleAvrInfo("TX-RZ50_1.2.3.4_main");
+
+      // Only the named slots are offered, in slot order, on every zone of the AVR.
+      for (const zone of ["main", "zone2"]) {
+        expect(mockDriver.updateEntityAttributes).toHaveBeenCalledWith(`TX-RZ50_1.2.3.4_${zone}_tuner_presets`, {
+          options: ["R10 80s", "NPO FunX", "STRKSTAD"]
+        });
+      }
+      expect(mockLog.debug).toHaveBeenCalledWith(
+        expect.stringContaining("Tuner presets collected from the AVR: 3 station(s)"),
+        "driver:",
+        "TX-RZ50_1.2.3.4_main"
+      );
+      expect(mockLog.debug).toHaveBeenCalledWith(
+        expect.stringContaining("Updating Tuner Presets select with 3 station(s)"),
+        "driver:",
+        "TX-RZ50_1.2.3.4_main"
+      );
+    });
+
+    it("does not touch the select when the stations did not change", async () => {
+      const driver = await createDriverWithPresets();
+      driver.handleAvrInfo("TX-RZ50_1.2.3.4_main");
+      mockDriver.updateEntityAttributes.mockClear();
+
+      // The AVR repeats its whole state on every NRI reply, so this arrives regularly.
+      driver.handleAvrInfo("TX-RZ50_1.2.3.4_main");
+
+      expect(mockDriver.updateEntityAttributes).not.toHaveBeenCalledWith(expect.stringContaining("_tuner_presets"), expect.anything());
+    });
+
+    it("clears the stations when the AVR reports none", async () => {
+      const avrInfoStore = (await import("../src/avrInfoStore.js")) as any;
+      const driver = await createDriverWithPresets();
+      driver.handleAvrInfo("TX-RZ50_1.2.3.4_main");
+
+      // A payload without a preset list must not leave the old stations standing.
+      avrInfoStore.setAvrInfo(
+        "TX-RZ50_1.2.3.4_main",
+        avrInfoStore.parseAvrInfo(`<?xml version="1.0" encoding="UTF-8" ?><response><device><model>TX-RZ50</model><zonelist count="1"><zone id="1" value="1" name="Main" /></zonelist></device></response>`)
+      );
+      mockDriver.updateEntityAttributes.mockClear();
+
+      driver.handleAvrInfo("TX-RZ50_1.2.3.4_main");
+
+      expect(mockDriver.updateEntityAttributes).toHaveBeenCalledWith("TX-RZ50_1.2.3.4_main_tuner_presets", { options: [] });
+    });
+
+    it("does not collect anything when the user turned the entity off", async () => {
+      const driver = await createDriverWithPresets({
+        ...presetsConfig,
+        avrs: presetsConfig.avrs.map((avr) => ({ ...avr, createTunerPresets: false }))
+      });
+
+      driver.handleAvrInfo("TX-RZ50_1.2.3.4_main");
+
+      expect(mockDriver.updateEntityAttributes).not.toHaveBeenCalledWith(expect.stringContaining("_tuner_presets"), expect.anything());
+      // The rest of the reply is still processed.
+      expect(mockResolveInputSourceList).toHaveBeenCalled();
+    });
+
+    it("sends PRS with the slot of the selected station", async () => {
+      const driver = await createDriverWithPresets();
+      const raw = vi.fn().mockResolvedValue(undefined);
+
+      await (driver as any).sendTunerPreset({ raw }, "TX-RZ50_1.2.3.4_main", "main", "NPO FunX");
+
+      expect(raw).toHaveBeenCalledWith("PRS0C");
+      expect(mockLog.debug).toHaveBeenCalledWith(
+        expect.stringContaining("Selecting tuner preset 'NPO FunX': slot 12 (band 2) -> PRS0C"),
+        "driver:",
+        "TX-RZ50_1.2.3.4"
+      );
+    });
+
+    it("does not send anything for a station the AVR never reported", async () => {
+      const driver = await createDriverWithPresets();
+      const raw = vi.fn().mockResolvedValue(undefined);
+
+      await expect((driver as any).sendTunerPreset({ raw }, "TX-RZ50_1.2.3.4_main", "main", "Made up station")).rejects.toThrow();
+      expect(raw).not.toHaveBeenCalled();
+      expect(mockLog.warn).toHaveBeenCalledWith(expect.stringContaining("is not one of the stations the AVR reported"), expect.anything());
     });
   });
 

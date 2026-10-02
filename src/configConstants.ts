@@ -153,6 +153,7 @@ export const AVR_DEFAULTS = {
   adjustVolumeDispl: true,
   entityNameStyle: "short",
   createSensors: true,
+  createTunerPresets: true,
   createRemoteEntity: true,
   createDiracSelectEntity: true,
   netMenuDelay: 500,
@@ -179,6 +180,7 @@ export interface AvrConfig {
   adjustVolumeDispl?: boolean; // true = use 0.5 dB steps (×2 / ÷2), false = direct EISCP value
   entityNameStyle?: EntityNameStyle; // long = include host/ip in visible names, short = omit host/ip
   createSensors?: boolean; // true = create sensor entities for this AVR
+  createTunerPresets?: boolean; // true (default) = create the select entity listing the AVR's tuner presets
   createRemoteEntity?: boolean; // true = create a remote entity for this AVR
   createDiracSelectEntity?: boolean; // true (default) = create the Dirac select entity (fixed options)
   netMenuDelay?: number; // delay in ms for NET menu to load (default 2500)
@@ -201,6 +203,7 @@ export interface OnkyoConfig {
   adjustVolumeDispl?: boolean; // true = use 0.5 dB steps (×2 / ÷2), false = direct EISCP value
   entityNameStyle?: EntityNameStyle;
   createSensors?: boolean; // true = create sensor entities
+  createTunerPresets?: boolean; // true = create the tuner presets select entity
   createRemoteEntity?: boolean; // true = create a remote entity
   // Legacy fields for backward compatibility
   model?: string;
@@ -223,6 +226,7 @@ export interface NormalizedAvrConfig {
   adjustVolumeDispl: boolean;
   entityNameStyle: EntityNameStyle;
   createSensors: boolean;
+  createTunerPresets: boolean;
   createRemoteEntity: boolean;
   createDiracSelectEntity: boolean;
   netMenuDelay: number;
@@ -253,6 +257,8 @@ export function normalizeAvrConfig(raw: AvrConfig): NormalizedAvrConfig {
   const entityNameStyle: EntityNameStyle = String(raw.entityNameStyle ?? AVR_DEFAULTS.entityNameStyle).toLowerCase() === "short" ? "short" : "long";
 
   const createSensors = parseBoolean(raw.createSensors, AVR_DEFAULTS.createSensors);
+
+  const createTunerPresets = parseBoolean(raw.createTunerPresets, AVR_DEFAULTS.createTunerPresets);
 
   const createRemoteEntity = parseBoolean(raw.createRemoteEntity, AVR_DEFAULTS.createRemoteEntity);
 
@@ -289,6 +295,7 @@ export function normalizeAvrConfig(raw: AvrConfig): NormalizedAvrConfig {
     adjustVolumeDispl,
     entityNameStyle,
     createSensors,
+    createTunerPresets,
     createRemoteEntity,
     createDiracSelectEntity,
     netMenuDelay,

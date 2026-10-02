@@ -321,6 +321,11 @@ export class ConfigManager {
       errors.push("createSensors must be boolean");
     }
 
+    // createTunerPresets
+    if (avr.createTunerPresets !== undefined && typeof avr.createTunerPresets !== "boolean" && !(typeof avr.createTunerPresets === "string")) {
+      errors.push("createTunerPresets must be boolean");
+    }
+
     // createRemoteEntity
     if (avr.createRemoteEntity !== undefined && typeof avr.createRemoteEntity !== "boolean" && !(typeof avr.createRemoteEntity === "string")) {
       errors.push("createRemoteEntity must be boolean");
@@ -399,6 +404,7 @@ export class ConfigManager {
       adjustVolumeDispl: parseBoolean(avr.adjustVolumeDispl, AVR_DEFAULTS.adjustVolumeDispl),
       entityNameStyle: (String(avr.entityNameStyle ?? AVR_DEFAULTS.entityNameStyle).toLowerCase() === "short" ? "short" : "long") as EntityNameStyle,
       createSensors: parseBoolean(avr.createSensors, AVR_DEFAULTS.createSensors),
+      createTunerPresets: parseBoolean(avr.createTunerPresets, AVR_DEFAULTS.createTunerPresets),
       createRemoteEntity: parseBoolean(avr.createRemoteEntity, AVR_DEFAULTS.createRemoteEntity),
       createDiracSelectEntity: parseBoolean(avr.createDiracSelectEntity, AVR_DEFAULTS.createDiracSelectEntity),
       netMenuDelay: typeof avr.netMenuDelay === "string" ? parseInt(avr.netMenuDelay, 10) : avr.netMenuDelay,

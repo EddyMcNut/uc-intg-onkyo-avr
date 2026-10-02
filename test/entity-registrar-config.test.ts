@@ -149,3 +149,42 @@ it("EntityRegistrar prefers the reported inputs over a user-configured input lis
     fs.rmSync(tmp, { recursive: true, force: true });
   }
 });
+
+it("EntityRegistrar lists the tuner preset stations the AVR reported, and none before that", async () => {
+  const tmp = mkTmpDir();
+  try {
+    const module = (await import("../src/entityRegistrar.js")) as any;
+    const cfgModule = (await import("../src/configManager.js")) as any;
+    const tunerPresetStore = (await import("../src/tunerPresetStore.js")) as any;
+
+    const { ConfigManager, setConfigDir } = cfgModule;
+    if (typeof setConfigDir === "function") setConfigDir(tmp);
+
+    const avrStateModule = (await import("../src/avrState.js")) as any;
+    const EntityRegistrar = module.default as any;
+    const { avrStateManager } = avrStateModule;
+    const registrar = new EntityRegistrar(avrStateManager);
+
+    ConfigManager.save({ avrs: [{ model: "M", ip: "1.2.3.4", port: 60128, zone: "main" }] });
+    const avrEntry = "M 1.2.3.4 main";
+
+    // Nothing was reported yet: the entity exists but has no stations to show.
+    expect(registrar.getTunerPresetOptions(avrEntry)).toEqual([]);
+    const select = registrar.createTunerPresetsSelectEntity(avrEntry, async () => {});
+    expect(select.id).toBe(`${avrEntry}_tuner_presets`);
+    expect((select as any).attributes.options).toEqual([]);
+
+    tunerPresetStore.setTunerPresets("M 1.2.3.4", [
+      { slot: 12, name: "NPO FunX", band: "2", freq: "0" },
+      { slot: 28, name: "STRKSTAD", band: "1", freq: "107.20" }
+    ]);
+    expect(registrar.getTunerPresetOptions(avrEntry)).toEqual(["NPO FunX", "STRKSTAD"]);
+
+    // The stations are also part of the entity definition, not only of the attribute update.
+    expect((registrar.createTunerPresetsSelectEntity(avrEntry, async () => {}) as any).attributes.options).toEqual(["NPO FunX", "STRKSTAD"]);
+
+    tunerPresetStore.clearAllTunerPresets();
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});

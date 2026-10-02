@@ -147,6 +147,22 @@ export class SetupFormBuilder {
         }
       },
       {
+        id: "createTunerPresets",
+        label: { en: "Create Tuner Presets select entity?" },
+        field: {
+          dropdown: {
+            value: String(values.createTunerPresetsValue),
+            items: [
+              { id: "true", label: { en: "Yes (default)" } },
+              { id: "false", label: { en: "No" } }
+            ]
+          }
+        },
+        description: {
+          en: "Creates a select entity listing the DAB/FM stations your AVR reports. Selecting a station recalls that preset. Needs an AVR that reports its presets; the entity stays empty otherwise."
+        }
+      },
+      {
         id: "createDiracSelectEntity",
         label: { en: "Create Dirac select entity?" },
         field: {

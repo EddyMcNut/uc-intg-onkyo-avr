@@ -39,6 +39,7 @@ export class ConfigPersistenceManager {
       volumeDisplay: parsedConfig.volumeDisplayValue,
       entityNameStyle: parsedConfig.entityNameStyleValue,
       createRemoteEntity: parsedConfig.createRemoteEntityValue,
+      createTunerPresets: parsedConfig.createTunerPresetsValue,
       createDiracSelectEntity: parsedConfig.createDiracSelectEntityValue,
       tuneinMenuStyle: parsedConfig.tuneinMenuStyleValue
     };
@@ -74,6 +75,7 @@ export class ConfigPersistenceManager {
       adjustVolumeDispl: parsedConfig.adjustVolumeDisplValue,
       entityNameStyle: parsedConfig.entityNameStyleValue,
       createSensors: parsedConfig.createSensorsValue,
+      createTunerPresets: parsedConfig.createTunerPresetsValue,
       createRemoteEntity: parsedConfig.createRemoteEntityValue,
       createDiracSelectEntity: parsedConfig.createDiracSelectEntityValue,
       netMenuDelay: parsedConfig.netMenuDelayValue,

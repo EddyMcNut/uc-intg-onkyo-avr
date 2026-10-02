@@ -2,6 +2,7 @@ import * as uc from "@unfoldedcircle/integration-api";
 import { SelectAttributes } from "@unfoldedcircle/integration-api";
 import { OnkyoConfig, AvrConfig, buildEntityId, physicalAvrIdFromEntityId, resolveVolumeScale, INPUT_SOURCE_LIST_AUTO } from "./configManager.js";
 import { findAvrInputId, hasAvrInputs } from "./inputSourceStore.js";
+import { findTunerPresetNameBySlot } from "./tunerPresetStore.js";
 import { EiscpDriver } from "./eiscp.js";
 import { getCompatibleListeningModes } from "./listeningModeFilters.js";
 import { classifyAudioFormat, formatAudioTypeName } from "./audioFormatClassifier.js";
@@ -240,6 +241,21 @@ export class CommandReceiver {
   private async handlePreset(avrUpdates: AvrUpdateEvent, entityId: string): Promise<void> {
     this.avrPreset = avrUpdates.argument.toString();
     log.info("%s [%s] preset set to: %s", integrationName, entityId, this.avrPreset);
+
+    // A numeric argument is a preset slot ("PRS0C" -> 12), which is what the tuner presets select
+    // entity lists stations for. "up"/"down" and the wrapped TuneIn/streaming presets are not.
+    if (typeof avrUpdates.argument !== "number") {
+      return;
+    }
+    const physicalAVR = physicalAvrIdFromEntityId(entityId);
+    const station = physicalAVR ? findTunerPresetNameBySlot(physicalAVR, avrUpdates.argument) : undefined;
+    if (!station) {
+      return;
+    }
+    log.debug("%s [%s] Tuner preset slot %d is '%s'", integrationName, entityId, avrUpdates.argument, station);
+    this.driver.updateEntityAttributes(`${entityId}_tuner_presets`, {
+      [SelectAttributes.CurrentOption]: station
+    });
   }
 
   private async handleInputSelector(avrUpdates: AvrUpdateEvent, entityId: string, eventZone: string): Promise<void> {

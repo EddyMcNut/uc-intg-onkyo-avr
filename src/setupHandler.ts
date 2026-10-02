@@ -156,6 +156,7 @@ export default class SetupHandler {
       input.adjustVolumeDispl ||
       input.zoneCount ||
       input.createSensors ||
+      input.createTunerPresets ||
       input.createRemoteEntity ||
       input.netMenuDelay ||
       input.tuneinPresetPosition ||
@@ -196,6 +197,7 @@ export default class SetupHandler {
         entityNameStyle: currentAvr?.entityNameStyle,
         zoneCount: currentAvr && cfg.avrs ? cfg.avrs.filter((a) => a.model === currentAvr.model && a.ip === currentAvr.ip).length : 1,
         createSensors: currentAvr?.createSensors,
+        createTunerPresets: currentAvr?.createTunerPresets,
         createRemoteEntity: currentAvr?.createRemoteEntity,
         createDiracSelectEntity: currentAvr?.createDiracSelectEntity,
         netMenuDelay: currentAvr?.netMenuDelay,

@@ -20,6 +20,7 @@ export const SENSOR_SUFFIXES = [
 export const SELECT_SUFFIXES = {
   listeningMode: "_listening_mode",
   inputSelector: "_input_selector",
+  tunerPresets: "_tuner_presets",
   dirac: "_dirac"
 } as const;
 
