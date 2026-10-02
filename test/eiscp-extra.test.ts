@@ -118,6 +118,32 @@ describe("sendIscp routing through commandToIscp", () => {
     expect(rawSpy).toHaveBeenCalledWith("PWR01");
   });
 
+  it("sends an AVR-reported input name as the input id the AVR gave", async () => {
+    const inputSourceStore = (await import("../src/inputSourceStore.js")) as any;
+    inputSourceStore.setAvrInputs("TX-RZ50 1.2.3.4", [
+      { id: "10", name: "BD/DVD" },
+      { id: "01", name: "CBL/SAT" }
+    ]);
+
+    const driver = await makeDriver();
+    const rawSpy = vi.spyOn(driver, "raw").mockResolvedValue(undefined);
+    await driver.command({ zone: "main", command: "input-selector", args: "BD/DVD" });
+    expect(rawSpy).toHaveBeenCalledWith("SLI10");
+
+    // The zone prefix still applies, and the lookup is not case sensitive.
+    await driver.command({ zone: "zone2", command: "input-selector", args: "cbl/sat" });
+    expect(rawSpy).toHaveBeenCalledWith("SLZ01");
+
+    inputSourceStore.clearAllAvrInputs();
+  });
+
+  it("still warns for an input that the AVR did not report and that is not in the command table", async () => {
+    const driver = await makeDriver();
+    const rawSpy = vi.spyOn(driver, "raw").mockResolvedValue(undefined);
+    await driver.command({ zone: "main", command: "input-selector", args: "not-an-input" });
+    expect(rawSpy).toHaveBeenCalledWith("SLInot-an-input");
+  });
+
   it("ISCP with NSS in value triggers handleNSSsend", async () => {
     const driver = await makeDriver();
     const rawSpy = vi.spyOn(driver, "raw").mockResolvedValue(undefined);

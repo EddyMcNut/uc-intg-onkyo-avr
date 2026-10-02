@@ -69,6 +69,7 @@ export class ConfigPersistenceManager {
       listeningModeOptions: parsedConfig.listeningModeOptions,
       inputSelectorOptions: parsedConfig.inputSelectorOptions,
       volumeScale: parsedConfig.volumeScaleValue,
+      inputSourceList: parsedConfig.inputSourceListValue,
       volumeDisplay: parsedConfig.volumeDisplayValue,
       adjustVolumeDispl: parsedConfig.adjustVolumeDisplValue,
       entityNameStyle: parsedConfig.entityNameStyleValue,

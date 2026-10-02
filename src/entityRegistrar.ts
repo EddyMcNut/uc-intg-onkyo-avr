@@ -5,7 +5,8 @@ import { Select, SelectStates } from "@unfoldedcircle/integration-api";
 import { eiscpMappings } from "./eiscp-mappings.js";
 import { ALL_SIMPLE_COMMANDS } from "./simpleCommands.js";
 import { getCompatibleListeningModes } from "./listeningModeFilters.js";
-import { ConfigManager, buildEntityId } from "./configManager.js";
+import { ConfigManager, buildEntityId, buildPhysicalAvrId, INPUT_SOURCE_LIST_AUTO } from "./configManager.js";
+import { getAvrInputs } from "./inputSourceStore.js";
 import {
   browseMedia,
   isTidalMainMenuRequest,
@@ -278,13 +279,24 @@ export default class EntityRegistrar {
     return selectEntity;
   }
 
-  // Return input selector options for the given AVR entry. If a user-configured `inputSelectorOptions` list is present it is returned exactly; if `null` (disabled) returns empty; otherwise all SLI keys (excluding navigation/query keys) are returned sorted.
+  // Return input selector options for the given AVR entry.
+  //
+  // In "auto" mode the inputs the AVR reported are authoritative, in the AVR's own spelling. Until
+  // they are collected (or when they never are, because the setting was stored as "manual") the
+  // hardcoded SLI keys are used: a user-configured `inputSelectorOptions` list is returned exactly,
+  // `null` (disabled) returns empty.
   getInputSelectorOptions(avrEntry?: string): string[] {
     if (avrEntry) {
       try {
         const cfg = ConfigManager.get();
         if (cfg && Array.isArray(cfg.avrs)) {
           const match = cfg.avrs.find((a) => buildEntityId(a.model, a.ip, a.zone) === avrEntry);
+          if (match?.inputSourceList === INPUT_SOURCE_LIST_AUTO) {
+            const collected = getAvrInputs(buildPhysicalAvrId(match.model, match.ip));
+            if (collected.length > 0) {
+              return collected.map((input) => input.name);
+            }
+          }
           if (match && Object.prototype.hasOwnProperty.call(match, "inputSelectorOptions")) {
             const opts = match.inputSelectorOptions;
             if (opts === null) return [];

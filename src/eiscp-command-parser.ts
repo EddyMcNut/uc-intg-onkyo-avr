@@ -4,6 +4,8 @@ import { diracResponseToCommandValue } from "./diracSelect.js";
 import { NO_TITLE } from "./constants.js";
 import { detectServiceFromText, detectServiceFromAsciiPrefix, getCanonicalServiceName } from "./serviceDetector.js";
 import { parseAvrInfo, setAvrInfo, listDabPresets, listFmPresets, PRESET_BAND_EMPTY } from "./avrInfoStore.js";
+import { findAvrInputName } from "./inputSourceStore.js";
+import { physicalAvrIdFromEntityId } from "./configManager.js";
 import log, { getLogLevel } from "./loggers.js";
 import type { DeezerBrowseState } from "./deezerBrowserStore.js";
 import type { MusicServerBrowseState } from "./musicServerBrowserStore.js";
@@ -154,7 +156,13 @@ export class IscpCommandParser {
     result.command = cmdObj.name;
     const valuesObj = cmdObj.values;
 
-    if (valuesObj[lookupValue]?.name !== undefined) {
+    const avrInputName = lookupCommand === "SLI" ? findAvrInputName(physicalAvrIdFromEntityId(this.getEntityId(result.zone)) ?? "", lookupValue) : undefined;
+
+    if (avrInputName) {
+      // An input the AVR reported itself: use the name the AVR shows for it, so the integration
+      // reports back exactly what the AVR says instead of a hardcoded alias.
+      result.argument = avrInputName;
+    } else if (valuesObj[lookupValue]?.name !== undefined) {
       result.argument = valuesObj[lookupValue].name;
     } else if (lookupValue === "N/A") {
       // Skip N/A values (zone is off or unavailable)

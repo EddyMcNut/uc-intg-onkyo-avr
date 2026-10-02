@@ -86,3 +86,66 @@ it("EntityRegistrar treats 'all' sentinel as showing all input sources", async (
     fs.rmSync(tmp, { recursive: true, force: true });
   }
 });
+
+it("EntityRegistrar uses the inputs the AVR reported when the input source list is auto", async () => {
+  const tmp = mkTmpDir();
+  try {
+    const module = (await import("../src/entityRegistrar.js")) as any;
+    const cfgModule = (await import("../src/configManager.js")) as any;
+    const inputSourceStore = (await import("../src/inputSourceStore.js")) as any;
+
+    const { ConfigManager, setConfigDir } = cfgModule;
+    if (typeof setConfigDir === "function") setConfigDir(tmp);
+
+    const avrStateModule = (await import("../src/avrState.js")) as any;
+    const EntityRegistrar = module.default as any;
+    const { avrStateManager } = avrStateModule;
+    const registrar = new EntityRegistrar(avrStateManager);
+
+    ConfigManager.save({ avrs: [{ model: "M", ip: "1.2.3.4", port: 60128, zone: "main", inputSourceList: "auto" }] });
+    const avrEntry = "M 1.2.3.4 main";
+
+    // Before the AVR reported anything, the built-in list is used.
+    expect(registrar.getInputSelectorOptions(avrEntry).length).toBeGreaterThan(5);
+
+    inputSourceStore.setAvrInputs("M 1.2.3.4", [
+      { id: "10", name: "BD/DVD" },
+      { id: "33", name: "DAB" }
+    ]);
+    expect(registrar.getInputSelectorOptions(avrEntry)).toEqual(["BD/DVD", "DAB"]);
+
+    // 'manual' ignores what was collected and uses the built-in list again.
+    ConfigManager.save({ avrs: [{ model: "M", ip: "1.2.3.4", port: 60128, zone: "main", inputSourceList: "manual" }] });
+    expect(registrar.getInputSelectorOptions(avrEntry).length).toBeGreaterThan(5);
+
+    inputSourceStore.clearAllAvrInputs();
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+it("EntityRegistrar prefers the reported inputs over a user-configured input list in auto mode", async () => {
+  const tmp = mkTmpDir();
+  try {
+    const module = (await import("../src/entityRegistrar.js")) as any;
+    const cfgModule = (await import("../src/configManager.js")) as any;
+    const inputSourceStore = (await import("../src/inputSourceStore.js")) as any;
+
+    const { ConfigManager, setConfigDir } = cfgModule;
+    if (typeof setConfigDir === "function") setConfigDir(tmp);
+
+    const avrStateModule = (await import("../src/avrState.js")) as any;
+    const EntityRegistrar = module.default as any;
+    const { avrStateManager } = avrStateModule;
+    const registrar = new EntityRegistrar(avrStateManager);
+
+    ConfigManager.save({ avrs: [{ model: "M", ip: "1.2.3.4", port: 60128, zone: "main", inputSourceList: "auto", inputSelectorOptions: ["bd", "tv"] }] });
+    inputSourceStore.setAvrInputs("M 1.2.3.4", [{ id: "10", name: "BD/DVD" }]);
+
+    expect(registrar.getInputSelectorOptions("M 1.2.3.4 main")).toEqual(["BD/DVD"]);
+
+    inputSourceStore.clearAllAvrInputs();
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});

@@ -38,6 +38,7 @@ describe("configPersistenceManager", () => {
       listeningModeOptions: undefined,
       inputSelectorOptions: undefined,
       volumeScaleValue: undefined,
+      inputSourceListValue: "manual",
       volumeDisplayValue: undefined,
       adjustVolumeDisplValue: undefined,
       entityNameStyleValue: undefined,
@@ -63,6 +64,18 @@ describe("configPersistenceManager", () => {
       expect(result.success).toBe(true);
       expect(result.errors).toHaveLength(0);
       expect(onConfigSaved).toHaveBeenCalledTimes(1);
+    });
+
+    it("writes the input source list into the stored config", async () => {
+      const mgr = new ConfigPersistenceManager(onConfigSaved);
+      await mgr.saveManualConfiguration({
+        ...baseParsedConfig,
+        zoneCountValue: 1,
+        inputSourceListValue: "manual"
+      });
+
+      const written = JSON.parse(mockWriteFileSync.mock.calls[0][1] as string);
+      expect(written.avrs[0].inputSourceList).toBe("manual");
     });
 
     it("saves multi-zone config", async () => {

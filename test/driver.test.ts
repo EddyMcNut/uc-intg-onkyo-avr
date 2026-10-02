@@ -75,12 +75,31 @@ const h = vi.hoisted(() => {
       sharedCmdHandler: vi.fn()
     },
     mockResolveAutoVolumeScale: vi.fn(),
+    mockResolveInputSourceList: vi.fn(),
+    mockSetAvrInputs: vi.fn(() => true),
+    mockClearAvrInputs: vi.fn(),
+    mockHasAvrInputs: vi.fn(() => false),
     mockSetupHost: { current: undefined as any },
     mockLog: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() }
   };
 });
 
-const { eventHandlers, mockDriver, mockAvrStateApi, mockEntityRegistrar, mockConnectionManager, mockConnectCoordinator, mockCommandSender, mockLog, mockResolveAutoVolumeScale, mockSetupHost } = h;
+const {
+  eventHandlers,
+  mockDriver,
+  mockAvrStateApi,
+  mockEntityRegistrar,
+  mockConnectionManager,
+  mockConnectCoordinator,
+  mockCommandSender,
+  mockLog,
+  mockResolveAutoVolumeScale,
+  mockSetupHost,
+  mockResolveInputSourceList,
+  mockSetAvrInputs,
+  mockClearAvrInputs,
+  mockHasAvrInputs
+} = h;
 
 vi.mock("@unfoldedcircle/integration-api", () => ({
   IntegrationAPI: function () {
@@ -113,6 +132,9 @@ vi.mock("../src/configManager.js", () => {
     buildEntityId: mockBuildId,
     buildPhysicalAvrId: mockBuildPhys,
     physicalAvrIdFromEntityId: vi.fn((id: string) => id.split("_").slice(0, 2).join("_")),
+    INPUT_SOURCE_LIST_AUTO: "auto",
+    INPUT_SOURCE_LIST_MANUAL: "manual",
+    parseInputSourceList: vi.fn((raw: any) => (raw === "manual" ? "manual" : "auto")),
     DEFAULT_QUEUE_THRESHOLD: 100,
     normalizeAvrConfig: vi.fn((cfg: any) => ({ ...cfg, queueThreshold: cfg.queueThreshold ?? 100, volumeScale: cfg.volumeScale ?? 100, port: cfg.port ?? 60128 })),
     resolveVolumeScale: vi.fn((scale: any) => (typeof scale === "number" ? scale : 100))
@@ -122,6 +144,10 @@ vi.mock("../src/configManager.js", () => {
 vi.mock("../src/loggers.js", () => ({ default: mockLog, setLogLevel: vi.fn() }));
 
 vi.mock("../src/volumeScaleResolver.js", () => ({ resolveAutoVolumeScale: mockResolveAutoVolumeScale }));
+
+vi.mock("../src/inputSourceResolver.js", () => ({ resolveInputSourceList: mockResolveInputSourceList }));
+
+vi.mock("../src/inputSourceStore.js", () => ({ setAvrInputs: mockSetAvrInputs, clearAvrInputs: mockClearAvrInputs, hasAvrInputs: mockHasAvrInputs }));
 
 // For modules used with `new`, provide a plain function that returns the mock instance
 vi.mock("../src/eiscp.js", () => ({
@@ -617,9 +643,117 @@ describe("OnkyoDriver", () => {
       const driver = await createDriverWithAutoScale();
       const configModule = await import("../src/configManager.js");
 
-      driver.handleAvrInfo("TX-NR860 5.6.7.8 main");
+      driver.handleAvrInfo("TX-NR860 5.6.7.8_main");
 
       expect(configModule.ConfigManager.patchAvr).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("handleAvrInfo with an auto input source list", () => {
+    const autoConfig = {
+      avrs: [{ model: "TX-RZ50", ip: "1.2.3.4", zone: "main", volumeScale: 100, inputSourceList: "auto", createSensors: false }],
+      logLevel: "info"
+    };
+    const collectedInputs = [
+      { id: "10", name: "BD/DVD" },
+      { id: "01", name: "CBL/SAT" }
+    ];
+
+    async function createDriverWithAutoInputList(saved = autoConfig) {
+      const configModule = await import("../src/configManager.js");
+      (configModule.ConfigManager.load as any).mockReturnValue(saved);
+      return createDriver();
+    }
+
+    // The volume scale is resolved independently, so it must not leak in from the tests above.
+    beforeEach(() => {
+      mockResolveAutoVolumeScale.mockReturnValue(undefined);
+    });
+
+    it("stores the collected inputs and re-registers the input selector", async () => {
+      mockResolveInputSourceList.mockReturnValue({ mode: "auto", inputs: collectedInputs, reason: "AVR reports 2 input(s)" });
+      mockSetAvrInputs.mockReturnValue(true);
+      const driver = await createDriverWithAutoInputList();
+      const configModule = await import("../src/configManager.js");
+      mockEntityRegistrar.createMediaPlayerEntity.mockClear();
+      mockEntityRegistrar.createInputSelectorSelectEntity.mockClear();
+
+      driver.handleAvrInfo("TX-RZ50_1.2.3.4_main");
+
+      // The setting itself stays "auto": the collected inputs are kept in memory only.
+      expect(mockSetAvrInputs).toHaveBeenCalledWith("TX-RZ50_1.2.3.4", collectedInputs);
+      expect(configModule.ConfigManager.patchAvr).not.toHaveBeenCalled();
+      expect(mockEntityRegistrar.createInputSelectorSelectEntity).toHaveBeenCalledTimes(1);
+      expect(mockEntityRegistrar.createMediaPlayerEntity).toHaveBeenCalledTimes(1);
+      expect(mockLog.debug).toHaveBeenCalledWith(expect.stringContaining("Input source list 'auto' resolved"), "driver:", "TX-RZ50_1.2.3.4_main", "AVR reports 2 input(s)");
+    });
+
+    it("re-registers the input selector of every zone of the AVR", async () => {
+      mockResolveInputSourceList.mockReturnValue({ mode: "auto", inputs: collectedInputs, reason: "AVR reports 2 input(s)" });
+      // The list is stored once per AVR, so only the first zone reports a change.
+      mockSetAvrInputs.mockReturnValue(true);
+      const driver = await createDriverWithAutoInputList({
+        ...autoConfig,
+        avrs: [autoConfig.avrs[0], { ...autoConfig.avrs[0], zone: "zone2" }]
+      });
+      mockEntityRegistrar.createMediaPlayerEntity.mockClear();
+      mockEntityRegistrar.createInputSelectorSelectEntity.mockClear();
+
+      driver.handleAvrInfo("TX-RZ50_1.2.3.4_main");
+
+      expect(mockSetAvrInputs).toHaveBeenCalledTimes(1);
+      expect(mockEntityRegistrar.createInputSelectorSelectEntity).toHaveBeenCalledTimes(2);
+      expect(mockEntityRegistrar.createMediaPlayerEntity).toHaveBeenCalledTimes(2);
+      // The inputs are device-wide, so the resolution is logged once.
+      expect(mockLog.debug).toHaveBeenCalledTimes(1);
+    });
+
+    it("does not re-register the entities when the collected inputs did not change", async () => {
+      mockResolveInputSourceList.mockReturnValue({ mode: "auto", inputs: collectedInputs, reason: "AVR reports 2 input(s)" });
+      mockSetAvrInputs.mockReturnValue(false);
+      const driver = await createDriverWithAutoInputList();
+      mockEntityRegistrar.createMediaPlayerEntity.mockClear();
+      mockEntityRegistrar.createInputSelectorSelectEntity.mockClear();
+
+      driver.handleAvrInfo("TX-RZ50_1.2.3.4_main");
+
+      expect(mockSetAvrInputs).toHaveBeenCalled();
+      expect(mockEntityRegistrar.createInputSelectorSelectEntity).not.toHaveBeenCalled();
+      expect(mockEntityRegistrar.createMediaPlayerEntity).not.toHaveBeenCalled();
+    });
+
+    it("stores 'manual' and forgets the inputs when the AVR reports none", async () => {
+      mockResolveInputSourceList.mockReturnValue({ mode: "manual", reason: "AVR reports no input sources, so the manual list is used" });
+      mockHasAvrInputs.mockReturnValue(true);
+      const driver = await createDriverWithAutoInputList();
+      const configModule = await import("../src/configManager.js");
+      (configModule.ConfigManager.patchAvr as any).mockReturnValue(true);
+      mockEntityRegistrar.createInputSelectorSelectEntity.mockClear();
+
+      driver.handleAvrInfo("TX-RZ50_1.2.3.4_main");
+
+      expect(configModule.ConfigManager.patchAvr).toHaveBeenCalledWith("1.2.3.4", "main", { inputSourceList: "manual" });
+      expect(mockClearAvrInputs).toHaveBeenCalledWith("TX-RZ50_1.2.3.4");
+      expect(mockLog.debug).toHaveBeenCalledWith(
+        expect.stringContaining("Input source list 'auto' reset to 'manual'"),
+        "driver:",
+        "TX-RZ50_1.2.3.4_main",
+        "AVR reports no input sources, so the manual list is used"
+      );
+      expect(mockEntityRegistrar.createInputSelectorSelectEntity).toHaveBeenCalledTimes(1);
+    });
+
+    it("leaves a manual input source list alone", async () => {
+      mockResolveInputSourceList.mockReturnValue(undefined);
+      const driver = await createDriverWithAutoInputList({ ...autoConfig, avrs: [{ ...autoConfig.avrs[0], inputSourceList: "manual" }] });
+      const configModule = await import("../src/configManager.js");
+      mockEntityRegistrar.createInputSelectorSelectEntity.mockClear();
+
+      driver.handleAvrInfo("TX-RZ50_1.2.3.4_main");
+
+      expect(configModule.ConfigManager.patchAvr).not.toHaveBeenCalled();
+      expect(mockClearAvrInputs).not.toHaveBeenCalled();
+      expect(mockEntityRegistrar.createInputSelectorSelectEntity).not.toHaveBeenCalled();
     });
   });
 

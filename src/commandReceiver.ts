@@ -1,6 +1,7 @@
 import * as uc from "@unfoldedcircle/integration-api";
 import { SelectAttributes } from "@unfoldedcircle/integration-api";
-import { OnkyoConfig, buildEntityId, resolveVolumeScale } from "./configManager.js";
+import { OnkyoConfig, AvrConfig, buildEntityId, physicalAvrIdFromEntityId, resolveVolumeScale, INPUT_SOURCE_LIST_AUTO } from "./configManager.js";
+import { findAvrInputId, hasAvrInputs } from "./inputSourceStore.js";
 import { EiscpDriver } from "./eiscp.js";
 import { getCompatibleListeningModes } from "./listeningModeFilters.js";
 import { classifyAudioFormat, formatAudioTypeName } from "./audioFormatClassifier.js";
@@ -244,8 +245,14 @@ export class CommandReceiver {
   private async handleInputSelector(avrUpdates: AvrUpdateEvent, entityId: string, eventZone: string): Promise<void> {
     const aliases = Array.isArray(avrUpdates.argument) ? (avrUpdates.argument as string[]) : [avrUpdates.argument.toString()];
     let source = aliases[0];
-    const cfgAvr = this.config.avrs ? this.config.avrs.find((a) => a.model === avrUpdates.model && a.ip === avrUpdates.host) : undefined;
-    if (cfgAvr && Array.isArray(cfgAvr.inputSelectorOptions) && cfgAvr.inputSelectorOptions.length > 0) {
+    const physicalAVR = physicalAvrIdFromEntityId(entityId);
+    // Zone-specific config first: the options are per zone, so another zone's list must not be used.
+    const cfgAvr = (this.config.avrs?.find((a) => a.model === avrUpdates.model && a.ip === avrUpdates.host && a.zone === eventZone) ??
+      this.config.avrs?.find((a) => a.model === avrUpdates.model && a.ip === avrUpdates.host)) as AvrConfig | undefined;
+    // The inputs the AVR reported are already the exact names it uses, so a user-configured list
+    // (which only exists for the manual list) is not applied on top of them.
+    const collectedInputs = cfgAvr?.inputSourceList === INPUT_SOURCE_LIST_AUTO && physicalAVR ? hasAvrInputs(physicalAVR) : false;
+    if (!collectedInputs && cfgAvr && Array.isArray(cfgAvr.inputSelectorOptions) && cfgAvr.inputSelectorOptions.length > 0) {
       const match = aliases.find((alias) => cfgAvr.inputSelectorOptions?.includes(alias));
       if (match) {
         source = match;
@@ -261,9 +268,12 @@ export class CommandReceiver {
     });
     this.zoneAgnosticProcessor.resetZone(entityId);
     await this.zoneAgnosticProcessor.renderEntity(entityId);
-    if (source === "dab") {
+    // The tuner presets are only queried for the tuner inputs, identified by their input id: the
+    // AVR-reported name ("DAB") is not the internal alias ("dab") the command table uses.
+    const sourceInputId = collectedInputs && physicalAVR ? findAvrInputId(physicalAVR, source) : aliases[0];
+    if (sourceInputId === "dab" || sourceInputId === "33") {
       this.eiscpInstance.raw("DSNQSTN");
-    } else if (source === "fm") {
+    } else if (sourceInputId === "fm" || sourceInputId === "24") {
       this.eiscpInstance.raw("FLDQSTN");
     }
     this.driver.updateEntityAttributes(`${entityId}_source_sensor`, {

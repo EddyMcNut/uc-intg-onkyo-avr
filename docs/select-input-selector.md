@@ -8,6 +8,22 @@ This entity will offer a drop down of all Input Selector options (for example `t
 
 As the list of all known options is very long, you can configure which options you want to have in the selection.
 
+### `Input source list: Auto (default) / Manual`
+
+During setup you can choose where the list of inputs comes from:
+
+- **`Auto` (default)**: the integration asks your AVR for its inputs (using the `avr-info` / NRI protocol) and shows exactly the inputs your AVR reports, using the names it shows for them. The list is rebuilt every time you save the setup, so renaming an input on the AVR is reflected after the next save.
+- **`Manual`**: the integration uses the list you configure yourself (see below).
+
+Auto works for every configured zone of an AVR, because the inputs belong to the AVR itself. All collected inputs are offered on every zone, sorted alphabetically.
+
+Notes:
+
+- Auto needs an AVR that supports the NRI protocol. If the AVR does not report any input, the setting is switched back to `Manual` and the log explains why.
+- Placeholder entries are skipped: an AVR that adds an entry named `Source` to its input list does not get that entry as an option.
+- The collected list is only kept in memory; only the `Auto`/`Manual` setting is saved and backed up.
+- A custom list from **Input selector options** is only used in `Manual` mode. In `Auto` mode the reported inputs take precedence.
+
 ### Customizing the `input-selector` select
 
 - You can configure a per‑AVR custom list of listening modes during setup.

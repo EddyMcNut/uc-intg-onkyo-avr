@@ -13,7 +13,8 @@ import {
   physicalAvrIdFromEntityId,
   DEFAULT_QUEUE_THRESHOLD,
   normalizeAvrConfig,
-  resolveVolumeScale
+  resolveVolumeScale,
+  INPUT_SOURCE_LIST_MANUAL
 } from "./configManager.js";
 import { CommandSender } from "./commandSender.js";
 import { CommandReceiver } from "./commandReceiver.js";
@@ -33,6 +34,8 @@ import SubscriptionHandler from "./subscriptionHandler.js";
 import ConnectCoordinator from "./connectCoordinator.js";
 import { AvrInstance, type AvrStateApi } from "./types.js";
 import { resolveAutoVolumeScale } from "./volumeScaleResolver.js";
+import { resolveInputSourceList } from "./inputSourceResolver.js";
+import { setAvrInputs, clearAvrInputs, hasAvrInputs } from "./inputSourceStore.js";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -286,6 +289,23 @@ export default class OnkyoDriver {
     registration.afterRegister?.(entities);
   }
 
+  /**
+   * Re-register a single input selector, e.g. after the input source list was resolved from the AVR.
+   * Its options are part of the entity definition, so a plain attribute update would not reach a
+   * manager that has not instantiated it yet.
+   */
+  private registerInputSelector(avrConfig: AvrConfig): void {
+    if (avrConfig.inputSelectorOptions === null) {
+      return;
+    }
+    const avrEntry = buildEntityId(avrConfig.model, avrConfig.ip, avrConfig.zone);
+    const handler = this.inputSelectorHandler?.handle.bind(this.inputSelectorHandler);
+    const entities = [this.entityRegistrar.createInputSelectorSelectEntity(avrEntry, handler)] as uc.Entity[];
+    for (const entity of entities) {
+      this.registerEntity(entity, avrEntry);
+    }
+  }
+
   private registerEntity(entity: uc.Entity, avrEntry: string): void {
     // Re-registration (e.g. after a config save) must replace the existing entity so updated
     // definitions take effect — addAvailableEntity silently keeps the old entity otherwise.
@@ -338,15 +358,18 @@ export default class OnkyoDriver {
   }
 
   /**
-   * Resolve volume scales that were left on "auto", using what the AVR reported about itself.
+   * Act on what the AVR reported about itself: resolve the volume scale and the input source list
+   * that were left on "auto".
    *
    * NRI describes the AVR as a whole and is answered on the main zone, so the single reply resolves
-   * every configured zone of that AVR — each zone reading the volume scale the AVR reported for it.
+   * every configured zone of that AVR — each zone reading the volume scale the AVR reported for it,
+   * while the inputs it reports are shared by all zones of that AVR.
    *
-   * A resolved scale replaces "auto" in the config and is saved, so it behaves exactly like a value
-   * the user entered: it is never determined again. The media players are re-registered because the
-   * scale is part of their entity options, and the runtime configs are refreshed so volume is scaled
-   * correctly from the next update on.
+   * A resolved volume scale replaces "auto" in the config and is saved, so it behaves exactly like
+   * a value the user entered: it is never determined again. An input source list that the AVR cannot
+   * provide is saved as "manual" for the same reason: there is nothing left to resolve. The entities
+   * carrying these settings are re-registered, since both are part of their entity options, and the
+   * runtime configs are refreshed so they take effect from the next update on.
    */
   private handleAvrInfo(entityId: string): void {
     const physicalAVR = physicalAvrIdFromEntityId(entityId);
@@ -354,34 +377,75 @@ export default class OnkyoDriver {
       return;
     }
 
+    const zones = (this.config.avrs ?? []).filter((avrConfig) => buildPhysicalAvrId(avrConfig.model, avrConfig.ip) === physicalAVR);
+    if (zones.length === 0) {
+      return;
+    }
+
+    // The input list belongs to the AVR, not to a single zone: it is stored once, and every zone of
+    // this AVR has to rebuild the entities that list the inputs.
+    let inputsChanged = false;
+    let inputsDecided = false;
+
     const resolvedZones: AvrConfig[] = [];
-    for (const avrConfig of this.config.avrs ?? []) {
-      if (buildPhysicalAvrId(avrConfig.model, avrConfig.ip) !== physicalAVR) {
-        continue;
-      }
-      const resolution = resolveAutoVolumeScale(avrConfig, entityId);
-      if (!resolution) {
-        continue;
+    let configChanged = false;
+    for (const avrConfig of zones) {
+      const zoneEntry = buildEntityId(avrConfig.model, avrConfig.ip, avrConfig.zone);
+      let changed = false;
+
+      const volumeResolution = resolveAutoVolumeScale(avrConfig, entityId);
+      if (volumeResolution) {
+        if (ConfigManager.patchAvr(avrConfig.ip, avrConfig.zone, { volumeScale: volumeResolution.scale })) {
+          log.debug("%s [%s] Volume scale 'auto' resolved to 0-%d: %s", integrationName, zoneEntry, volumeResolution.scale, volumeResolution.reason);
+          configChanged = true;
+          changed = true;
+        } else {
+          log.warn("%s [%s] Could not store the resolved volume scale 0-%d in the config", integrationName, zoneEntry, volumeResolution.scale);
+        }
       }
 
-      const zoneEntry = buildEntityId(avrConfig.model, avrConfig.ip, avrConfig.zone);
-      if (!ConfigManager.patchAvr(avrConfig.ip, avrConfig.zone, { volumeScale: resolution.scale })) {
-        log.warn("%s [%s] Could not store the resolved volume scale 0-%d in the config", integrationName, zoneEntry, resolution.scale);
-        continue;
+      const inputResolution = resolveInputSourceList(avrConfig, entityId);
+      if (inputResolution) {
+        if (inputResolution.mode === INPUT_SOURCE_LIST_MANUAL) {
+          // Nothing to collect: fall back to the hardcoded list and remember that, so the AVR is not
+          // asked to resolve it again on every NRI reply.
+          if (ConfigManager.patchAvr(avrConfig.ip, avrConfig.zone, { inputSourceList: INPUT_SOURCE_LIST_MANUAL })) {
+            log.debug("%s [%s] Input source list 'auto' reset to 'manual': %s", integrationName, zoneEntry, inputResolution.reason);
+            configChanged = true;
+            changed = true;
+          } else {
+            log.warn("%s [%s] Could not store the input source list reset to 'manual' in the config", integrationName, zoneEntry);
+          }
+          if (!inputsDecided) {
+            inputsDecided = true;
+            inputsChanged = hasAvrInputs(physicalAVR);
+            clearAvrInputs(physicalAVR);
+          }
+        } else if (inputResolution.inputs && !inputsDecided) {
+          inputsDecided = true;
+          inputsChanged = setAvrInputs(physicalAVR, inputResolution.inputs);
+          if (inputsChanged) {
+            // The inputs changed, so the entities listing them have to be rebuilt.
+            log.debug("%s [%s] Input source list 'auto' resolved: %s", integrationName, zoneEntry, inputResolution.reason);
+          }
+        }
       }
-      log.debug("%s [%s] Volume scale 'auto' resolved to 0-%d: %s", integrationName, zoneEntry, resolution.scale, resolution.reason);
-      resolvedZones.push(avrConfig);
+
+      if (changed || inputsChanged) {
+        resolvedZones.push(avrConfig);
+      }
     }
 
     if (resolvedZones.length === 0) {
       return;
     }
 
-    this.config = ConfigManager.load();
+    this.config = configChanged ? ConfigManager.load() : this.config;
     for (const resolvedZone of resolvedZones) {
       // Register and refresh with the value from the saved config, since that is what is persisted now.
       const updatedConfig = this.config.avrs?.find((a) => a.ip === resolvedZone.ip && a.zone === resolvedZone.zone) ?? resolvedZone;
       this.registerMediaPlayer(updatedConfig);
+      this.registerInputSelector(updatedConfig);
       this.refreshZoneRuntimeConfig(updatedConfig);
     }
   }

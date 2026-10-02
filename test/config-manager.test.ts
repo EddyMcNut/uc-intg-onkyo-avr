@@ -109,6 +109,22 @@ describe("ConfigManager static methods", () => {
       expect(result.normalized!.volumeScale).toBe("auto");
     });
 
+    it("accepts an inputSourceList", () => {
+      const result = ConfigManager.validateAvrPayload({ model: "TX-RZ50", ip: "1.2.3.4", port: 60128, inputSourceList: "manual" });
+      expect(result.errors).toHaveLength(0);
+      expect(result.normalized!.inputSourceList).toBe("manual");
+    });
+
+    it("rejects an invalid inputSourceList", () => {
+      const result = ConfigManager.validateAvrPayload({ model: "TX-RZ50", ip: "1.2.3.4", port: 60128, inputSourceList: "nonsense" });
+      expect(result.errors).toContain('inputSourceList must be "auto" or "manual"');
+    });
+
+    it("defaults an absent inputSourceList to auto", () => {
+      const result = ConfigManager.validateAvrPayload({ model: "TX-RZ50", ip: "1.2.3.4", port: 60128 });
+      expect(result.normalized!.inputSourceList).toBe("auto");
+    });
+
     it("defaults an absent volumeScale to auto", () => {
       const result = ConfigManager.validateAvrPayload({ model: "TX-RZ50", ip: "1.2.3.4", port: 60128 });
       expect(result.normalized!.volumeScale).toBe("auto");

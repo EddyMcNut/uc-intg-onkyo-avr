@@ -554,3 +554,25 @@ describe("IscpCommandParser NRI handling", () => {
     store.resetAvrInfo(entityId);
   });
 });
+
+it("IscpCommandParser reports the input name the AVR gave for an input it collected", async () => {
+  const parserModule = await import("../src/eiscp-command-parser.js");
+  const inputSourceStore = (await import("../src/inputSourceStore.js")) as any;
+  const { IscpCommandParser } = parserModule as { IscpCommandParser: new (...deps: any) => any };
+
+  // The store is keyed by physical AVR id, so it is looked up via the zone entity id.
+  inputSourceStore.setAvrInputs("TX-RZ50 1.2.3.4", [
+    { id: "33", name: "DAB" },
+    { id: "10", name: "BD/DVD" }
+  ]);
+
+  const parser = new IscpCommandParser(() => "TX-RZ50 1.2.3.4 main", makeParserHarness().stateReader, null, null, null);
+
+  // SLI33 is "dab" in the hardcoded table, but the AVR calls it "DAB".
+  expect(parser.parse("SLI", "33").argument).toBe("DAB");
+  // An input that is not in the collected list falls back to the command table.
+  expect(parser.parse("SLI", "12").argument).toBe("tv");
+  expect(parser.parse("SLI", "01").argument).toEqual(["video2", "cbl", "sat"]);
+
+  inputSourceStore.clearAllAvrInputs();
+});

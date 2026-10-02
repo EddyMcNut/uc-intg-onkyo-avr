@@ -52,6 +52,7 @@ describe("ManualConfigParser", () => {
     expect(result.queueThresholdValue).toBe(100);
     expect(result.albumArtURLValue).toBe("album_art.cgi");
     expect(result.volumeScaleValue).toBe("auto");
+    expect(result.inputSourceListValue).toBe("auto");
     expect(result.volumeDisplayValue).toBe("absolute");
     expect(result.adjustVolumeDisplValue).toBe(true);
     expect(result.zoneCountValue).toBe(1);
@@ -83,6 +84,17 @@ describe("ManualConfigParser", () => {
     // Invalid values fall back to the default
     expect(parser.parse({ volumeScale: 50 }).volumeScaleValue).toBe("auto");
     expect(parser.parse({ volumeScale: "abc" }).volumeScaleValue).toBe("auto");
+  });
+
+  it("validates inputSourceList (auto or manual)", async () => {
+    const mod = await import("../src/manualConfigParser.js");
+    const { ManualConfigParser } = mod as { ManualConfigParser: new () => any };
+    const parser = new ManualConfigParser();
+
+    expect(parser.parse({ inputSourceList: "manual" }).inputSourceListValue).toBe("manual");
+    expect(parser.parse({ inputSourceList: " AUTO " }).inputSourceListValue).toBe("auto");
+    // Anything unknown falls back to the safe default.
+    expect(parser.parse({ inputSourceList: "nonsense" }).inputSourceListValue).toBe("auto");
   });
 
   it("validates tuneinPresetPosition (1-9 range)", async () => {

@@ -10,6 +10,7 @@ import {
   parseSelectOptions,
   parseBoolean,
   parseVolumeScale,
+  parseInputSourceList,
   AvrZone,
   AvrConfig,
   OnkyoConfig,
@@ -18,7 +19,9 @@ import {
   LogLevel,
   ALL_OPTIONS,
   SelectOptions,
-  VOLUME_SCALE_AUTO
+  VOLUME_SCALE_AUTO,
+  INPUT_SOURCE_LIST_AUTO,
+  INPUT_SOURCE_LIST_MANUAL
 } from "./configConstants.js";
 
 const integrationName = "configManager:";
@@ -51,6 +54,7 @@ export class ConfigManager {
       queueThreshold: avr.queueThreshold ?? AVR_DEFAULTS.queueThreshold,
       albumArtURL: avr.albumArtURL ?? AVR_DEFAULTS.albumArtURL,
       volumeScale: parseVolumeScale(avr.volumeScale),
+      inputSourceList: parseInputSourceList(avr.inputSourceList),
       volumeDisplay: avr.volumeDisplay ?? AVR_DEFAULTS.volumeDisplay,
       adjustVolumeDispl: avr.adjustVolumeDispl ?? AVR_DEFAULTS.adjustVolumeDispl,
       entityNameStyle: avr.entityNameStyle ?? AVR_DEFAULTS.entityNameStyle,
@@ -283,6 +287,14 @@ export class ConfigManager {
       }
     }
 
+    // inputSourceList
+    if (avr.inputSourceList !== undefined) {
+      const raw = String(avr.inputSourceList).trim().toLowerCase();
+      if (raw !== INPUT_SOURCE_LIST_AUTO && raw !== INPUT_SOURCE_LIST_MANUAL) {
+        errors.push('inputSourceList must be "auto" or "manual"');
+      }
+    }
+
     // volumeDisplay
     if (avr.volumeDisplay !== undefined) {
       const vd = String(avr.volumeDisplay).toLowerCase();
@@ -382,6 +394,7 @@ export class ConfigManager {
       queueThreshold: avr.queueThreshold,
       albumArtURL: avr.albumArtURL,
       volumeScale: parseVolumeScale(avr.volumeScale),
+      inputSourceList: parseInputSourceList(avr.inputSourceList),
       volumeDisplay: String(avr.volumeDisplay ?? AVR_DEFAULTS.volumeDisplay).toLowerCase() === "relative" ? "relative" : "absolute",
       adjustVolumeDispl: parseBoolean(avr.adjustVolumeDispl, AVR_DEFAULTS.adjustVolumeDispl),
       entityNameStyle: (String(avr.entityNameStyle ?? AVR_DEFAULTS.entityNameStyle).toLowerCase() === "short" ? "short" : "long") as EntityNameStyle,

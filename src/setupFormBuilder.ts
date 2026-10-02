@@ -50,6 +50,22 @@ export class SetupFormBuilder {
         }
       },
       {
+        id: "inputSourceList",
+        label: { en: "Input source list" },
+        field: {
+          dropdown: {
+            value: String(values.inputSourceListValue),
+            items: [
+              { id: "auto", label: { en: "Auto (default)" } },
+              { id: "manual", label: { en: "Manual" } }
+            ]
+          }
+        },
+        description: {
+          en: "Auto uses the inputs the AVR reports itself, in the AVR's own naming. Manual uses the built-in input list (see 'Input selector options' below)."
+        }
+      },
+      {
         id: "volumeDisplay",
         label: { en: "Volume display" },
         field: {

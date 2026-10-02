@@ -151,6 +151,7 @@ export default class SetupHandler {
       input.inputSelectorOptions ||
       input.createDiracSelectEntity ||
       input.volumeScale ||
+      input.inputSourceList ||
       input.volumeDisplay ||
       input.adjustVolumeDispl ||
       input.zoneCount ||
@@ -189,6 +190,7 @@ export default class SetupHandler {
               ? "none"
               : "",
         volumeScale: currentAvr?.volumeScale,
+        inputSourceList: currentAvr?.inputSourceList,
         volumeDisplay: currentAvr?.volumeDisplay,
         adjustVolumeDispl: currentAvr?.adjustVolumeDispl,
         entityNameStyle: currentAvr?.entityNameStyle,

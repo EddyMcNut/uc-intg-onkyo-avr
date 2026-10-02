@@ -4,7 +4,8 @@ import log from "./loggers.js";
 
 import EventEmitter from "events";
 import { eiscpMappings } from "./eiscp-mappings.js";
-import { DEFAULT_QUEUE_THRESHOLD, buildEntityId } from "./configManager.js";
+import { DEFAULT_QUEUE_THRESHOLD, buildEntityId, buildPhysicalAvrId } from "./configManager.js";
+import { findAvrInputId } from "./inputSourceStore.js";
 import { delay } from "./utils.js";
 import { IscpCommandParser, type CommandResult } from "./eiscp-command-parser.js";
 import { createEiscpPacket, extractIscpMessage, extractAllIscpMessages } from "./eiscp-packet.js";
@@ -580,6 +581,16 @@ export class EiscpDriver extends EventEmitter {
     const valueMap = (VALUE_MAPPINGS as unknown as Record<string, Record<string, { value: string }>>)[prefix];
     if (args !== undefined && valueMap && Object.prototype.hasOwnProperty.call(valueMap, args)) {
       value = valueMap[String(args)].value;
+    } else if (prefix === "SLI" && typeof args === "string") {
+      // An input name the AVR reported itself ("BD/DVD", "CBL/SAT") is not in the hardcoded SLI
+      // table: send the input id the AVR gave for it instead.
+      const inputId = findAvrInputId(buildPhysicalAvrId(this.config.model ?? "", this.config.host ?? ""), args);
+      if (inputId) {
+        log.debug("%s Sending input-selector %s as %s%s (id reported by the AVR)", integrationName, args, getZonePrefix(prefix, zone), inputId);
+        return getZonePrefix(prefix, zone) + inputId;
+      }
+      log.warn("%s not found in JSON: %s %s", integrationName, command, args);
+      value = String(args ?? "");
     } else if (valueMap && Object.prototype.hasOwnProperty.call(valueMap, "intgrRange")) {
       value = (+args!).toString(16).toUpperCase().padStart(2, "0");
     } else {
