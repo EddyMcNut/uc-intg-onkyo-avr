@@ -3,7 +3,18 @@
 import * as uc from "@unfoldedcircle/integration-api";
 import { SelectAttributes } from "@unfoldedcircle/integration-api";
 import EiscpDriver from "./eiscp.js";
-import { ConfigManager, setConfigDir, OnkyoConfig, AvrConfig, buildEntityId, buildPhysicalAvrId, DEFAULT_QUEUE_THRESHOLD, normalizeAvrConfig } from "./configManager.js";
+import {
+  ConfigManager,
+  setConfigDir,
+  OnkyoConfig,
+  AvrConfig,
+  buildEntityId,
+  buildPhysicalAvrId,
+  physicalAvrIdFromEntityId,
+  DEFAULT_QUEUE_THRESHOLD,
+  normalizeAvrConfig,
+  resolveVolumeScale
+} from "./configManager.js";
 import { CommandSender } from "./commandSender.js";
 import { CommandReceiver } from "./commandReceiver.js";
 import { ReconnectionManager } from "./reconnectionManager.js";
@@ -21,6 +32,7 @@ import { remoteEntityCommandHandler } from "./remoteEntityCommandHandler.js";
 import SubscriptionHandler from "./subscriptionHandler.js";
 import ConnectCoordinator from "./connectCoordinator.js";
 import { AvrInstance, type AvrStateApi } from "./types.js";
+import { resolveAutoVolumeScale } from "./volumeScaleResolver.js";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -157,15 +169,7 @@ export default class OnkyoDriver {
   private buildEntityRegistrations(avrEntry: string, avrConfig: AvrConfig, rawSend: (cmd: string) => Promise<void>): EntityRegistration[] {
     return [
       // ── Media player — always registered ───────────────────────────────────
-      {
-        enabled: () => true,
-        create: () => this.entityRegistrar.createMediaPlayerEntity(avrEntry, avrConfig.volumeScale ?? 100, this.sharedCmdHandler.bind(this), rawSend),
-        afterRegister: () => {
-          if (typeof this.driver.updateEntityAttributes === "function") {
-            this.driver.updateEntityAttributes(avrEntry, { [uc.MediaPlayerAttributes.SourceList]: this.entityRegistrar.getInputSelectorOptions(avrEntry) });
-          }
-        }
-      },
+      this.buildMediaPlayerRegistration(avrEntry, avrConfig, rawSend),
 
       // ── Sensor entities — conditional on createSensors flag ────────────────
       {
@@ -234,37 +238,132 @@ export default class OnkyoDriver {
     ];
   }
 
+  // The media player carries the volume scale in its entity options, so it is registered on its own
+  // whenever that scale changes, without rebuilding the other entities of the AVR.
+  private buildMediaPlayerRegistration(avrEntry: string, avrConfig: AvrConfig, rawSend: (cmd: string) => Promise<void>): EntityRegistration {
+    return {
+      enabled: () => true,
+      create: () => this.entityRegistrar.createMediaPlayerEntity(avrEntry, resolveVolumeScale(avrConfig.volumeScale), this.sharedCmdHandler.bind(this), rawSend),
+      afterRegister: () => {
+        if (typeof this.driver.updateEntityAttributes === "function") {
+          this.driver.updateEntityAttributes(avrEntry, { [uc.MediaPlayerAttributes.SourceList]: this.entityRegistrar.getInputSelectorOptions(avrEntry) });
+        }
+      }
+    };
+  }
+
   private registerAvailableEntities(): void {
     log.info("%s Registering available entities from config", integrationName);
     if (!this.entityRegistrar) this.entityRegistrar = new EntityRegistrar(this.avrStateApi);
     for (const avrConfig of this.config.avrs!) {
       const avrEntry = buildEntityId(avrConfig.model, avrConfig.ip, avrConfig.zone);
-      const physicalAVR = buildPhysicalAvrId(avrConfig.model, avrConfig.ip);
-      const rawSend = async (cmd: string): Promise<void> => {
-        const conn = this.connectionManager.getPhysicalConnection(physicalAVR);
-        await conn?.eiscp?.raw(cmd);
-      };
 
-      for (const registration of this.buildEntityRegistrations(avrEntry, avrConfig, rawSend)) {
+      for (const registration of this.buildEntityRegistrations(avrEntry, avrConfig, this.createRawSend(avrConfig))) {
         if (!registration.enabled(avrConfig)) {
           if (registration.disabledMessage) log.info(registration.disabledMessage);
           continue;
         }
         const entities = [registration.create()].flat() as uc.Entity[];
         for (const entity of entities) {
-          // Re-registration (e.g. after a config save) must replace the existing entity so updated
-          // definitions take effect — addAvailableEntity silently keeps the old entity otherwise.
-          const availablePool = this.driver.getAvailableEntities?.();
-          if (availablePool && availablePool.contains(entity.id)) {
-            log.info("%s [%s] Re-registering existing entity with updated definition: %s", integrationName, avrEntry, entity.id);
-            availablePool.removeEntity(entity.id);
-          }
-          this.driver.addAvailableEntity(entity);
-          log.info("%s [%s] Entity registered: %s", integrationName, avrEntry, entity.id);
+          this.registerEntity(entity, avrEntry);
         }
         registration.afterRegister?.(entities);
       }
     }
+  }
+
+  /** Re-register a single media player, e.g. after the volume scale was resolved from the AVR. */
+  private registerMediaPlayer(avrConfig: AvrConfig): void {
+    const avrEntry = buildEntityId(avrConfig.model, avrConfig.ip, avrConfig.zone);
+    const registration = this.buildMediaPlayerRegistration(avrEntry, avrConfig, this.createRawSend(avrConfig));
+    const entities = [registration.create()].flat() as uc.Entity[];
+    for (const entity of entities) {
+      this.registerEntity(entity, avrEntry);
+    }
+    registration.afterRegister?.(entities);
+  }
+
+  private registerEntity(entity: uc.Entity, avrEntry: string): void {
+    // Re-registration (e.g. after a config save) must replace the existing entity so updated
+    // definitions take effect — addAvailableEntity silently keeps the old entity otherwise.
+    const availablePool = this.driver.getAvailableEntities?.();
+    if (availablePool && availablePool.contains(entity.id)) {
+      log.info("%s [%s] Re-registering existing entity with updated definition: %s", integrationName, avrEntry, entity.id);
+      availablePool.removeEntity(entity.id);
+    }
+    this.driver.addAvailableEntity(entity);
+    log.info("%s [%s] Entity registered: %s", integrationName, avrEntry, entity.id);
+  }
+
+  private createRawSend(avrConfig: AvrConfig): (cmd: string) => Promise<void> {
+    const physicalAVR = buildPhysicalAvrId(avrConfig.model, avrConfig.ip);
+    return async (cmd: string): Promise<void> => {
+      const conn = this.connectionManager.getPhysicalConnection(physicalAVR);
+      await conn?.eiscp?.raw(cmd);
+    };
+  }
+
+  /**
+   * Resolve volume scales that were left on "auto", using what the AVR reported about itself.
+   *
+   * NRI describes the AVR as a whole and is answered on the main zone, so the single reply resolves
+   * every configured zone of that AVR — each zone reading the volume scale the AVR reported for it.
+   *
+   * A resolved scale replaces "auto" in the config and is saved, so it behaves exactly like a value
+   * the user entered: it is never determined again. The media players are re-registered because the
+   * scale is part of their entity options, and the runtime configs are refreshed so volume is scaled
+   * correctly from the next update on.
+   */
+  private handleAvrInfo(entityId: string): void {
+    const physicalAVR = physicalAvrIdFromEntityId(entityId);
+    if (!physicalAVR) {
+      return;
+    }
+
+    const resolvedZones: AvrConfig[] = [];
+    for (const avrConfig of this.config.avrs ?? []) {
+      if (buildPhysicalAvrId(avrConfig.model, avrConfig.ip) !== physicalAVR) {
+        continue;
+      }
+      const resolution = resolveAutoVolumeScale(avrConfig, entityId);
+      if (!resolution) {
+        continue;
+      }
+
+      const zoneEntry = buildEntityId(avrConfig.model, avrConfig.ip, avrConfig.zone);
+      if (!ConfigManager.patchAvr(avrConfig.ip, avrConfig.zone, { volumeScale: resolution.scale })) {
+        log.warn("%s [%s] Could not store the resolved volume scale 0-%d in the config", integrationName, zoneEntry, resolution.scale);
+        continue;
+      }
+      log.debug("%s [%s] Volume scale 'auto' resolved to 0-%d: %s", integrationName, zoneEntry, resolution.scale, resolution.reason);
+      resolvedZones.push(avrConfig);
+    }
+
+    if (resolvedZones.length === 0) {
+      return;
+    }
+
+    this.config = ConfigManager.load();
+    for (const resolvedZone of resolvedZones) {
+      // Register and refresh with the value from the saved config, since that is what is persisted now.
+      const updatedConfig = this.config.avrs?.find((a) => a.ip === resolvedZone.ip && a.zone === resolvedZone.zone) ?? resolvedZone;
+      this.registerMediaPlayer(updatedConfig);
+      this.refreshZoneRuntimeConfig(updatedConfig);
+    }
+  }
+
+  /** Push a refreshed per-zone runtime config into the live command handlers after a config change. */
+  private refreshZoneRuntimeConfig(avrConfig: AvrConfig): void {
+    const avrEntry = buildEntityId(avrConfig.model, avrConfig.ip, avrConfig.zone);
+    const avrSpecificConfig = this.createAvrSpecificConfig(avrConfig);
+
+    const instance = this.avrInstances.get(avrEntry);
+    if (instance) {
+      instance.config = avrConfig;
+      instance.commandSender.updateConfig(avrSpecificConfig);
+    }
+    const physicalConnection = this.connectionManager.getPhysicalConnection(buildPhysicalAvrId(avrConfig.model, avrConfig.ip));
+    physicalConnection?.commandReceiver.updateConfig(avrSpecificConfig);
   }
 
   private setupDriverEvents() {
@@ -362,7 +461,7 @@ export default class OnkyoDriver {
       this.config,
       (avrConfig) => (eiscpInstance) => {
         const avrSpecificConfig = this.createAvrSpecificConfig(avrConfig);
-        return new CommandReceiver(this.driver, avrSpecificConfig, eiscpInstance, this.avrStateApi, this.driverVersion);
+        return new CommandReceiver(this.driver, avrSpecificConfig, eiscpInstance, this.avrStateApi, this.driverVersion, this.handleAvrInfo.bind(this));
       },
       (avrSpecificConfig, eiscp, commandReceiver) => new CommandSender(this.driver, avrSpecificConfig, eiscp, this.avrStateApi, commandReceiver)
     );

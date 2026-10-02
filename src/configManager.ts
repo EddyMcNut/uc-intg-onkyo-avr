@@ -4,7 +4,22 @@ import log, { setLogLevel } from "./loggers.js";
 
 // Re-export everything from configConstants so existing imports via configManager continue to work.
 export * from "./configConstants.js";
-import { MAX_LENGTHS, PATTERNS, parseSelectOptions, parseBoolean, AvrZone, AvrConfig, OnkyoConfig, AVR_DEFAULTS, EntityNameStyle, LogLevel, ALL_OPTIONS, SelectOptions } from "./configConstants.js";
+import {
+  MAX_LENGTHS,
+  PATTERNS,
+  parseSelectOptions,
+  parseBoolean,
+  parseVolumeScale,
+  AvrZone,
+  AvrConfig,
+  OnkyoConfig,
+  AVR_DEFAULTS,
+  EntityNameStyle,
+  LogLevel,
+  ALL_OPTIONS,
+  SelectOptions,
+  VOLUME_SCALE_AUTO
+} from "./configConstants.js";
 
 const integrationName = "configManager:";
 
@@ -35,7 +50,7 @@ export class ConfigManager {
       zone: avr.zone ?? "main",
       queueThreshold: avr.queueThreshold ?? AVR_DEFAULTS.queueThreshold,
       albumArtURL: avr.albumArtURL ?? AVR_DEFAULTS.albumArtURL,
-      volumeScale: avr.volumeScale ?? AVR_DEFAULTS.volumeScale,
+      volumeScale: parseVolumeScale(avr.volumeScale),
       volumeDisplay: avr.volumeDisplay ?? AVR_DEFAULTS.volumeDisplay,
       adjustVolumeDispl: avr.adjustVolumeDispl ?? AVR_DEFAULTS.adjustVolumeDispl,
       entityNameStyle: avr.entityNameStyle ?? AVR_DEFAULTS.entityNameStyle,
@@ -163,6 +178,24 @@ export class ConfigManager {
     this.save(this.config);
   }
 
+  /**
+   * Merge a partial update into one configured AVR zone and persist it.
+   * Used for values the integration determines itself (e.g. a volume scale resolved from the AVR),
+   * so the other settings of that AVR are left untouched. Returns false when the zone is not configured.
+   */
+  static patchAvr(ip: string, zone: AvrZone, patch: Partial<AvrConfig>): boolean {
+    if (!this.config.avrs) {
+      return false;
+    }
+    const index = this.config.avrs.findIndex((a) => a.ip === ip && a.zone === zone);
+    if (index < 0) {
+      return false;
+    }
+    this.config.avrs[index] = { ...this.config.avrs[index], ...patch };
+    this.save(this.config);
+    return true;
+  }
+
   /** Clear all configuration and persist empty config */
   static clear(): void {
     this.config = {} as OnkyoConfig;
@@ -244,9 +277,9 @@ export class ConfigManager {
 
     // volumeScale
     if (avr.volumeScale !== undefined) {
-      const vs = typeof avr.volumeScale === "number" ? avr.volumeScale : parseInt(String(avr.volumeScale), 10);
-      if (![80, 100].includes(vs)) {
-        errors.push("volumeScale must be 80 or 100");
+      const raw = String(avr.volumeScale).trim().toLowerCase();
+      if (raw !== VOLUME_SCALE_AUTO && ![80, 100].includes(parseInt(raw, 10))) {
+        errors.push('volumeScale must be 80, 100 or "auto"');
       }
     }
 
@@ -348,7 +381,7 @@ export class ConfigManager {
       zone: this.validateZone(zone),
       queueThreshold: avr.queueThreshold,
       albumArtURL: avr.albumArtURL,
-      volumeScale: typeof avr.volumeScale === "string" ? parseInt(avr.volumeScale, 10) : avr.volumeScale,
+      volumeScale: parseVolumeScale(avr.volumeScale),
       volumeDisplay: String(avr.volumeDisplay ?? AVR_DEFAULTS.volumeDisplay).toLowerCase() === "relative" ? "relative" : "absolute",
       adjustVolumeDispl: parseBoolean(avr.adjustVolumeDispl, AVR_DEFAULTS.adjustVolumeDispl),
       entityNameStyle: (String(avr.entityNameStyle ?? AVR_DEFAULTS.entityNameStyle).toLowerCase() === "short" ? "short" : "long") as EntityNameStyle,

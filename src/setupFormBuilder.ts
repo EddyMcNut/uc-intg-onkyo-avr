@@ -34,15 +34,19 @@ export class SetupFormBuilder {
       },
       {
         id: "volumeScale",
-        label: { en: "Volume scale (0-80 or 0-100)" },
+        label: { en: "Volume scale" },
         field: {
           dropdown: {
             value: String(values.volumeScaleValue),
             items: [
-              { id: "100", label: { en: "0-100" } },
-              { id: "80", label: { en: "0-80" } }
+              { id: "auto", label: { en: "Auto (default)" } },
+              { id: "80", label: { en: "0-80" } },
+              { id: "100", label: { en: "0-100" } }
             ]
           }
+        },
+        description: {
+          en: "Auto reads the volume scale (0-80 or 0-100) from the AVR itself the first time it reports its capabilities, and then stores that value. Pick a scale yourself to skip that."
         }
       },
       {

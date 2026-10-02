@@ -92,11 +92,43 @@ export function physicalAvrIdFromEntityId(entityId: string): string | null {
   return buildPhysicalAvrId(model, host);
 }
 
+/**
+ * Volume scale setting.
+ *
+ * `VOLUME_SCALE_AUTO` is stored in the config until the AVR itself has reported its own maximum
+ * display volume through NRI. From then on the resolved 0-80 or 0-100 is stored, exactly like a
+ * manually chosen value, so it is never re-evaluated afterwards.
+ */
+export const VOLUME_SCALE_AUTO = "auto";
+export type VolumeScale = 80 | 100 | typeof VOLUME_SCALE_AUTO;
+
+/** Used for volume arithmetic as long as the setting is still "auto" and no AVR report is available. */
+export const VOLUME_SCALE_FALLBACK = 100;
+
+/** Coerce any stored or user-supplied volume scale to "auto", 80 or 100. Anything unknown becomes the default ("auto"). */
+export function parseVolumeScale(raw: unknown): VolumeScale {
+  if (typeof raw === "string" && raw.trim().toLowerCase() === VOLUME_SCALE_AUTO) {
+    return VOLUME_SCALE_AUTO;
+  }
+  const parsed = typeof raw === "number" ? raw : parseInt(String(raw ?? "").trim(), 10);
+  return parsed === 80 || parsed === 100 ? parsed : VOLUME_SCALE_AUTO;
+}
+
+/**
+ * Numeric volume scale for volume arithmetic.
+ * An unresolved "auto" (or anything unusable) falls back to VOLUME_SCALE_FALLBACK, which is also the
+ * documented default for AVRs that do not report their own maximum.
+ */
+export function resolveVolumeScale(raw: unknown): number {
+  const parsed = typeof raw === "number" ? raw : parseInt(String(raw ?? "").trim(), 10);
+  return isNaN(parsed) || parsed <= 0 ? VOLUME_SCALE_FALLBACK : parsed;
+}
+
 /** Default values for AVR configuration */
 export const AVR_DEFAULTS = {
   queueThreshold: DEFAULT_QUEUE_THRESHOLD,
   albumArtURL: "album_art.cgi",
-  volumeScale: 100,
+  volumeScale: VOLUME_SCALE_AUTO,
   volumeDisplay: "absolute",
   adjustVolumeDispl: true,
   entityNameStyle: "short",
@@ -121,7 +153,7 @@ export interface AvrConfig {
   zone: AvrZone;
   queueThreshold?: number;
   albumArtURL?: string;
-  volumeScale?: number; // 80 or 100
+  volumeScale?: VolumeScale; // "auto" (resolve from the AVR), 80 or 100
   volumeDisplay?: VolumeDisplay; // absolute = 1-100 style, relative = dB style
   adjustVolumeDispl?: boolean; // true = use 0.5 dB steps (×2 / ÷2), false = direct EISCP value
   entityNameStyle?: EntityNameStyle; // long = include host/ip in visible names, short = omit host/ip
@@ -142,7 +174,7 @@ export interface OnkyoConfig {
   logLevel?: LogLevel;
   queueThreshold?: number;
   albumArtURL?: string;
-  volumeScale?: number; // 80 or 100
+  volumeScale?: VolumeScale; // "auto" (resolve from the AVR), 80 or 100
   volumeDisplay?: VolumeDisplay;
   adjustVolumeDispl?: boolean; // true = use 0.5 dB steps (×2 / ÷2), false = direct EISCP value
   entityNameStyle?: EntityNameStyle;
@@ -163,7 +195,7 @@ export interface NormalizedAvrConfig {
   zone: AvrZone;
   queueThreshold: number;
   albumArtURL: string;
-  volumeScale: number;
+  volumeScale: VolumeScale;
   volumeDisplay: VolumeDisplay;
   adjustVolumeDispl: boolean;
   entityNameStyle: EntityNameStyle;
@@ -187,10 +219,7 @@ export function normalizeAvrConfig(raw: AvrConfig): NormalizedAvrConfig {
 
   const albumArtURL = typeof raw.albumArtURL === "string" && raw.albumArtURL.trim() !== "" ? raw.albumArtURL.trim() : AVR_DEFAULTS.albumArtURL;
 
-  const volumeScale = (() => {
-    const v = typeof raw.volumeScale === "number" ? raw.volumeScale : parseInt(String(raw.volumeScale ?? ""), 10);
-    return v === 80 || v === 100 ? v : AVR_DEFAULTS.volumeScale;
-  })();
+  const volumeScale = parseVolumeScale(raw.volumeScale);
 
   const volumeDisplay: VolumeDisplay = String(raw.volumeDisplay ?? AVR_DEFAULTS.volumeDisplay).toLowerCase() === "relative" ? "relative" : "absolute";
 

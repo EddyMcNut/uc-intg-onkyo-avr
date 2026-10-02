@@ -8,6 +8,7 @@
 // The payload is a flat, attribute-only document, so a targeted scan is used instead of a real
 // XML parser: this keeps the integration free of runtime dependencies.
 import { physicalAvrIdFromEntityId } from "./configManager.js";
+import { ZONE_ID_BY_ZONE } from "./zoneMappings.js";
 
 /**
  * Band values observed in the `band` attribute of `<preset>` elements.
@@ -67,6 +68,11 @@ export type AvrZone = {
   id: number;
   name: string;
   enabled: boolean;
+  /**
+   * `volmax`: the highest volume the AVR shows on its own display for this zone, in display units
+   * (80 or 100). Zones the AVR has disabled report 0, and models without a volume scale omit it.
+   */
+  volMax?: number;
 };
 
 export type AvrTunerBand = {
@@ -236,7 +242,8 @@ export function parseAvrInfo(xml: string): AvrInfo | null {
         info.zones.push({
           id,
           name: attributes.name ?? "",
-          enabled: toBoolean(attributes.value)
+          enabled: toBoolean(attributes.value),
+          volMax: toOptionalInt(attributes.volmax)
         });
         break;
       }
@@ -342,6 +349,20 @@ export function listNetServiceNames(entityId: string): string[] {
 /** Read one control's raw value by id, e.g. getControlValue(id, "DolbyAtmos"). */
 export function getControlValue(entityId: string, controlId: string): string | undefined {
   return getAvrInfo(entityId)?.controls.find((control) => control.id === controlId)?.value;
+}
+
+/**
+ * Highest volume the AVR shows on its own display, in display units (80 or 100).
+ *
+ * The scale is a property of the AVR rather than of the zone, so the zone itself is preferred and any
+ * other zone that reports a usable value is used as fallback. Returns undefined when nothing was
+ * collected yet, when the AVR does not support NRI, or when it reports no volume scale at all.
+ */
+export function getAvrVolumeScale(entityId: string, zone: string): number | undefined {
+  const zones = getAvrInfo(entityId)?.zones ?? [];
+  const hasVolumeScale = (candidate: AvrZone | undefined): boolean => (candidate?.volMax ?? 0) > 0;
+  const reporting = [zones.find((z) => z.id === ZONE_ID_BY_ZONE[zone]), ...zones].find(hasVolumeScale);
+  return reporting?.volMax;
 }
 
 export function resetAvrInfo(entityId: string): void {

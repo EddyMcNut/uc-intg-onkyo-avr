@@ -1,6 +1,6 @@
 import * as uc from "@unfoldedcircle/integration-api";
 import { EiscpDriver } from "./eiscp.js";
-import { buildEntityId, DEFAULT_QUEUE_THRESHOLD, OnkyoConfig } from "./configManager.js";
+import { buildEntityId, DEFAULT_QUEUE_THRESHOLD, OnkyoConfig, resolveVolumeScale } from "./configManager.js";
 import { MAX_LENGTHS, PATTERNS } from "./configConstants.js";
 import { ICommandReceiver, AvrStateApi } from "./types.js";
 import { ZONE_VOLUME_PREFIX, ZONE_VOLUME_UP_DOWN } from "./zoneMappings.js";
@@ -145,7 +145,7 @@ export class CommandSender {
           return uc.StatusCodes.Ok;
         }
         const sliderValue = Math.max(0, Math.min(100, Number(params.volume)));
-        const volumeScale = this.config.volumeScale || 100;
+        const volumeScale = resolveVolumeScale(this.config.volumeScale);
         const adjustVolumeDispl = this.config.adjustVolumeDispl ?? true;
         const avrDisplayValue = Math.round((sliderValue * volumeScale) / 100);
         const eiscpValue = adjustVolumeDispl ? avrDisplayValue * 2 : avrDisplayValue;

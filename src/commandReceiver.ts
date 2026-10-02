@@ -1,6 +1,6 @@
 import * as uc from "@unfoldedcircle/integration-api";
 import { SelectAttributes } from "@unfoldedcircle/integration-api";
-import { OnkyoConfig, buildEntityId } from "./configManager.js";
+import { OnkyoConfig, buildEntityId, resolveVolumeScale } from "./configManager.js";
 import { EiscpDriver } from "./eiscp.js";
 import { getCompatibleListeningModes } from "./listeningModeFilters.js";
 import { classifyAudioFormat, formatAudioTypeName } from "./audioFormatClassifier.js";
@@ -41,13 +41,15 @@ export class CommandReceiver {
   private zoneAgnosticProcessor: ZoneAgnosticUpdateProcessor;
   private zoneAgnosticHandlers: Record<string, ZoneAgnosticHandler>;
   private avInfoRequeryTimer: ReturnType<typeof setTimeout> | null = null;
+  private onAvrInfo?: (entityId: string) => void;
 
-  constructor(driver: uc.IntegrationAPI, config: OnkyoConfig, eiscpInstance: EiscpDriver, avrStateApi: AvrStateApi, driverVersion: string = "unknown") {
+  constructor(driver: uc.IntegrationAPI, config: OnkyoConfig, eiscpInstance: EiscpDriver, avrStateApi: AvrStateApi, driverVersion: string = "unknown", onAvrInfo?: (entityId: string) => void) {
     this.driver = driver;
     this.config = config;
     this.eiscpInstance = eiscpInstance;
     this.avrStateApi = avrStateApi;
     this.driverVersion = driverVersion;
+    this.onAvrInfo = onAvrInfo;
     this.zoneAgnosticProcessor = new ZoneAgnosticUpdateProcessor(driver, config, eiscpInstance, avrStateApi);
     this.zoneAgnosticHandlers = {
       IFA: async (avrUpdates, entityId, eventZone) => {
@@ -87,8 +89,11 @@ export class CommandReceiver {
         await this.zoneAgnosticProcessor.handleMetadata(entityId, metadata);
       },
       // The NRI payload is already parsed and stored by the command parser. All that is left is to
+      // let the driver act on what the AVR reported (e.g. the maximum display volume) and to
       // re-render, so the entity picks up presets, zones and services without another AVR query.
-      "avr-info": async () => {}
+      "avr-info": async (_avrUpdates, entityId) => {
+        this.onAvrInfo?.(entityId);
+      }
     };
   }
 
@@ -214,7 +219,7 @@ export class CommandReceiver {
 
   private async handleVolume(avrUpdates: AvrUpdateEvent, entityId: string): Promise<void> {
     const eiscpValue = Number(avrUpdates.argument);
-    const volumeScale = this.config.volumeScale ?? 100;
+    const volumeScale = resolveVolumeScale(this.config.volumeScale);
     const adjustVolumeDispl = this.config.adjustVolumeDispl ?? true;
     const volumeDisplay = String(this.config.volumeDisplay ?? "absolute").toLowerCase() === "relative" ? "relative" : "absolute";
     const avrDisplayValue = adjustVolumeDispl ? Math.round(eiscpValue / 2) : eiscpValue;

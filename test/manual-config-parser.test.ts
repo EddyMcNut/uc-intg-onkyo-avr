@@ -51,7 +51,7 @@ describe("ManualConfigParser", () => {
     expect(result.portNum).toBe(60128);
     expect(result.queueThresholdValue).toBe(100);
     expect(result.albumArtURLValue).toBe("album_art.cgi");
-    expect(result.volumeScaleValue).toBe(100);
+    expect(result.volumeScaleValue).toBe("auto");
     expect(result.volumeDisplayValue).toBe("absolute");
     expect(result.adjustVolumeDisplValue).toBe(true);
     expect(result.zoneCountValue).toBe(1);
@@ -71,15 +71,18 @@ describe("ManualConfigParser", () => {
     expect(parser.parse({ port: null }).portNum).toBe(60128);
   });
 
-  it("validates volume scale (only 80 or 100)", async () => {
+  it("validates volume scale (auto, 80 or 100)", async () => {
     const mod = await import("../src/manualConfigParser.js");
     const { ManualConfigParser } = mod as { ManualConfigParser: new () => any };
     const parser = new ManualConfigParser();
     expect(parser.parse({ volumeScale: 80 }).volumeScaleValue).toBe(80);
     expect(parser.parse({ volumeScale: 100 }).volumeScaleValue).toBe(100);
-    // Invalid values fall back to default
-    expect(parser.parse({ volumeScale: 50 }).volumeScaleValue).toBe(100);
-    expect(parser.parse({ volumeScale: "abc" }).volumeScaleValue).toBe(100);
+    expect(parser.parse({ volumeScale: "100" }).volumeScaleValue).toBe(100);
+    expect(parser.parse({ volumeScale: "auto" }).volumeScaleValue).toBe("auto");
+    expect(parser.parse({ volumeScale: "AUTO" }).volumeScaleValue).toBe("auto");
+    // Invalid values fall back to the default
+    expect(parser.parse({ volumeScale: 50 }).volumeScaleValue).toBe("auto");
+    expect(parser.parse({ volumeScale: "abc" }).volumeScaleValue).toBe("auto");
   });
 
   it("validates tuneinPresetPosition (1-9 range)", async () => {

@@ -71,6 +71,22 @@ In the Activity, `Button mapping`, click the `Touch slider`, select your Onkyo A
 
 Now you can control the AVR volume with the Slider.
 
+### Volume scale: Auto
+
+Your AVR shows its volume either as 0-80 or as 0-100. When the setup asks for the `Volume scale` you can pick one of those yourself, or leave it on `Auto (default)`:
+
+- `Auto (default)`: the integration asks the AVR for its own maximum volume the first time the AVR reports what it can do, stores that value (0-80 or 0-100) and uses it from then on. Which scale your AVR uses is therefore never a guess.
+- `0-80` / `0-100`: the scale you selected is used as-is and is never checked against the AVR.
+
+`Auto` is only used once: as soon as a value is stored it behaves exactly like a value you selected yourself, so it is not updated again later on. You can always set it back to `Auto` (or to the other scale) in the setup.
+
+Not every model answers this question. When the AVR does not report a volume scale, or does not report what it can do at all, `Auto` falls back to 0-100. Set the log level to `Debug (all)` to see which of the two happened:
+
+```
+[DEBUG] driver: [TX-RZ50 192.168.2.103 main] Volume scale 'auto' resolved to 0-80: AVR reports a maximum display volume of 80
+[DEBUG] driver: [TX-RZ50 192.168.2.103 main] Volume scale 'auto' resolved to 0-100: AVR does not report a maximum display volume, so the default is used
+```
+
 ### Multi Zone Volume
 
 As from v0.8.3 this integration supports controlling the volume for multiple zones with just a single command. Let's assume you have an activity that uses multiple zones:
@@ -81,7 +97,7 @@ Then in that activity you can use the `multi-zone-volume all-up` command (assign
 
 ![](../screenshots/volume-multi.png)
 
-Lookup `multi-zone-volume` in the [JSON](../src/eiscp-commands.ts) to see the available options, for example `zone2-zone3-up` to adjust zones2 and 3 but not the main zone. The command `multi-zone-volume all-up`controls the volume on all _configured_ zones.
+Lookup `multi-zone-volume` in the [simple commands overview](./generated-simplecommands.md) to see the available options, for example `zone2-zone3-up` to adjust zones2 and 3 but not the main zone. The command `multi-zone-volume all-up`controls the volume on all _configured_ zones.
 
 _Note: multi-zone-volume does **not** support the use of the slider._
 
@@ -93,4 +109,4 @@ Assign `multi-zone-mute-all-toggle` to the muting button to mute all comfigured 
 
 ![](../screenshots/muting-multi.png)
 
-Lookup `multi-zone-muting` in the [JSON](../src/eiscp-commands.ts) to see the available options, for example `zone2-zone3-toggle` to toggle zones2 and 3 but not the main zone.
+Lookup `multi-zone-muting` in the [simple commands overview](./generated-simplecommands.md) to see the available options, for example `zone2-zone3-toggle` to toggle zones2 and 3 but not the main zone.

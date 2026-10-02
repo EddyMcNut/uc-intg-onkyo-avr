@@ -71,7 +71,9 @@ describe("avrInfoStore", () => {
       expect(info.netServices.find((s: any) => s.id === "0e")?.name).toBe("TuneIn Radio");
 
       expect(info.zones).toHaveLength(4);
-      expect(info.zones[0]).toEqual({ id: 1, name: "Main", enabled: true });
+      expect(info.zones[0]).toEqual({ id: 1, name: "Main", enabled: true, volMax: 100 });
+      // Zone 4 is disabled on this AVR and reports no usable volume maximum.
+      expect(info.zones[3]).toEqual({ id: 4, name: "Zone4", enabled: false, volMax: 0 });
 
       expect(info.tunerBands).toEqual([{ band: "FM", min: 87500, max: 108000, step: 50 }]);
     });
@@ -204,6 +206,37 @@ describe("avrInfoStore", () => {
     it("getControlValue reads a control flag by id", () => {
       expect(store.getControlValue(validEntityId, "DolbyAtmos")).toBe("1");
       expect(store.getControlValue(validEntityId, "NoSuchControl")).toBeUndefined();
+    });
+
+    it("getAvrVolumeScale reads the maximum display volume of the requested zone", () => {
+      expect(store.getAvrVolumeScale(validEntityId, "main")).toBe(100);
+      expect(store.getAvrVolumeScale(validEntityId, "zone2")).toBe(100);
+    });
+
+    it("getAvrVolumeScale is undefined when the AVR reports no volume scale", () => {
+      const info = store.parseAvrInfo(realResponseXml);
+      info.zones = [{ id: 1, name: "Main", enabled: true }];
+      store.setAvrInfo(validEntityId, info);
+
+      expect(store.getAvrVolumeScale(validEntityId, "main")).toBeUndefined();
+    });
+
+    it("getAvrVolumeScale falls back to another zone when the requested zone reports none", () => {
+      const info = store.parseAvrInfo(realResponseXml);
+      // A zone the AVR has switched off reports 0 rather than its volume range.
+      info.zones = [
+        { id: 4, name: "Zone4", enabled: false, volMax: 0 },
+        { id: 1, name: "Main", enabled: true, volMax: 80 }
+      ];
+      store.setAvrInfo(validEntityId, info);
+
+      expect(store.getAvrVolumeScale(validEntityId, "zone4")).toBe(80);
+      expect(store.getAvrVolumeScale(validEntityId, "unknownzone")).toBe(80);
+    });
+
+    it("getAvrVolumeScale is undefined when nothing was collected", () => {
+      store.resetAvrInfo(validEntityId);
+      expect(store.getAvrVolumeScale(validEntityId, "main")).toBeUndefined();
     });
 
     it("resetAvrInfo clears the snapshot", () => {

@@ -1,5 +1,5 @@
 // Focused responsibility: Parse and validate manual configuration input
-import { LogLevel, AVR_DEFAULTS, parseBoolean } from "./configManager.js";
+import { LogLevel, AVR_DEFAULTS, parseBoolean, parseVolumeScale, type VolumeScale } from "./configManager.js";
 
 export interface ManualConfigInput {
   model?: unknown;
@@ -31,7 +31,7 @@ export interface ParsedManualConfig {
   albumArtURLValue: string;
   listeningModeOptions: string;
   inputSelectorOptions: string;
-  volumeScaleValue: number;
+  volumeScaleValue: VolumeScale;
   volumeDisplayValue: "absolute" | "relative";
   adjustVolumeDisplValue: boolean;
   entityNameStyleValue: "long" | "short";
@@ -86,10 +86,8 @@ export class ManualConfigParser {
     return typeof url === "string" && url.trim() !== "" ? url.trim() : AVR_DEFAULTS.albumArtURL;
   }
 
-  private parseVolumeScale(scale: unknown): number {
-    const parsed = parseInt(String(scale), 10);
-    if (isNaN(parsed)) return AVR_DEFAULTS.volumeScale;
-    return [80, 100].includes(parsed) ? parsed : AVR_DEFAULTS.volumeScale;
+  private parseVolumeScale(scale: unknown): VolumeScale {
+    return parseVolumeScale(scale);
   }
 
   private parseVolumeDisplay(display: unknown): "absolute" | "relative" {

@@ -100,7 +100,18 @@ describe("ConfigManager static methods", () => {
 
     it("rejects invalid volumeScale", () => {
       const result = ConfigManager.validateAvrPayload({ model: "TX-RZ50", ip: "1.2.3.4", port: 60128, volumeScale: 50 });
-      expect(result.errors).toContain("volumeScale must be 80 or 100");
+      expect(result.errors).toContain('volumeScale must be 80, 100 or "auto"');
+    });
+
+    it("accepts an auto volumeScale", () => {
+      const result = ConfigManager.validateAvrPayload({ model: "TX-RZ50", ip: "1.2.3.4", port: 60128, volumeScale: "auto" });
+      expect(result.errors).toHaveLength(0);
+      expect(result.normalized!.volumeScale).toBe("auto");
+    });
+
+    it("defaults an absent volumeScale to auto", () => {
+      const result = ConfigManager.validateAvrPayload({ model: "TX-RZ50", ip: "1.2.3.4", port: 60128 });
+      expect(result.normalized!.volumeScale).toBe("auto");
     });
 
     it("rejects invalid volumeDisplay", () => {
@@ -242,7 +253,7 @@ describe("ConfigManager static methods", () => {
 
     it("rejects volumeScale from string NaN", () => {
       const result = ConfigManager.validateAvrPayload({ model: "TX-RZ50", ip: "1.2.3.4", port: 60128, volumeScale: "abc" });
-      expect(result.errors).toContain("volumeScale must be 80 or 100");
+      expect(result.errors).toContain('volumeScale must be 80, 100 or "auto"');
     });
 
     it("rejects adjustVolumeDispl with wrong type", () => {
@@ -400,6 +411,36 @@ describe("ConfigManager static methods", () => {
       expect(result.avrs).toHaveLength(1);
       expect(result.avrs[0].queueThreshold).toBe(10);
       expect(result.avrs[0].albumArtURL).toBe("/art");
+    });
+  });
+
+  describe("patchAvr", () => {
+    beforeEach(() => {
+      mockWriteFileSync.mockReset();
+      ConfigManager.config = {
+        avrs: [
+          { model: "TX-RZ50", ip: "1.2.3.4", port: 60128, zone: "main", volumeScale: "auto", entityNameStyle: "short" },
+          { model: "TX-RZ50", ip: "1.2.3.4", port: 60128, zone: "zone2", volumeScale: "auto" }
+        ]
+      } as any;
+    });
+
+    it("merges the patch into the matching zone only and persists it", () => {
+      expect(ConfigManager.patchAvr("1.2.3.4", "main", { volumeScale: 80 })).toBe(true);
+
+      expect(ConfigManager.config.avrs[0].volumeScale).toBe(80);
+      // The other settings of that AVR are left alone.
+      expect(ConfigManager.config.avrs[0].entityNameStyle).toBe("short");
+      expect(ConfigManager.config.avrs[1].volumeScale).toBe("auto");
+
+      expect(mockWriteFileSync).toHaveBeenCalled();
+      const written = JSON.parse(mockWriteFileSync.mock.calls[0][1]);
+      expect(written.avrs[0].volumeScale).toBe(80);
+    });
+
+    it("returns false for a zone that is not configured", () => {
+      expect(ConfigManager.patchAvr("9.9.9.9", "main", { volumeScale: 80 })).toBe(false);
+      expect(mockWriteFileSync).not.toHaveBeenCalled();
     });
   });
 

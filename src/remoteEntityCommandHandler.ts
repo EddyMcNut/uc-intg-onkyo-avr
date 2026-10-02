@@ -3,7 +3,7 @@
 import * as uc from "@unfoldedcircle/integration-api";
 import { RemoteCommands, RemoteAttributes, RemoteStates } from "@unfoldedcircle/integration-api";
 import { IPhysicalConnectionLookup, IAvrInstanceLookup, AvrStateApi, ICommandReceiver } from "./types.js";
-import { buildPhysicalAvrId } from "./configManager.js";
+import { buildPhysicalAvrId, resolveVolumeScale } from "./configManager.js";
 import { ensureEiscpConnected, delay, toHex } from "./utils.js";
 import { ZONE_VOLUME_PREFIX, ZONE_VOLUME_UP_DOWN } from "./zoneMappings.js";
 import { SIMPLE_COMMANDS_MAP, ALL_INPUT_SELECTOR_NAMES } from "./simpleCommands.js";
@@ -230,7 +230,7 @@ export class remoteEntityCommandHandler {
       return uc.StatusCodes.Ok;
     }
     const sliderValue = Math.max(0, Math.min(100, Number(params.volume)));
-    const volumeScale = cfg.volumeScale || 100;
+    const volumeScale = resolveVolumeScale(cfg.volumeScale);
     const adjustVolumeDispl = cfg.adjustVolumeDispl ?? true;
     const avrDisplayValue = Math.round((sliderValue * volumeScale) / 100);
     const eiscpValue = adjustVolumeDispl ? avrDisplayValue * 2 : avrDisplayValue;
