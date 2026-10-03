@@ -3,7 +3,6 @@ import { EiscpDriver } from "./eiscp.js";
 import log from "./loggers.js";
 import { delay } from "./utils.js";
 import { QUERY_DEFAULT_DELAY, WAIT_FOR_CONNECT_TIMEOUT } from "./constants.js";
-import { isAvrInfoStale } from "./avrInfoStore.js";
 
 const integrationName = "avrStateQuery:";
 
@@ -52,12 +51,6 @@ class AvrStateQueryService {
 
     log.info(`${integrationName} [%s] Querying AVR state for zone %s (%s)...`, entityId, zone, context);
     try {
-      // AVR info is queried first because it carries the preset lists and the available inputs
-      // and services. It is a large reply, so it is only re-collected once the snapshot goes stale.
-      if (isAvrInfoStale(entityId)) {
-        await eiscpInstance.command({ zone, command: "avr-info", args: "query" });
-        await delay(threshold);
-      }
       await eiscpInstance.command({ zone, command: "system-power", args: "query" });
       await delay(threshold);
       await eiscpInstance.command({ zone, command: "input-selector", args: "query" });

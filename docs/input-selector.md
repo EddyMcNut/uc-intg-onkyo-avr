@@ -2,7 +2,7 @@
 
 ### Select source from dropdown
 
-The `Input source` command offers a dropdown list [based on your config](./source-webconfigurator-mediawidget.md), so depending on how you configured [Input Select](./select-input-selector.md) the integration will show a list of input sources. By default the list is taken from your AVR itself, see [`Input source list: Auto / Manual`](./select-input-selector.md).
+The `Input source` command offers a dropdown list [based on your config](./source-webconfigurator-mediawidget.md), so depending on how you configured [Input Select](./select-input-selector.md) the integration will show a list of input sources. By default AVR-reported names and IDs are used when available.
 
 ![](/screenshots/input-source2.png)
 

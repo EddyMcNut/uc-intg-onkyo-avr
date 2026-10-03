@@ -1,33 +1,51 @@
-// Resolve the "auto" input source list setting against what the AVR reports about itself.
-//
-// The hardcoded SLI table in eiscp-commands.ts has to guess what an AVR calls its inputs and which
-// ones it has, and gets it wrong for renamed inputs, model-specific variants and inputs added by a
-// firmware update. NRI knows: it states the exact input ids and the exact names per AVR.
-//
-// "auto" therefore uses those collected names. When the AVR reports no inputs at all — because it
-// does not support NRI, or its firmware has no input list — there is nothing to use, so the setting
-// is stored as "manual" and the hardcoded table is used from then on.
-import { INPUT_SOURCE_LIST_AUTO, INPUT_SOURCE_LIST_MANUAL, type AvrConfig, type InputSourceList } from "./configManager.js";
+// Resolve configured input aliases against the names and IDs reported by the AVR.
+import { eiscpMappings } from "./eiscp-mappings.js";
+import { type AvrConfig } from "./configManager.js";
+import { getAvrInputs, normalizeAvrInputs, type AvrInput } from "./inputSourceStore.js";
 import { listSelectors } from "./avrInfoStore.js";
-import { isExcludedInputName, normalizeAvrInputs, type AvrInput } from "./inputSourceStore.js";
 
 export type InputSourceListResolution = {
-  /** Mode to keep, or to store in the config. */
-  mode: InputSourceList;
-  /** Collected inputs, only set when the mode stays "auto". */
   inputs?: AvrInput[];
-  /** How this was arrived at, for the debug log. */
   reason: string;
 };
 
-/**
- * Resolve the input source list of one AVR when it is set to "auto".
- *
- * Returns undefined when there is nothing to do: the AVR is already on "manual", so a setting the
- * user made is never overwritten.
- */
+/** Return the stable SLI ID for a built-in integration alias. */
+export function getInputSourceId(option: string): string | undefined {
+  const mappings = eiscpMappings.value_mappings.SLI as Record<string, { value: string }>;
+  return mappings[option.trim().toLowerCase()]?.value.toLowerCase();
+}
+
+/** Resolve a displayed option to an AVR-reported ID, then fall back to the built-in alias mapping. */
+export function resolveInputSourceId(physicalAvrId: string, option: string): string | undefined {
+  return getAvrInputs(physicalAvrId).find((input) => input.name.toLowerCase() === option.trim().toLowerCase())?.id ?? getInputSourceId(option);
+}
+
+/** Build the options shown by the input selector for one configured AVR zone. */
+export function getEffectiveInputSourceOptions(avrConfig: AvrConfig, physicalAvrId: string, builtInOptions: string[]): string[] {
+  const configured = avrConfig.inputSelectorOptions;
+  if (!avrConfig.useAvrReportedInputs) {
+    return configured === null ? [] : Array.isArray(configured) ? configured.map((option) => option.trim()) : builtInOptions;
+  }
+
+  const reported = getAvrInputs(physicalAvrId);
+  if (configured === null) {
+    return [];
+  }
+  if (configured === undefined || configured === "all") {
+    return reported.length > 0 ? reported.map((input) => input.name) : builtInOptions;
+  }
+
+  // The configured aliases remain the allowlist. AVR names replace matching aliases, while
+  // aliases unknown to this AVR remain selectable through the existing hardcoded SLI mapping.
+  return configured.map((option) => {
+    const id = getInputSourceId(option);
+    return reported.find((input) => input.id === id)?.name ?? option.trim();
+  });
+}
+
+/** Resolve the AVR's input list when AVR-reported names are enabled. */
 export function resolveInputSourceList(avrConfig: AvrConfig, entityId: string): InputSourceListResolution | undefined {
-  if (avrConfig.inputSourceList !== INPUT_SOURCE_LIST_AUTO) {
+  if (!avrConfig.useAvrReportedInputs) {
     return undefined;
   }
 
@@ -36,24 +54,12 @@ export function resolveInputSourceList(avrConfig: AvrConfig, entityId: string): 
 
   if (inputs.length === 0) {
     return {
-      mode: INPUT_SOURCE_LIST_MANUAL,
-      reason:
-        selectors.length === 0
-          ? "AVR reports no input sources, so the manual list is used"
-          : isOnlyPlaceholderInputs(selectors)
-            ? "AVR only reports placeholder inputs, so the manual list is used"
-            : "AVR reports input sources without usable names, so the manual list is used"
+      reason: selectors.length === 0 ? "AVR reports no input sources, so integration mappings are used" : "AVR reports no usable input source names, so integration mappings are used"
     };
   }
 
   return {
-    mode: INPUT_SOURCE_LIST_AUTO,
     inputs,
     reason: `AVR reports ${inputs.length} input(s): ${inputs.map((input) => `${input.name} (${input.id})`).join(", ")}`
   };
-}
-
-/** True when every reported entry is a placeholder that is not collected (see EXCLUDED_INPUT_NAMES). */
-function isOnlyPlaceholderInputs(selectors: { name: string }[]): boolean {
-  return selectors.every((selector) => isExcludedInputName(selector.name));
 }

@@ -38,7 +38,7 @@ describe("configPersistenceManager", () => {
       listeningModeOptions: undefined,
       inputSelectorOptions: undefined,
       volumeScaleValue: undefined,
-      inputSourceListValue: "manual",
+      useAvrReportedInputsValue: false,
       volumeDisplayValue: undefined,
       adjustVolumeDisplValue: undefined,
       entityNameStyleValue: undefined,
@@ -66,16 +66,28 @@ describe("configPersistenceManager", () => {
       expect(onConfigSaved).toHaveBeenCalledTimes(1);
     });
 
-    it("writes the input source list into the stored config", async () => {
+    it("writes AVR input name setting into the stored config", async () => {
       const mgr = new ConfigPersistenceManager(onConfigSaved);
       await mgr.saveManualConfiguration({
         ...baseParsedConfig,
         zoneCountValue: 1,
-        inputSourceListValue: "manual"
+        useAvrReportedInputsValue: false
       });
 
       const written = JSON.parse(mockWriteFileSync.mock.calls[0][1] as string);
-      expect(written.avrs[0].inputSourceList).toBe("manual");
+      expect(written.avrs[0].useAvrReportedInputs).toBe(false);
+    });
+
+    it("persists an empty input selector filter as all", async () => {
+      const mgr = new ConfigPersistenceManager(onConfigSaved);
+      await mgr.saveManualConfiguration({
+        ...baseParsedConfig,
+        zoneCountValue: 1,
+        inputSelectorOptions: ""
+      });
+
+      const written = JSON.parse(mockWriteFileSync.mock.calls[0][1] as string);
+      expect(written.avrs[0].inputSelectorOptions).toBe("all");
     });
 
     it("saves multi-zone config", async () => {

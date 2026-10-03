@@ -4,34 +4,68 @@ import { ParsedManualConfig } from "./manualConfigParser.js";
 
 export class SetupFormBuilder {
   buildManualConfigForm(values: ParsedManualConfig): uc.RequestUserInput {
+    return this.buildManualConfigPage1(values);
+  }
+
+  buildManualConfigPage1(values: ParsedManualConfig): uc.RequestUserInput {
+    return this.buildManualConfigFormPage(values, "Manual configuration (1/3)", [
+      "info", "autoDiscoveryInfo", "model", "ipAddress", "port", "albumArtURL", "queueThreshold", "netMenuDelay", "zoneCount"
+    ]);
+  }
+
+  buildManualConfigPage2(values: ParsedManualConfig): uc.RequestUserInput {
+    return this.buildManualConfigFormPage(values, "Manual configuration (2/3)", [
+      "entityNameStyle", "volumeScale", "volumeDisplay", "adjustVolumeDispl", "useAvrReportedInputs", "tuneinPresetPosition", "tuneinMenuStyle"
+    ]);
+  }
+
+  buildManualConfigPage3(values: ParsedManualConfig): uc.RequestUserInput {
+    return this.buildManualConfigFormPage(values, "Manual configuration (3/3)", [
+      "createRemoteEntity", "createSensors", "createTunerPresets", "createDiracSelectEntity", "listeningModeOptions", "inputSelectorOptions", "logLevel"
+    ]);
+  }
+
+  private buildManualConfigFormPage(values: ParsedManualConfig, title: string, ids: string[]): uc.RequestUserInput {
+    const form = this.buildManualConfigFormAll(values);
+    const settings = (form.settings as Array<{ id: string }>).filter((setting) => ids.includes(setting.id));
+    return new uc.RequestUserInput(title, settings);
+  }
+
+  private buildManualConfigFormAll(values: ParsedManualConfig): uc.RequestUserInput {
     return new uc.RequestUserInput("Manual configuration", [
       ...(values.errorMessage ? [{ id: "info", label: { en: "Validation errors" }, field: { label: { value: { en: values.errorMessage } } } }] : []),
-      { id: "model", label: { en: "AVR Model (or a name you prefer)" }, field: { text: { value: values.modelName } } },
-      { id: "ipAddress", label: { en: "AVR IP Address (for example `192.168.1.100`)" }, field: { text: { value: values.ipVal } } },
-      { id: "port", label: { en: "AVR Port (default `60128`)" }, field: { number: { value: values.portNum } } },
+      {
+        id: "autoDiscoveryInfo",
+        label: { en: "Automatic AVR detection" },
+        field: {
+          label: {
+            value: {
+              en: "Leave the Model, IP Address and Port empty to let the integration try to automatically detect the AVR."
+            }
+          }
+        }
+      },
+      {
+        id: "model",
+        label: { en: "AVR Model (or a name you prefer)" },
+        field: { text: { value: values.modelName } },
+        description: { en: "Leave empty together with the AVR IP Address to let the integration auto-detect the AVR." }
+      },
+      {
+        id: "ipAddress",
+        label: { en: "AVR IP Address (for example `192.168.1.100`)" },
+        field: { text: { value: values.ipVal } },
+        description: { en: "Leave empty together with the AVR Model to let the integration auto-detect the AVR." }
+      },
+      {
+        id: "port",
+        label: { en: "AVR Port (default `60128`)" },
+        field: { number: { value: values.portNum } },
+        description: { en: "Leave empty during auto-detection to use the port reported by the AVR." }
+      },
       { id: "albumArtURL", label: { en: "AVR AlbumArt endpoint. Default `album_art.cgi`, if not known set to `na`." }, field: { text: { value: values.albumArtURLValue } } },
       { id: "queueThreshold", label: { en: "Message queue threshold. Default `100`" }, field: { number: { value: values.queueThresholdValue } } },
       { id: "netMenuDelay", label: { en: "NET sub-source selection delay. Default `500`" }, field: { number: { value: values.netMenuDelayValue } } },
-      {
-        id: "tuneinPresetPosition",
-        label: { en: "TuneIn 'My Presets' menu position (1-9). Default `1`" },
-        field: { number: { value: values.tuneinPresetPositionValue } },
-        description: { en: "Position of 'My Presets' in your AVR's TuneIn menu (1=first, 2=second, etc.)" }
-      },
-      {
-        id: "tuneinMenuStyle",
-        label: { en: "TuneIn menu mode" },
-        field: {
-          dropdown: {
-            value: String(values.tuneinMenuStyleValue),
-            items: [
-              { id: "mypresets", label: { en: "My Presets (default)" } },
-              { id: "full", label: { en: "Full menu" } }
-            ]
-          }
-        },
-        description: { en: "Choose how TuneIn navigation is handled when selecting presets." }
-      },
       {
         id: "volumeScale",
         label: { en: "Volume scale" },
@@ -47,22 +81,6 @@ export class SetupFormBuilder {
         },
         description: {
           en: "Auto reads the volume scale (0-80 or 0-100) from the AVR itself the first time it reports its capabilities, and then stores that value. Pick a scale yourself to skip that."
-        }
-      },
-      {
-        id: "inputSourceList",
-        label: { en: "Input source list" },
-        field: {
-          dropdown: {
-            value: String(values.inputSourceListValue),
-            items: [
-              { id: "auto", label: { en: "Auto (default)" } },
-              { id: "manual", label: { en: "Manual" } }
-            ]
-          }
-        },
-        description: {
-          en: "Auto uses the inputs the AVR reports itself, in the AVR's own naming. Manual uses the built-in input list (see 'Input selector options' below)."
         }
       },
       {
@@ -98,11 +116,47 @@ export class SetupFormBuilder {
           dropdown: {
             value: String(values.entityNameStyleValue),
             items: [
-              { id: "long", label: { en: "Long - include IP address" } },
-              { id: "short", label: { en: "Short - hide IP address" } }
+              { id: "short", label: { en: "Short (default)" } },
+              { id: "long", label: { en: "Long (includes IP address)" } }
             ]
           }
         }
+      },
+      {
+        id: "useAvrReportedInputs",
+        label: { en: "Input source names" },
+        field: {
+          dropdown: {
+            value: String(values.useAvrReportedInputsValue),
+            items: [
+              { id: "true", label: { en: "Use AVR names (default)" } },
+              { id: "false", label: { en: "Use integration names" } }
+            ]
+          }
+        },
+        description: {
+          en: "Use AVR-reported names and IDs when available. Older AVRs without a usable input list fall back to the integration mappings."
+        }
+      },
+      {
+        id: "tuneinPresetPosition",
+        label: { en: "TuneIn 'My Presets' menu position (default 1)" },
+        field: { dropdown: { value: String(values.tuneinPresetPositionValue), items: Array.from({ length: 10 }, (_, i) => ({ id: String(i + 1), label: { en: String(i + 1) } })) } },
+        description: { en: "Position of 'My Presets' in your AVR's TuneIn menu (1=first, 2=second, etc.)" }
+      },
+      {
+        id: "tuneinMenuStyle",
+        label: { en: "TuneIn menu mode" },
+        field: {
+          dropdown: {
+            value: String(values.tuneinMenuStyleValue),
+            items: [
+              { id: "mypresets", label: { en: "My Presets (default)" } },
+              { id: "full", label: { en: "Full menu" } }
+            ]
+          }
+        },
+        description: { en: "Choose how TuneIn navigation is handled when selecting presets." }
       },
       {
         id: "zoneCount",
@@ -118,6 +172,18 @@ export class SetupFormBuilder {
             ]
           }
         }
+      },
+      {
+        id: "listeningModeOptions",
+        label: { en: "Listening mode options (semicolon-separated, 'all' shows all, 'none' to disable)" },
+        field: { text: { value: values.listeningModeOptions } },
+        description: { en: "Optional — semicolon-separated list (e.g. stereo; straight-decode; neural-thx). Enter 'all' for dynamic options, enter 'none' to hide this entity." }
+      },
+      {
+        id: "inputSelectorOptions",
+        label: { en: "Input selector options (semicolon-separated, 'all' shows all, 'none' to disable)" },
+        field: { text: { value: values.inputSelectorOptions } },
+        description: { en: "Optional — semicolon-separated list (e.g. dvd; bd; net; bluetooth). Enter 'all' to show all inputs, enter 'none' to hide this entity." }
       },
       {
         id: "createRemoteEntity",
@@ -177,18 +243,6 @@ export class SetupFormBuilder {
         description: { en: "Creates a select entity with fixed options Off, Slot 1, Slot 2, Slot 3 to switch Dirac room correction." }
       },
       {
-        id: "listeningModeOptions",
-        label: { en: "Listening mode options (semicolon-separated, 'all' shows all, 'none' to disable)" },
-        field: { text: { value: values.listeningModeOptions } },
-        description: { en: "Optional — semicolon-separated list (e.g. stereo; straight-decode; neural-thx). Enter 'all' for dynamic options, enter 'none' to hide this entity." }
-      },
-      {
-        id: "inputSelectorOptions",
-        label: { en: "Input selector options (semicolon-separated, 'all' shows all, 'none' to disable)" },
-        field: { text: { value: values.inputSelectorOptions } },
-        description: { en: "Optional — semicolon-separated list (e.g. dvd; bd; net; bluetooth). Enter 'all' to show all inputs, enter 'none' to hide this entity." }
-      },
-      {
         id: "logLevel",
         label: { en: "Log level" },
         field: {
@@ -235,7 +289,7 @@ export class SetupFormBuilder {
         field: {
           label: {
             value: {
-              en: "Choose whether to configure the integration manually, create a backup, or restore from a backup."
+              en: "Choose whether to configure the integration manually or restore from a backup."
             }
           }
         }

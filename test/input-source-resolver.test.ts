@@ -1,13 +1,13 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { resolveInputSourceList } from "../src/inputSourceResolver.js";
-import { clearAllAvrInputs } from "../src/inputSourceStore.js";
+import { getEffectiveInputSourceOptions, resolveInputSourceList } from "../src/inputSourceResolver.js";
+import { clearAllAvrInputs, setAvrInputs } from "../src/inputSourceStore.js";
 import { parseAvrInfo, setAvrInfo, resetAvrInfo } from "../src/avrInfoStore.js";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import type { AvrConfig } from "../src/configManager.js";
 
 const ENTITY_ID = "TX-RZ50 192.168.2.103 main";
-const AVR_CONFIG = { model: "TX-RZ50", ip: "192.168.2.103", zone: "main", inputSourceList: "auto" } as AvrConfig;
+const AVR_CONFIG = { model: "TX-RZ50", ip: "192.168.2.103", zone: "main", useAvrReportedInputs: true } as AvrConfig;
 
 function nriXml(selectorList: string): string {
   return [
@@ -30,7 +30,6 @@ describe("inputSourceResolver", () => {
 
     const resolution = resolveInputSourceList(AVR_CONFIG, ENTITY_ID);
 
-    expect(resolution?.mode).toBe("auto");
     // Sorted by name, so the option list is presented in a stable order.
     expect(resolution?.inputs).toEqual([
       { id: "10", name: "BD/DVD" },
@@ -39,18 +38,17 @@ describe("inputSourceResolver", () => {
     expect(resolution?.reason).toContain("2 input(s)");
   });
 
-  it("falls back to 'manual' when the AVR reports no inputs", () => {
+  it("falls back to integration mappings when the AVR reports no inputs", () => {
     setAvrInfo(ENTITY_ID, parseAvrInfo(nriXml("")));
 
     const resolution = resolveInputSourceList(AVR_CONFIG, ENTITY_ID);
 
-    expect(resolution?.mode).toBe("manual");
     expect(resolution?.inputs).toBeUndefined();
     expect(resolution?.reason).toContain("no input sources");
   });
 
-  it("falls back to 'manual' when nothing was collected at all", () => {
-    expect(resolveInputSourceList(AVR_CONFIG, ENTITY_ID)?.mode).toBe("manual");
+  it("falls back to integration mappings when nothing was collected at all", () => {
+    expect(resolveInputSourceList(AVR_CONFIG, ENTITY_ID)?.inputs).toBeUndefined();
   });
 
   it("ignores reported inputs without a usable name", () => {
@@ -58,8 +56,8 @@ describe("inputSourceResolver", () => {
 
     const resolution = resolveInputSourceList(AVR_CONFIG, ENTITY_ID);
 
-    expect(resolution?.mode).toBe("manual");
-    expect(resolution?.reason).toContain("without usable names");
+    expect(resolution?.inputs).toBeUndefined();
+    expect(resolution?.reason).toContain("no usable");
   });
 
   it("skips the placeholder entry 'Source' some AVRs report", () => {
@@ -67,26 +65,24 @@ describe("inputSourceResolver", () => {
 
     const resolution = resolveInputSourceList(AVR_CONFIG, ENTITY_ID);
 
-    expect(resolution?.mode).toBe("auto");
     expect(resolution?.inputs).toEqual([
       { id: "10", name: "BD/DVD" },
       { id: "12", name: "TV" }
     ]);
   });
 
-  it("falls back to 'manual' when the AVR only reports placeholder inputs", () => {
+  it("falls back when the AVR only reports placeholder inputs", () => {
     setAvrInfo(ENTITY_ID, parseAvrInfo(nriXml('<selectorlist count="1"><selector id="80" name="SOURCE" /></selectorlist>')));
 
     const resolution = resolveInputSourceList(AVR_CONFIG, ENTITY_ID);
 
-    expect(resolution?.mode).toBe("manual");
-    expect(resolution?.reason).toContain("placeholder");
+    expect(resolution?.inputs).toBeUndefined();
   });
 
-  it("does nothing when the setting is already 'manual'", () => {
+  it("does nothing when AVR-reported names are disabled", () => {
     setAvrInfo(ENTITY_ID, parseAvrInfo(nriXml('<selectorlist count="1"><selector id="10" name="BD/DVD" /></selectorlist>')));
 
-    expect(resolveInputSourceList({ ...AVR_CONFIG, inputSourceList: "manual" }, ENTITY_ID)).toBeUndefined();
+    expect(resolveInputSourceList({ ...AVR_CONFIG, useAvrReportedInputs: false }, ENTITY_ID)).toBeUndefined();
   });
 
   it("reads the inputs of a real AVR payload", () => {
@@ -95,8 +91,18 @@ describe("inputSourceResolver", () => {
 
     const resolution = resolveInputSourceList(AVR_CONFIG, ENTITY_ID);
 
-    expect(resolution?.mode).toBe("auto");
     expect(resolution?.inputs?.map((input) => input.name)).toContain("BD/DVD");
     expect(resolution?.inputs?.find((input) => input.name === "DAB")?.id).toBe("33");
+  });
+
+  it("renames configured aliases when the AVR reports the same ID and keeps unmatched aliases", () => {
+    setAvrInfo(ENTITY_ID, parseAvrInfo(nriXml('<selectorlist count="2"><selector id="10" name="Blu-ray" /><selector id="12" name="Television" /></selectorlist>')));
+    setAvrInputs("TX-RZ50 192.168.2.103", [
+      { id: "10", name: "Blu-ray" },
+      { id: "12", name: "Television" }
+    ]);
+    const config = { ...AVR_CONFIG, inputSelectorOptions: ["bd", "tv", "cd"] };
+
+    expect(getEffectiveInputSourceOptions(config, "TX-RZ50 192.168.2.103", ["bd", "tv", "cd"])).toEqual(["Blu-ray", "Television", "cd"]);
   });
 });

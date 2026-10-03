@@ -10,7 +10,6 @@ import {
   parseSelectOptions,
   parseBoolean,
   parseVolumeScale,
-  parseInputSourceList,
   AvrZone,
   AvrConfig,
   OnkyoConfig,
@@ -19,9 +18,7 @@ import {
   LogLevel,
   ALL_OPTIONS,
   SelectOptions,
-  VOLUME_SCALE_AUTO,
-  INPUT_SOURCE_LIST_AUTO,
-  INPUT_SOURCE_LIST_MANUAL
+  VOLUME_SCALE_AUTO
 } from "./configConstants.js";
 
 const integrationName = "configManager:";
@@ -54,7 +51,7 @@ export class ConfigManager {
       queueThreshold: avr.queueThreshold ?? AVR_DEFAULTS.queueThreshold,
       albumArtURL: avr.albumArtURL ?? AVR_DEFAULTS.albumArtURL,
       volumeScale: parseVolumeScale(avr.volumeScale),
-      inputSourceList: parseInputSourceList(avr.inputSourceList),
+      useAvrReportedInputs: parseBoolean(avr.useAvrReportedInputs, AVR_DEFAULTS.useAvrReportedInputs),
       volumeDisplay: avr.volumeDisplay ?? AVR_DEFAULTS.volumeDisplay,
       adjustVolumeDispl: avr.adjustVolumeDispl ?? AVR_DEFAULTS.adjustVolumeDispl,
       entityNameStyle: avr.entityNameStyle ?? AVR_DEFAULTS.entityNameStyle,
@@ -287,12 +284,9 @@ export class ConfigManager {
       }
     }
 
-    // inputSourceList
-    if (avr.inputSourceList !== undefined) {
-      const raw = String(avr.inputSourceList).trim().toLowerCase();
-      if (raw !== INPUT_SOURCE_LIST_AUTO && raw !== INPUT_SOURCE_LIST_MANUAL) {
-        errors.push('inputSourceList must be "auto" or "manual"');
-      }
+    // useAvrReportedInputs
+    if (avr.useAvrReportedInputs !== undefined && typeof avr.useAvrReportedInputs !== "boolean" && typeof avr.useAvrReportedInputs !== "string") {
+      errors.push("useAvrReportedInputs must be boolean");
     }
 
     // volumeDisplay
@@ -348,7 +342,7 @@ export class ConfigManager {
     if (avr.tuneinPresetPosition !== undefined) {
       const tp = typeof avr.tuneinPresetPosition === "number" ? avr.tuneinPresetPosition : parseInt(String(avr.tuneinPresetPosition), 10);
       if (isNaN(tp) || tp < 1 || tp > 9) {
-        errors.push("tuneinPresetPosition must be an integer between 1 and 9");
+        errors.push("tuneinPresetPosition must be an integer between 1 and 10");
       }
     }
 
@@ -399,7 +393,7 @@ export class ConfigManager {
       queueThreshold: avr.queueThreshold,
       albumArtURL: avr.albumArtURL,
       volumeScale: parseVolumeScale(avr.volumeScale),
-      inputSourceList: parseInputSourceList(avr.inputSourceList),
+      useAvrReportedInputs: parseBoolean(avr.useAvrReportedInputs, AVR_DEFAULTS.useAvrReportedInputs),
       volumeDisplay: String(avr.volumeDisplay ?? AVR_DEFAULTS.volumeDisplay).toLowerCase() === "relative" ? "relative" : "absolute",
       adjustVolumeDispl: parseBoolean(avr.adjustVolumeDispl, AVR_DEFAULTS.adjustVolumeDispl),
       entityNameStyle: (String(avr.entityNameStyle ?? AVR_DEFAULTS.entityNameStyle).toLowerCase() === "short" ? "short" : "long") as EntityNameStyle,

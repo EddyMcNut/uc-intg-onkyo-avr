@@ -1,5 +1,5 @@
 // Focused responsibility: Parse and validate manual configuration input
-import { LogLevel, AVR_DEFAULTS, parseBoolean, parseVolumeScale, parseInputSourceList, type VolumeScale, type InputSourceList } from "./configManager.js";
+import { LogLevel, AVR_DEFAULTS, parseBoolean, parseVolumeScale, type VolumeScale } from "./configManager.js";
 
 export interface ManualConfigInput {
   model?: unknown;
@@ -10,7 +10,7 @@ export interface ManualConfigInput {
   listeningModeOptions?: unknown;
   inputSelectorOptions?: unknown;
   volumeScale?: unknown;
-  inputSourceList?: unknown;
+  useAvrReportedInputs?: unknown;
   volumeDisplay?: unknown;
   adjustVolumeDispl?: unknown;
   zoneCount?: unknown;
@@ -34,7 +34,7 @@ export interface ParsedManualConfig {
   listeningModeOptions: string;
   inputSelectorOptions: string;
   volumeScaleValue: VolumeScale;
-  inputSourceListValue: InputSourceList;
+  useAvrReportedInputsValue: boolean;
   volumeDisplayValue: "absolute" | "relative";
   adjustVolumeDisplValue: boolean;
   entityNameStyleValue: "long" | "short";
@@ -61,7 +61,7 @@ export class ManualConfigParser {
       listeningModeOptions: String(input.listeningModeOptions ?? ""),
       inputSelectorOptions: String(input.inputSelectorOptions ?? ""),
       volumeScaleValue: this.parseVolumeScale(input.volumeScale),
-      inputSourceListValue: parseInputSourceList(input.inputSourceList),
+      useAvrReportedInputsValue: parseBoolean(input.useAvrReportedInputs, AVR_DEFAULTS.useAvrReportedInputs),
       volumeDisplayValue: this.parseVolumeDisplay(input.volumeDisplay),
       adjustVolumeDisplValue: parseBoolean(input.adjustVolumeDispl, true),
       entityNameStyleValue: this.parseEntityNameStyle(input.entityNameStyle),
@@ -112,7 +112,7 @@ export class ManualConfigParser {
   private parseTuneInPresetPosition(position: unknown): number {
     const parsed = parseInt(String(position), 10);
     if (isNaN(parsed)) return AVR_DEFAULTS.tuneinPresetPosition;
-    return parsed >= 1 && parsed <= 9 ? parsed : AVR_DEFAULTS.tuneinPresetPosition;
+    return parsed >= 1 && parsed <= 10 ? parsed : AVR_DEFAULTS.tuneinPresetPosition;
   }
 
   private parseTuneInMenuStyle(style: unknown): "mypresets" | "full" {

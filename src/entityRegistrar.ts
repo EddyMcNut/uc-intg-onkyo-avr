@@ -5,8 +5,8 @@ import { Select, SelectStates } from "@unfoldedcircle/integration-api";
 import { eiscpMappings } from "./eiscp-mappings.js";
 import { ALL_SIMPLE_COMMANDS } from "./simpleCommands.js";
 import { getCompatibleListeningModes } from "./listeningModeFilters.js";
-import { ConfigManager, buildEntityId, buildPhysicalAvrId, INPUT_SOURCE_LIST_AUTO } from "./configManager.js";
-import { getAvrInputs } from "./inputSourceStore.js";
+import { ConfigManager, buildEntityId, buildPhysicalAvrId } from "./configManager.js";
+import { getEffectiveInputSourceOptions } from "./inputSourceResolver.js";
 import { getTunerPresetNames } from "./tunerPresetStore.js";
 import {
   browseMedia,
@@ -292,16 +292,12 @@ export default class EntityRegistrar {
         const cfg = ConfigManager.get();
         if (cfg && Array.isArray(cfg.avrs)) {
           const match = cfg.avrs.find((a) => buildEntityId(a.model, a.ip, a.zone) === avrEntry);
-          if (match?.inputSourceList === INPUT_SOURCE_LIST_AUTO) {
-            const collected = getAvrInputs(buildPhysicalAvrId(match.model, match.ip));
-            if (collected.length > 0) {
-              return collected.map((input) => input.name);
-            }
-          }
-          if (match && Object.prototype.hasOwnProperty.call(match, "inputSelectorOptions")) {
-            const opts = match.inputSelectorOptions;
-            if (opts === null) return [];
-            if (Array.isArray(opts) && opts.length > 0) return opts.map((s) => s.trim());
+          if (match) {
+            const sliMappings = eiscpMappings.value_mappings.SLI;
+            const builtInOptions = Object.keys(sliMappings)
+              .filter((key) => !["up", "down", "query"].includes(key))
+              .sort();
+            return getEffectiveInputSourceOptions(match, buildPhysicalAvrId(match.model, match.ip), builtInOptions);
           }
         }
       } catch {

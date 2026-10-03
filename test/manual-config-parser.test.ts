@@ -52,7 +52,7 @@ describe("ManualConfigParser", () => {
     expect(result.queueThresholdValue).toBe(100);
     expect(result.albumArtURLValue).toBe("album_art.cgi");
     expect(result.volumeScaleValue).toBe("auto");
-    expect(result.inputSourceListValue).toBe("auto");
+    expect(result.useAvrReportedInputsValue).toBe(true);
     expect(result.volumeDisplayValue).toBe("absolute");
     expect(result.adjustVolumeDisplValue).toBe(true);
     expect(result.zoneCountValue).toBe(1);
@@ -86,24 +86,23 @@ describe("ManualConfigParser", () => {
     expect(parser.parse({ volumeScale: "abc" }).volumeScaleValue).toBe("auto");
   });
 
-  it("validates inputSourceList (auto or manual)", async () => {
+  it("parses useAvrReportedInputs as a boolean", async () => {
     const mod = await import("../src/manualConfigParser.js");
     const { ManualConfigParser } = mod as { ManualConfigParser: new () => any };
     const parser = new ManualConfigParser();
 
-    expect(parser.parse({ inputSourceList: "manual" }).inputSourceListValue).toBe("manual");
-    expect(parser.parse({ inputSourceList: " AUTO " }).inputSourceListValue).toBe("auto");
-    // Anything unknown falls back to the safe default.
-    expect(parser.parse({ inputSourceList: "nonsense" }).inputSourceListValue).toBe("auto");
+    expect(parser.parse({ useAvrReportedInputs: false }).useAvrReportedInputsValue).toBe(false);
+    expect(parser.parse({ useAvrReportedInputs: "false" }).useAvrReportedInputsValue).toBe(false);
+    expect(parser.parse({ useAvrReportedInputs: true }).useAvrReportedInputsValue).toBe(true);
   });
 
-  it("validates tuneinPresetPosition (1-9 range)", async () => {
+  it("validates tuneinPresetPosition (1-10 range)", async () => {
     const mod = await import("../src/manualConfigParser.js");
     const { ManualConfigParser } = mod as { ManualConfigParser: new () => any };
     const parser = new ManualConfigParser();
     expect(parser.parse({ tuneinPresetPosition: 5 }).tuneinPresetPositionValue).toBe(5);
     expect(parser.parse({ tuneinPresetPosition: 0 }).tuneinPresetPositionValue).toBe(1);
-    expect(parser.parse({ tuneinPresetPosition: 10 }).tuneinPresetPositionValue).toBe(1);
+    expect(parser.parse({ tuneinPresetPosition: 10 }).tuneinPresetPositionValue).toBe(10);
   });
 
   it("validates zoneCount (1-4 range)", async () => {

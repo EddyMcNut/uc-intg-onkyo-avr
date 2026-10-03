@@ -71,8 +71,8 @@ describe("tunerPresetStore", () => {
     expect(findTunerPresetNameBySlot(AVR, 27)).toBeUndefined();
   });
 
-  it("offers the station names in slot order", () => {
-    setTunerPresets(AVR, [preset(28, "STRKSTAD", "1", "107.20"), preset(1, "R10 80s")]);
+  it("offers the station names alphabetically", () => {
+    setTunerPresets(AVR, [preset(1, "STRKSTAD", "1", "107.20"), preset(28, "R10 80s")]);
 
     expect(getTunerPresetNames(AVR)).toEqual(["R10 80s", "STRKSTAD"]);
     expect(getTunerPresets(AVR)).toHaveLength(2);

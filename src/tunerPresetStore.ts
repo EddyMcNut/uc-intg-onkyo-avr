@@ -70,7 +70,9 @@ export function getTunerPresets(physicalAvrId: string): AvrTunerPreset[] {
 
 /** Station names for the select entity, in AVR slot order. */
 export function getTunerPresetNames(physicalAvrId: string): string[] {
-  return getTunerPresets(physicalAvrId).map((preset) => preset.name);
+  return getTunerPresets(physicalAvrId)
+    .map((preset) => preset.name)
+    .sort((a, b) => a.localeCompare(b));
 }
 
 /** True when the AVR reported at least one station. */

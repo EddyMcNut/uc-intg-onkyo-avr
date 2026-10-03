@@ -87,7 +87,7 @@ it("EntityRegistrar treats 'all' sentinel as showing all input sources", async (
   }
 });
 
-it("EntityRegistrar uses the inputs the AVR reported when the input source list is auto", async () => {
+it("EntityRegistrar uses AVR-reported input names when enabled", async () => {
   const tmp = mkTmpDir();
   try {
     const module = (await import("../src/entityRegistrar.js")) as any;
@@ -102,7 +102,7 @@ it("EntityRegistrar uses the inputs the AVR reported when the input source list 
     const { avrStateManager } = avrStateModule;
     const registrar = new EntityRegistrar(avrStateManager);
 
-    ConfigManager.save({ avrs: [{ model: "M", ip: "1.2.3.4", port: 60128, zone: "main", inputSourceList: "auto" }] });
+    ConfigManager.save({ avrs: [{ model: "M", ip: "1.2.3.4", port: 60128, zone: "main", useAvrReportedInputs: true }] });
     const avrEntry = "M 1.2.3.4 main";
 
     // Before the AVR reported anything, the built-in list is used.
@@ -114,8 +114,8 @@ it("EntityRegistrar uses the inputs the AVR reported when the input source list 
     ]);
     expect(registrar.getInputSelectorOptions(avrEntry)).toEqual(["BD/DVD", "DAB"]);
 
-    // 'manual' ignores what was collected and uses the built-in list again.
-    ConfigManager.save({ avrs: [{ model: "M", ip: "1.2.3.4", port: 60128, zone: "main", inputSourceList: "manual" }] });
+    // Disabling AVR-reported names ignores what was collected and uses the built-in list again.
+    ConfigManager.save({ avrs: [{ model: "M", ip: "1.2.3.4", port: 60128, zone: "main", useAvrReportedInputs: false }] });
     expect(registrar.getInputSelectorOptions(avrEntry).length).toBeGreaterThan(5);
 
     inputSourceStore.clearAllAvrInputs();
@@ -124,7 +124,7 @@ it("EntityRegistrar uses the inputs the AVR reported when the input source list 
   }
 });
 
-it("EntityRegistrar prefers the reported inputs over a user-configured input list in auto mode", async () => {
+it("EntityRegistrar applies AVR names to matching aliases and keeps unmatched options", async () => {
   const tmp = mkTmpDir();
   try {
     const module = (await import("../src/entityRegistrar.js")) as any;
@@ -139,10 +139,10 @@ it("EntityRegistrar prefers the reported inputs over a user-configured input lis
     const { avrStateManager } = avrStateModule;
     const registrar = new EntityRegistrar(avrStateManager);
 
-    ConfigManager.save({ avrs: [{ model: "M", ip: "1.2.3.4", port: 60128, zone: "main", inputSourceList: "auto", inputSelectorOptions: ["bd", "tv"] }] });
+    ConfigManager.save({ avrs: [{ model: "M", ip: "1.2.3.4", port: 60128, zone: "main", useAvrReportedInputs: true, inputSelectorOptions: ["bd", "tv"] }] });
     inputSourceStore.setAvrInputs("M 1.2.3.4", [{ id: "10", name: "BD/DVD" }]);
 
-    expect(registrar.getInputSelectorOptions("M 1.2.3.4 main")).toEqual(["BD/DVD"]);
+    expect(registrar.getInputSelectorOptions("M 1.2.3.4 main")).toEqual(["BD/DVD", "tv"]);
 
     inputSourceStore.clearAllAvrInputs();
   } finally {

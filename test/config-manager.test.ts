@@ -109,20 +109,20 @@ describe("ConfigManager static methods", () => {
       expect(result.normalized!.volumeScale).toBe("auto");
     });
 
-    it("accepts an inputSourceList", () => {
-      const result = ConfigManager.validateAvrPayload({ model: "TX-RZ50", ip: "1.2.3.4", port: 60128, inputSourceList: "manual" });
+    it("accepts useAvrReportedInputs", () => {
+      const result = ConfigManager.validateAvrPayload({ model: "TX-RZ50", ip: "1.2.3.4", port: 60128, useAvrReportedInputs: false });
       expect(result.errors).toHaveLength(0);
-      expect(result.normalized!.inputSourceList).toBe("manual");
+      expect(result.normalized!.useAvrReportedInputs).toBe(false);
     });
 
-    it("rejects an invalid inputSourceList", () => {
-      const result = ConfigManager.validateAvrPayload({ model: "TX-RZ50", ip: "1.2.3.4", port: 60128, inputSourceList: "nonsense" });
-      expect(result.errors).toContain('inputSourceList must be "auto" or "manual"');
+    it("rejects an invalid useAvrReportedInputs value", () => {
+      const result = ConfigManager.validateAvrPayload({ model: "TX-RZ50", ip: "1.2.3.4", port: 60128, useAvrReportedInputs: 1 as any });
+      expect(result.errors).toContain("useAvrReportedInputs must be boolean");
     });
 
-    it("defaults an absent inputSourceList to auto", () => {
+    it("defaults useAvrReportedInputs to true", () => {
       const result = ConfigManager.validateAvrPayload({ model: "TX-RZ50", ip: "1.2.3.4", port: 60128 });
-      expect(result.normalized!.inputSourceList).toBe("auto");
+      expect(result.normalized!.useAvrReportedInputs).toBe(true);
     });
 
     it("defaults an absent volumeScale to auto", () => {
@@ -147,7 +147,7 @@ describe("ConfigManager static methods", () => {
 
     it("rejects tuneinPresetPosition out of range", () => {
       const result = ConfigManager.validateAvrPayload({ model: "TX-RZ50", ip: "1.2.3.4", port: 60128, tuneinPresetPosition: 0 });
-      expect(result.errors).toContain("tuneinPresetPosition must be an integer between 1 and 9");
+      expect(result.errors).toContain("tuneinPresetPosition must be an integer between 1 and 10");
     });
 
     it("rejects invalid tuneinMenuStyle", () => {
@@ -289,7 +289,7 @@ describe("ConfigManager static methods", () => {
 
     it("rejects tuneinPresetPosition from string NaN", () => {
       const result = ConfigManager.validateAvrPayload({ model: "TX-RZ50", ip: "1.2.3.4", port: 60128, tuneinPresetPosition: "abc" });
-      expect(result.errors).toContain("tuneinPresetPosition must be an integer between 1 and 9");
+      expect(result.errors).toContain("tuneinPresetPosition must be an integer between 1 and 10");
     });
 
     it("rejects invalid input selector option", () => {

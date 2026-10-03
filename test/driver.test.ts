@@ -134,9 +134,6 @@ vi.mock("../src/configManager.js", () => {
     buildEntityId: mockBuildId,
     buildPhysicalAvrId: mockBuildPhys,
     physicalAvrIdFromEntityId: vi.fn((id: string) => id.split("_").slice(0, 2).join("_")),
-    INPUT_SOURCE_LIST_AUTO: "auto",
-    INPUT_SOURCE_LIST_MANUAL: "manual",
-    parseInputSourceList: vi.fn((raw: any) => (raw === "manual" ? "manual" : "auto")),
     DEFAULT_QUEUE_THRESHOLD: 100,
     normalizeAvrConfig: vi.fn((cfg: any) => ({ ...cfg, queueThreshold: cfg.queueThreshold ?? 100, volumeScale: cfg.volumeScale ?? 100, port: cfg.port ?? 60128 })),
     resolveVolumeScale: vi.fn((scale: any) => (typeof scale === "number" ? scale : 100))
@@ -653,7 +650,7 @@ describe("OnkyoDriver", () => {
 
   describe("handleAvrInfo with an auto input source list", () => {
     const autoConfig = {
-      avrs: [{ model: "TX-RZ50", ip: "1.2.3.4", zone: "main", volumeScale: 100, inputSourceList: "auto", createSensors: false }],
+      avrs: [{ model: "TX-RZ50", ip: "1.2.3.4", zone: "main", volumeScale: 100, useAvrReportedInputs: true, createSensors: false }],
       logLevel: "info"
     };
     const collectedInputs = [
@@ -673,7 +670,7 @@ describe("OnkyoDriver", () => {
     });
 
     it("stores the collected inputs and re-registers the input selector", async () => {
-      mockResolveInputSourceList.mockReturnValue({ mode: "auto", inputs: collectedInputs, reason: "AVR reports 2 input(s)" });
+      mockResolveInputSourceList.mockReturnValue({ inputs: collectedInputs, reason: "AVR reports 2 input(s)" });
       mockSetAvrInputs.mockReturnValue(true);
       const driver = await createDriverWithAutoInputList();
       const configModule = await import("../src/configManager.js");
@@ -691,7 +688,7 @@ describe("OnkyoDriver", () => {
     });
 
     it("re-registers the input selector of every zone of the AVR", async () => {
-      mockResolveInputSourceList.mockReturnValue({ mode: "auto", inputs: collectedInputs, reason: "AVR reports 2 input(s)" });
+      mockResolveInputSourceList.mockReturnValue({ inputs: collectedInputs, reason: "AVR reports 2 input(s)" });
       // The list is stored once per AVR, so only the first zone reports a change.
       mockSetAvrInputs.mockReturnValue(true);
       const driver = await createDriverWithAutoInputList({
@@ -711,7 +708,7 @@ describe("OnkyoDriver", () => {
     });
 
     it("does not re-register the entities when the collected inputs did not change", async () => {
-      mockResolveInputSourceList.mockReturnValue({ mode: "auto", inputs: collectedInputs, reason: "AVR reports 2 input(s)" });
+      mockResolveInputSourceList.mockReturnValue({ inputs: collectedInputs, reason: "AVR reports 2 input(s)" });
       mockSetAvrInputs.mockReturnValue(false);
       const driver = await createDriverWithAutoInputList();
       mockEntityRegistrar.createMediaPlayerEntity.mockClear();
@@ -725,7 +722,7 @@ describe("OnkyoDriver", () => {
     });
 
     it("stores 'manual' and forgets the inputs when the AVR reports none", async () => {
-      mockResolveInputSourceList.mockReturnValue({ mode: "manual", reason: "AVR reports no input sources, so the manual list is used" });
+      mockResolveInputSourceList.mockReturnValue({ reason: "AVR reports no input sources, so integration mappings are used" });
       mockHasAvrInputs.mockReturnValue(true);
       const driver = await createDriverWithAutoInputList();
       const configModule = await import("../src/configManager.js");
@@ -734,20 +731,15 @@ describe("OnkyoDriver", () => {
 
       driver.handleAvrInfo("TX-RZ50_1.2.3.4_main");
 
-      expect(configModule.ConfigManager.patchAvr).toHaveBeenCalledWith("1.2.3.4", "main", { inputSourceList: "manual" });
+      expect(configModule.ConfigManager.patchAvr).toHaveBeenCalledWith("1.2.3.4", "main", { useAvrReportedInputs: false });
       expect(mockClearAvrInputs).toHaveBeenCalledWith("TX-RZ50_1.2.3.4");
-      expect(mockLog.debug).toHaveBeenCalledWith(
-        expect.stringContaining("Input source list 'auto' reset to 'manual'"),
-        "driver:",
-        "TX-RZ50_1.2.3.4_main",
-        "AVR reports no input sources, so the manual list is used"
-      );
+      expect(mockLog.debug).toHaveBeenCalledWith("%s [%s] AVR-reported input names disabled: %s", "driver:", "TX-RZ50_1.2.3.4_main", "AVR reports no input sources, so integration mappings are used");
       expect(mockEntityRegistrar.createInputSelectorSelectEntity).toHaveBeenCalledTimes(1);
     });
 
     it("leaves a manual input source list alone", async () => {
       mockResolveInputSourceList.mockReturnValue(undefined);
-      const driver = await createDriverWithAutoInputList({ ...autoConfig, avrs: [{ ...autoConfig.avrs[0], inputSourceList: "manual" }] });
+      const driver = await createDriverWithAutoInputList({ ...autoConfig, avrs: [{ ...autoConfig.avrs[0], useAvrReportedInputs: false }] });
       const configModule = await import("../src/configManager.js");
       mockEntityRegistrar.createInputSelectorSelectEntity.mockClear();
 
@@ -808,11 +800,11 @@ describe("OnkyoDriver", () => {
           options: ["R10 80s", "NPO FunX", "STRKSTAD"]
         });
       }
-      expect(mockLog.debug).toHaveBeenCalledWith("%s [%s] Tuner presets collected from the AVR: %d station(s): %s", "driver:", "TX-RZ50_1.2.3.4_main", 3, "R10 80s, NPO FunX, STRKSTAD");
+      expect(mockLog.debug).toHaveBeenCalledWith("%s [%s] Tuner presets collected from the AVR: %d station(s): %s", "driver:", "TX-RZ50_1.2.3.4_main", 3, "NPO FunX, R10 80s, STRKSTAD");
       expect(mockLog.debug).toHaveBeenCalledWith("%s [%s] Updating Tuner Presets select with %d station(s)", "driver:", "TX-RZ50_1.2.3.4_main", 3);
     });
 
-    it("does not touch the select when the stations did not change", async () => {
+    it("refreshes the select when NRI repeats, even when stations did not change", async () => {
       const driver = await createDriverWithPresets();
       driver.handleAvrInfo("TX-RZ50_1.2.3.4_main");
       mockDriver.updateEntityAttributes.mockClear();
@@ -821,7 +813,9 @@ describe("OnkyoDriver", () => {
       // The AVR repeats its whole state on every NRI reply, so this arrives regularly.
       driver.handleAvrInfo("TX-RZ50_1.2.3.4_main");
 
-      expect(mockDriver.updateEntityAttributes).not.toHaveBeenCalledWith(expect.stringContaining("_tuner_presets"), expect.anything());
+      expect(mockDriver.updateEntityAttributes).toHaveBeenCalledWith("TX-RZ50_1.2.3.4_main_tuner_presets", {
+        options: []
+      });
     });
 
     it("clears the stations when the AVR reports none", async () => {

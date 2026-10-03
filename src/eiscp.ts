@@ -589,7 +589,7 @@ export class EiscpDriver extends EventEmitter {
         log.debug("%s Sending input-selector %s as %s%s (id reported by the AVR)", integrationName, args, getZonePrefix(prefix, zone), inputId);
         return getZonePrefix(prefix, zone) + inputId;
       }
-      log.warn("%s not found in JSON: %s %s", integrationName, command, args);
+      log.error("%s Input source alias is not mapped: %s %s", integrationName, command, args);
       value = String(args ?? "");
     } else if (valueMap && Object.prototype.hasOwnProperty.call(valueMap, "intgrRange")) {
       value = (+args!).toString(16).toUpperCase().padStart(2, "0");

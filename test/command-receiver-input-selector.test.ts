@@ -206,7 +206,7 @@ it("CommandReceiver uses the AVR-reported input name and ignores a manual input 
 
     // The setting is "auto" (the default) and the AVR reported these inputs. A leftover manual list
     // must not be applied on top of them.
-    const cfg = { avrs: [{ model: "M", ip: "1.2.3.4", port: 60128, zone: "main", inputSourceList: "auto", inputSelectorOptions: ["cd", "dvd", "tv"] }] };
+    const cfg = { avrs: [{ model: "M", ip: "1.2.3.4", port: 60128, zone: "main", useAvrReportedInputs: true, inputSelectorOptions: ["cd", "dvd", "tv"] }] };
     await makeReceiver(mockDriver, tmp, cfg, mockEiscp);
     inputSourceStore.setAvrInputs("M 1.2.3.4", [
       { id: "33", name: "DAB" },
@@ -264,7 +264,7 @@ it("CommandReceiver ignores collected inputs once the input source list is manua
     const mockEiscp = new MockEiscp();
     const inputSourceStore = (await import("../src/inputSourceStore.js")) as any;
 
-    const cfg = { avrs: [{ model: "M", ip: "1.2.3.4", port: 60128, zone: "main", inputSourceList: "manual", inputSelectorOptions: ["dvd"] }] };
+    const cfg = { avrs: [{ model: "M", ip: "1.2.3.4", port: 60128, zone: "main", useAvrReportedInputs: false, inputSelectorOptions: ["dvd"] }] };
     await makeReceiver(mockDriver, tmp, cfg, mockEiscp);
     inputSourceStore.setAvrInputs("M 1.2.3.4", [{ id: "33", name: "DAB" }]);
 

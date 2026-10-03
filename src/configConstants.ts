@@ -124,31 +124,12 @@ export function resolveVolumeScale(raw: unknown): number {
   return isNaN(parsed) || parsed <= 0 ? VOLUME_SCALE_FALLBACK : parsed;
 }
 
-/**
- * Input source list setting.
- *
- * `INPUT_SOURCE_LIST_AUTO` uses the inputs the AVR itself reported through NRI, in the spelling the
- * AVR shows. They are kept in memory only: the setting itself is what is stored, so switching back
- * to "manual" is all it takes to return to the hardcoded SLI list.
- *
- * `INPUT_SOURCE_LIST_MANUAL` always uses the hardcoded SLI command table, optionally narrowed by
- * the user-configured `inputSelectorOptions`.
- */
-export const INPUT_SOURCE_LIST_AUTO = "auto";
-export const INPUT_SOURCE_LIST_MANUAL = "manual";
-export type InputSourceList = typeof INPUT_SOURCE_LIST_AUTO | typeof INPUT_SOURCE_LIST_MANUAL;
-
-/** Coerce any stored or user-supplied input source list to "auto" or "manual". Anything unknown becomes the default ("auto"). */
-export function parseInputSourceList(raw: unknown): InputSourceList {
-  return typeof raw === "string" && raw.trim().toLowerCase() === INPUT_SOURCE_LIST_MANUAL ? INPUT_SOURCE_LIST_MANUAL : INPUT_SOURCE_LIST_AUTO;
-}
-
 /** Default values for AVR configuration */
 export const AVR_DEFAULTS = {
   queueThreshold: DEFAULT_QUEUE_THRESHOLD,
   albumArtURL: "album_art.cgi",
   volumeScale: VOLUME_SCALE_AUTO,
-  inputSourceList: INPUT_SOURCE_LIST_AUTO,
+  useAvrReportedInputs: true,
   volumeDisplay: "absolute",
   adjustVolumeDispl: true,
   entityNameStyle: "short",
@@ -175,7 +156,7 @@ export interface AvrConfig {
   queueThreshold?: number;
   albumArtURL?: string;
   volumeScale?: VolumeScale; // "auto" (resolve from the AVR), 80 or 100
-  inputSourceList?: InputSourceList; // "auto" (inputs reported by the AVR), "manual" (hardcoded SLI list)
+  useAvrReportedInputs?: boolean; // use AVR-reported names and IDs when available
   volumeDisplay?: VolumeDisplay; // absolute = 1-100 style, relative = dB style
   adjustVolumeDispl?: boolean; // true = use 0.5 dB steps (×2 / ÷2), false = direct EISCP value
   entityNameStyle?: EntityNameStyle; // long = include host/ip in visible names, short = omit host/ip
@@ -184,7 +165,7 @@ export interface AvrConfig {
   createRemoteEntity?: boolean; // true = create a remote entity for this AVR
   createDiracSelectEntity?: boolean; // true (default) = create the Dirac select entity (fixed options)
   netMenuDelay?: number; // delay in ms for NET menu to load (default 2500)
-  tuneinPresetPosition?: number; // position of "My Presets" in TuneIn menu (1-9, default 1)
+  tuneinPresetPosition?: number; // position of "My Presets" in TuneIn menu (1-10, default 1)
   tuneinMenuStyle?: TuneInMenuStyle; // choose TuneIn navigation mode: mypresets or full
   // undefined = all options, non-empty = exact options, null = don't create entity. Empty input is normalized to "all".
   listeningModeOptions?: SelectOptions;
@@ -198,7 +179,7 @@ export interface OnkyoConfig {
   queueThreshold?: number;
   albumArtURL?: string;
   volumeScale?: VolumeScale; // "auto" (resolve from the AVR), 80 or 100
-  inputSourceList?: InputSourceList;
+  useAvrReportedInputs?: boolean;
   volumeDisplay?: VolumeDisplay;
   adjustVolumeDispl?: boolean; // true = use 0.5 dB steps (×2 / ÷2), false = direct EISCP value
   entityNameStyle?: EntityNameStyle;
@@ -221,7 +202,7 @@ export interface NormalizedAvrConfig {
   queueThreshold: number;
   albumArtURL: string;
   volumeScale: VolumeScale;
-  inputSourceList: InputSourceList;
+  useAvrReportedInputs: boolean;
   volumeDisplay: VolumeDisplay;
   adjustVolumeDispl: boolean;
   entityNameStyle: EntityNameStyle;
@@ -248,7 +229,7 @@ export function normalizeAvrConfig(raw: AvrConfig): NormalizedAvrConfig {
 
   const volumeScale = parseVolumeScale(raw.volumeScale);
 
-  const inputSourceList = parseInputSourceList(raw.inputSourceList);
+  const useAvrReportedInputs = parseBoolean(raw.useAvrReportedInputs, AVR_DEFAULTS.useAvrReportedInputs);
 
   const volumeDisplay: VolumeDisplay = String(raw.volumeDisplay ?? AVR_DEFAULTS.volumeDisplay).toLowerCase() === "relative" ? "relative" : "absolute";
 
@@ -271,7 +252,7 @@ export function normalizeAvrConfig(raw: AvrConfig): NormalizedAvrConfig {
 
   const tuneinPresetPosition = (() => {
     const v = typeof raw.tuneinPresetPosition === "number" ? raw.tuneinPresetPosition : parseInt(String(raw.tuneinPresetPosition ?? ""), 10);
-    if (isNaN(v) || v < 1 || v > 9) return AVR_DEFAULTS.tuneinPresetPosition;
+    if (isNaN(v) || v < 1 || v > 10) return AVR_DEFAULTS.tuneinPresetPosition;
     return v;
   })();
 
@@ -290,7 +271,7 @@ export function normalizeAvrConfig(raw: AvrConfig): NormalizedAvrConfig {
     queueThreshold,
     albumArtURL,
     volumeScale,
-    inputSourceList,
+    useAvrReportedInputs,
     volumeDisplay,
     adjustVolumeDispl,
     entityNameStyle,
