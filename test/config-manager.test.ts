@@ -406,6 +406,28 @@ describe("ConfigManager static methods", () => {
       const result = ConfigManager.load();
       expect(result.avrs).toHaveLength(1);
       expect(result.avrs[0].model).toBe("TX-RZ50");
+      expect(result.configVersion).toBe("0.9.6");
+      expect(result.avrs[0].createTunerPresets).toBe(true);
+      expect(result.avrs[0].createRemoteEntity).toBe(true);
+      expect(result.avrs[0].createDiracSelectEntity).toBe(true);
+    });
+
+    it("persists 0.9.6 defaults for an existing config without setup", () => {
+      mockExistsSync.mockReturnValue(true);
+      mockReadFileSync.mockReturnValue(
+        JSON.stringify({
+          avrs: [{ model: "TX-RZ50", ip: "1.2.3.4", port: 60128, zone: "main" }]
+        })
+      );
+
+      const result = ConfigManager.load();
+
+      expect(mockWriteFileSync).toHaveBeenCalledTimes(1);
+      const written = JSON.parse(mockWriteFileSync.mock.calls[0][1]);
+      expect(written.configVersion).toBe("0.9.6");
+      expect(written.avrs[0].createTunerPresets).toBe(true);
+      expect(written.avrs[0].netMenuDelay).toBe(500);
+      expect(result.avrs[0].createTunerPresets).toBe(true);
     });
 
     it("removes legacy learning/learningEnabled keys and persists cleaned config", () => {

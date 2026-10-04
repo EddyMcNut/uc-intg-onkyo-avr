@@ -176,6 +176,8 @@ export interface AvrConfig {
 export interface OnkyoConfig {
   avrs?: AvrConfig[];
   logLevel?: LogLevel;
+  /** Version of the persisted configuration schema, not the driver package version. */
+  configVersion?: string;
   queueThreshold?: number;
   albumArtURL?: string;
   volumeScale?: VolumeScale; // "auto" (resolve from the AVR), 80 or 100

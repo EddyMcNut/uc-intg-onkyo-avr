@@ -22,6 +22,7 @@ import {
 } from "./configConstants.js";
 
 const integrationName = "configManager:";
+const CURRENT_CONFIG_VERSION = "0.9.6";
 
 // Config directory is configurable at runtime to support integration manager backups/restores
 let CONFIG_DIR = process.env.UC_CONFIG_HOME || process.cwd();
@@ -56,6 +57,7 @@ export class ConfigManager {
       adjustVolumeDispl: avr.adjustVolumeDispl ?? AVR_DEFAULTS.adjustVolumeDispl,
       entityNameStyle: avr.entityNameStyle ?? AVR_DEFAULTS.entityNameStyle,
       createSensors: avr.createSensors ?? AVR_DEFAULTS.createSensors,
+      createTunerPresets: avr.createTunerPresets ?? AVR_DEFAULTS.createTunerPresets,
       createRemoteEntity: avr.createRemoteEntity ?? AVR_DEFAULTS.createRemoteEntity,
       createDiracSelectEntity: avr.createDiracSelectEntity ?? AVR_DEFAULTS.createDiracSelectEntity,
       netMenuDelay: avr.netMenuDelay ?? AVR_DEFAULTS.netMenuDelay,
@@ -79,6 +81,7 @@ export class ConfigManager {
       if (fs.existsSync(CONFIG_PATH)) {
         const raw = fs.readFileSync(CONFIG_PATH, "utf-8");
         this.config = JSON.parse(raw);
+        let shouldPersistMigration = this.config.configVersion !== CURRENT_CONFIG_VERSION;
 
         // Remove legacy learning-store keys from the abandoned feature/learn experiment.
         // Not used at runtime; drop them from memory and persist the cleaned config so
@@ -87,7 +90,7 @@ export class ConfigManager {
         if ("learning" in rawConfig || "learningEnabled" in rawConfig) {
           delete rawConfig.learning;
           delete rawConfig.learningEnabled;
-          this.save(this.config);
+          shouldPersistMigration = true;
           log.info("%s Removed legacy learning/learningEnabled keys from config", integrationName);
         }
 
@@ -122,7 +125,7 @@ export class ConfigManager {
           delete this.config.albumArtURL;
           delete this.config.entityNameStyle;
           delete this.config.volumeDisplay;
-          this.save(this.config);
+          shouldPersistMigration = true;
         }
 
         // Ensure all AVRs have defaults applied
@@ -133,6 +136,14 @@ export class ConfigManager {
               zone: this.validateZone(avr.zone)
             })
           );
+        }
+
+        // Persist the normalized settings once so installations upgraded without opening setup
+        // receive the same per-AVR configuration as installations that saved the 0.9.6 form.
+        if (shouldPersistMigration) {
+          this.config.configVersion = CURRENT_CONFIG_VERSION;
+          this.save(this.config);
+          log.info("%s Migrated persisted configuration to schema %s", integrationName, CURRENT_CONFIG_VERSION);
         }
       }
     } catch (err) {
