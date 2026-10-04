@@ -5,7 +5,10 @@ import { Select, SelectStates } from "@unfoldedcircle/integration-api";
 import { eiscpMappings } from "./eiscp-mappings.js";
 import { ALL_SIMPLE_COMMANDS } from "./simpleCommands.js";
 import { getCompatibleListeningModes } from "./listeningModeFilters.js";
-import { ConfigManager, buildEntityId } from "./configManager.js";
+import { ConfigManager, buildEntityId, buildPhysicalAvrId } from "./configManager.js";
+import { getAvrSourceCatalog } from "./avrSourceCatalog.js";
+import { getEffectiveInputSourceOptions } from "./inputSourceResolver.js";
+import { getTunerPresetNames } from "./tunerPresetStore.js";
 import {
   browseMedia,
   isTidalMainMenuRequest,
@@ -278,17 +281,24 @@ export default class EntityRegistrar {
     return selectEntity;
   }
 
-  // Return input selector options for the given AVR entry. If a user-configured `inputSelectorOptions` list is present it is returned exactly; if `null` (disabled) returns empty; otherwise all SLI keys (excluding navigation/query keys) are returned sorted.
+  // Return input selector options for the given AVR entry.
+  //
+  // In "auto" mode the inputs the AVR reported are authoritative, in the AVR's own spelling. Until
+  // they are collected (or when they never are, because the setting was stored as "manual") the
+  // hardcoded SLI keys are used: a user-configured `inputSelectorOptions` list is returned exactly,
+  // `null` (disabled) returns empty.
   getInputSelectorOptions(avrEntry?: string): string[] {
     if (avrEntry) {
       try {
         const cfg = ConfigManager.get();
         if (cfg && Array.isArray(cfg.avrs)) {
           const match = cfg.avrs.find((a) => buildEntityId(a.model, a.ip, a.zone) === avrEntry);
-          if (match && Object.prototype.hasOwnProperty.call(match, "inputSelectorOptions")) {
-            const opts = match.inputSelectorOptions;
-            if (opts === null) return [];
-            if (Array.isArray(opts) && opts.length > 0) return opts.map((s) => s.trim());
+          if (match) {
+            const sliMappings = eiscpMappings.value_mappings.SLI;
+            const builtInOptions = Object.keys(sliMappings)
+              .filter((key) => !["up", "down", "query"].includes(key))
+              .sort();
+            return getEffectiveInputSourceOptions(match, buildPhysicalAvrId(match.model, match.ip), builtInOptions);
           }
         }
       } catch {
@@ -320,9 +330,58 @@ export default class EntityRegistrar {
     return selectEntity;
   }
 
+  // Station names of the tuner presets the AVR reported, alphabetically sorted for the select entity.
+  //
+  // Empty until the first NRI reply arrives, which is also what an AVR without a tuner preset list
+  // leaves the select with: an empty option list rather than a made-up set of stations.
+  getTunerPresetOptions(avrEntry: string): string[] {
+    try {
+      const cfg = ConfigManager.get();
+      const match = cfg?.avrs?.find((a) => buildEntityId(a.model, a.ip, a.zone) === avrEntry);
+      if (match) {
+        return getTunerPresetNames(buildPhysicalAvrId(match.model, match.ip));
+      }
+    } catch {
+      // ignore and show no options
+    }
+    return [];
+  }
+
+  // Tuner presets select entity — optional (createTunerPresets config). Lists the station names the
+  // AVR reported; selecting one recalls that preset slot on the AVR.
+  createTunerPresetsSelectEntity(avrEntry: string, cmdHandler?: CmdHandlerFn): Select {
+    const displayBaseName = this.getDisplayBaseName(avrEntry);
+    const selectEntity = new Select(
+      `${avrEntry}${SELECT_SUFFIXES.tunerPresets}`,
+      { en: `${displayBaseName} Tuner Presets` },
+      {
+        attributes: {
+          state: SelectStates.On,
+          current_option: "",
+          options: this.getTunerPresetOptions(avrEntry)
+        }
+      }
+    );
+    if (cmdHandler) selectEntity.setCmdHandler(cmdHandler);
+    return selectEntity;
+  }
+
   // Remote entity — optional (createRemoteEntity config)
   createRemoteEntity(avrEntry: string, cmdHandler?: CmdHandlerFn): uc.Remote {
-    return buildRemoteEntity(avrEntry, this.getDisplayBaseName(avrEntry), cmdHandler);
+    return buildRemoteEntity(avrEntry, this.getDisplayBaseName(avrEntry), cmdHandler, this.getReportedRemoteInputNames(avrEntry));
+  }
+
+  private getReportedRemoteInputNames(avrEntry: string): string[] | undefined {
+    try {
+      const cfg = ConfigManager.get()?.avrs?.find((a) => buildEntityId(a.model, a.ip, a.zone) === avrEntry);
+      if (!cfg?.useAvrReportedInputs) return undefined;
+      const catalog = getAvrSourceCatalog(avrEntry);
+      if (!catalog.complete) return undefined;
+      const names = catalog.sources.map((input) => input.name);
+      return names.length > 0 ? names : undefined;
+    } catch {
+      return undefined;
+    }
   }
 
   // Dirac select entity — optional (createDiracSelectEntity config). Options are fixed, see diracSelect.ts.

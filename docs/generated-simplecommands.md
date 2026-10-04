@@ -2,7 +2,7 @@
 
 This integration creates a list of simple commands which are available for you in Web Configurator.
 
-These are the available `simple commands` in `v0.9.5` (631 commands):
+These are the available `simple commands` in `v0.9.6` (631 commands):
 
 - `ACCUEQ_OFF`
 - `ACCUEQ_ON_EX_FRONT_L_R`

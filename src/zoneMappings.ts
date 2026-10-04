@@ -1,6 +1,14 @@
 // Single source of truth for zone-specific command prefix mappings.
 // All zone→command prefix lookups should import from here.
 
+/** NRI zone id (1-based) per configured zone name. The AVR numbers its zones in this order. */
+export const ZONE_ID_BY_ZONE: Record<string, number> = {
+  main: 1,
+  zone2: 2,
+  zone3: 3,
+  zone4: 4
+};
+
 /** Volume set/query command prefix per zone (MVL → main, ZVL → zone2, etc.) */
 export const ZONE_VOLUME_PREFIX: Record<string, string> = {
   main: "MVL",

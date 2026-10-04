@@ -1,6 +1,6 @@
 import * as uc from "@unfoldedcircle/integration-api";
 import { EiscpDriver } from "./eiscp.js";
-import { buildEntityId, DEFAULT_QUEUE_THRESHOLD, OnkyoConfig } from "./configManager.js";
+import { buildEntityId, DEFAULT_QUEUE_THRESHOLD, OnkyoConfig, physicalAvrIdFromEntityId, resolveVolumeScale } from "./configManager.js";
 import { MAX_LENGTHS, PATTERNS } from "./configConstants.js";
 import { ICommandReceiver, AvrStateApi } from "./types.js";
 import { ZONE_VOLUME_PREFIX, ZONE_VOLUME_UP_DOWN } from "./zoneMappings.js";
@@ -10,6 +10,7 @@ import log from "./loggers.js";
 import { toHex, ensureEiscpConnected } from "./utils.js";
 import { browseMedia, isMediaBrowsingAvailable } from "./mediaBrowser.js";
 import { PlayMediaCommandHandler } from "./playMediaCommandHandler.js";
+import { findAvrSourceId } from "./avrSourceCatalog.js";
 
 const integrationName = "commandSender:";
 
@@ -145,7 +146,7 @@ export class CommandSender {
           return uc.StatusCodes.Ok;
         }
         const sliderValue = Math.max(0, Math.min(100, Number(params.volume)));
-        const volumeScale = this.config.volumeScale || 100;
+        const volumeScale = resolveVolumeScale(this.config.volumeScale);
         const adjustVolumeDispl = this.config.adjustVolumeDispl ?? true;
         const avrDisplayValue = Math.round((sliderValue * volumeScale) / 100);
         const eiscpValue = adjustVolumeDispl ? avrDisplayValue * 2 : avrDisplayValue;
@@ -169,7 +170,7 @@ export class CommandSender {
     ],
     [
       uc.MediaPlayerCommands.SelectSource,
-      async (_e, _zone, sz, params) => {
+      async (_e, zone, sz, params) => {
         if (!params?.source || typeof params.source !== "string") return uc.StatusCodes.Ok;
         const request = params.source.toLowerCase();
         if (request.startsWith("raw ")) {
@@ -199,8 +200,17 @@ export class CommandSender {
           await this.eiscp.command(request);
         } else if (INPUT_NAMES_SET.has(request)) {
           await this.eiscp.command(sz(`input-selector ${request}`));
+        } else if (physicalAvrIdFromEntityId(_e.id) && findAvrSourceId(physicalAvrIdFromEntityId(_e.id)!, request)) {
+          await this.eiscp.command({ zone, command: "input-selector", args: request });
         } else {
-          await this.eiscp.command(sz(request));
+          // AVR-reported service names can contain spaces (e.g. "TuneIn Radio"); use the
+          // structured form so the complete name remains the input-selector argument.
+          const inputPrefix = "input-selector ";
+          if (request.startsWith(inputPrefix)) {
+            await this.eiscp.command({ zone, command: "input-selector", args: request.substring(inputPrefix.length) });
+          } else {
+            await this.eiscp.command(sz(request));
+          }
         }
         return uc.StatusCodes.Ok;
       }

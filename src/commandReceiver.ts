@@ -1,6 +1,9 @@
 import * as uc from "@unfoldedcircle/integration-api";
 import { SelectAttributes } from "@unfoldedcircle/integration-api";
-import { OnkyoConfig, buildEntityId } from "./configManager.js";
+import { OnkyoConfig, AvrConfig, buildEntityId, physicalAvrIdFromEntityId, resolveVolumeScale } from "./configManager.js";
+import { hasAvrInputs } from "./inputSourceStore.js";
+import { resolveInputSourceId } from "./inputSourceResolver.js";
+import { findTunerPresetByName, findTunerPresetNameBySlot } from "./tunerPresetStore.js";
 import { EiscpDriver } from "./eiscp.js";
 import { getCompatibleListeningModes } from "./listeningModeFilters.js";
 import { classifyAudioFormat, formatAudioTypeName } from "./audioFormatClassifier.js";
@@ -41,13 +44,15 @@ export class CommandReceiver {
   private zoneAgnosticProcessor: ZoneAgnosticUpdateProcessor;
   private zoneAgnosticHandlers: Record<string, ZoneAgnosticHandler>;
   private avInfoRequeryTimer: ReturnType<typeof setTimeout> | null = null;
+  private onAvrInfo?: (entityId: string) => void;
 
-  constructor(driver: uc.IntegrationAPI, config: OnkyoConfig, eiscpInstance: EiscpDriver, avrStateApi: AvrStateApi, driverVersion: string = "unknown") {
+  constructor(driver: uc.IntegrationAPI, config: OnkyoConfig, eiscpInstance: EiscpDriver, avrStateApi: AvrStateApi, driverVersion: string = "unknown", onAvrInfo?: (entityId: string) => void) {
     this.driver = driver;
     this.config = config;
     this.eiscpInstance = eiscpInstance;
     this.avrStateApi = avrStateApi;
     this.driverVersion = driverVersion;
+    this.onAvrInfo = onAvrInfo;
     this.zoneAgnosticProcessor = new ZoneAgnosticUpdateProcessor(driver, config, eiscpInstance, avrStateApi);
     this.zoneAgnosticHandlers = {
       IFA: async (avrUpdates, entityId, eventZone) => {
@@ -85,6 +90,12 @@ export class CommandReceiver {
       metadata: async (avrUpdates, entityId) => {
         const metadata = extractMetadataArgument(avrUpdates.argument);
         await this.zoneAgnosticProcessor.handleMetadata(entityId, metadata);
+      },
+      // The NRI payload is already parsed and stored by the command parser. All that is left is to
+      // let the driver act on what the AVR reported (e.g. the maximum display volume) and to
+      // re-render, so the entity picks up presets, zones and services without another AVR query.
+      "avr-info": async (_avrUpdates, entityId) => {
+        this.onAvrInfo?.(entityId);
       }
     };
   }
@@ -211,7 +222,7 @@ export class CommandReceiver {
 
   private async handleVolume(avrUpdates: AvrUpdateEvent, entityId: string): Promise<void> {
     const eiscpValue = Number(avrUpdates.argument);
-    const volumeScale = this.config.volumeScale ?? 100;
+    const volumeScale = resolveVolumeScale(this.config.volumeScale);
     const adjustVolumeDispl = this.config.adjustVolumeDispl ?? true;
     const volumeDisplay = String(this.config.volumeDisplay ?? "absolute").toLowerCase() === "relative" ? "relative" : "absolute";
     const avrDisplayValue = adjustVolumeDispl ? Math.round(eiscpValue / 2) : eiscpValue;
@@ -231,13 +242,44 @@ export class CommandReceiver {
   private async handlePreset(avrUpdates: AvrUpdateEvent, entityId: string): Promise<void> {
     this.avrPreset = avrUpdates.argument.toString();
     log.info("%s [%s] preset set to: %s", integrationName, entityId, this.avrPreset);
+
+    // A numeric argument is a preset slot ("PRS0C" -> 12), which is what the tuner presets select
+    // entity lists stations for. "up"/"down" and the wrapped TuneIn/streaming presets are not.
+    if (typeof avrUpdates.argument !== "number") {
+      return;
+    }
+    const physicalAVR = physicalAvrIdFromEntityId(entityId);
+    const station = physicalAVR ? findTunerPresetNameBySlot(physicalAVR, avrUpdates.argument) : undefined;
+    if (!station) {
+      this.driver.updateEntityAttributes(`${entityId}_tuner_presets`, {
+        [SelectAttributes.CurrentOption]: ""
+      });
+      return;
+    }
+    log.debug("%s [%s] Tuner preset slot %d is '%s'", integrationName, entityId, avrUpdates.argument, station);
+    this.updateTunerPresetSelection(entityId, station);
+  }
+
+  private updateTunerPresetSelection(entityId: string, stationName: string): void {
+    const physicalAVR = physicalAvrIdFromEntityId(entityId);
+    if (!physicalAVR) {
+      return;
+    }
+    const preset = findTunerPresetByName(physicalAVR, stationName);
+    this.driver.updateEntityAttributes(`${entityId}_tuner_presets`, {
+      [SelectAttributes.CurrentOption]: preset?.name ?? ""
+    });
   }
 
   private async handleInputSelector(avrUpdates: AvrUpdateEvent, entityId: string, eventZone: string): Promise<void> {
     const aliases = Array.isArray(avrUpdates.argument) ? (avrUpdates.argument as string[]) : [avrUpdates.argument.toString()];
     let source = aliases[0];
-    const cfgAvr = this.config.avrs ? this.config.avrs.find((a) => a.model === avrUpdates.model && a.ip === avrUpdates.host) : undefined;
-    if (cfgAvr && Array.isArray(cfgAvr.inputSelectorOptions) && cfgAvr.inputSelectorOptions.length > 0) {
+    const physicalAVR = physicalAvrIdFromEntityId(entityId);
+    // Zone-specific config first: the options are per zone, so another zone's list must not be used.
+    const cfgAvr = (this.config.avrs?.find((a) => a.model === avrUpdates.model && a.ip === avrUpdates.host && a.zone === eventZone) ??
+      this.config.avrs?.find((a) => a.model === avrUpdates.model && a.ip === avrUpdates.host)) as AvrConfig | undefined;
+    const collectedInputs = cfgAvr?.useAvrReportedInputs === true && physicalAVR ? hasAvrInputs(physicalAVR) : false;
+    if (!collectedInputs && cfgAvr && Array.isArray(cfgAvr.inputSelectorOptions) && cfgAvr.inputSelectorOptions.length > 0) {
       const match = aliases.find((alias) => cfgAvr.inputSelectorOptions?.includes(alias));
       if (match) {
         source = match;
@@ -253,9 +295,12 @@ export class CommandReceiver {
     });
     this.zoneAgnosticProcessor.resetZone(entityId);
     await this.zoneAgnosticProcessor.renderEntity(entityId);
-    if (source === "dab") {
+    // The tuner presets are only queried for the tuner inputs, identified by their input id: the
+    // AVR-reported name ("DAB") is not the internal alias ("dab") the command table uses.
+    const sourceInputId = collectedInputs && physicalAVR ? resolveInputSourceId(physicalAVR, source) : aliases[0];
+    if (sourceInputId === "dab" || sourceInputId === "33") {
       this.eiscpInstance.raw("DSNQSTN");
-    } else if (source === "fm") {
+    } else if (sourceInputId === "fm" || sourceInputId === "24") {
       this.eiscpInstance.raw("FLDQSTN");
     }
     this.driver.updateEntityAttributes(`${entityId}_source_sensor`, {

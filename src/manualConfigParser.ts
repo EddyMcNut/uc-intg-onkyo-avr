@@ -1,5 +1,5 @@
 // Focused responsibility: Parse and validate manual configuration input
-import { LogLevel, AVR_DEFAULTS, parseBoolean } from "./configManager.js";
+import { LogLevel, AVR_DEFAULTS, parseBoolean, parseVolumeScale, type VolumeScale } from "./configManager.js";
 
 export interface ManualConfigInput {
   model?: unknown;
@@ -10,10 +10,12 @@ export interface ManualConfigInput {
   listeningModeOptions?: unknown;
   inputSelectorOptions?: unknown;
   volumeScale?: unknown;
+  useAvrReportedInputs?: unknown;
   volumeDisplay?: unknown;
   adjustVolumeDispl?: unknown;
   zoneCount?: unknown;
   createSensors?: unknown;
+  createTunerPresets?: unknown;
   createRemoteEntity?: unknown;
   createDiracSelectEntity?: unknown;
   netMenuDelay?: unknown;
@@ -31,12 +33,14 @@ export interface ParsedManualConfig {
   albumArtURLValue: string;
   listeningModeOptions: string;
   inputSelectorOptions: string;
-  volumeScaleValue: number;
+  volumeScaleValue: VolumeScale;
+  useAvrReportedInputsValue: boolean;
   volumeDisplayValue: "absolute" | "relative";
   adjustVolumeDisplValue: boolean;
   entityNameStyleValue: "long" | "short";
   zoneCountValue: number;
   createSensorsValue: boolean;
+  createTunerPresetsValue: boolean;
   createRemoteEntityValue: boolean;
   createDiracSelectEntityValue: boolean;
   netMenuDelayValue: number;
@@ -48,6 +52,7 @@ export interface ParsedManualConfig {
 
 export class ManualConfigParser {
   parse(input: ManualConfigInput, fallbackLogLevel: LogLevel = "warn"): ParsedManualConfig {
+    const useAvrReportedInputsValue = parseBoolean(input.useAvrReportedInputs, AVR_DEFAULTS.useAvrReportedInputs);
     return {
       modelName: (input.model ?? "").toString().trim(),
       ipVal: (input.ipAddress ?? "").toString().trim(),
@@ -55,12 +60,14 @@ export class ManualConfigParser {
       queueThresholdValue: this.parseQueueThreshold(input.queueThreshold),
       albumArtURLValue: this.parseAlbumArtUrl(input.albumArtURL),
       listeningModeOptions: String(input.listeningModeOptions ?? ""),
-      inputSelectorOptions: String(input.inputSelectorOptions ?? ""),
+      inputSelectorOptions: useAvrReportedInputsValue ? "all" : String(input.inputSelectorOptions ?? ""),
       volumeScaleValue: this.parseVolumeScale(input.volumeScale),
+      useAvrReportedInputsValue,
       volumeDisplayValue: this.parseVolumeDisplay(input.volumeDisplay),
       adjustVolumeDisplValue: parseBoolean(input.adjustVolumeDispl, true),
       entityNameStyleValue: this.parseEntityNameStyle(input.entityNameStyle),
       createSensorsValue: parseBoolean(input.createSensors, AVR_DEFAULTS.createSensors),
+      createTunerPresetsValue: parseBoolean(input.createTunerPresets, AVR_DEFAULTS.createTunerPresets),
       createRemoteEntityValue: parseBoolean(input.createRemoteEntity, AVR_DEFAULTS.createRemoteEntity),
       createDiracSelectEntityValue: parseBoolean(input.createDiracSelectEntity, AVR_DEFAULTS.createDiracSelectEntity),
       netMenuDelayValue: this.parseNetMenuDelay(input.netMenuDelay),
@@ -86,10 +93,8 @@ export class ManualConfigParser {
     return typeof url === "string" && url.trim() !== "" ? url.trim() : AVR_DEFAULTS.albumArtURL;
   }
 
-  private parseVolumeScale(scale: unknown): number {
-    const parsed = parseInt(String(scale), 10);
-    if (isNaN(parsed)) return AVR_DEFAULTS.volumeScale;
-    return [80, 100].includes(parsed) ? parsed : AVR_DEFAULTS.volumeScale;
+  private parseVolumeScale(scale: unknown): VolumeScale {
+    return parseVolumeScale(scale);
   }
 
   private parseVolumeDisplay(display: unknown): "absolute" | "relative" {
@@ -108,7 +113,7 @@ export class ManualConfigParser {
   private parseTuneInPresetPosition(position: unknown): number {
     const parsed = parseInt(String(position), 10);
     if (isNaN(parsed)) return AVR_DEFAULTS.tuneinPresetPosition;
-    return parsed >= 1 && parsed <= 9 ? parsed : AVR_DEFAULTS.tuneinPresetPosition;
+    return parsed >= 1 && parsed <= 10 ? parsed : AVR_DEFAULTS.tuneinPresetPosition;
   }
 
   private parseTuneInMenuStyle(style: unknown): "mypresets" | "full" {

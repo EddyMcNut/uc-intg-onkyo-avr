@@ -4,6 +4,7 @@ import type { AvrStateApi } from "./types.js";
 import type { ZoneAgnosticServiceAdapter } from "./zoneAgnosticServiceAdapters.js";
 import type { ZoneAgnosticMediaStateStore } from "./zoneAgnosticMediaState.js";
 import type { EiscpDriver } from "./eiscp.js";
+import { findTunerPresetByName } from "./tunerPresetStore.js";
 
 type FrontPanelRouterDeps = {
   driver: uc.IntegrationAPI;
@@ -25,15 +26,26 @@ export class ZoneAgnosticFrontPanelRouter {
   async handleFld(sourceEntityId: string, frontPanelText: string, eventZone: string): Promise<void> {
     const physicalAvrId = this.deps.getPhysicalAvrId(sourceEntityId);
     const fmZones = this.deps.state.getEntitiesByPhysicalAvrAndSource(physicalAvrId, "fm");
-    for (const zoneEntityId of fmZones) {
-      this.deps.mediaStateStore.updateNowPlaying(zoneEntityId, "fm", {
-        station: frontPanelText,
-        artist: "FM Radio"
-      });
-      await this.deps.renderZoneMedia(zoneEntityId, true);
+    const amZones = this.deps.state.getEntitiesByPhysicalAvrAndSource(physicalAvrId, "am");
+    for (const [source, zones] of [
+      ["fm", fmZones],
+      ["am", amZones]
+    ] as const) {
+      for (const zoneEntityId of zones) {
+        this.deps.mediaStateStore.updateNowPlaying(zoneEntityId, source, {
+          station: frontPanelText,
+          artist: `${source.toUpperCase()} Radio`
+        });
+        const preset = findTunerPresetByName(physicalAvrId, frontPanelText);
+        this.deps.driver.updateEntityAttributes(`${zoneEntityId}_tuner_presets`, {
+          [uc.SelectAttributes.CurrentOption]: preset?.name ?? ""
+        });
+        await this.deps.renderZoneMedia(zoneEntityId, true);
+      }
     }
-    if (fmZones.length > 0) {
-      this.deps.updateFrontPanelDisplay(fmZones, frontPanelText);
+    const tunerZones = [...fmZones, ...amZones];
+    if (tunerZones.length > 0) {
+      this.deps.updateFrontPanelDisplay(tunerZones, frontPanelText);
     }
 
     const netZones = this.deps.getNetZones(sourceEntityId);
@@ -63,7 +75,7 @@ export class ZoneAgnosticFrontPanelRouter {
       return;
     }
 
-    if (fmZones.length === 0) {
+    if (tunerZones.length === 0) {
       this.deps.updateFrontPanelDisplay([sourceEntityId], frontPanelText);
     }
   }

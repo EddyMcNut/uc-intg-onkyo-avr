@@ -39,8 +39,10 @@ export class ConfigPersistenceManager {
       volumeDisplay: parsedConfig.volumeDisplayValue,
       entityNameStyle: parsedConfig.entityNameStyleValue,
       createRemoteEntity: parsedConfig.createRemoteEntityValue,
+      createTunerPresets: parsedConfig.createTunerPresetsValue,
       createDiracSelectEntity: parsedConfig.createDiracSelectEntityValue,
-      tuneinMenuStyle: parsedConfig.tuneinMenuStyleValue
+      tuneinMenuStyle: parsedConfig.tuneinMenuStyleValue,
+      useAvrReportedInputs: parsedConfig.useAvrReportedInputsValue
     };
 
     // Use parseSelectOptions which handles the 'none' sentinel (-> null = don't create entity) and 'all'/empty (-> "all" = show all)
@@ -69,10 +71,12 @@ export class ConfigPersistenceManager {
       listeningModeOptions: parsedConfig.listeningModeOptions,
       inputSelectorOptions: parsedConfig.inputSelectorOptions,
       volumeScale: parsedConfig.volumeScaleValue,
+      useAvrReportedInputs: parsedConfig.useAvrReportedInputsValue,
       volumeDisplay: parsedConfig.volumeDisplayValue,
       adjustVolumeDispl: parsedConfig.adjustVolumeDisplValue,
       entityNameStyle: parsedConfig.entityNameStyleValue,
       createSensors: parsedConfig.createSensorsValue,
+      createTunerPresets: parsedConfig.createTunerPresetsValue,
       createRemoteEntity: parsedConfig.createRemoteEntityValue,
       createDiracSelectEntity: parsedConfig.createDiracSelectEntityValue,
       netMenuDelay: parsedConfig.netMenuDelayValue,

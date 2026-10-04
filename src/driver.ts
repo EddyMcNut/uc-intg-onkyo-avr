@@ -3,7 +3,18 @@
 import * as uc from "@unfoldedcircle/integration-api";
 import { SelectAttributes } from "@unfoldedcircle/integration-api";
 import EiscpDriver from "./eiscp.js";
-import { ConfigManager, setConfigDir, OnkyoConfig, AvrConfig, buildEntityId, buildPhysicalAvrId, DEFAULT_QUEUE_THRESHOLD, normalizeAvrConfig } from "./configManager.js";
+import {
+  ConfigManager,
+  setConfigDir,
+  OnkyoConfig,
+  AvrConfig,
+  buildEntityId,
+  buildPhysicalAvrId,
+  physicalAvrIdFromEntityId,
+  DEFAULT_QUEUE_THRESHOLD,
+  normalizeAvrConfig,
+  resolveVolumeScale
+} from "./configManager.js";
 import { CommandSender } from "./commandSender.js";
 import { CommandReceiver } from "./commandReceiver.js";
 import { ReconnectionManager } from "./reconnectionManager.js";
@@ -20,7 +31,12 @@ import { DIRAC_OPTION_LABELS, diracOptionToServiceKey } from "./diracSelect.js";
 import { remoteEntityCommandHandler } from "./remoteEntityCommandHandler.js";
 import SubscriptionHandler from "./subscriptionHandler.js";
 import ConnectCoordinator from "./connectCoordinator.js";
-import { AvrInstance, type AvrStateApi } from "./types.js";
+import { AvrInstance, EiscpInstance, type AvrStateApi } from "./types.js";
+import { resolveAutoVolumeScale } from "./volumeScaleResolver.js";
+import { resolveInputSourceList } from "./inputSourceResolver.js";
+import { setAvrInputs, clearAvrInputs, hasAvrInputs } from "./inputSourceStore.js";
+import { findTunerPresetByName, getTunerPresetNames, setTunerPresets, tunerPresetCommandValue } from "./tunerPresetStore.js";
+import { listNamedPresets } from "./avrInfoStore.js";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -54,6 +70,8 @@ export default class OnkyoDriver {
   private entityRegistrar: EntityRegistrar;
   private listeningModeHandler: SelectEntityHandler;
   private inputSelectorHandler: SelectEntityHandler;
+  private tunerPresetsHandler: SelectEntityHandler;
+  private setupAvrInfoTimer: ReturnType<typeof setTimeout> | null = null;
   private diracHandler: SelectEntityHandler;
   private remoteEntityCommandHandler: remoteEntityCommandHandler;
   private subscriptionHandler: SubscriptionHandler;
@@ -104,6 +122,17 @@ export default class OnkyoDriver {
     this.inputSelectorHandler = new SelectEntityHandler(this.driver, this.connectionManager, this.avrInstances, "_input_selector", "input-selector", "Input Selector", (avrEntry) =>
       this.entityRegistrar.getInputSelectorOptions(avrEntry)
     );
+    this.tunerPresetsHandler = new SelectEntityHandler(
+      this.driver,
+      this.connectionManager,
+      this.avrInstances,
+      "_tuner_presets",
+      "preset",
+      "Tuner Presets",
+      (avrEntry) => this.entityRegistrar.getTunerPresetOptions(avrEntry),
+      undefined,
+      this.sendTunerPreset.bind(this)
+    );
     this.diracHandler = new SelectEntityHandler(this.driver, this.connectionManager, this.avrInstances, "_dirac", "dirac", "Dirac", () => [...DIRAC_OPTION_LABELS], diracOptionToServiceKey);
     this.remoteEntityCommandHandler = new remoteEntityCommandHandler(this.driver, this.connectionManager, this.avrInstances, this.avrStateApi);
     this.subscriptionHandler = new SubscriptionHandler(this.connectionManager, this.avrInstances);
@@ -137,6 +166,7 @@ export default class OnkyoDriver {
           if (this.config.logLevel) setLogLevel(this.config.logLevel);
           this.registerAvailableEntities();
           await this.handleConnect();
+          this.schedulePostSetupAvrInfoQuery();
         },
         onConfigCleared: async () => {
           ConfigManager.clear();
@@ -157,15 +187,7 @@ export default class OnkyoDriver {
   private buildEntityRegistrations(avrEntry: string, avrConfig: AvrConfig, rawSend: (cmd: string) => Promise<void>): EntityRegistration[] {
     return [
       // ── Media player — always registered ───────────────────────────────────
-      {
-        enabled: () => true,
-        create: () => this.entityRegistrar.createMediaPlayerEntity(avrEntry, avrConfig.volumeScale ?? 100, this.sharedCmdHandler.bind(this), rawSend),
-        afterRegister: () => {
-          if (typeof this.driver.updateEntityAttributes === "function") {
-            this.driver.updateEntityAttributes(avrEntry, { [uc.MediaPlayerAttributes.SourceList]: this.entityRegistrar.getInputSelectorOptions(avrEntry) });
-          }
-        }
-      },
+      this.buildMediaPlayerRegistration(avrEntry, avrConfig, rawSend),
 
       // ── Sensor entities — conditional on createSensors flag ────────────────
       {
@@ -222,6 +244,22 @@ export default class OnkyoDriver {
         disabledMessage: `${integrationName} [${avrEntry}] Input Selector select entity disabled by user preference (none)`
       },
 
+      // ── Tuner Presets select — conditional on createTunerPresets flag ──────
+      {
+        enabled: (cfg) => cfg.createTunerPresets !== false,
+        create: () => {
+          const handler = this.tunerPresetsHandler?.handle.bind(this.tunerPresetsHandler) ?? (async () => uc.StatusCodes.Ok);
+          return this.entityRegistrar.createTunerPresetsSelectEntity(avrEntry, handler);
+        },
+        afterRegister: () => {
+          // The station names arrive with the first NRI reply, so push whatever was collected so far.
+          if (typeof this.driver.updateEntityAttributes === "function") {
+            this.driver.updateEntityAttributes(`${avrEntry}_tuner_presets`, { [SelectAttributes.Options]: this.entityRegistrar.getTunerPresetOptions(avrEntry) });
+          }
+        },
+        disabledMessage: `${integrationName} [${avrEntry}] Tuner Presets select entity disabled by user preference`
+      },
+
       // ── Dirac select — conditional on createDiracSelectEntity flag ─────────
       {
         enabled: (cfg) => cfg.createDiracSelectEntity !== false,
@@ -234,37 +272,311 @@ export default class OnkyoDriver {
     ];
   }
 
+  // The media player carries the volume scale in its entity options, so it is registered on its own
+  // whenever that scale changes, without rebuilding the other entities of the AVR.
+  private buildMediaPlayerRegistration(avrEntry: string, avrConfig: AvrConfig, rawSend: (cmd: string) => Promise<void>): EntityRegistration {
+    return {
+      enabled: () => true,
+      create: () => this.entityRegistrar.createMediaPlayerEntity(avrEntry, resolveVolumeScale(avrConfig.volumeScale), this.sharedCmdHandler.bind(this), rawSend),
+      afterRegister: () => {
+        if (typeof this.driver.updateEntityAttributes === "function") {
+          this.driver.updateEntityAttributes(avrEntry, { [uc.MediaPlayerAttributes.SourceList]: this.entityRegistrar.getInputSelectorOptions(avrEntry) });
+        }
+      }
+    };
+  }
+
   private registerAvailableEntities(): void {
     log.info("%s Registering available entities from config", integrationName);
     if (!this.entityRegistrar) this.entityRegistrar = new EntityRegistrar(this.avrStateApi);
     for (const avrConfig of this.config.avrs!) {
       const avrEntry = buildEntityId(avrConfig.model, avrConfig.ip, avrConfig.zone);
-      const physicalAVR = buildPhysicalAvrId(avrConfig.model, avrConfig.ip);
-      const rawSend = async (cmd: string): Promise<void> => {
-        const conn = this.connectionManager.getPhysicalConnection(physicalAVR);
-        await conn?.eiscp?.raw(cmd);
-      };
 
-      for (const registration of this.buildEntityRegistrations(avrEntry, avrConfig, rawSend)) {
+      for (const registration of this.buildEntityRegistrations(avrEntry, avrConfig, this.createRawSend(avrConfig))) {
         if (!registration.enabled(avrConfig)) {
           if (registration.disabledMessage) log.info(registration.disabledMessage);
           continue;
         }
         const entities = [registration.create()].flat() as uc.Entity[];
         for (const entity of entities) {
-          // Re-registration (e.g. after a config save) must replace the existing entity so updated
-          // definitions take effect — addAvailableEntity silently keeps the old entity otherwise.
-          const availablePool = this.driver.getAvailableEntities?.();
-          if (availablePool && availablePool.contains(entity.id)) {
-            log.info("%s [%s] Re-registering existing entity with updated definition: %s", integrationName, avrEntry, entity.id);
-            availablePool.removeEntity(entity.id);
-          }
-          this.driver.addAvailableEntity(entity);
-          log.info("%s [%s] Entity registered: %s", integrationName, avrEntry, entity.id);
+          this.registerEntity(entity, avrEntry);
         }
         registration.afterRegister?.(entities);
       }
     }
+  }
+
+  /** Re-register a single media player, e.g. after the volume scale was resolved from the AVR. */
+  private registerMediaPlayer(avrConfig: AvrConfig): void {
+    const avrEntry = buildEntityId(avrConfig.model, avrConfig.ip, avrConfig.zone);
+    const registration = this.buildMediaPlayerRegistration(avrEntry, avrConfig, this.createRawSend(avrConfig));
+    const entities = [registration.create()].flat() as uc.Entity[];
+    for (const entity of entities) {
+      this.registerEntity(entity, avrEntry);
+    }
+    registration.afterRegister?.(entities);
+  }
+
+  /**
+   * Re-register a single input selector, e.g. after the input source list was resolved from the AVR.
+   * Its options are part of the entity definition, so a plain attribute update would not reach a
+   * manager that has not instantiated it yet.
+   */
+  private registerInputSelector(avrConfig: AvrConfig): void {
+    if (avrConfig.inputSelectorOptions === null) {
+      return;
+    }
+    const avrEntry = buildEntityId(avrConfig.model, avrConfig.ip, avrConfig.zone);
+    const handler = this.inputSelectorHandler?.handle.bind(this.inputSelectorHandler);
+    const entities = [this.entityRegistrar.createInputSelectorSelectEntity(avrEntry, handler)] as uc.Entity[];
+    for (const entity of entities) {
+      this.registerEntity(entity, avrEntry);
+    }
+  }
+
+  /** Re-register the remote so its reported-source page reflects the latest NRI snapshot. */
+  private registerRemoteEntity(avrConfig: AvrConfig): void {
+    const avrEntry = buildEntityId(avrConfig.model, avrConfig.ip, avrConfig.zone);
+    const handler = this.remoteEntityCommandHandler?.handle.bind(this.remoteEntityCommandHandler);
+    this.registerEntity(this.entityRegistrar.createRemoteEntity(avrEntry, handler), avrEntry);
+  }
+
+  /**
+   * Recall a tuner preset slot: the station name from the select entity is mapped back to the slot
+   * number the AVR reported it in, and sent as `PRS<slot in hex>`.
+   *
+   * The raw command is used on purpose: `PRS` is documented as "Preset No. 1-40 in hexadecimal", so
+   * the value has to be exactly that hex slot. Presets are a property of the AVR, not of a zone, so
+   * the command is sent for the main zone.
+   */
+  private async sendTunerPreset(eiscp: EiscpInstance, avrEntry: string, _zone: string, option: string): Promise<void> {
+    const physicalAVR = physicalAvrIdFromEntityId(avrEntry);
+    const preset = physicalAVR ? findTunerPresetByName(physicalAVR, option) : undefined;
+    if (!preset) {
+      log.warn("%s Tuner preset '%s' is not one of the stations the AVR reported, nothing sent", integrationName, option);
+      throw new Error(`Unknown tuner preset: ${option}`);
+    }
+
+    const value = tunerPresetCommandValue(preset.slot);
+    log.debug("%s [%s] Selecting tuner preset '%s': slot %d (band %s) -> PRS%s", integrationName, physicalAVR, preset.name, preset.slot, preset.band, value);
+    await eiscp.raw(`PRS${value}`);
+  }
+
+  private registerEntity(entity: uc.Entity, avrEntry: string): void {
+    // Re-registration (e.g. after a config save) must replace the existing entity so updated
+    // definitions take effect — addAvailableEntity silently keeps the old entity otherwise.
+    const availablePool = this.driver.getAvailableEntities?.();
+    if (availablePool && availablePool.contains(entity.id)) {
+      log.info("%s [%s] Re-registering existing entity with updated definition: %s", integrationName, avrEntry, entity.id);
+      availablePool.removeEntity(entity.id);
+    }
+    this.driver.addAvailableEntity(entity);
+    log.info("%s [%s] Entity registered: %s", integrationName, avrEntry, entity.id);
+  }
+
+  private createRawSend(avrConfig: AvrConfig): (cmd: string) => Promise<void> {
+    const physicalAVR = buildPhysicalAvrId(avrConfig.model, avrConfig.ip);
+    return async (cmd: string): Promise<void> => {
+      const conn = this.connectionManager.getPhysicalConnection(physicalAVR);
+      await conn?.eiscp?.raw(cmd);
+    };
+  }
+
+  /**
+   * Ask every configured AVR for its info document (NRI), once per AVR.
+   *
+   * This is a deliberate collection on every setup save: the AVR info carries the presets, inputs,
+   * services and the maximum display volume, all of which can be relevant to a config the user just
+   * changed. It deliberately bypasses the staleness check of the regular state query.
+   */
+  private async triggerAvrInfoQuery(): Promise<void> {
+    const queried = new Set<string>();
+    for (const avrConfig of this.config.avrs ?? []) {
+      const physicalAVR = buildPhysicalAvrId(avrConfig.model, avrConfig.ip);
+      if (queried.has(physicalAVR)) {
+        continue;
+      }
+      queried.add(physicalAVR);
+
+      const eiscp = this.connectionManager?.getPhysicalConnection(physicalAVR)?.eiscp;
+      if (!eiscp) {
+        log.debug("%s [%s] Not connected, cannot collect the AVR info", integrationName, buildEntityId(avrConfig.model, avrConfig.ip, avrConfig.zone));
+        continue;
+      }
+
+      log.info("%s [%s] Collecting the AVR info after the config was saved...", integrationName, physicalAVR);
+      try {
+        await eiscp.command({ zone: avrConfig.zone, command: "avr-info", args: "query" });
+      } catch (err) {
+        log.warn("%s [%s] Failed to collect the AVR info after the config was saved:", integrationName, physicalAVR, err);
+      }
+    }
+  }
+
+  private schedulePostSetupAvrInfoQuery(): void {
+    if (this.setupAvrInfoTimer) {
+      clearTimeout(this.setupAvrInfoTimer);
+    }
+    this.setupAvrInfoTimer = setTimeout(() => {
+      this.setupAvrInfoTimer = null;
+      void this.triggerAvrInfoQuery();
+    }, 10_000);
+  }
+
+  /**
+   * Act on what the AVR reported about itself: resolve the volume scale and the input source list
+   * that were left on "auto".
+   *
+   * NRI describes the AVR as a whole and is answered on the main zone, so the single reply resolves
+   * every configured zone of that AVR — each zone reading the volume scale the AVR reported for it,
+   * while the inputs it reports are shared by all zones of that AVR.
+   *
+   * A resolved volume scale replaces "auto" in the config and is saved, so it behaves exactly like
+   * a value the user entered: it is never determined again. An input source list that the AVR cannot
+   * provide is saved as "manual" for the same reason: there is nothing left to resolve. The entities
+   * carrying these settings are re-registered, since both are part of their entity options, and the
+   * runtime configs are refreshed so they take effect from the next update on.
+   */
+  private handleAvrInfo(entityId: string): void {
+    const physicalAVR = physicalAvrIdFromEntityId(entityId);
+    if (!physicalAVR) {
+      return;
+    }
+
+    const zones = (this.config.avrs ?? []).filter((avrConfig) => buildPhysicalAvrId(avrConfig.model, avrConfig.ip) === physicalAVR);
+    if (zones.length === 0) {
+      return;
+    }
+
+    // The input list belongs to the AVR, not to a single zone: it is stored once, and every zone of
+    // this AVR has to rebuild the entities that list the inputs. The same holds for the tuner
+    // presets, which are also AVR-wide.
+    let inputsChanged = false;
+    let inputsDecided = false;
+    let presetsChanged = false;
+    let presetsCollected = false;
+
+    const resolvedZones: AvrConfig[] = [];
+    let configChanged = false;
+    for (const avrConfig of zones) {
+      const zoneEntry = buildEntityId(avrConfig.model, avrConfig.ip, avrConfig.zone);
+      let changed = false;
+
+      const volumeResolution = resolveAutoVolumeScale(avrConfig, entityId);
+      if (volumeResolution) {
+        if (ConfigManager.patchAvr(avrConfig.ip, avrConfig.zone, { volumeScale: volumeResolution.scale })) {
+          log.debug("%s [%s] Volume scale 'auto' resolved to 0-%d: %s", integrationName, zoneEntry, volumeResolution.scale, volumeResolution.reason);
+          configChanged = true;
+          changed = true;
+        } else {
+          log.warn("%s [%s] Could not store the resolved volume scale 0-%d in the config", integrationName, zoneEntry, volumeResolution.scale);
+        }
+      }
+
+      const inputResolution = resolveInputSourceList(avrConfig, entityId);
+      if (inputResolution) {
+        if (!inputResolution.inputs) {
+          // Nothing to collect: fall back to integration mappings and remember that, so unsupported
+          // older AVRs are not queried for names on every NRI reply.
+          if (ConfigManager.patchAvr(avrConfig.ip, avrConfig.zone, { useAvrReportedInputs: false })) {
+            log.debug("%s [%s] AVR-reported input names disabled: %s", integrationName, zoneEntry, inputResolution.reason);
+            configChanged = true;
+            changed = true;
+          } else {
+            log.error("%s [%s] Could not disable AVR-reported input names in the config", integrationName, zoneEntry);
+          }
+          if (!inputsDecided) {
+            inputsDecided = true;
+            inputsChanged = hasAvrInputs(physicalAVR);
+            clearAvrInputs(physicalAVR);
+          }
+        } else if (!inputsDecided) {
+          inputsDecided = true;
+          inputsChanged = setAvrInputs(physicalAVR, inputResolution.inputs);
+          if (inputsChanged) {
+            // The inputs changed, so the entities listing them have to be rebuilt.
+            log.debug("%s [%s] Input source list 'auto' resolved: %s", integrationName, zoneEntry, inputResolution.reason);
+          }
+        }
+      }
+
+      if (avrConfig.createTunerPresets !== false && !presetsCollected) {
+        presetsCollected = true;
+        presetsChanged = setTunerPresets(physicalAVR, listNamedPresets(entityId));
+        if (presetsChanged) {
+          const names = getTunerPresetNames(physicalAVR);
+          log.debug("%s [%s] Tuner presets collected from the AVR: %d station(s): %s", integrationName, zoneEntry, names.length, names.join(", "));
+        }
+      }
+
+      if (avrConfig.createTunerPresets !== false) {
+        this.registerTunerPresetsEntity(avrConfig);
+        this.updateTunerPresetsOptions(avrConfig, presetsChanged);
+      }
+
+      if (changed || inputsChanged || presetsChanged) {
+        resolvedZones.push(avrConfig);
+      }
+    }
+
+    if (resolvedZones.length === 0) {
+      return;
+    }
+
+    this.config = configChanged ? ConfigManager.load() : this.config;
+    for (const resolvedZone of resolvedZones) {
+      // Register and refresh with the value from the saved config, since that is what is persisted now.
+      const updatedConfig = this.config.avrs?.find((a) => a.ip === resolvedZone.ip && a.zone === resolvedZone.zone) ?? resolvedZone;
+      this.registerMediaPlayer(updatedConfig);
+      this.registerInputSelector(updatedConfig);
+      if (updatedConfig.createRemoteEntity === true) {
+        this.registerRemoteEntity(updatedConfig);
+      }
+      this.refreshZoneRuntimeConfig(updatedConfig);
+    }
+  }
+
+  /** Push the stations the AVR reported into the existing tuner presets select entity. */
+  private updateTunerPresetsOptions(avrConfig: AvrConfig, logUpdate = true): void {
+    const avrEntry = buildEntityId(avrConfig.model, avrConfig.ip, avrConfig.zone);
+    const options = this.entityRegistrar.getTunerPresetOptions(avrEntry);
+    if (logUpdate) {
+      log.debug("%s [%s] Updating Tuner Presets select with %d station(s)", integrationName, avrEntry, options.length);
+    }
+    this.driver.updateEntityAttributes(`${avrEntry}_tuner_presets`, { [SelectAttributes.Options]: options });
+  }
+
+  /** Replace the available definition so managers that ignore updates to uninstantiated entities refresh it. */
+  private registerTunerPresetsEntity(avrConfig: AvrConfig): void {
+    const avrEntry = buildEntityId(avrConfig.model, avrConfig.ip, avrConfig.zone);
+    const handler = this.tunerPresetsHandler?.handle.bind(this.tunerPresetsHandler);
+    const entity = this.entityRegistrar.createTunerPresetsSelectEntity(avrEntry, handler);
+    this.registerEntity(entity, avrEntry);
+  }
+
+  /** Rebuild tuner preset entities after setup connection handling, which may race the first NRI reply. */
+  private refreshTunerPresetEntities(): void {
+    for (const avrConfig of this.config.avrs ?? []) {
+      if (avrConfig.createTunerPresets === false) {
+        continue;
+      }
+
+      this.registerTunerPresetsEntity(avrConfig);
+    }
+  }
+
+  /** Push a refreshed per-zone runtime config into the live command handlers after a config change. */
+  private refreshZoneRuntimeConfig(avrConfig: AvrConfig): void {
+    const avrEntry = buildEntityId(avrConfig.model, avrConfig.ip, avrConfig.zone);
+    const avrSpecificConfig = this.createAvrSpecificConfig(avrConfig);
+
+    const instance = this.avrInstances.get(avrEntry);
+    if (instance) {
+      instance.config = avrConfig;
+      instance.commandSender.updateConfig(avrSpecificConfig);
+    }
+    const physicalConnection = this.connectionManager.getPhysicalConnection(buildPhysicalAvrId(avrConfig.model, avrConfig.ip));
+    physicalConnection?.commandReceiver.updateConfig(avrSpecificConfig);
   }
 
   private setupDriverEvents() {
@@ -362,7 +674,7 @@ export default class OnkyoDriver {
       this.config,
       (avrConfig) => (eiscpInstance) => {
         const avrSpecificConfig = this.createAvrSpecificConfig(avrConfig);
-        return new CommandReceiver(this.driver, avrSpecificConfig, eiscpInstance, this.avrStateApi, this.driverVersion);
+        return new CommandReceiver(this.driver, avrSpecificConfig, eiscpInstance, this.avrStateApi, this.driverVersion, this.handleAvrInfo.bind(this));
       },
       (avrSpecificConfig, eiscp, commandReceiver) => new CommandSender(this.driver, avrSpecificConfig, eiscp, this.avrStateApi, commandReceiver)
     );
@@ -372,6 +684,9 @@ export default class OnkyoDriver {
     } else {
       await this.driver.setDeviceState(uc.DeviceStates.Disconnected);
     }
+
+    // Query AVR info only after all configured entities have been registered.
+    await this.triggerAvrInfoQuery();
   }
 
   private async setupEventHandlers() {

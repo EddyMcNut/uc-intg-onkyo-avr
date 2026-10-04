@@ -106,6 +106,16 @@ describe("handleVolume", () => {
     expect(driverMock.updateEntityAttributes).toHaveBeenCalledWith("M 1.2.3.4 main", { [uc.MediaPlayerAttributes.Volume]: 13 });
   });
 
+  it("falls back to 0-100 while the volume scale is still auto", async () => {
+    const { receiver, driverMock } = await makeReceiver({ config: makeOnkyoConfig({ volumeScale: "auto" }) });
+
+    const avrUpdates = { command: "volume", argument: 50, zone: "main", iscpCommand: "MVL50", host: "1.2.3.4", port: 60128, model: "TX-RZ50" };
+    const handlers = (receiver as any).eventHandlers;
+    await handlers.volume(avrUpdates, "M 1.2.3.4 main", "main");
+
+    expect(driverMock.updateEntityAttributes).toHaveBeenCalledWith("M 1.2.3.4 main", { [uc.MediaPlayerAttributes.Volume]: 25 });
+  });
+
   it("uses relative volume display", async () => {
     const { receiver, driverMock } = await makeReceiver({ config: makeOnkyoConfig({ volumeDisplay: "relative" }) });
 
@@ -187,6 +197,17 @@ describe("dispatchZoneAgnosticCommand", () => {
     const avrUpdates = { command: "FOO", argument: "bar", zone: "main", iscpCommand: "FOObar", host: "1.2.3.4", port: 60128, model: "TX-RZ50" };
     const result = await receiver.dispatchZoneAgnosticCommand(avrUpdates, "entity1", "main");
     expect(result).toBe(false);
+  });
+
+  it("hands the collected AVR info to the driver", async () => {
+    const onAvrInfo = vi.fn();
+    const mod = await import("../src/commandReceiver.js");
+    const { CommandReceiver } = mod as any;
+    const receiver = new CommandReceiver({ updateEntityAttributes: vi.fn() }, makeOnkyoConfig(), makeEiscpMock(), makeAvrStateApiMock(), "v-test", onAvrInfo);
+
+    const avrUpdates = { command: "avr-info", argument: "40", zone: "main", iscpCommand: "NRI", host: "1.2.3.4", port: 60128, model: "TX-RZ50" };
+    expect(await receiver.dispatchZoneAgnosticCommand(avrUpdates, "TX-RZ50 1.2.3.4 main", "main")).toBe(true);
+    expect(onAvrInfo).toHaveBeenCalledWith("TX-RZ50 1.2.3.4 main");
   });
 });
 

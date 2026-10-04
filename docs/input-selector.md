@@ -2,7 +2,7 @@
 
 ### Select source from dropdown
 
-The `Input source` command offers a dropdown list [based on your config](./source-webconfigurator-mediawidget.md), so depending on how you configured [Input Select](./select-input-selector.md) the integration will show a list of input sources.
+The `Input source` command offers a dropdown list [based on your config](./source-webconfigurator-mediawidget.md), so depending on how you configured [Input Select](./select-input-selector.md) the integration will show a list of input sources. By default AVR-reported names and IDs are used when available.
 
 ![](/screenshots/input-source2.png)
 
@@ -17,19 +17,16 @@ As from v0.7.3 you can select the 'sub-sources'of `NET` directly, let's say you 
 ![](/screenshots/net-subsource-delay.png)
 
 For the following sources, the integration will first send the `input-selector net` command automatically _before_ sending the second command for switching to the sub-source:
-
-| Source       | Input source (v0.9.0+) |
-| ------------ | ---------------------- |
-| TuneIn       | tunein                 |
-| Spotify      | spotify                |
-| Deezer       | deezer                 |
-| Tidal        | tidal                  |
-| AmazonMusic  | amazonmusic            |
-| Chromecast   | chromecast             |
-| DTS-Play-Fi  | dts-play-fi            |
-| AirPlay      | airplay                |
-| Alexa        | alexa                  |
-| Music-Server | music-server           |
+- TuneIn
+- Spotify
+- Deezer
+- Tidal
+- AmazonMusic
+- Chromecast
+- DTS-Play-Fi
+- AirPlay
+- Alexa
+- Music-Server
 
 _Your AVR must support these services. Check the manual of your model to see which of these services / inputs are available. Another way to check is to use the Onkyo app and see if you can switch the AVR to such a source, if it can then this integration should also be able to do that._
 

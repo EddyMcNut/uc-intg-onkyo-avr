@@ -51,7 +51,8 @@ describe("ManualConfigParser", () => {
     expect(result.portNum).toBe(60128);
     expect(result.queueThresholdValue).toBe(100);
     expect(result.albumArtURLValue).toBe("album_art.cgi");
-    expect(result.volumeScaleValue).toBe(100);
+    expect(result.volumeScaleValue).toBe("auto");
+    expect(result.useAvrReportedInputsValue).toBe(true);
     expect(result.volumeDisplayValue).toBe("absolute");
     expect(result.adjustVolumeDisplValue).toBe(true);
     expect(result.zoneCountValue).toBe(1);
@@ -71,24 +72,45 @@ describe("ManualConfigParser", () => {
     expect(parser.parse({ port: null }).portNum).toBe(60128);
   });
 
-  it("validates volume scale (only 80 or 100)", async () => {
+  it("validates volume scale (auto, 80 or 100)", async () => {
     const mod = await import("../src/manualConfigParser.js");
     const { ManualConfigParser } = mod as { ManualConfigParser: new () => any };
     const parser = new ManualConfigParser();
     expect(parser.parse({ volumeScale: 80 }).volumeScaleValue).toBe(80);
     expect(parser.parse({ volumeScale: 100 }).volumeScaleValue).toBe(100);
-    // Invalid values fall back to default
-    expect(parser.parse({ volumeScale: 50 }).volumeScaleValue).toBe(100);
-    expect(parser.parse({ volumeScale: "abc" }).volumeScaleValue).toBe(100);
+    expect(parser.parse({ volumeScale: "100" }).volumeScaleValue).toBe(100);
+    expect(parser.parse({ volumeScale: "auto" }).volumeScaleValue).toBe("auto");
+    expect(parser.parse({ volumeScale: "AUTO" }).volumeScaleValue).toBe("auto");
+    // Invalid values fall back to the default
+    expect(parser.parse({ volumeScale: 50 }).volumeScaleValue).toBe("auto");
+    expect(parser.parse({ volumeScale: "abc" }).volumeScaleValue).toBe("auto");
   });
 
-  it("validates tuneinPresetPosition (1-9 range)", async () => {
+  it("parses useAvrReportedInputs as a boolean", async () => {
+    const mod = await import("../src/manualConfigParser.js");
+    const { ManualConfigParser } = mod as { ManualConfigParser: new () => any };
+    const parser = new ManualConfigParser();
+
+    expect(parser.parse({ useAvrReportedInputs: false }).useAvrReportedInputsValue).toBe(false);
+    expect(parser.parse({ useAvrReportedInputs: "false" }).useAvrReportedInputsValue).toBe(false);
+    expect(parser.parse({ useAvrReportedInputs: true }).useAvrReportedInputsValue).toBe(true);
+  });
+
+  it("uses all input options when AVR-reported names are enabled", async () => {
+    const mod = await import("../src/manualConfigParser.js");
+    const { ManualConfigParser } = mod as { ManualConfigParser: new () => any };
+    const parser = new ManualConfigParser();
+    const result = parser.parse({ useAvrReportedInputs: true, inputSelectorOptions: "cd; dvd" });
+    expect(result.inputSelectorOptions).toBe("all");
+  });
+
+  it("validates tuneinPresetPosition (1-10 range)", async () => {
     const mod = await import("../src/manualConfigParser.js");
     const { ManualConfigParser } = mod as { ManualConfigParser: new () => any };
     const parser = new ManualConfigParser();
     expect(parser.parse({ tuneinPresetPosition: 5 }).tuneinPresetPositionValue).toBe(5);
     expect(parser.parse({ tuneinPresetPosition: 0 }).tuneinPresetPositionValue).toBe(1);
-    expect(parser.parse({ tuneinPresetPosition: 10 }).tuneinPresetPositionValue).toBe(1);
+    expect(parser.parse({ tuneinPresetPosition: 10 }).tuneinPresetPositionValue).toBe(10);
   });
 
   it("validates zoneCount (1-4 range)", async () => {

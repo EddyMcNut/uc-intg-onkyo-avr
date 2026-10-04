@@ -100,7 +100,47 @@ describe("ConfigManager static methods", () => {
 
     it("rejects invalid volumeScale", () => {
       const result = ConfigManager.validateAvrPayload({ model: "TX-RZ50", ip: "1.2.3.4", port: 60128, volumeScale: 50 });
-      expect(result.errors).toContain("volumeScale must be 80 or 100");
+      expect(result.errors).toContain('volumeScale must be 80, 100 or "auto"');
+    });
+
+    it("accepts an auto volumeScale", () => {
+      const result = ConfigManager.validateAvrPayload({ model: "TX-RZ50", ip: "1.2.3.4", port: 60128, volumeScale: "auto" });
+      expect(result.errors).toHaveLength(0);
+      expect(result.normalized!.volumeScale).toBe("auto");
+    });
+
+    it("accepts useAvrReportedInputs", () => {
+      const result = ConfigManager.validateAvrPayload({ model: "TX-RZ50", ip: "1.2.3.4", port: 60128, useAvrReportedInputs: false });
+      expect(result.errors).toHaveLength(0);
+      expect(result.normalized!.useAvrReportedInputs).toBe(false);
+    });
+
+    it("rejects an invalid useAvrReportedInputs value", () => {
+      const result = ConfigManager.validateAvrPayload({ model: "TX-RZ50", ip: "1.2.3.4", port: 60128, useAvrReportedInputs: 1 as any });
+      expect(result.errors).toContain("useAvrReportedInputs must be boolean");
+    });
+
+    it("defaults useAvrReportedInputs to true", () => {
+      const result = ConfigManager.validateAvrPayload({ model: "TX-RZ50", ip: "1.2.3.4", port: 60128 });
+      expect(result.normalized!.useAvrReportedInputs).toBe(true);
+    });
+
+    it("forces all input options when AVR-reported names are enabled", () => {
+      const result = ConfigManager.validateAvrPayload({
+        model: "TX-RZ50",
+        ip: "1.2.3.4",
+        port: 60128,
+        useAvrReportedInputs: true,
+        inputSelectorOptions: ["cd", "dvd"]
+      });
+
+      expect(result.errors).toEqual([]);
+      expect(result.normalized!.inputSelectorOptions).toBe("all");
+    });
+
+    it("defaults an absent volumeScale to auto", () => {
+      const result = ConfigManager.validateAvrPayload({ model: "TX-RZ50", ip: "1.2.3.4", port: 60128 });
+      expect(result.normalized!.volumeScale).toBe("auto");
     });
 
     it("rejects invalid volumeDisplay", () => {
@@ -120,7 +160,7 @@ describe("ConfigManager static methods", () => {
 
     it("rejects tuneinPresetPosition out of range", () => {
       const result = ConfigManager.validateAvrPayload({ model: "TX-RZ50", ip: "1.2.3.4", port: 60128, tuneinPresetPosition: 0 });
-      expect(result.errors).toContain("tuneinPresetPosition must be an integer between 1 and 9");
+      expect(result.errors).toContain("tuneinPresetPosition must be an integer between 1 and 10");
     });
 
     it("rejects invalid tuneinMenuStyle", () => {
@@ -242,7 +282,7 @@ describe("ConfigManager static methods", () => {
 
     it("rejects volumeScale from string NaN", () => {
       const result = ConfigManager.validateAvrPayload({ model: "TX-RZ50", ip: "1.2.3.4", port: 60128, volumeScale: "abc" });
-      expect(result.errors).toContain("volumeScale must be 80 or 100");
+      expect(result.errors).toContain('volumeScale must be 80, 100 or "auto"');
     });
 
     it("rejects adjustVolumeDispl with wrong type", () => {
@@ -262,7 +302,7 @@ describe("ConfigManager static methods", () => {
 
     it("rejects tuneinPresetPosition from string NaN", () => {
       const result = ConfigManager.validateAvrPayload({ model: "TX-RZ50", ip: "1.2.3.4", port: 60128, tuneinPresetPosition: "abc" });
-      expect(result.errors).toContain("tuneinPresetPosition must be an integer between 1 and 9");
+      expect(result.errors).toContain("tuneinPresetPosition must be an integer between 1 and 10");
     });
 
     it("rejects invalid input selector option", () => {
@@ -285,6 +325,7 @@ describe("ConfigManager static methods", () => {
         volumeScale: "80",
         netMenuDelay: "5",
         tuneinPresetPosition: "3",
+        useAvrReportedInputs: false,
         inputSelectorOptions: ["opt1", "opt2"]
       });
       expect(result.errors.length).toBe(0);
@@ -365,6 +406,28 @@ describe("ConfigManager static methods", () => {
       const result = ConfigManager.load();
       expect(result.avrs).toHaveLength(1);
       expect(result.avrs[0].model).toBe("TX-RZ50");
+      expect(result.configVersion).toBe("0.9.6");
+      expect(result.avrs[0].createTunerPresets).toBe(true);
+      expect(result.avrs[0].createRemoteEntity).toBe(true);
+      expect(result.avrs[0].createDiracSelectEntity).toBe(true);
+    });
+
+    it("persists 0.9.6 defaults for an existing config without setup", () => {
+      mockExistsSync.mockReturnValue(true);
+      mockReadFileSync.mockReturnValue(
+        JSON.stringify({
+          avrs: [{ model: "TX-RZ50", ip: "1.2.3.4", port: 60128, zone: "main" }]
+        })
+      );
+
+      const result = ConfigManager.load();
+
+      expect(mockWriteFileSync).toHaveBeenCalledTimes(1);
+      const written = JSON.parse(mockWriteFileSync.mock.calls[0][1]);
+      expect(written.configVersion).toBe("0.9.6");
+      expect(written.avrs[0].createTunerPresets).toBe(true);
+      expect(written.avrs[0].netMenuDelay).toBe(500);
+      expect(result.avrs[0].createTunerPresets).toBe(true);
     });
 
     it("removes legacy learning/learningEnabled keys and persists cleaned config", () => {
@@ -400,6 +463,36 @@ describe("ConfigManager static methods", () => {
       expect(result.avrs).toHaveLength(1);
       expect(result.avrs[0].queueThreshold).toBe(10);
       expect(result.avrs[0].albumArtURL).toBe("/art");
+    });
+  });
+
+  describe("patchAvr", () => {
+    beforeEach(() => {
+      mockWriteFileSync.mockReset();
+      ConfigManager.config = {
+        avrs: [
+          { model: "TX-RZ50", ip: "1.2.3.4", port: 60128, zone: "main", volumeScale: "auto", entityNameStyle: "short" },
+          { model: "TX-RZ50", ip: "1.2.3.4", port: 60128, zone: "zone2", volumeScale: "auto" }
+        ]
+      } as any;
+    });
+
+    it("merges the patch into the matching zone only and persists it", () => {
+      expect(ConfigManager.patchAvr("1.2.3.4", "main", { volumeScale: 80 })).toBe(true);
+
+      expect(ConfigManager.config.avrs[0].volumeScale).toBe(80);
+      // The other settings of that AVR are left alone.
+      expect(ConfigManager.config.avrs[0].entityNameStyle).toBe("short");
+      expect(ConfigManager.config.avrs[1].volumeScale).toBe("auto");
+
+      expect(mockWriteFileSync).toHaveBeenCalled();
+      const written = JSON.parse(mockWriteFileSync.mock.calls[0][1]);
+      expect(written.avrs[0].volumeScale).toBe(80);
+    });
+
+    it("returns false for a zone that is not configured", () => {
+      expect(ConfigManager.patchAvr("9.9.9.9", "main", { volumeScale: 80 })).toBe(false);
+      expect(mockWriteFileSync).not.toHaveBeenCalled();
     });
   });
 

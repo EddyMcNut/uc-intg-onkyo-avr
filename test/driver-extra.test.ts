@@ -20,7 +20,7 @@ describe("normalizeAvrConfig (used by createAvrSpecificConfig)", () => {
 
     const result = normalizeAvrConfig({ model: "TX-RZ50", ip: "1.2.3.4" });
 
-    expect(result.volumeScale).toBe(100);
+    expect(result.volumeScale).toBe("auto");
     expect(result.queueThreshold).toBe(100);
   });
 });

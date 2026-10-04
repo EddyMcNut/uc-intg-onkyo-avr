@@ -81,6 +81,25 @@ it("queryAvrState sends all query commands in order", async () => {
   expect(commands[10]).toEqual({ zone: "main", command: "dirac", args: "query" });
 });
 
+it("queryAvrState does not query avr-info", async () => {
+  const queryMod = await import("../src/avrStateQuery.js");
+  const { avrStateQueryService } = queryMod as any;
+
+  const eid = `TX-RZ50 10.0.0.${Math.floor(Math.random() * 250) + 1} main`;
+
+  const commands: Array<{ command: string }> = [];
+  const mock = {
+    command: vi.fn().mockImplementation(async (cmd: any) => {
+      commands.push(cmd);
+    }),
+    eiscpConfig: { sendDelay: 10 }
+  };
+
+  await avrStateQueryService.queryAvrState(eid, mock, "main", "stale");
+  expect(commands.some((c) => c.command === "avr-info")).toBe(false);
+  expect(commands.length).toBe(11);
+});
+
 it("queryAvrState skips redundant query", async () => {
   const mod = await import("../src/avrStateQuery.js");
   const { avrStateQueryService } = mod as any;

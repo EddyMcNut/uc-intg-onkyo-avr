@@ -24,6 +24,8 @@ export default class SetupHandler {
   private formBuilder: SetupFormBuilder;
   private backupRestoreManager: BackupRestoreManager;
   private persistenceManager: ConfigPersistenceManager;
+  private manualConfigPage = 0;
+  private pendingManualConfig: ManualConfigInput = {};
 
   constructor(host: SetupHost) {
     this.host = host;
@@ -91,6 +93,28 @@ export default class SetupHandler {
       return this.handleRestorePayload(restoreData);
     }
 
+    if (this.manualConfigPage > 0 && this.hasManualConfigFields(input)) {
+      this.pendingManualConfig = { ...this.pendingManualConfig, ...input };
+      const parsed = this.configParser.parse(this.pendingManualConfig, ConfigManager.get().logLevel ?? "warn");
+      if (this.manualConfigPage === 1) {
+        this.manualConfigPage = 2;
+        return this.formBuilder.buildManualConfigPage2(parsed);
+      }
+      if (this.manualConfigPage === 2) {
+        this.manualConfigPage = 3;
+        return this.formBuilder.buildManualConfigPage3(parsed);
+      }
+
+      this.manualConfigPage = 0;
+      const completeConfig = this.pendingManualConfig;
+      this.pendingManualConfig = {};
+      try {
+        return await this.handleManualConfiguration(completeConfig);
+      } catch (_err) {
+        return new uc.SetupError("OTHER");
+      }
+    }
+
     const hasManualFields = this.hasManualConfigFields(input);
 
     if (!action && hasManualFields) {
@@ -151,10 +175,12 @@ export default class SetupHandler {
       input.inputSelectorOptions ||
       input.createDiracSelectEntity ||
       input.volumeScale ||
+      input.useAvrReportedInputs !== undefined ||
       input.volumeDisplay ||
       input.adjustVolumeDispl ||
       input.zoneCount ||
       input.createSensors ||
+      input.createTunerPresets ||
       input.createRemoteEntity ||
       input.netMenuDelay ||
       input.tuneinPresetPosition ||
@@ -165,6 +191,8 @@ export default class SetupHandler {
   }
 
   private requestManualConfiguration(): uc.RequestUserInput {
+    this.manualConfigPage = 1;
+    this.pendingManualConfig = {};
     const cfg = ConfigManager.load();
     const currentAvr = cfg.avrs && cfg.avrs.length > 0 ? cfg.avrs[0] : undefined;
     const parsedConfig = this.configParser.parse(
@@ -189,11 +217,13 @@ export default class SetupHandler {
               ? "none"
               : "",
         volumeScale: currentAvr?.volumeScale,
+        useAvrReportedInputs: currentAvr?.useAvrReportedInputs,
         volumeDisplay: currentAvr?.volumeDisplay,
         adjustVolumeDispl: currentAvr?.adjustVolumeDispl,
         entityNameStyle: currentAvr?.entityNameStyle,
         zoneCount: currentAvr && cfg.avrs ? cfg.avrs.filter((a) => a.model === currentAvr.model && a.ip === currentAvr.ip).length : 1,
         createSensors: currentAvr?.createSensors,
+        createTunerPresets: currentAvr?.createTunerPresets,
         createRemoteEntity: currentAvr?.createRemoteEntity,
         createDiracSelectEntity: currentAvr?.createDiracSelectEntity,
         netMenuDelay: currentAvr?.netMenuDelay,
@@ -203,6 +233,31 @@ export default class SetupHandler {
       },
       (cfg.logLevel ?? "warn") as LogLevel
     );
+
+    // Keep settings that are not shown on a later page, such as tuner presets.
+    this.pendingManualConfig = {
+      model: parsedConfig.modelName,
+      ipAddress: parsedConfig.ipVal,
+      port: parsedConfig.portNum,
+      queueThreshold: parsedConfig.queueThresholdValue,
+      albumArtURL: parsedConfig.albumArtURLValue,
+      listeningModeOptions: parsedConfig.listeningModeOptions,
+      inputSelectorOptions: parsedConfig.inputSelectorOptions,
+      volumeScale: parsedConfig.volumeScaleValue,
+      useAvrReportedInputs: parsedConfig.useAvrReportedInputsValue,
+      volumeDisplay: parsedConfig.volumeDisplayValue,
+      adjustVolumeDispl: parsedConfig.adjustVolumeDisplValue,
+      entityNameStyle: parsedConfig.entityNameStyleValue,
+      zoneCount: parsedConfig.zoneCountValue,
+      createSensors: parsedConfig.createSensorsValue,
+      createTunerPresets: parsedConfig.createTunerPresetsValue,
+      createRemoteEntity: parsedConfig.createRemoteEntityValue,
+      createDiracSelectEntity: parsedConfig.createDiracSelectEntityValue,
+      netMenuDelay: parsedConfig.netMenuDelayValue,
+      tuneinPresetPosition: parsedConfig.tuneinPresetPositionValue,
+      tuneinMenuStyle: parsedConfig.tuneinMenuStyleValue,
+      logLevel: parsedConfig.logLevelValue
+    };
 
     return this.formBuilder.buildManualConfigForm(parsedConfig);
   }

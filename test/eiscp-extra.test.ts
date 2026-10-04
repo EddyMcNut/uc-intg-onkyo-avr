@@ -118,6 +118,32 @@ describe("sendIscp routing through commandToIscp", () => {
     expect(rawSpy).toHaveBeenCalledWith("PWR01");
   });
 
+  it("sends an AVR-reported input name as the input id the AVR gave", async () => {
+    const inputSourceStore = (await import("../src/inputSourceStore.js")) as any;
+    inputSourceStore.setAvrInputs("TX-RZ50 1.2.3.4", [
+      { id: "10", name: "BD/DVD" },
+      { id: "01", name: "CBL/SAT" }
+    ]);
+
+    const driver = await makeDriver();
+    const rawSpy = vi.spyOn(driver, "raw").mockResolvedValue(undefined);
+    await driver.command({ zone: "main", command: "input-selector", args: "BD/DVD" });
+    expect(rawSpy).toHaveBeenCalledWith("SLI10");
+
+    // The zone prefix still applies, and the lookup is not case sensitive.
+    await driver.command({ zone: "zone2", command: "input-selector", args: "cbl/sat" });
+    expect(rawSpy).toHaveBeenCalledWith("SLZ01");
+
+    inputSourceStore.clearAllAvrInputs();
+  });
+
+  it("still warns for an input that the AVR did not report and that is not in the command table", async () => {
+    const driver = await makeDriver();
+    const rawSpy = vi.spyOn(driver, "raw").mockResolvedValue(undefined);
+    await driver.command({ zone: "main", command: "input-selector", args: "not-an-input" });
+    expect(rawSpy).toHaveBeenCalledWith("SLInot-an-input");
+  });
+
   it("ISCP with NSS in value triggers handleNSSsend", async () => {
     const driver = await makeDriver();
     const rawSpy = vi.spyOn(driver, "raw").mockResolvedValue(undefined);
@@ -126,6 +152,46 @@ describe("sendIscp routing through commandToIscp", () => {
     // handleNSSsend sends SLI2B first (switch to NET), then NTCTOP, then NLSI, then SLIQSTN
     expect(rawSpy).toHaveBeenCalled();
     expect(rawSpy).toHaveBeenCalledWith(expect.stringContaining("SLI"));
+  });
+
+  it("uses the NRI service id for direct network-service selection", async () => {
+    const driver = await makeDriver();
+    const rawSpy = vi.spyOn(driver, "raw").mockResolvedValue(undefined);
+    const { setAvrInfo } = await import("../src/avrInfoStore.js");
+    setAvrInfo("TX-RZ50 1.2.3.4 main", {
+      model: "TX-RZ50",
+      friendlyName: "",
+      firmwareVersion: "",
+      presetCount: 0,
+      presets: [],
+      netServices: [
+        { id: "0a", name: "Spotify", enabled: true, hasAccount: false },
+        { id: "0e", name: "TuneIn Radio", enabled: true, hasAccount: true },
+        { id: "1d", name: "Play Queue", enabled: true, hasAccount: false }
+      ],
+      zones: [],
+      selectors: [],
+      controls: [],
+      tunerBands: []
+    });
+
+    await driver.command("input-selector.spotify");
+
+    expect(rawSpy).toHaveBeenNthCalledWith(1, "SLI2B");
+    expect(rawSpy).toHaveBeenNthCalledWith(2, "NSV0A0");
+    expect(rawSpy).toHaveBeenNthCalledWith(3, "SLIQSTN");
+
+    rawSpy.mockClear();
+    await driver.command({ zone: "main", command: "input-selector", args: "TuneIn Radio" });
+    expect(rawSpy).toHaveBeenNthCalledWith(1, "SLI2B");
+    expect(rawSpy).toHaveBeenNthCalledWith(2, "NSV0E0");
+    expect(rawSpy).toHaveBeenNthCalledWith(3, "SLIQSTN");
+
+    rawSpy.mockClear();
+    await driver.command({ zone: "main", command: "input-selector", args: "Play Queue" });
+    expect(rawSpy).toHaveBeenNthCalledWith(1, "SLI2B");
+    expect(rawSpy).toHaveBeenNthCalledWith(2, "NSV1D0");
+    expect(rawSpy).toHaveBeenNthCalledWith(3, "SLIQSTN");
   });
 
   it("passes ISCP with TIP prefix directly to sendIscp via raw() call", async () => {

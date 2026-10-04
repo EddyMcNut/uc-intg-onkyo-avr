@@ -1,6 +1,6 @@
 {
   "driver_id": "onkyo_avr_custom_driver",
-  "version": "0.9.5",
+  "version": "0.9.6",
   "min_core_api": "0.20.0",
   "name": { "en": "Onkyo/Pioneer/Integra AVR (eISCP)" },
   "icon": "custom:eiscp.png",
@@ -23,7 +23,7 @@
         "field": {
           "label": {
             "value": {
-              "en": "This integration will allow you to control Onkyo / Pioneer / Integra AVRs on your network. Use the 'Configure' action to enter model/IP manually, or leave blank to autodiscover."
+              "en": "This integration will allow you to control Onkyo / Pioneer / Integra AVRs on your network."
             }
           }
         }

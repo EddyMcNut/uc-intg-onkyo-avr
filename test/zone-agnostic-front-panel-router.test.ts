@@ -29,7 +29,7 @@ it("handleFld updates FM zones and front panel for FM source", async () => {
   const { ZoneAgnosticFrontPanelRouter } = mod as any;
 
   const deps = makeDeps();
-  deps.state.getEntitiesByPhysicalAvrAndSource.mockReturnValue(["M 1.2.3.4 main"]);
+  deps.state.getEntitiesByPhysicalAvrAndSource.mockImplementation((_physicalAvrId: string, source: string) => (source === "fm" ? ["M 1.2.3.4 main"] : []));
   deps.getNetZones.mockReturnValue([]);
 
   const router = new ZoneAgnosticFrontPanelRouter(deps);
@@ -37,8 +37,25 @@ it("handleFld updates FM zones and front panel for FM source", async () => {
   await router.handleFld("M 1.2.3.4 main", "89.7 FM", "main");
 
   expect(deps.mediaStateStore.updateNowPlaying).toHaveBeenCalledWith("M 1.2.3.4 main", "fm", { station: "89.7 FM", artist: "FM Radio" });
+  expect(deps.driver.updateEntityAttributes).toHaveBeenCalledWith("M 1.2.3.4 main_tuner_presets", { current_option: "" });
   expect(deps.renderZoneMedia).toHaveBeenCalledWith("M 1.2.3.4 main", true);
   expect(deps.updateFrontPanelDisplay).toHaveBeenCalledWith(["M 1.2.3.4 main"], "89.7 FM");
+});
+
+it("handleFld updates AM zones and clears a stale tuner preset", async () => {
+  const mod = await import("../src/zoneAgnosticFrontPanelRouter.js");
+  const { ZoneAgnosticFrontPanelRouter } = mod as any;
+
+  const deps = makeDeps();
+  deps.state.getEntitiesByPhysicalAvrAndSource.mockImplementation((_physicalAvrId: string, source: string) => (source === "am" ? ["M 1.2.3.4 main"] : []));
+
+  const router = new ZoneAgnosticFrontPanelRouter(deps);
+
+  await router.handleFld("M 1.2.3.4 main", "630 AM", "main");
+
+  expect(deps.mediaStateStore.updateNowPlaying).toHaveBeenCalledWith("M 1.2.3.4 main", "am", { station: "630 AM", artist: "AM Radio" });
+  expect(deps.driver.updateEntityAttributes).toHaveBeenCalledWith("M 1.2.3.4 main_tuner_presets", { current_option: "" });
+  expect(deps.updateFrontPanelDisplay).toHaveBeenCalledWith(["M 1.2.3.4 main"], "630 AM");
 });
 
 it("handleFld updates NET zones when detected", async () => {

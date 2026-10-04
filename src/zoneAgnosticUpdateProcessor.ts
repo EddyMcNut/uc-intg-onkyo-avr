@@ -11,11 +11,12 @@ import { ZoneAgnosticServiceCommandRouter } from "./zoneAgnosticServiceCommandRo
 import { ZoneAgnosticFrontPanelRouter } from "./zoneAgnosticFrontPanelRouter.js";
 import { TUNEIN_SERVICE_ID } from "./browseServiceContract.js";
 import type { AvrStateApi } from "./types.js";
+import { findTunerPresetByName } from "./tunerPresetStore.js";
 
 const integrationName = "zoneAgnosticUpdateProcessor:";
 
 export class ZoneAgnosticUpdateProcessor {
-  public static readonly ZONE_AGNOSTIC_COMMANDS = new Set<string>(["IFA", "DSN", "NST", "NLT", "NLT_CONTEXT", "NLS", "NLA", "FLD", "NTM", "metadata"]);
+  public static readonly ZONE_AGNOSTIC_COMMANDS = new Set<string>(["IFA", "DSN", "NST", "NLT", "NLT_CONTEXT", "NLS", "NLA", "FLD", "NTM", "metadata", "avr-info"]);
 
   private readonly mediaStateStore = new ZoneAgnosticMediaStateStore();
   private readonly tuneInPreloader: TuneInPreloader;
@@ -196,6 +197,11 @@ export class ZoneAgnosticUpdateProcessor {
       this.mediaStateStore.updateNowPlaying(zoneEntityId, "dab", {
         station: stationName,
         artist: "DAB Radio"
+      });
+      const physicalAvrId = this.getPhysicalAvrId(zoneEntityId);
+      const preset = findTunerPresetByName(physicalAvrId, stationName);
+      this.driver.updateEntityAttributes(`${zoneEntityId}_tuner_presets`, {
+        [uc.SelectAttributes.CurrentOption]: preset?.name ?? ""
       });
       await this.renderZoneMedia(zoneEntityId, true);
     }

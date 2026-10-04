@@ -5,6 +5,8 @@ describe("configConstants", () => {
   let parseBoolean: any;
   let normalizeAvrConfig: any;
   let physicalAvrIdFromEntityId: any;
+  let parseVolumeScale: any;
+  let resolveVolumeScale: any;
 
   beforeAll(async () => {
     const mod = await import("../src/configConstants.js");
@@ -12,6 +14,8 @@ describe("configConstants", () => {
     parseBoolean = mod.parseBoolean;
     normalizeAvrConfig = mod.normalizeAvrConfig;
     physicalAvrIdFromEntityId = mod.physicalAvrIdFromEntityId;
+    parseVolumeScale = mod.parseVolumeScale;
+    resolveVolumeScale = mod.resolveVolumeScale;
   });
 
   describe("parseSelectOptions", () => {
@@ -182,6 +186,48 @@ describe("configConstants", () => {
     it("normalizes volumeScale as number", () => {
       const result = normalizeAvrConfig({ model: "TX", ip: "1.2.3.4", volumeScale: 80 });
       expect(result.volumeScale).toBe(80);
+    });
+
+    it("keeps an auto volumeScale and defaults to auto", () => {
+      expect(normalizeAvrConfig({ model: "TX", ip: "1.2.3.4", volumeScale: "auto" }).volumeScale).toBe("auto");
+      expect(normalizeAvrConfig({ model: "TX", ip: "1.2.3.4" }).volumeScale).toBe("auto");
+      expect(normalizeAvrConfig({ model: "TX", ip: "1.2.3.4", volumeScale: 50 }).volumeScale).toBe("auto");
+    });
+  });
+
+  describe("parseVolumeScale", () => {
+    it("accepts auto in any casing", () => {
+      expect(parseVolumeScale("auto")).toBe("auto");
+      expect(parseVolumeScale("AUTO")).toBe("auto");
+      expect(parseVolumeScale(" Auto ")).toBe("auto");
+    });
+
+    it("accepts the two AVR volume scales as number or string", () => {
+      expect(parseVolumeScale(80)).toBe(80);
+      expect(parseVolumeScale("80")).toBe(80);
+      expect(parseVolumeScale(100)).toBe(100);
+      expect(parseVolumeScale("100")).toBe(100);
+    });
+
+    it("falls back to auto for anything else", () => {
+      expect(parseVolumeScale(undefined)).toBe("auto");
+      expect(parseVolumeScale("")).toBe("auto");
+      expect(parseVolumeScale(50)).toBe("auto");
+      expect(parseVolumeScale("abc")).toBe("auto");
+    });
+  });
+
+  describe("resolveVolumeScale", () => {
+    it("returns the configured scale", () => {
+      expect(resolveVolumeScale(80)).toBe(80);
+      expect(resolveVolumeScale(100)).toBe(100);
+      expect(resolveVolumeScale("80")).toBe(80);
+    });
+
+    it("falls back to 0-100 while the scale is still auto", () => {
+      expect(resolveVolumeScale("auto")).toBe(100);
+      expect(resolveVolumeScale(undefined)).toBe(100);
+      expect(resolveVolumeScale(0)).toBe(100);
     });
   });
 });

@@ -4,9 +4,25 @@ import log, { setLogLevel } from "./loggers.js";
 
 // Re-export everything from configConstants so existing imports via configManager continue to work.
 export * from "./configConstants.js";
-import { MAX_LENGTHS, PATTERNS, parseSelectOptions, parseBoolean, AvrZone, AvrConfig, OnkyoConfig, AVR_DEFAULTS, EntityNameStyle, LogLevel, ALL_OPTIONS, SelectOptions } from "./configConstants.js";
+import {
+  MAX_LENGTHS,
+  PATTERNS,
+  parseSelectOptions,
+  parseBoolean,
+  parseVolumeScale,
+  AvrZone,
+  AvrConfig,
+  OnkyoConfig,
+  AVR_DEFAULTS,
+  EntityNameStyle,
+  LogLevel,
+  ALL_OPTIONS,
+  SelectOptions,
+  VOLUME_SCALE_AUTO
+} from "./configConstants.js";
 
 const integrationName = "configManager:";
+const CURRENT_CONFIG_VERSION = "0.9.6";
 
 // Config directory is configurable at runtime to support integration manager backups/restores
 let CONFIG_DIR = process.env.UC_CONFIG_HOME || process.cwd();
@@ -35,11 +51,13 @@ export class ConfigManager {
       zone: avr.zone ?? "main",
       queueThreshold: avr.queueThreshold ?? AVR_DEFAULTS.queueThreshold,
       albumArtURL: avr.albumArtURL ?? AVR_DEFAULTS.albumArtURL,
-      volumeScale: avr.volumeScale ?? AVR_DEFAULTS.volumeScale,
+      volumeScale: parseVolumeScale(avr.volumeScale),
+      useAvrReportedInputs: parseBoolean(avr.useAvrReportedInputs, AVR_DEFAULTS.useAvrReportedInputs),
       volumeDisplay: avr.volumeDisplay ?? AVR_DEFAULTS.volumeDisplay,
       adjustVolumeDispl: avr.adjustVolumeDispl ?? AVR_DEFAULTS.adjustVolumeDispl,
       entityNameStyle: avr.entityNameStyle ?? AVR_DEFAULTS.entityNameStyle,
       createSensors: avr.createSensors ?? AVR_DEFAULTS.createSensors,
+      createTunerPresets: avr.createTunerPresets ?? AVR_DEFAULTS.createTunerPresets,
       createRemoteEntity: avr.createRemoteEntity ?? AVR_DEFAULTS.createRemoteEntity,
       createDiracSelectEntity: avr.createDiracSelectEntity ?? AVR_DEFAULTS.createDiracSelectEntity,
       netMenuDelay: avr.netMenuDelay ?? AVR_DEFAULTS.netMenuDelay,
@@ -63,6 +81,7 @@ export class ConfigManager {
       if (fs.existsSync(CONFIG_PATH)) {
         const raw = fs.readFileSync(CONFIG_PATH, "utf-8");
         this.config = JSON.parse(raw);
+        let shouldPersistMigration = this.config.configVersion !== CURRENT_CONFIG_VERSION;
 
         // Remove legacy learning-store keys from the abandoned feature/learn experiment.
         // Not used at runtime; drop them from memory and persist the cleaned config so
@@ -71,7 +90,7 @@ export class ConfigManager {
         if ("learning" in rawConfig || "learningEnabled" in rawConfig) {
           delete rawConfig.learning;
           delete rawConfig.learningEnabled;
-          this.save(this.config);
+          shouldPersistMigration = true;
           log.info("%s Removed legacy learning/learningEnabled keys from config", integrationName);
         }
 
@@ -106,7 +125,7 @@ export class ConfigManager {
           delete this.config.albumArtURL;
           delete this.config.entityNameStyle;
           delete this.config.volumeDisplay;
-          this.save(this.config);
+          shouldPersistMigration = true;
         }
 
         // Ensure all AVRs have defaults applied
@@ -117,6 +136,14 @@ export class ConfigManager {
               zone: this.validateZone(avr.zone)
             })
           );
+        }
+
+        // Persist the normalized settings once so installations upgraded without opening setup
+        // receive the same per-AVR configuration as installations that saved the 0.9.6 form.
+        if (shouldPersistMigration) {
+          this.config.configVersion = CURRENT_CONFIG_VERSION;
+          this.save(this.config);
+          log.info("%s Migrated persisted configuration to schema %s", integrationName, CURRENT_CONFIG_VERSION);
         }
       }
     } catch (err) {
@@ -161,6 +188,24 @@ export class ConfigManager {
     // Add new AVR with defaults applied
     this.config.avrs.push(normalizedAvr);
     this.save(this.config);
+  }
+
+  /**
+   * Merge a partial update into one configured AVR zone and persist it.
+   * Used for values the integration determines itself (e.g. a volume scale resolved from the AVR),
+   * so the other settings of that AVR are left untouched. Returns false when the zone is not configured.
+   */
+  static patchAvr(ip: string, zone: AvrZone, patch: Partial<AvrConfig>): boolean {
+    if (!this.config.avrs) {
+      return false;
+    }
+    const index = this.config.avrs.findIndex((a) => a.ip === ip && a.zone === zone);
+    if (index < 0) {
+      return false;
+    }
+    this.config.avrs[index] = { ...this.config.avrs[index], ...patch };
+    this.save(this.config);
+    return true;
   }
 
   /** Clear all configuration and persist empty config */
@@ -244,10 +289,15 @@ export class ConfigManager {
 
     // volumeScale
     if (avr.volumeScale !== undefined) {
-      const vs = typeof avr.volumeScale === "number" ? avr.volumeScale : parseInt(String(avr.volumeScale), 10);
-      if (![80, 100].includes(vs)) {
-        errors.push("volumeScale must be 80 or 100");
+      const raw = String(avr.volumeScale).trim().toLowerCase();
+      if (raw !== VOLUME_SCALE_AUTO && ![80, 100].includes(parseInt(raw, 10))) {
+        errors.push('volumeScale must be 80, 100 or "auto"');
       }
+    }
+
+    // useAvrReportedInputs
+    if (avr.useAvrReportedInputs !== undefined && typeof avr.useAvrReportedInputs !== "boolean" && typeof avr.useAvrReportedInputs !== "string") {
+      errors.push("useAvrReportedInputs must be boolean");
     }
 
     // volumeDisplay
@@ -276,6 +326,11 @@ export class ConfigManager {
       errors.push("createSensors must be boolean");
     }
 
+    // createTunerPresets
+    if (avr.createTunerPresets !== undefined && typeof avr.createTunerPresets !== "boolean" && !(typeof avr.createTunerPresets === "string")) {
+      errors.push("createTunerPresets must be boolean");
+    }
+
     // createRemoteEntity
     if (avr.createRemoteEntity !== undefined && typeof avr.createRemoteEntity !== "boolean" && !(typeof avr.createRemoteEntity === "string")) {
       errors.push("createRemoteEntity must be boolean");
@@ -298,7 +353,7 @@ export class ConfigManager {
     if (avr.tuneinPresetPosition !== undefined) {
       const tp = typeof avr.tuneinPresetPosition === "number" ? avr.tuneinPresetPosition : parseInt(String(avr.tuneinPresetPosition), 10);
       if (isNaN(tp) || tp < 1 || tp > 9) {
-        errors.push("tuneinPresetPosition must be an integer between 1 and 9");
+        errors.push("tuneinPresetPosition must be an integer between 1 and 10");
       }
     }
 
@@ -341,6 +396,7 @@ export class ConfigManager {
     }
 
     // Build normalized AVR with defaults
+    const useAvrReportedInputs = parseBoolean(avr.useAvrReportedInputs, AVR_DEFAULTS.useAvrReportedInputs);
     const normalized: AvrConfig = this.applyDefaults({
       model: String(avr.model).trim(),
       ip: String(avr.ip).trim(),
@@ -348,18 +404,20 @@ export class ConfigManager {
       zone: this.validateZone(zone),
       queueThreshold: avr.queueThreshold,
       albumArtURL: avr.albumArtURL,
-      volumeScale: typeof avr.volumeScale === "string" ? parseInt(avr.volumeScale, 10) : avr.volumeScale,
+      volumeScale: parseVolumeScale(avr.volumeScale),
+      useAvrReportedInputs,
       volumeDisplay: String(avr.volumeDisplay ?? AVR_DEFAULTS.volumeDisplay).toLowerCase() === "relative" ? "relative" : "absolute",
       adjustVolumeDispl: parseBoolean(avr.adjustVolumeDispl, AVR_DEFAULTS.adjustVolumeDispl),
       entityNameStyle: (String(avr.entityNameStyle ?? AVR_DEFAULTS.entityNameStyle).toLowerCase() === "short" ? "short" : "long") as EntityNameStyle,
       createSensors: parseBoolean(avr.createSensors, AVR_DEFAULTS.createSensors),
+      createTunerPresets: parseBoolean(avr.createTunerPresets, AVR_DEFAULTS.createTunerPresets),
       createRemoteEntity: parseBoolean(avr.createRemoteEntity, AVR_DEFAULTS.createRemoteEntity),
       createDiracSelectEntity: parseBoolean(avr.createDiracSelectEntity, AVR_DEFAULTS.createDiracSelectEntity),
       netMenuDelay: typeof avr.netMenuDelay === "string" ? parseInt(avr.netMenuDelay, 10) : avr.netMenuDelay,
       tuneinPresetPosition: typeof avr.tuneinPresetPosition === "string" ? parseInt(avr.tuneinPresetPosition, 10) : avr.tuneinPresetPosition,
       tuneinMenuStyle: String(avr.tuneinMenuStyle ?? AVR_DEFAULTS.tuneinMenuStyle).toLowerCase() === "full" ? "full" : "mypresets",
       listeningModeOptions: lmoParsed,
-      inputSelectorOptions: isoParsed
+      inputSelectorOptions: useAvrReportedInputs ? ALL_OPTIONS : isoParsed
     });
 
     return { errors: [], normalized };

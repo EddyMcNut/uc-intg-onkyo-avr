@@ -239,3 +239,62 @@ it("handle wraps around for SelectPrevious with cycle at beginning", async () =>
   expect(result).toBe(uc.StatusCodes.Ok);
   expect(mockEiscp.command).toHaveBeenCalledWith({ zone: "main", command: "listening-mode", args: "mono" });
 });
+
+it("handle uses the custom send path instead of eiscp.command when one is given", async () => {
+  const mod = await import("../src/selectEntityHandler.js");
+  const { SelectEntityHandler } = mod as any;
+
+  const mockEiscp = makeMockEiscp(true);
+  const driver = { updateEntityAttributes: vi.fn() };
+  const connMgr = { getPhysicalConnection: vi.fn().mockReturnValue({ eiscp: mockEiscp }) };
+  const avrMgr = { get: vi.fn().mockReturnValue({ config: { model: "M", ip: "1.2.3.4", port: 60128, zone: "main" } }) };
+  const sendOptionToAvr = vi.fn().mockResolvedValue(undefined);
+
+  const handler = new SelectEntityHandler(driver, connMgr, avrMgr, "_tuner_presets", "preset", "Tuner Presets", () => ["NPO FunX", "STRKSTAD"], undefined, sendOptionToAvr);
+
+  const entity = { id: "M_1.2.3.4_main_tuner_presets", attributes: {} };
+  const result = await handler.handle(entity, uc.SelectCommands.SelectOption, { option: "STRKSTAD" });
+
+  expect(result).toBe(uc.StatusCodes.Ok);
+  expect(sendOptionToAvr).toHaveBeenCalledWith(mockEiscp, "M_1.2.3.4_main", "main", "STRKSTAD");
+  expect(mockEiscp.command).not.toHaveBeenCalled();
+  expect(driver.updateEntityAttributes).toHaveBeenCalledWith("M_1.2.3.4_main_tuner_presets", {
+    [uc.SelectAttributes.CurrentOption]: "STRKSTAD"
+  });
+});
+
+it("handle walks the station list with SelectNext and SelectFirst", async () => {
+  const mod = await import("../src/selectEntityHandler.js");
+  const { SelectEntityHandler } = mod as any;
+
+  const mockEiscp = makeMockEiscp(true);
+  const driver = { updateEntityAttributes: vi.fn() };
+  const connMgr = { getPhysicalConnection: vi.fn().mockReturnValue({ eiscp: mockEiscp }) };
+  const avrMgr = { get: vi.fn().mockReturnValue({ config: { model: "M", ip: "1.2.3.4", port: 60128, zone: "main" } }) };
+  const sendOptionToAvr = vi.fn().mockResolvedValue(undefined);
+
+  const handler = new SelectEntityHandler(driver, connMgr, avrMgr, "_tuner_presets", "preset", "Tuner Presets", () => ["R10 80s", "NPO FunX"], undefined, sendOptionToAvr);
+
+  const entity = { id: "M_1.2.3.4_main_tuner_presets", attributes: { [uc.SelectAttributes.CurrentOption]: "R10 80s" } };
+  expect(await handler.handle(entity, uc.SelectCommands.SelectNext, {})).toBe(uc.StatusCodes.Ok);
+  expect(sendOptionToAvr).toHaveBeenLastCalledWith(mockEiscp, "M_1.2.3.4_main", "main", "NPO FunX");
+
+  expect(await handler.handle(entity, uc.SelectCommands.SelectFirst, {})).toBe(uc.StatusCodes.Ok);
+  expect(sendOptionToAvr).toHaveBeenLastCalledWith(mockEiscp, "M_1.2.3.4_main", "main", "R10 80s");
+});
+
+it("handle returns BadRequest and sends nothing when no station is known", async () => {
+  const mod = await import("../src/selectEntityHandler.js");
+  const { SelectEntityHandler } = mod as any;
+
+  const mockEiscp = makeMockEiscp(true);
+  const driver = { updateEntityAttributes: vi.fn() };
+  const connMgr = { getPhysicalConnection: vi.fn().mockReturnValue({ eiscp: mockEiscp }) };
+  const avrMgr = { get: vi.fn().mockReturnValue({ config: { model: "M", ip: "1.2.3.4", port: 60128, zone: "main" } }) };
+
+  const handler = new SelectEntityHandler(driver, connMgr, avrMgr, "_tuner_presets", "preset", "Tuner Presets", () => []);
+
+  const entity = { id: "M_1.2.3.4_main_tuner_presets", attributes: {} };
+  expect(await handler.handle(entity, uc.SelectCommands.SelectFirst, {})).toBe(uc.StatusCodes.BadRequest);
+  expect(mockEiscp.command).not.toHaveBeenCalled();
+});

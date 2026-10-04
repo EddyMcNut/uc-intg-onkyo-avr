@@ -18,7 +18,7 @@ export const PATTERNS = {
   MODEL_NAME: /^[a-zA-Z0-9\-_.() ]+$/,
   ALBUM_ART_URL: /^[a-zA-Z0-9._\-/]+$/,
   PIN_CODE: /^\d{4}$/,
-  USER_COMMAND: /^[a-z0-9\-\s.:=]+$/i, // Letters, numbers, hyphens, spaces, delimiters
+  USER_COMMAND: /^[a-z0-9\-\s.:=\/]+$/i, // Letters, numbers, hyphens, slashes, spaces, delimiters
   SELECT_OPTION: /^[a-zA-Z0-9-]+$/, // Select-entity option entries: letters, numbers, hyphens only
   RAW_COMMAND: /^[A-Z0-9]+$/ // Uppercase letters and numbers only
 } as const;
@@ -92,15 +92,49 @@ export function physicalAvrIdFromEntityId(entityId: string): string | null {
   return buildPhysicalAvrId(model, host);
 }
 
+/**
+ * Volume scale setting.
+ *
+ * `VOLUME_SCALE_AUTO` is stored in the config until the AVR itself has reported its own maximum
+ * display volume through NRI. From then on the resolved 0-80 or 0-100 is stored, exactly like a
+ * manually chosen value, so it is never re-evaluated afterwards.
+ */
+export const VOLUME_SCALE_AUTO = "auto";
+export type VolumeScale = 80 | 100 | typeof VOLUME_SCALE_AUTO;
+
+/** Used for volume arithmetic as long as the setting is still "auto" and no AVR report is available. */
+export const VOLUME_SCALE_FALLBACK = 100;
+
+/** Coerce any stored or user-supplied volume scale to "auto", 80 or 100. Anything unknown becomes the default ("auto"). */
+export function parseVolumeScale(raw: unknown): VolumeScale {
+  if (typeof raw === "string" && raw.trim().toLowerCase() === VOLUME_SCALE_AUTO) {
+    return VOLUME_SCALE_AUTO;
+  }
+  const parsed = typeof raw === "number" ? raw : parseInt(String(raw ?? "").trim(), 10);
+  return parsed === 80 || parsed === 100 ? parsed : VOLUME_SCALE_AUTO;
+}
+
+/**
+ * Numeric volume scale for volume arithmetic.
+ * An unresolved "auto" (or anything unusable) falls back to VOLUME_SCALE_FALLBACK, which is also the
+ * documented default for AVRs that do not report their own maximum.
+ */
+export function resolveVolumeScale(raw: unknown): number {
+  const parsed = typeof raw === "number" ? raw : parseInt(String(raw ?? "").trim(), 10);
+  return isNaN(parsed) || parsed <= 0 ? VOLUME_SCALE_FALLBACK : parsed;
+}
+
 /** Default values for AVR configuration */
 export const AVR_DEFAULTS = {
   queueThreshold: DEFAULT_QUEUE_THRESHOLD,
   albumArtURL: "album_art.cgi",
-  volumeScale: 100,
+  volumeScale: VOLUME_SCALE_AUTO,
+  useAvrReportedInputs: true,
   volumeDisplay: "absolute",
   adjustVolumeDispl: true,
   entityNameStyle: "short",
   createSensors: true,
+  createTunerPresets: true,
   createRemoteEntity: true,
   createDiracSelectEntity: true,
   netMenuDelay: 500,
@@ -121,15 +155,17 @@ export interface AvrConfig {
   zone: AvrZone;
   queueThreshold?: number;
   albumArtURL?: string;
-  volumeScale?: number; // 80 or 100
+  volumeScale?: VolumeScale; // "auto" (resolve from the AVR), 80 or 100
+  useAvrReportedInputs?: boolean; // use AVR-reported names and IDs when available
   volumeDisplay?: VolumeDisplay; // absolute = 1-100 style, relative = dB style
   adjustVolumeDispl?: boolean; // true = use 0.5 dB steps (×2 / ÷2), false = direct EISCP value
   entityNameStyle?: EntityNameStyle; // long = include host/ip in visible names, short = omit host/ip
   createSensors?: boolean; // true = create sensor entities for this AVR
+  createTunerPresets?: boolean; // true (default) = create the select entity listing the AVR's tuner presets
   createRemoteEntity?: boolean; // true = create a remote entity for this AVR
   createDiracSelectEntity?: boolean; // true (default) = create the Dirac select entity (fixed options)
   netMenuDelay?: number; // delay in ms for NET menu to load (default 2500)
-  tuneinPresetPosition?: number; // position of "My Presets" in TuneIn menu (1-9, default 1)
+  tuneinPresetPosition?: number; // position of "My Presets" in TuneIn menu (1-10, default 1)
   tuneinMenuStyle?: TuneInMenuStyle; // choose TuneIn navigation mode: mypresets or full
   // undefined = all options, non-empty = exact options, null = don't create entity. Empty input is normalized to "all".
   listeningModeOptions?: SelectOptions;
@@ -140,13 +176,17 @@ export interface AvrConfig {
 export interface OnkyoConfig {
   avrs?: AvrConfig[];
   logLevel?: LogLevel;
+  /** Version of the persisted configuration schema, not the driver package version. */
+  configVersion?: string;
   queueThreshold?: number;
   albumArtURL?: string;
-  volumeScale?: number; // 80 or 100
+  volumeScale?: VolumeScale; // "auto" (resolve from the AVR), 80 or 100
+  useAvrReportedInputs?: boolean;
   volumeDisplay?: VolumeDisplay;
   adjustVolumeDispl?: boolean; // true = use 0.5 dB steps (×2 / ÷2), false = direct EISCP value
   entityNameStyle?: EntityNameStyle;
   createSensors?: boolean; // true = create sensor entities
+  createTunerPresets?: boolean; // true = create the tuner presets select entity
   createRemoteEntity?: boolean; // true = create a remote entity
   // Legacy fields for backward compatibility
   model?: string;
@@ -163,11 +203,13 @@ export interface NormalizedAvrConfig {
   zone: AvrZone;
   queueThreshold: number;
   albumArtURL: string;
-  volumeScale: number;
+  volumeScale: VolumeScale;
+  useAvrReportedInputs: boolean;
   volumeDisplay: VolumeDisplay;
   adjustVolumeDispl: boolean;
   entityNameStyle: EntityNameStyle;
   createSensors: boolean;
+  createTunerPresets: boolean;
   createRemoteEntity: boolean;
   createDiracSelectEntity: boolean;
   netMenuDelay: number;
@@ -187,10 +229,9 @@ export function normalizeAvrConfig(raw: AvrConfig): NormalizedAvrConfig {
 
   const albumArtURL = typeof raw.albumArtURL === "string" && raw.albumArtURL.trim() !== "" ? raw.albumArtURL.trim() : AVR_DEFAULTS.albumArtURL;
 
-  const volumeScale = (() => {
-    const v = typeof raw.volumeScale === "number" ? raw.volumeScale : parseInt(String(raw.volumeScale ?? ""), 10);
-    return v === 80 || v === 100 ? v : AVR_DEFAULTS.volumeScale;
-  })();
+  const volumeScale = parseVolumeScale(raw.volumeScale);
+
+  const useAvrReportedInputs = parseBoolean(raw.useAvrReportedInputs, AVR_DEFAULTS.useAvrReportedInputs);
 
   const volumeDisplay: VolumeDisplay = String(raw.volumeDisplay ?? AVR_DEFAULTS.volumeDisplay).toLowerCase() === "relative" ? "relative" : "absolute";
 
@@ -199,6 +240,8 @@ export function normalizeAvrConfig(raw: AvrConfig): NormalizedAvrConfig {
   const entityNameStyle: EntityNameStyle = String(raw.entityNameStyle ?? AVR_DEFAULTS.entityNameStyle).toLowerCase() === "short" ? "short" : "long";
 
   const createSensors = parseBoolean(raw.createSensors, AVR_DEFAULTS.createSensors);
+
+  const createTunerPresets = parseBoolean(raw.createTunerPresets, AVR_DEFAULTS.createTunerPresets);
 
   const createRemoteEntity = parseBoolean(raw.createRemoteEntity, AVR_DEFAULTS.createRemoteEntity);
 
@@ -211,7 +254,7 @@ export function normalizeAvrConfig(raw: AvrConfig): NormalizedAvrConfig {
 
   const tuneinPresetPosition = (() => {
     const v = typeof raw.tuneinPresetPosition === "number" ? raw.tuneinPresetPosition : parseInt(String(raw.tuneinPresetPosition ?? ""), 10);
-    if (isNaN(v) || v < 1 || v > 9) return AVR_DEFAULTS.tuneinPresetPosition;
+    if (isNaN(v) || v < 1 || v > 10) return AVR_DEFAULTS.tuneinPresetPosition;
     return v;
   })();
 
@@ -230,10 +273,12 @@ export function normalizeAvrConfig(raw: AvrConfig): NormalizedAvrConfig {
     queueThreshold,
     albumArtURL,
     volumeScale,
+    useAvrReportedInputs,
     volumeDisplay,
     adjustVolumeDispl,
     entityNameStyle,
     createSensors,
+    createTunerPresets,
     createRemoteEntity,
     createDiracSelectEntity,
     netMenuDelay,
