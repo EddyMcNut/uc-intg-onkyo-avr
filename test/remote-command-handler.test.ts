@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { EventEmitter } from "node:events";
 import * as uc from "@unfoldedcircle/integration-api";
+import { clearAllAvrInputs, setAvrInputs } from "../src/inputSourceStore.js";
 
 vi.mock("../src/utils.js", () => ({
   ensureEiscpConnected: vi.fn().mockResolvedValue(true),
@@ -191,6 +192,21 @@ describe("remoteEntityCommandHandler", () => {
 
     expect(result).toBe(uc.StatusCodes.Ok);
     expect(mock.mockEiscp.command).toHaveBeenCalledWith("input-selector tv");
+  });
+
+  it("routes a generated reported-source command with spaces through input-selector", async () => {
+    setAvrInputs("TX-RZ50 192.168.1.100", [{ id: "0e", name: "TuneIn Radio" }]);
+    try {
+      const mock = makeHandler();
+      const handler = await createHandler(mock);
+      const entity = { id: REMOTE_ID, attributes: {} };
+      const result = await handler.handle(entity, "INPUT_REPORTED_TuneIn%20Radio", {});
+
+      expect(result).toBe(uc.StatusCodes.Ok);
+      expect(mock.mockEiscp.command).toHaveBeenCalledWith({ zone: "main", command: "input-selector", args: "tunein radio" });
+    } finally {
+      clearAllAvrInputs();
+    }
   });
 
   it("passes multi-zone commands through for SelectSource", async () => {

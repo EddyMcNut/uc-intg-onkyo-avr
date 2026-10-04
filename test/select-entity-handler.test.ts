@@ -250,17 +250,7 @@ it("handle uses the custom send path instead of eiscp.command when one is given"
   const avrMgr = { get: vi.fn().mockReturnValue({ config: { model: "M", ip: "1.2.3.4", port: 60128, zone: "main" } }) };
   const sendOptionToAvr = vi.fn().mockResolvedValue(undefined);
 
-  const handler = new SelectEntityHandler(
-    driver,
-    connMgr,
-    avrMgr,
-    "_tuner_presets",
-    "preset",
-    "Tuner Presets",
-    () => ["NPO FunX", "STRKSTAD"],
-    undefined,
-    sendOptionToAvr
-  );
+  const handler = new SelectEntityHandler(driver, connMgr, avrMgr, "_tuner_presets", "preset", "Tuner Presets", () => ["NPO FunX", "STRKSTAD"], undefined, sendOptionToAvr);
 
   const entity = { id: "M_1.2.3.4_main_tuner_presets", attributes: {} };
   const result = await handler.handle(entity, uc.SelectCommands.SelectOption, { option: "STRKSTAD" });

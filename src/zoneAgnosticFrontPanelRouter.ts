@@ -27,10 +27,13 @@ export class ZoneAgnosticFrontPanelRouter {
     const physicalAvrId = this.deps.getPhysicalAvrId(sourceEntityId);
     const fmZones = this.deps.state.getEntitiesByPhysicalAvrAndSource(physicalAvrId, "fm");
     const amZones = this.deps.state.getEntitiesByPhysicalAvrAndSource(physicalAvrId, "am");
-    for (const [source, zones] of [["fm", fmZones], ["am", amZones]] as const) {
+    for (const [source, zones] of [
+      ["fm", fmZones],
+      ["am", amZones]
+    ] as const) {
       for (const zoneEntityId of zones) {
         this.deps.mediaStateStore.updateNowPlaying(zoneEntityId, source, {
-        station: frontPanelText,
+          station: frontPanelText,
           artist: `${source.toUpperCase()} Radio`
         });
         const preset = findTunerPresetByName(physicalAvrId, frontPanelText);

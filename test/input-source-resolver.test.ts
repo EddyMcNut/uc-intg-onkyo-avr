@@ -96,12 +96,19 @@ describe("inputSourceResolver", () => {
   });
 
   it("adds enabled NRI network services and sorts them with selectors", () => {
-    setAvrInfo(ENTITY_ID, parseAvrInfo(nriXml([
-      '<selectorlist count="1"><selector id="10" name="BD/DVD" /></selectorlist>',
-      '<netservicelist count="3"><netservice id="0a" name="Spotify" value="1" />',
-      '<netservice id="0e" name="TuneIn Radio" value="1" />',
-      '<netservice id="40" name="Chromecast built-in" value="2" enable="1" /></netservicelist>'
-    ].join(""))));
+    setAvrInfo(
+      ENTITY_ID,
+      parseAvrInfo(
+        nriXml(
+          [
+            '<selectorlist count="1"><selector id="10" name="BD/DVD" /></selectorlist>',
+            '<netservicelist count="3"><netservice id="0a" name="Spotify" value="1" />',
+            '<netservice id="0e" name="TuneIn Radio" value="1" />',
+            '<netservice id="40" name="Chromecast built-in" value="2" enable="1" /></netservicelist>'
+          ].join("")
+        )
+      )
+    );
 
     expect(resolveInputSourceList(AVR_CONFIG, ENTITY_ID)?.inputs).toEqual([
       { id: "10", name: "BD/DVD" },

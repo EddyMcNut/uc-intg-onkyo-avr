@@ -334,6 +334,13 @@ export default class OnkyoDriver {
     }
   }
 
+  /** Re-register the remote so its reported-source page reflects the latest NRI snapshot. */
+  private registerRemoteEntity(avrConfig: AvrConfig): void {
+    const avrEntry = buildEntityId(avrConfig.model, avrConfig.ip, avrConfig.zone);
+    const handler = this.remoteEntityCommandHandler?.handle.bind(this.remoteEntityCommandHandler);
+    this.registerEntity(this.entityRegistrar.createRemoteEntity(avrEntry, handler), avrEntry);
+  }
+
   /**
    * Recall a tuner preset slot: the station name from the select entity is mapped back to the slot
    * number the AVR reported it in, and sent as `PRS<slot in hex>`.
@@ -522,6 +529,9 @@ export default class OnkyoDriver {
       const updatedConfig = this.config.avrs?.find((a) => a.ip === resolvedZone.ip && a.zone === resolvedZone.zone) ?? resolvedZone;
       this.registerMediaPlayer(updatedConfig);
       this.registerInputSelector(updatedConfig);
+      if (updatedConfig.createRemoteEntity === true) {
+        this.registerRemoteEntity(updatedConfig);
+      }
       this.refreshZoneRuntimeConfig(updatedConfig);
     }
   }
@@ -551,7 +561,6 @@ export default class OnkyoDriver {
         continue;
       }
 
-      const avrEntry = buildEntityId(avrConfig.model, avrConfig.ip, avrConfig.zone);
       this.registerTunerPresetsEntity(avrConfig);
     }
   }
@@ -662,7 +671,7 @@ export default class OnkyoDriver {
     if (this.config.logLevel) setLogLevel(this.config.logLevel);
 
     const hasInstances = await this.connectCoordinator.connect(
-           this.config,
+      this.config,
       (avrConfig) => (eiscpInstance) => {
         const avrSpecificConfig = this.createAvrSpecificConfig(avrConfig);
         return new CommandReceiver(this.driver, avrSpecificConfig, eiscpInstance, this.avrStateApi, this.driverVersion, this.handleAvrInfo.bind(this));

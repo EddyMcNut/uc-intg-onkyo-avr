@@ -9,20 +9,32 @@ export class SetupFormBuilder {
 
   buildManualConfigPage1(values: ParsedManualConfig): uc.RequestUserInput {
     return this.buildManualConfigFormPage(values, "Manual configuration (1/3)", [
-      "info", "autoDiscoveryInfo", "model", "ipAddress", "port", "albumArtURL", "queueThreshold", "netMenuDelay", "zoneCount"
+      "info",
+      "autoDiscoveryInfo",
+      "model",
+      "ipAddress",
+      "port",
+      "albumArtURL",
+      "queueThreshold",
+      "netMenuDelay",
+      "zoneCount"
     ]);
   }
 
   buildManualConfigPage2(values: ParsedManualConfig): uc.RequestUserInput {
     return this.buildManualConfigFormPage(values, "Manual configuration (2/3)", [
-      "entityNameStyle", "volumeScale", "volumeDisplay", "adjustVolumeDispl", "useAvrReportedInputs", "tuneinPresetPosition", "tuneinMenuStyle"
+      "entityNameStyle",
+      "volumeScale",
+      "volumeDisplay",
+      "adjustVolumeDispl",
+      "useAvrReportedInputs",
+      "tuneinPresetPosition",
+      "tuneinMenuStyle"
     ]);
   }
 
   buildManualConfigPage3(values: ParsedManualConfig): uc.RequestUserInput {
-    const ids = [
-      "createRemoteEntity", "createSensors", "createTunerPresets", "createDiracSelectEntity", "listeningModeOptions", "inputSelectorOptions", "logLevel"
-    ];
+    const ids = ["createRemoteEntity", "createSensors", "createTunerPresets", "createDiracSelectEntity", "listeningModeOptions", "inputSelectorOptions", "logLevel"];
     if (values.useAvrReportedInputsValue) {
       ids.splice(ids.indexOf("inputSelectorOptions"), 1);
     }

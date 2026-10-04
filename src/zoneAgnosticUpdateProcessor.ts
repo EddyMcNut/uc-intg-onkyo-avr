@@ -193,17 +193,17 @@ export class ZoneAgnosticUpdateProcessor {
     this.state.setSource(sourceEntityId, "dab", this.eiscpInstance, eventZone, this.driver);
 
     const affectedZones = this.state.getEntitiesByPhysicalAvrAndSource(this.getPhysicalAvrId(sourceEntityId), "dab");
-      for (const zoneEntityId of affectedZones) {
-        this.mediaStateStore.updateNowPlaying(zoneEntityId, "dab", {
+    for (const zoneEntityId of affectedZones) {
+      this.mediaStateStore.updateNowPlaying(zoneEntityId, "dab", {
         station: stationName,
         artist: "DAB Radio"
-        });
-        const physicalAvrId = this.getPhysicalAvrId(zoneEntityId);
-        const preset = findTunerPresetByName(physicalAvrId, stationName);
-        this.driver.updateEntityAttributes(`${zoneEntityId}_tuner_presets`, {
-          [uc.SelectAttributes.CurrentOption]: preset?.name ?? ""
-        });
-        await this.renderZoneMedia(zoneEntityId, true);
+      });
+      const physicalAvrId = this.getPhysicalAvrId(zoneEntityId);
+      const preset = findTunerPresetByName(physicalAvrId, stationName);
+      this.driver.updateEntityAttributes(`${zoneEntityId}_tuner_presets`, {
+        [uc.SelectAttributes.CurrentOption]: preset?.name ?? ""
+      });
+      await this.renderZoneMedia(zoneEntityId, true);
     }
 
     log.info("%s DAB station set to %s (updated %d zone(s))", integrationName, stationName, affectedZones.length);

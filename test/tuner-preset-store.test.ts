@@ -26,13 +26,7 @@ describe("tunerPresetStore", () => {
   });
 
   it("keeps the stations in AVR slot order and drops empty slots", () => {
-    const presets = normalizeTunerPresets([
-      preset(12, "NPO FunX  "),
-      preset(1, "R10 80s   "),
-      preset(26, "   "),
-      preset(13, ""),
-      preset(28, "STRKSTAD", "1", "107.20")
-    ]);
+    const presets = normalizeTunerPresets([preset(12, "NPO FunX  "), preset(1, "R10 80s   "), preset(26, "   "), preset(13, ""), preset(28, "STRKSTAD", "1", "107.20")]);
 
     expect(presets.map((p) => [p.slot, p.name])).toEqual([
       [1, "R10 80s"],

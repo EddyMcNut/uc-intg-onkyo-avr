@@ -6,7 +6,7 @@ import { eiscpMappings } from "./eiscp-mappings.js";
 import { ALL_SIMPLE_COMMANDS } from "./simpleCommands.js";
 import { getCompatibleListeningModes } from "./listeningModeFilters.js";
 import { ConfigManager, buildEntityId, buildPhysicalAvrId } from "./configManager.js";
-import { getAvrInfo } from "./avrInfoStore.js";
+import { getAvrSourceCatalog } from "./avrSourceCatalog.js";
 import { getEffectiveInputSourceOptions } from "./inputSourceResolver.js";
 import { getTunerPresetNames } from "./tunerPresetStore.js";
 import {
@@ -330,7 +330,7 @@ export default class EntityRegistrar {
     return selectEntity;
   }
 
-  // Station names of the tuner presets the AVR reported, in AVR slot order.
+  // Station names of the tuner presets the AVR reported, alphabetically sorted for the select entity.
   //
   // Empty until the first NRI reply arrives, which is also what an AVR without a tuner preset list
   // leaves the select with: an empty option list rather than a made-up set of stations.
@@ -375,12 +375,10 @@ export default class EntityRegistrar {
     try {
       const cfg = ConfigManager.get()?.avrs?.find((a) => buildEntityId(a.model, a.ip, a.zone) === avrEntry);
       if (!cfg?.useAvrReportedInputs) return undefined;
-      const info = getAvrInfo(avrEntry);
-      if (!info || info.selectors.length === 0 || info.netServices.length === 0) return undefined;
-      const names = [...info.selectors.map((selector) => selector.name), ...info.netServices.filter((service) => service.enabled).map((service) => service.name)]
-        .map((name) => name.trim())
-        .filter(Boolean);
-      return names.length > 0 ? [...new Set(names.map((name) => name.toLowerCase()))].map((key) => names.find((name) => name.toLowerCase() === key)!).sort((a, b) => a.localeCompare(b)) : undefined;
+      const catalog = getAvrSourceCatalog(avrEntry);
+      if (!catalog.complete) return undefined;
+      const names = catalog.sources.map((input) => input.name);
+      return names.length > 0 ? names : undefined;
     } catch {
       return undefined;
     }

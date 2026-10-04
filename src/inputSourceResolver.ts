@@ -1,8 +1,9 @@
 // Resolve configured input aliases against the names and IDs reported by the AVR.
 import { eiscpMappings } from "./eiscp-mappings.js";
 import { type AvrConfig } from "./configManager.js";
-import { getAvrInputs, normalizeAvrInputs, type AvrInput } from "./inputSourceStore.js";
+import { normalizeAvrInputs, type AvrInput } from "./inputSourceStore.js";
 import { getAvrInfo, listSelectors } from "./avrInfoStore.js";
+import { getAvrSourcesByPhysicalId } from "./avrSourceCatalog.js";
 
 export type InputSourceListResolution = {
   inputs?: AvrInput[];
@@ -17,7 +18,7 @@ export function getInputSourceId(option: string): string | undefined {
 
 /** Resolve a displayed option to an AVR-reported ID, then fall back to the built-in alias mapping. */
 export function resolveInputSourceId(physicalAvrId: string, option: string): string | undefined {
-  return getAvrInputs(physicalAvrId).find((input) => input.name.toLowerCase() === option.trim().toLowerCase())?.id ?? getInputSourceId(option);
+  return getAvrSourcesByPhysicalId(physicalAvrId).find((input) => input.name.toLowerCase() === option.trim().toLowerCase())?.id ?? getInputSourceId(option);
 }
 
 /** Build the options shown by the input selector for one configured AVR zone. */
@@ -27,7 +28,7 @@ export function getEffectiveInputSourceOptions(avrConfig: AvrConfig, physicalAvr
     return configured === null ? [] : Array.isArray(configured) ? configured.map((option) => option.trim()) : builtInOptions;
   }
 
-  const reported = getAvrInputs(physicalAvrId);
+  const reported = getAvrSourcesByPhysicalId(physicalAvrId);
   if (configured === null) {
     return [];
   }
@@ -51,17 +52,15 @@ export function resolveInputSourceList(avrConfig: AvrConfig, entityId: string): 
 
   const selectors = listSelectors(entityId);
   const info = getAvrInfo(entityId);
-  const services = (info?.netServices ?? [])
-    .filter((service) => service.enabled && service.id && service.name)
-    .map((service) => ({ id: service.id, name: service.name }));
-  const inputs = normalizeAvrInputs([
-    ...selectors.map((selector) => ({ id: selector.id, name: selector.name })),
-    ...services
-  ]);
+  const services = (info?.netServices ?? []).filter((service) => service.enabled && service.id && service.name).map((service) => ({ id: service.id, name: service.name }));
+  const inputs = normalizeAvrInputs([...selectors.map((selector) => ({ id: selector.id, name: selector.name })), ...services]);
 
   if (inputs.length === 0) {
     return {
-      reason: selectors.length === 0 && services.length === 0 ? "AVR reports no input sources, so integration mappings are used" : "AVR reports no usable input source names, so integration mappings are used"
+      reason:
+        selectors.length === 0 && services.length === 0
+          ? "AVR reports no input sources, so integration mappings are used"
+          : "AVR reports no usable input source names, so integration mappings are used"
     };
   }
 

@@ -9,6 +9,7 @@ import { ZONE_VOLUME_PREFIX, ZONE_VOLUME_UP_DOWN } from "./zoneMappings.js";
 import { SIMPLE_COMMANDS_MAP, ALL_INPUT_SELECTOR_NAMES } from "./simpleCommands.js";
 import { MAX_LENGTHS, PATTERNS } from "./configConstants.js";
 import { REPORTED_INPUT_COMMAND_PREFIX } from "./remoteEntity.js";
+import { findAvrSourceId } from "./avrSourceCatalog.js";
 import { REMOTE_SUFFIX } from "./sensorSuffixes.js";
 import log from "./loggers.js";
 import { EiscpDriver } from "./eiscp.js";
@@ -149,7 +150,9 @@ export class remoteEntityCommandHandler {
     if (cmdId.startsWith(REPORTED_INPUT_COMMAND_PREFIX)) {
       try {
         const source = decodeURIComponent(cmdId.substring(REPORTED_INPUT_COMMAND_PREFIX.length));
-        return this.selectSource(eiscp, zone, zonePrefix, { source });
+        const physicalAvrId = buildPhysicalAvrId(cfg.model, cfg.ip);
+        if (!findAvrSourceId(physicalAvrId, source)) return uc.StatusCodes.BadRequest;
+        return this.selectSource(eiscp, zone, zonePrefix, { source }, physicalAvrId);
       } catch {
         return uc.StatusCodes.BadRequest;
       }
@@ -213,7 +216,7 @@ export class remoteEntityCommandHandler {
         await this.avrStateApi.refreshAvrState(avrEntry, eiscp, zone, this.driver, cfg.queueThreshold, commandReceiver);
         return uc.StatusCodes.Ok;
       case uc.MediaPlayerCommands.SelectSource:
-        return this.selectSource(eiscp, zone, zonePrefix, params);
+        return this.selectSource(eiscp, zone, zonePrefix, params, buildPhysicalAvrId(cfg.model, cfg.ip));
       case uc.MediaPlayerCommands.PlayPause:
         await eiscp.command(zonePrefix("network-usb play"));
         return uc.StatusCodes.Ok;
@@ -248,7 +251,7 @@ export class remoteEntityCommandHandler {
     return uc.StatusCodes.Ok;
   }
 
-  private async selectSource(eiscp: EiscpDriver, zone: string, zonePrefix: (cmd: string) => string, params: RemoteParams): Promise<uc.StatusCodes> {
+  private async selectSource(eiscp: EiscpDriver, zone: string, zonePrefix: (cmd: string) => string, params: RemoteParams, physicalAvrId?: string): Promise<uc.StatusCodes> {
     if (!params?.source || typeof params.source !== "string") return uc.StatusCodes.Ok;
     const request = params.source.toLowerCase();
 
@@ -275,8 +278,11 @@ export class remoteEntityCommandHandler {
       return uc.StatusCodes.BadRequest;
     }
 
+    const reportedInputId = physicalAvrId ? findAvrSourceId(physicalAvrId, request) : undefined;
     if (request.startsWith("multi-zone")) {
       await eiscp.command(request);
+    } else if (reportedInputId) {
+      await eiscp.command({ zone, command: "input-selector", args: request });
     } else if (INPUT_NAMES_SET.has(request)) {
       await eiscp.command(zonePrefix(`input-selector ${request}`));
     } else {

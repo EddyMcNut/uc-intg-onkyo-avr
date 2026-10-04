@@ -362,6 +362,12 @@ export function listSelectors(entityId: string): AvrSelector[] {
   return getAvrInfo(entityId)?.selectors ?? [];
 }
 
+/** True when NRI contains both selector and network-service lists needed for AVR-specific source UI. */
+export function hasCompleteInputSourceInfo(entityId: string): boolean {
+  const info = getAvrInfo(entityId);
+  return Boolean(info && info.selectors.length > 0 && info.netServices.length > 0);
+}
+
 /**
  * Network services the AVR reports, e.g. TuneIn Radio, Spotify, TIDAL.
  *
@@ -376,7 +382,8 @@ export function listNetServiceNames(entityId: string): string[] {
 export function findNetServiceByName(physicalAvrId: string, names: string[]): AvrNetService | undefined {
   const wanted = names.map((name) => name.toLowerCase().replace(/[^a-z0-9]/g, ""));
   return [...avrInfoByPhysicalAvr.entries()]
-    .find(([id]) => id === physicalAvrId)?.[1].netServices.find((service) => service.enabled && wanted.includes(service.name.toLowerCase().replace(/[^a-z0-9]/g, "")));
+    .find(([id]) => id === physicalAvrId)?.[1]
+    .netServices.find((service) => service.enabled && wanted.includes(service.name.toLowerCase().replace(/[^a-z0-9]/g, "")));
 }
 
 /** Read one control's raw value by id, e.g. getControlValue(id, "DolbyAtmos"). */

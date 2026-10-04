@@ -29,7 +29,7 @@ it("handleFld updates FM zones and front panel for FM source", async () => {
   const { ZoneAgnosticFrontPanelRouter } = mod as any;
 
   const deps = makeDeps();
-  deps.state.getEntitiesByPhysicalAvrAndSource.mockImplementation((_physicalAvrId: string, source: string) => source === "fm" ? ["M 1.2.3.4 main"] : []);
+  deps.state.getEntitiesByPhysicalAvrAndSource.mockImplementation((_physicalAvrId: string, source: string) => (source === "fm" ? ["M 1.2.3.4 main"] : []));
   deps.getNetZones.mockReturnValue([]);
 
   const router = new ZoneAgnosticFrontPanelRouter(deps);
@@ -47,7 +47,7 @@ it("handleFld updates AM zones and clears a stale tuner preset", async () => {
   const { ZoneAgnosticFrontPanelRouter } = mod as any;
 
   const deps = makeDeps();
-  deps.state.getEntitiesByPhysicalAvrAndSource.mockImplementation((_physicalAvrId: string, source: string) => source === "am" ? ["M 1.2.3.4 main"] : []);
+  deps.state.getEntitiesByPhysicalAvrAndSource.mockImplementation((_physicalAvrId: string, source: string) => (source === "am" ? ["M 1.2.3.4 main"] : []));
 
   const router = new ZoneAgnosticFrontPanelRouter(deps);
 
