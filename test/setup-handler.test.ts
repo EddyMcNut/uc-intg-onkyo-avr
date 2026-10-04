@@ -54,6 +54,35 @@ it("handleRestorePayload: applies valid payload and calls onConfigSaved", async 
   }
 });
 
+it("handleRestorePayload: forces restored input options to all when AVR names are enabled", async () => {
+  const tmp = mkTmpDir();
+  try {
+    const configModule = await import("../src/configManager.js");
+    const SetupHandlerModule = await import("../src/setupHandler.js");
+    if (typeof configModule.setConfigDir === "function") configModule.setConfigDir(tmp);
+
+    const host: any = {
+      driver: {},
+      getConfigDirPath: () => tmp,
+      onConfigSaved: async () => {},
+      onConfigCleared: async () => {},
+      log: console
+    };
+    const setup = new SetupHandlerModule.default(host);
+    const raw = JSON.stringify({
+      config: {
+        avrs: [{ model: "TX-RZ50", ip: "192.168.2.103", port: 60128, zone: "main", useAvrReportedInputs: true, inputSelectorOptions: ["cd"] }]
+      }
+    });
+
+    const res = await (setup as any).handleRestorePayload(raw);
+    expect(res).toBeInstanceOf(uc.SetupComplete);
+    expect(configModule.ConfigManager.load().avrs![0].inputSelectorOptions).toBe("all");
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
 it("handleRestorePayload: invalid payload returns RequestUserInput with preserved textarea", async () => {
   const tmp = mkTmpDir();
   try {

@@ -200,11 +200,9 @@ export class ZoneAgnosticUpdateProcessor {
         });
         const physicalAvrId = this.getPhysicalAvrId(zoneEntityId);
         const preset = findTunerPresetByName(physicalAvrId, stationName);
-        if (preset) {
-          this.driver.updateEntityAttributes(`${zoneEntityId}_tuner_presets`, {
-            [uc.SelectAttributes.CurrentOption]: preset.name
-          });
-        }
+        this.driver.updateEntityAttributes(`${zoneEntityId}_tuner_presets`, {
+          [uc.SelectAttributes.CurrentOption]: preset?.name ?? ""
+        });
         await this.renderZoneMedia(zoneEntityId, true);
     }
 

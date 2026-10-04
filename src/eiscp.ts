@@ -17,6 +17,7 @@ import { getTuneInMenuBrowseState } from "./tuneInMenuStore.js";
 import { getZonePrefix } from "./zoneMappings.js";
 import { WAIT_FOR_CONNECT_TIMEOUT, CONNECTION_TIMEOUT } from "./constants.js";
 import type { AvrStateReader } from "./eiscp-command-parser.js";
+import { findNetServiceByName } from "./avrInfoStore.js";
 
 export interface EiscpConfig {
   host?: string;
@@ -42,6 +43,18 @@ const integrationName = "eISCP:";
 const IGNORED_COMMANDS = new Set(["NMS", "NPB"]); // Commands to ignore from AVR (NMS=menu, NPB=playback info)
 const THROTTLED_COMMANDS = new Set(["IFA", "IFV", "FLD"]); // Commands to send to incoming queue for throttling
 const FLD_VOLUME_HEX_PREFIX = "566F6C756D65"; // "Volume" in hex - skip these FLD messages
+const NSS_SERVICE_NAMES: Record<string, string[]> = {
+  NSS01: ["tuneinradio", "tunein"],
+  NSS02: ["spotify"],
+  NSS03: ["deezer"],
+  NSS04: ["tidal"],
+  NSS05: ["amazonmusic"],
+  NSS06: ["chromecastbuiltin", "chromecast"],
+  NSS07: ["dtsplayfi", "playfi"],
+  NSS08: ["airplay", "airplay2"],
+  NSS09: ["alexa"],
+  NSS10: ["musicserver"]
+};
 
 // Re-export zone prefix lookup for backward compatibility — canonical definition is in zoneMappings.ts
 export { getZonePrefix, ZONE_COMMAND_MAP, ZONE_VOLUME_PREFIX, ZONE_VOLUME_UP_DOWN, ZONE_MUTE } from "./zoneMappings.js";
@@ -474,10 +487,21 @@ export class EiscpDriver extends EventEmitter {
     const netCommand = `${sliPrefix}2B`; // 2B = NET input
     const queryCommand = `${sliPrefix}QSTN`;
     const newSubsource = String(nssCode.slice(-2)).padStart(5, "0");
+    const physicalAvrId = this.config.model && this.config.host ? buildPhysicalAvrId(this.config.model, this.config.host) : "";
+    const directService = physicalAvrId ? findNetServiceByName(physicalAvrId, NSS_SERVICE_NAMES[nssCode] ?? []) : undefined;
 
     log.debug("%s Sending %s (NET input for zone %s) before %s", integrationName, netCommand, zone, nssCode);
     await this.raw(netCommand); // Select NET input first
     await delay(menuDelay); // Wait for AVR to switch/acknowledge NET input
+
+    if (directService) {
+      const serviceCommand = `NSV${directService.id.toUpperCase()}0`;
+      log.debug("%s Selecting reported network service %s (%s) directly: %s", integrationName, directService.name, directService.id, serviceCommand);
+      await this.raw(serviceCommand);
+      await delay(menuDelay);
+      await this.raw(queryCommand);
+      return;
+    }
 
     // NTCTOP exits any active sub-service (e.g. Spotify) and returns to the NET root menu. Without this, if the AVR was already on NET/Spotify, SLI2B is a no-op and NLSI would select from Spotify's menu instead of the NET top-level service list.
     await this.raw("NTCTOP");
@@ -489,9 +513,23 @@ export class EiscpDriver extends EventEmitter {
     await this.raw(queryCommand); // Query input-selector to ensure source state updates
   }
 
+  private async handleNSVsend(serviceId: string, zone: string): Promise<void> {
+    const menuDelay = this.config.netMenuDelay ?? 2500;
+    const sliPrefix = getZonePrefix("SLI", zone);
+    const netCommand = `${sliPrefix}2B`;
+    const queryCommand = `${sliPrefix}QSTN`;
+
+    log.debug("%s Sending %s (NET input for zone %s) before NSV%s", integrationName, netCommand, zone, serviceId);
+    await this.raw(netCommand);
+    await delay(menuDelay);
+    await this.raw(`NSV${serviceId.toUpperCase()}0`);
+    await delay(menuDelay);
+    await this.raw(queryCommand);
+  }
+
   private async sendIscp(iscpCommand: string, zone: string = "main"): Promise<void> {
     // Hot path: most commands are plain ISCP and do not require TIP/NSS special handling.
-    if (!iscpCommand.startsWith("TIP") && iscpCommand.indexOf("NSS") === -1) {
+    if (!iscpCommand.startsWith("TIP") && iscpCommand.indexOf("NSS") === -1 && !iscpCommand.startsWith("NSV")) {
       await this.raw(iscpCommand);
       return;
     }
@@ -505,6 +543,11 @@ export class EiscpDriver extends EventEmitter {
     const nssCode = this.extractNSSCode(iscpCommand);
     if (nssCode) {
       return this.handleNSSsend(nssCode, zone);
+    }
+
+    const nsvMatch = iscpCommand.match(/^NSV([0-9A-Fa-f]{2})0$/);
+    if (nsvMatch) {
+      return this.handleNSVsend(nsvMatch[1], zone);
     }
   }
 
@@ -582,6 +625,18 @@ export class EiscpDriver extends EventEmitter {
     if (args !== undefined && valueMap && Object.prototype.hasOwnProperty.call(valueMap, args)) {
       value = valueMap[String(args)].value;
     } else if (prefix === "SLI" && typeof args === "string") {
+      const physicalAvrId = buildPhysicalAvrId(this.config.model ?? "", this.config.host ?? "");
+      const reportedService = findNetServiceByName(physicalAvrId, [args]);
+      if (reportedService) {
+        const logicalService = Object.entries(NSS_SERVICE_NAMES).find(([, names]) => names.includes(reportedService.name.toLowerCase().replace(/[^a-z0-9]/g, "")));
+        if (logicalService) {
+          log.debug("%s Sending reported network service %s through %s", integrationName, args, logicalService[0]);
+          return logicalService[0];
+        }
+        log.debug("%s Sending reported network service %s directly through NSV%s", integrationName, args, reportedService.id);
+        return `NSV${reportedService.id.toUpperCase()}0`;
+      }
+
       // An input name the AVR reported itself ("BD/DVD", "CBL/SAT") is not in the hardcoded SLI
       // table: send the input id the AVR gave for it instead.
       const inputId = findAvrInputId(buildPhysicalAvrId(this.config.model ?? "", this.config.host ?? ""), args);

@@ -52,6 +52,7 @@ export interface ParsedManualConfig {
 
 export class ManualConfigParser {
   parse(input: ManualConfigInput, fallbackLogLevel: LogLevel = "warn"): ParsedManualConfig {
+    const useAvrReportedInputsValue = parseBoolean(input.useAvrReportedInputs, AVR_DEFAULTS.useAvrReportedInputs);
     return {
       modelName: (input.model ?? "").toString().trim(),
       ipVal: (input.ipAddress ?? "").toString().trim(),
@@ -59,9 +60,9 @@ export class ManualConfigParser {
       queueThresholdValue: this.parseQueueThreshold(input.queueThreshold),
       albumArtURLValue: this.parseAlbumArtUrl(input.albumArtURL),
       listeningModeOptions: String(input.listeningModeOptions ?? ""),
-      inputSelectorOptions: String(input.inputSelectorOptions ?? ""),
+      inputSelectorOptions: useAvrReportedInputsValue ? "all" : String(input.inputSelectorOptions ?? ""),
       volumeScaleValue: this.parseVolumeScale(input.volumeScale),
-      useAvrReportedInputsValue: parseBoolean(input.useAvrReportedInputs, AVR_DEFAULTS.useAvrReportedInputs),
+      useAvrReportedInputsValue,
       volumeDisplayValue: this.parseVolumeDisplay(input.volumeDisplay),
       adjustVolumeDisplValue: parseBoolean(input.adjustVolumeDispl, true),
       entityNameStyleValue: this.parseEntityNameStyle(input.entityNameStyle),

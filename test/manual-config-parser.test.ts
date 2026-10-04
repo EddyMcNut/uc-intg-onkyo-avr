@@ -96,6 +96,14 @@ describe("ManualConfigParser", () => {
     expect(parser.parse({ useAvrReportedInputs: true }).useAvrReportedInputsValue).toBe(true);
   });
 
+  it("uses all input options when AVR-reported names are enabled", async () => {
+    const mod = await import("../src/manualConfigParser.js");
+    const { ManualConfigParser } = mod as { ManualConfigParser: new () => any };
+    const parser = new ManualConfigParser();
+    const result = parser.parse({ useAvrReportedInputs: true, inputSelectorOptions: "cd; dvd" });
+    expect(result.inputSelectorOptions).toBe("all");
+  });
+
   it("validates tuneinPresetPosition (1-10 range)", async () => {
     const mod = await import("../src/manualConfigParser.js");
     const { ManualConfigParser } = mod as { ManualConfigParser: new () => any };

@@ -69,6 +69,7 @@ describe("avrInfoStore", () => {
 
       expect(info.netServices.length).toBeGreaterThan(0);
       expect(info.netServices.find((s: any) => s.id === "0e")?.name).toBe("TuneIn Radio");
+      expect(info.netServices.find((s: any) => s.id === "0e")?.enabled).toBe(true);
 
       expect(info.zones).toHaveLength(4);
       expect(info.zones[0]).toEqual({ id: 1, name: "Main", enabled: true, volMax: 100 });

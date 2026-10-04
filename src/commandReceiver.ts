@@ -251,6 +251,9 @@ export class CommandReceiver {
     const physicalAVR = physicalAvrIdFromEntityId(entityId);
     const station = physicalAVR ? findTunerPresetNameBySlot(physicalAVR, avrUpdates.argument) : undefined;
     if (!station) {
+      this.driver.updateEntityAttributes(`${entityId}_tuner_presets`, {
+        [SelectAttributes.CurrentOption]: ""
+      });
       return;
     }
     log.debug("%s [%s] Tuner preset slot %d is '%s'", integrationName, entityId, avrUpdates.argument, station);
@@ -263,11 +266,8 @@ export class CommandReceiver {
       return;
     }
     const preset = findTunerPresetByName(physicalAVR, stationName);
-    if (!preset) {
-      return;
-    }
     this.driver.updateEntityAttributes(`${entityId}_tuner_presets`, {
-      [SelectAttributes.CurrentOption]: preset.name
+      [SelectAttributes.CurrentOption]: preset?.name ?? ""
     });
   }
 

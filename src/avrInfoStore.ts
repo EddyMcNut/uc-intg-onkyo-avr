@@ -125,6 +125,18 @@ function toBoolean(value: string | undefined): boolean {
   return value === "1" || value?.toLowerCase() === "true";
 }
 
+/** Network-service enable values are bitmasks on some AVRs (for example, "07"). */
+function toServiceEnabled(value: string | undefined): boolean {
+  if (value === undefined) {
+    return false;
+  }
+  if (value.toLowerCase() === "false") {
+    return false;
+  }
+  const numeric = Number.parseInt(value, 16);
+  return Number.isNaN(numeric) ? value.toLowerCase() === "true" : numeric !== 0;
+}
+
 function toOptionalInt(value: string | undefined): number | undefined {
   if (value === undefined) {
     return undefined;
@@ -197,7 +209,7 @@ export function parseAvrInfo(xml: string): AvrInfo | null {
         info.netServices.push({
           id: (attributes.id ?? "").toLowerCase(),
           name: attributes.name ?? "",
-          enabled: toBoolean(attributes.enable ?? attributes.value),
+          enabled: toServiceEnabled(attributes.enable ?? attributes.value),
           // The AVR sends placeholder strings for services it has no credentials for, and omits
           // the attributes entirely for services that need no login.
           hasAccount: attributes.account !== undefined || attributes.password !== undefined
@@ -358,6 +370,13 @@ export function listSelectors(entityId: string): AvrSelector[] {
  */
 export function listNetServiceNames(entityId: string): string[] {
   return (getAvrInfo(entityId)?.netServices ?? []).map((service) => service.name).filter((name) => name !== "");
+}
+
+/** Find a reported network service by its physical AVR id and logical service aliases. */
+export function findNetServiceByName(physicalAvrId: string, names: string[]): AvrNetService | undefined {
+  const wanted = names.map((name) => name.toLowerCase().replace(/[^a-z0-9]/g, ""));
+  return [...avrInfoByPhysicalAvr.entries()]
+    .find(([id]) => id === physicalAvrId)?.[1].netServices.find((service) => service.enabled && wanted.includes(service.name.toLowerCase().replace(/[^a-z0-9]/g, "")));
 }
 
 /** Read one control's raw value by id, e.g. getControlValue(id, "DolbyAtmos"). */

@@ -385,6 +385,7 @@ export class ConfigManager {
     }
 
     // Build normalized AVR with defaults
+    const useAvrReportedInputs = parseBoolean(avr.useAvrReportedInputs, AVR_DEFAULTS.useAvrReportedInputs);
     const normalized: AvrConfig = this.applyDefaults({
       model: String(avr.model).trim(),
       ip: String(avr.ip).trim(),
@@ -393,7 +394,7 @@ export class ConfigManager {
       queueThreshold: avr.queueThreshold,
       albumArtURL: avr.albumArtURL,
       volumeScale: parseVolumeScale(avr.volumeScale),
-      useAvrReportedInputs: parseBoolean(avr.useAvrReportedInputs, AVR_DEFAULTS.useAvrReportedInputs),
+      useAvrReportedInputs,
       volumeDisplay: String(avr.volumeDisplay ?? AVR_DEFAULTS.volumeDisplay).toLowerCase() === "relative" ? "relative" : "absolute",
       adjustVolumeDispl: parseBoolean(avr.adjustVolumeDispl, AVR_DEFAULTS.adjustVolumeDispl),
       entityNameStyle: (String(avr.entityNameStyle ?? AVR_DEFAULTS.entityNameStyle).toLowerCase() === "short" ? "short" : "long") as EntityNameStyle,
@@ -405,7 +406,7 @@ export class ConfigManager {
       tuneinPresetPosition: typeof avr.tuneinPresetPosition === "string" ? parseInt(avr.tuneinPresetPosition, 10) : avr.tuneinPresetPosition,
       tuneinMenuStyle: String(avr.tuneinMenuStyle ?? AVR_DEFAULTS.tuneinMenuStyle).toLowerCase() === "full" ? "full" : "mypresets",
       listeningModeOptions: lmoParsed,
-      inputSelectorOptions: isoParsed
+      inputSelectorOptions: useAvrReportedInputs ? ALL_OPTIONS : isoParsed
     });
 
     return { errors: [], normalized };

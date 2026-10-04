@@ -2,7 +2,7 @@
 import { eiscpMappings } from "./eiscp-mappings.js";
 import { type AvrConfig } from "./configManager.js";
 import { getAvrInputs, normalizeAvrInputs, type AvrInput } from "./inputSourceStore.js";
-import { listSelectors } from "./avrInfoStore.js";
+import { getAvrInfo, listSelectors } from "./avrInfoStore.js";
 
 export type InputSourceListResolution = {
   inputs?: AvrInput[];
@@ -39,7 +39,7 @@ export function getEffectiveInputSourceOptions(avrConfig: AvrConfig, physicalAvr
   // aliases unknown to this AVR remain selectable through the existing hardcoded SLI mapping.
   return configured.map((option) => {
     const id = getInputSourceId(option);
-    return reported.find((input) => input.id === id)?.name ?? option.trim();
+    return reported.find((input) => input.id === id || input.name.toLowerCase() === option.trim().toLowerCase())?.name ?? option.trim();
   });
 }
 
@@ -50,16 +50,23 @@ export function resolveInputSourceList(avrConfig: AvrConfig, entityId: string): 
   }
 
   const selectors = listSelectors(entityId);
-  const inputs = normalizeAvrInputs(selectors.map((selector) => ({ id: selector.id, name: selector.name })));
+  const info = getAvrInfo(entityId);
+  const services = (info?.netServices ?? [])
+    .filter((service) => service.enabled && service.id && service.name)
+    .map((service) => ({ id: service.id, name: service.name }));
+  const inputs = normalizeAvrInputs([
+    ...selectors.map((selector) => ({ id: selector.id, name: selector.name })),
+    ...services
+  ]);
 
   if (inputs.length === 0) {
     return {
-      reason: selectors.length === 0 ? "AVR reports no input sources, so integration mappings are used" : "AVR reports no usable input source names, so integration mappings are used"
+      reason: selectors.length === 0 && services.length === 0 ? "AVR reports no input sources, so integration mappings are used" : "AVR reports no usable input source names, so integration mappings are used"
     };
   }
 
   return {
     inputs,
-    reason: `AVR reports ${inputs.length} input(s): ${inputs.map((input) => `${input.name} (${input.id})`).join(", ")}`
+    reason: `AVR reports ${inputs.length} input(s), including network services where available: ${inputs.map((input) => `${input.name} (${input.id})`).join(", ")}`
   };
 }

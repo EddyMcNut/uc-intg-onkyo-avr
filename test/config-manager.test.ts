@@ -125,6 +125,19 @@ describe("ConfigManager static methods", () => {
       expect(result.normalized!.useAvrReportedInputs).toBe(true);
     });
 
+    it("forces all input options when AVR-reported names are enabled", () => {
+      const result = ConfigManager.validateAvrPayload({
+        model: "TX-RZ50",
+        ip: "1.2.3.4",
+        port: 60128,
+        useAvrReportedInputs: true,
+        inputSelectorOptions: ["cd", "dvd"]
+      });
+
+      expect(result.errors).toEqual([]);
+      expect(result.normalized!.inputSelectorOptions).toBe("all");
+    });
+
     it("defaults an absent volumeScale to auto", () => {
       const result = ConfigManager.validateAvrPayload({ model: "TX-RZ50", ip: "1.2.3.4", port: 60128 });
       expect(result.normalized!.volumeScale).toBe("auto");
@@ -312,6 +325,7 @@ describe("ConfigManager static methods", () => {
         volumeScale: "80",
         netMenuDelay: "5",
         tuneinPresetPosition: "3",
+        useAvrReportedInputs: false,
         inputSelectorOptions: ["opt1", "opt2"]
       });
       expect(result.errors.length).toBe(0);

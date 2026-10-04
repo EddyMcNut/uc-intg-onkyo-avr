@@ -95,6 +95,22 @@ describe("inputSourceResolver", () => {
     expect(resolution?.inputs?.find((input) => input.name === "DAB")?.id).toBe("33");
   });
 
+  it("adds enabled NRI network services and sorts them with selectors", () => {
+    setAvrInfo(ENTITY_ID, parseAvrInfo(nriXml([
+      '<selectorlist count="1"><selector id="10" name="BD/DVD" /></selectorlist>',
+      '<netservicelist count="3"><netservice id="0a" name="Spotify" value="1" />',
+      '<netservice id="0e" name="TuneIn Radio" value="1" />',
+      '<netservice id="40" name="Chromecast built-in" value="2" enable="1" /></netservicelist>'
+    ].join(""))));
+
+    expect(resolveInputSourceList(AVR_CONFIG, ENTITY_ID)?.inputs).toEqual([
+      { id: "10", name: "BD/DVD" },
+      { id: "40", name: "Chromecast built-in" },
+      { id: "0a", name: "Spotify" },
+      { id: "0e", name: "TuneIn Radio" }
+    ]);
+  });
+
   it("renames configured aliases when the AVR reports the same ID and keeps unmatched aliases", () => {
     setAvrInfo(ENTITY_ID, parseAvrInfo(nriXml('<selectorlist count="2"><selector id="10" name="Blu-ray" /><selector id="12" name="Television" /></selectorlist>')));
     setAvrInputs("TX-RZ50 192.168.2.103", [

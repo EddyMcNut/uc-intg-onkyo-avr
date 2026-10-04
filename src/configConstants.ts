@@ -18,7 +18,7 @@ export const PATTERNS = {
   MODEL_NAME: /^[a-zA-Z0-9\-_.() ]+$/,
   ALBUM_ART_URL: /^[a-zA-Z0-9._\-/]+$/,
   PIN_CODE: /^\d{4}$/,
-  USER_COMMAND: /^[a-z0-9\-\s.:=]+$/i, // Letters, numbers, hyphens, spaces, delimiters
+  USER_COMMAND: /^[a-z0-9\-\s.:=\/]+$/i, // Letters, numbers, hyphens, slashes, spaces, delimiters
   SELECT_OPTION: /^[a-zA-Z0-9-]+$/, // Select-entity option entries: letters, numbers, hyphens only
   RAW_COMMAND: /^[A-Z0-9]+$/ // Uppercase letters and numbers only
 } as const;

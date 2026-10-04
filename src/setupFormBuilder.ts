@@ -20,9 +20,13 @@ export class SetupFormBuilder {
   }
 
   buildManualConfigPage3(values: ParsedManualConfig): uc.RequestUserInput {
-    return this.buildManualConfigFormPage(values, "Manual configuration (3/3)", [
+    const ids = [
       "createRemoteEntity", "createSensors", "createTunerPresets", "createDiracSelectEntity", "listeningModeOptions", "inputSelectorOptions", "logLevel"
-    ]);
+    ];
+    if (values.useAvrReportedInputsValue) {
+      ids.splice(ids.indexOf("inputSelectorOptions"), 1);
+    }
+    return this.buildManualConfigFormPage(values, "Manual configuration (3/3)", ids);
   }
 
   private buildManualConfigFormPage(values: ParsedManualConfig, title: string, ids: string[]): uc.RequestUserInput {

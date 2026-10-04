@@ -154,6 +154,46 @@ describe("sendIscp routing through commandToIscp", () => {
     expect(rawSpy).toHaveBeenCalledWith(expect.stringContaining("SLI"));
   });
 
+  it("uses the NRI service id for direct network-service selection", async () => {
+    const driver = await makeDriver();
+    const rawSpy = vi.spyOn(driver, "raw").mockResolvedValue(undefined);
+    const { setAvrInfo } = await import("../src/avrInfoStore.js");
+    setAvrInfo("TX-RZ50 1.2.3.4 main", {
+      model: "TX-RZ50",
+      friendlyName: "",
+      firmwareVersion: "",
+      presetCount: 0,
+      presets: [],
+      netServices: [
+        { id: "0a", name: "Spotify", enabled: true, hasAccount: false },
+        { id: "0e", name: "TuneIn Radio", enabled: true, hasAccount: true },
+        { id: "1d", name: "Play Queue", enabled: true, hasAccount: false }
+      ],
+      zones: [],
+      selectors: [],
+      controls: [],
+      tunerBands: []
+    });
+
+    await driver.command("input-selector.spotify");
+
+    expect(rawSpy).toHaveBeenNthCalledWith(1, "SLI2B");
+    expect(rawSpy).toHaveBeenNthCalledWith(2, "NSV0A0");
+    expect(rawSpy).toHaveBeenNthCalledWith(3, "SLIQSTN");
+
+    rawSpy.mockClear();
+    await driver.command({ zone: "main", command: "input-selector", args: "TuneIn Radio" });
+    expect(rawSpy).toHaveBeenNthCalledWith(1, "SLI2B");
+    expect(rawSpy).toHaveBeenNthCalledWith(2, "NSV0E0");
+    expect(rawSpy).toHaveBeenNthCalledWith(3, "SLIQSTN");
+
+    rawSpy.mockClear();
+    await driver.command({ zone: "main", command: "input-selector", args: "Play Queue" });
+    expect(rawSpy).toHaveBeenNthCalledWith(1, "SLI2B");
+    expect(rawSpy).toHaveBeenNthCalledWith(2, "NSV1D0");
+    expect(rawSpy).toHaveBeenNthCalledWith(3, "SLIQSTN");
+  });
+
   it("passes ISCP with TIP prefix directly to sendIscp via raw() call", async () => {
     const driver = await makeDriver();
     const rawSpy = vi.spyOn(driver, "raw").mockResolvedValue(undefined);
