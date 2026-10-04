@@ -6,6 +6,7 @@ import { eiscpMappings } from "./eiscp-mappings.js";
 import { ALL_SIMPLE_COMMANDS } from "./simpleCommands.js";
 import { getCompatibleListeningModes } from "./listeningModeFilters.js";
 import { ConfigManager, buildEntityId, buildPhysicalAvrId } from "./configManager.js";
+import { getAvrInfo } from "./avrInfoStore.js";
 import { getEffectiveInputSourceOptions } from "./inputSourceResolver.js";
 import { getTunerPresetNames } from "./tunerPresetStore.js";
 import {
@@ -367,7 +368,22 @@ export default class EntityRegistrar {
 
   // Remote entity — optional (createRemoteEntity config)
   createRemoteEntity(avrEntry: string, cmdHandler?: CmdHandlerFn): uc.Remote {
-    return buildRemoteEntity(avrEntry, this.getDisplayBaseName(avrEntry), cmdHandler);
+    return buildRemoteEntity(avrEntry, this.getDisplayBaseName(avrEntry), cmdHandler, this.getReportedRemoteInputNames(avrEntry));
+  }
+
+  private getReportedRemoteInputNames(avrEntry: string): string[] | undefined {
+    try {
+      const cfg = ConfigManager.get()?.avrs?.find((a) => buildEntityId(a.model, a.ip, a.zone) === avrEntry);
+      if (!cfg?.useAvrReportedInputs) return undefined;
+      const info = getAvrInfo(avrEntry);
+      if (!info || info.selectors.length === 0 || info.netServices.length === 0) return undefined;
+      const names = [...info.selectors.map((selector) => selector.name), ...info.netServices.filter((service) => service.enabled).map((service) => service.name)]
+        .map((name) => name.trim())
+        .filter(Boolean);
+      return names.length > 0 ? [...new Set(names.map((name) => name.toLowerCase()))].map((key) => names.find((name) => name.toLowerCase() === key)!).sort((a, b) => a.localeCompare(b)) : undefined;
+    } catch {
+      return undefined;
+    }
   }
 
   // Dirac select entity — optional (createDiracSelectEntity config). Options are fixed, see diracSelect.ts.

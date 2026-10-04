@@ -5,12 +5,14 @@ import { ALL_SIMPLE_COMMANDS } from "./simpleCommands.js";
 import { REMOTE_SUFFIX } from "./sensorSuffixes.js";
 
 type CmdHandlerFn = (entity: uc.Entity, cmdId: string, params?: { [key: string]: string | number | boolean }) => Promise<uc.StatusCodes>;
+export const REPORTED_INPUT_COMMAND_PREFIX = "INPUT_REPORTED_";
 
 const GRID_WIDTH = 7;
 
 // Remote entity — optional (createRemoteEntity config). Exposes the same media-player style commands as the media player
 // entity plus the generated simple commands, mapped to physical buttons and UI pages.
-export function createRemoteEntity(avrEntry: string, displayBaseName: string, cmdHandler?: CmdHandlerFn): uc.Remote {
+export function createRemoteEntity(avrEntry: string, displayBaseName: string, cmdHandler?: CmdHandlerFn, reportedInputNames?: string[]): uc.Remote {
+  const reportedInputCommands = reportedInputNames?.map((name) => `${REPORTED_INPUT_COMMAND_PREFIX}${encodeURIComponent(name)}`) ?? [];
   const remoteEntity = new uc.Remote(
     `${avrEntry}${REMOTE_SUFFIX}`,
     { en: `${displayBaseName} Remote` },
@@ -19,9 +21,9 @@ export function createRemoteEntity(avrEntry: string, displayBaseName: string, cm
       attributes: {
         [uc.RemoteAttributes.State]: uc.RemoteStates.Unknown
       },
-      simpleCommands: ALL_SIMPLE_COMMANDS,
+      simpleCommands: [...ALL_SIMPLE_COMMANDS, ...reportedInputCommands],
       buttonMapping: buildRemoteButtonMapping(),
-      uiPages: buildRemoteUiPages(),
+      uiPages: buildRemoteUiPages(reportedInputNames),
       cmdHandler
     }
   );
@@ -50,7 +52,7 @@ function buildRemoteButtonMapping(): uc.DeviceButtonMapping[] {
   ];
 }
 
-function buildRemoteUiPages(): uc.UiPage[] {
+function buildRemoteUiPages(reportedInputNames?: string[]): uc.UiPage[] {
   const pages: uc.UiPage[] = [];
 
   const avrPage1 = new uc.UiPage("onkyo_avr_commands1", "AVR commands (1)", new uc.Size(GRID_WIDTH, 8));
@@ -102,7 +104,10 @@ function buildRemoteUiPages(): uc.UiPage[] {
 
   pages.push(avrPage2);
 
-  const avrPage3 = new uc.UiPage("onkyo_avr_commands3", "AVR commands (3)", new uc.Size(6, 11));
+  const avrPage3 = reportedInputNames ? buildReportedInputPage(reportedInputNames) : new uc.UiPage("onkyo_avr_commands3", "AVR commands (3)", new uc.Size(6, 11));
+  if (reportedInputNames) {
+    pages.push(avrPage3);
+  } else {
   avrPage3.add(uc.createUiText("strmbox", 0, 0, uc.createRemoteSendCmd("INPUT_STM"), new uc.Size(2, 1)));
   avrPage3.add(uc.createUiText("vcr/dvr", 2, 0, uc.createRemoteSendCmd("INPUT_VCR"), new uc.Size(2, 1)));
   avrPage3.add(uc.createUiText("cbl/sat", 4, 0, uc.createRemoteSendCmd("INPUT_CBL"), new uc.Size(2, 1)));
@@ -147,6 +152,7 @@ function buildRemoteUiPages(): uc.UiPage[] {
   avrPage3.add(uc.createUiText("multich", 2, 10, uc.createRemoteSendCmd("INPUT_MULTICH"), new uc.Size(2, 1)));
   avrPage3.add(uc.createUiText("universalport", 4, 10, uc.createRemoteSendCmd("INPUT_UNIVERSALPORT"), new uc.Size(2, 1)));
   pages.push(avrPage3);
+  }
 
   const avrPage4 = new uc.UiPage("onkyo_avr_commands4", "AVR commands (4)", new uc.Size(GRID_WIDTH, 8));
   avrPage4.add(uc.createUiText("HDMI", 0, 0, uc.createRemoteSendCmd("HDMI_OUTPUT_UP"), new uc.Size(7, 1)));
@@ -160,4 +166,14 @@ function buildRemoteUiPages(): uc.UiPage[] {
   pages.push(avrPage4);
 
   return pages;
+}
+
+function buildReportedInputPage(names: string[]): uc.UiPage {
+  const columns = 3;
+  const rows = Math.max(1, Math.ceil(names.length / columns));
+  const page = new uc.UiPage("onkyo_avr_sources", "AVR sources", new uc.Size(6, rows));
+  names.forEach((name, index) => {
+    page.add(uc.createUiText(name, (index % columns) * 2, Math.floor(index / columns), uc.createRemoteSendCmd(`${REPORTED_INPUT_COMMAND_PREFIX}${encodeURIComponent(name)}`), new uc.Size(2, 1)));
+  });
+  return page;
 }

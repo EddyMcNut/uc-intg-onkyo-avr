@@ -8,6 +8,7 @@ import { ensureEiscpConnected, delay, toHex } from "./utils.js";
 import { ZONE_VOLUME_PREFIX, ZONE_VOLUME_UP_DOWN } from "./zoneMappings.js";
 import { SIMPLE_COMMANDS_MAP, ALL_INPUT_SELECTOR_NAMES } from "./simpleCommands.js";
 import { MAX_LENGTHS, PATTERNS } from "./configConstants.js";
+import { REPORTED_INPUT_COMMAND_PREFIX } from "./remoteEntity.js";
 import { REMOTE_SUFFIX } from "./sensorSuffixes.js";
 import log from "./loggers.js";
 import { EiscpDriver } from "./eiscp.js";
@@ -144,6 +145,15 @@ export class remoteEntityCommandHandler {
   ): Promise<uc.StatusCodes> {
     const zone = cfg.zone;
     const zonePrefix = (cmd: string): string => this.zonePrefixed(zone, cmd);
+
+    if (cmdId.startsWith(REPORTED_INPUT_COMMAND_PREFIX)) {
+      try {
+        const source = decodeURIComponent(cmdId.substring(REPORTED_INPUT_COMMAND_PREFIX.length));
+        return this.selectSource(eiscp, zone, zonePrefix, { source });
+      } catch {
+        return uc.StatusCodes.BadRequest;
+      }
+    }
 
     switch (cmdId) {
       case uc.MediaPlayerCommands.On:
