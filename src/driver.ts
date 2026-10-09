@@ -72,6 +72,7 @@ export default class OnkyoDriver {
   private inputSelectorHandler: SelectEntityHandler;
   private tunerPresetsHandler: SelectEntityHandler;
   private setupAvrInfoTimer: ReturnType<typeof setTimeout> | null = null;
+  private setupAvrInfoSecondRetryTimer: ReturnType<typeof setTimeout> | null = null;
   private diracHandler: SelectEntityHandler;
   private remoteEntityCommandHandler: remoteEntityCommandHandler;
   private subscriptionHandler: SubscriptionHandler;
@@ -417,9 +418,20 @@ export default class OnkyoDriver {
     if (this.setupAvrInfoTimer) {
       clearTimeout(this.setupAvrInfoTimer);
     }
+    if (this.setupAvrInfoSecondRetryTimer) {
+      clearTimeout(this.setupAvrInfoSecondRetryTimer);
+    }
     this.setupAvrInfoTimer = setTimeout(() => {
       this.setupAvrInfoTimer = null;
       void this.triggerAvrInfoQuery();
+
+      // Some AVRs answer the first NRI request with an incomplete preset snapshot while their
+      // tuner database is still settling. Give them one more chance without requiring a remote
+      // reboot; later complete replies replace the transient list normally.
+      this.setupAvrInfoSecondRetryTimer = setTimeout(() => {
+        this.setupAvrInfoSecondRetryTimer = null;
+        void this.triggerAvrInfoQuery();
+      }, 20_000);
     }, 10_000);
   }
 
@@ -498,6 +510,11 @@ export default class OnkyoDriver {
             log.debug("%s [%s] Input source list 'auto' resolved: %s", integrationName, zoneEntry, inputResolution.reason);
           }
         }
+
+        // Push the AVR spelling directly to already-instantiated entities. Re-registering the
+        // available definitions is needed for entities not instantiated yet, but an existing
+        // remote entity may otherwise keep the old built-in alias list.
+        this.updateInputSourceOptions(avrConfig);
       }
 
       if (avrConfig.createTunerPresets !== false && !presetsCollected) {
@@ -544,6 +561,18 @@ export default class OnkyoDriver {
       log.debug("%s [%s] Updating Tuner Presets select with %d station(s)", integrationName, avrEntry, options.length);
     }
     this.driver.updateEntityAttributes(`${avrEntry}_tuner_presets`, { [SelectAttributes.Options]: options });
+  }
+
+  /** Push the current AVR-reported names to both entities that expose source options. */
+  private updateInputSourceOptions(avrConfig: AvrConfig): void {
+    if (typeof this.driver.updateEntityAttributes !== "function") {
+      return;
+    }
+
+    const avrEntry = buildEntityId(avrConfig.model, avrConfig.ip, avrConfig.zone);
+    const options = this.entityRegistrar.getInputSelectorOptions(avrEntry);
+    this.driver.updateEntityAttributes(`${avrEntry}_input_selector`, { [SelectAttributes.Options]: options });
+    this.driver.updateEntityAttributes(avrEntry, { [uc.MediaPlayerAttributes.SourceList]: options });
   }
 
   /** Replace the available definition so managers that ignore updates to uninstantiated entities refresh it. */
@@ -687,6 +716,11 @@ export default class OnkyoDriver {
 
     // Query AVR info only after all configured entities have been registered.
     await this.triggerAvrInfoQuery();
+    if (hasInstances) {
+      // The first NRI query can race the AVR's initial TCP/state setup after an integration update.
+      // Retry once after the connection has settled, as the setup-save path already does.
+      this.schedulePostSetupAvrInfoQuery();
+    }
   }
 
   private async setupEventHandlers() {
@@ -730,6 +764,15 @@ export default class OnkyoDriver {
 
   async init() {
     log.info("%s Initializing...", integrationName);
+
+    // The integration can be upgraded while the remote is already connected. In that case the
+    // Integration API may not emit a new Connect event, leaving NRI-only data (reported input
+    // names and tuner presets) uncollected until the user reboots the remote. Run the normal
+    // idempotent connection flow during initialization as well; a later Connect event will only
+    // refresh the existing connection.
+    if (this.config.avrs && this.config.avrs.length > 0) {
+      await this.handleConnect();
+    }
   }
 }
 

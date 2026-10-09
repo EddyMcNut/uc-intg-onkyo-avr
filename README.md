@@ -7,9 +7,9 @@ Custom integration for Unfolded Circle remotes to control your Onkyo / Pioneer /
 [![Discord](https://img.shields.io/badge/Discord-Join%20Chat-5865F2?logo=discord&logoColor=white)](https://discord.gg/zGVYf58)
 [![Unfolded Community](https://img.shields.io/badge/Unfolded-Community-orange?logo=discourse&logoColor=white)](https://unfolded.community/)
 
-## ⚠️ Disclaimer ⚠️
+## Disclaimer
 
-You use this integration at your own risk!
+You use this integration at your own risk.
 
 ## Prerequisites
 

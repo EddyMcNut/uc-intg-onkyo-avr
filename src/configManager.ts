@@ -130,12 +130,20 @@ export class ConfigManager {
 
         // Ensure all AVRs have defaults applied
         if (this.config.avrs) {
+          const configBeforeDefaults = JSON.stringify(this.config.avrs);
           this.config.avrs = this.config.avrs.map((avr) =>
             this.applyDefaults({
               ...avr,
               zone: this.validateZone(avr.zone)
             })
           );
+          // A config can already carry the current version while still having been written by an
+          // older build that did not know the newer per-AVR fields. Persist the normalized shape,
+          // rather than relying only on configVersion, so a setup save is not required to activate
+          // the current runtime defaults.
+          if (JSON.stringify(this.config.avrs) !== configBeforeDefaults) {
+            shouldPersistMigration = true;
+          }
         }
 
         // Persist the normalized settings once so installations upgraded without opening setup
