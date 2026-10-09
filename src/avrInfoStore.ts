@@ -93,8 +93,6 @@ export type AvrInfo = {
   selectors: AvrSelector[];
   controls: AvrControl[];
   tunerBands: AvrTunerBand[];
-  /** Unix ms of the last successful parse, or undefined when nothing was collected yet. */
-  collectedAt?: number;
 };
 
 // Match one self-closing element and capture its attributes, e.g. `<preset id="01" band="2" />`.
@@ -168,8 +166,7 @@ export function parseAvrInfo(xml: string): AvrInfo | null {
     zones: [],
     selectors: [],
     controls: [],
-    tunerBands: [],
-    collectedAt: Date.now()
+    tunerBands: []
   };
 
   let currentSection: "device" | "preset" | "netservice" | "zone" | "selector" | "control" | "tuner" | null = null;
@@ -290,21 +287,6 @@ function textElement(xml: string, tagName: string): string | undefined {
 }
 
 const avrInfoByPhysicalAvr = new Map<string, AvrInfo>();
-
-/**
- * The NRI response is roughly 9 KB, so it is re-collected at most this often.
- * Preset edits on the AVR are picked up within this window without flooding the socket.
- */
-export const AVR_INFO_TTL = 10 * 60 * 1000;
-
-/** True when no receiver info was collected yet, or the cached snapshot is older than AVR_INFO_TTL. */
-export function isAvrInfoStale(entityId: string): boolean {
-  const info = getAvrInfo(entityId);
-  if (!info?.collectedAt) {
-    return true;
-  }
-  return Date.now() - info.collectedAt > AVR_INFO_TTL;
-}
 
 export function getAvrInfo(entityId: string): AvrInfo | null {
   const physicalAvrId = physicalAvrIdFromEntityId(entityId);

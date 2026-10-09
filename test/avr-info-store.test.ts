@@ -246,22 +246,4 @@ describe("avrInfoStore", () => {
       expect(store.listDabPresets(validEntityId)).toEqual([]);
     });
   });
-
-  describe("isAvrInfoStale", () => {
-    it("is true when nothing was collected yet", () => {
-      expect(store.isAvrInfoStale(validEntityId)).toBe(true);
-    });
-
-    it("is false right after collecting", () => {
-      store.setAvrInfo(validEntityId, store.parseAvrInfo(realResponseXml));
-      expect(store.isAvrInfoStale(validEntityId)).toBe(false);
-    });
-
-    it("is true again once the snapshot exceeds the TTL", () => {
-      const info = store.parseAvrInfo(realResponseXml);
-      info.collectedAt = Date.now() - store.AVR_INFO_TTL - 1000;
-      store.setAvrInfo(validEntityId, info);
-      expect(store.isAvrInfoStale(validEntityId)).toBe(true);
-    });
-  });
 });

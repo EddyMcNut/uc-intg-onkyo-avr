@@ -430,6 +430,23 @@ describe("ConfigManager static methods", () => {
       expect(result.avrs[0].createTunerPresets).toBe(true);
     });
 
+    it("persists missing defaults even when the config version is already current", () => {
+      mockExistsSync.mockReturnValue(true);
+      mockReadFileSync.mockReturnValue(
+        JSON.stringify({
+          configVersion: "0.9.6",
+          avrs: [{ model: "TX-RZ50", ip: "1.2.3.4", port: 60128, zone: "main" }]
+        })
+      );
+
+      ConfigManager.load();
+
+      expect(mockWriteFileSync).toHaveBeenCalledTimes(1);
+      const written = JSON.parse(mockWriteFileSync.mock.calls[0][1]);
+      expect(written.avrs[0].useAvrReportedInputs).toBe(true);
+      expect(written.avrs[0].createTunerPresets).toBe(true);
+    });
+
     it("removes legacy learning/learningEnabled keys and persists cleaned config", () => {
       mockExistsSync.mockReturnValue(true);
       mockReadFileSync.mockReturnValue(

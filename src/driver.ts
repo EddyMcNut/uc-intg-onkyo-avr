@@ -687,6 +687,11 @@ export default class OnkyoDriver {
 
     // Query AVR info only after all configured entities have been registered.
     await this.triggerAvrInfoQuery();
+    if (hasInstances) {
+      // The first NRI query can race the AVR's initial TCP/state setup after an integration update.
+      // Retry once after the connection has settled, as the setup-save path already does.
+      this.schedulePostSetupAvrInfoQuery();
+    }
   }
 
   private async setupEventHandlers() {
