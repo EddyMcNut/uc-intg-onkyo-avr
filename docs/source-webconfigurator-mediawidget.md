@@ -2,11 +2,12 @@
 
 - as from v0.9.0 and higher, the integration collects a list of Input sources which are then available as dropdown in `Input source`. Note that `Input source` still allows for text input
 - since v0.8.1 you could already configure [Select Input Selector](./select-input-selector.md)
+- since v0.9.7 you can configure the integration to use the exact input source names used by your AVR
 - the Unfolded Circle MediaWidget allows for MediaBrowsing and Source select
 
 ### Example behaviour
 
-The above items are related to each other, here are some examples to explain the behavior.
+The above items are related to each other, here are some examples to explain the behavior in case you have set `Input source names` to `Use integration names` during the setup of this integration.
 
 1. Select Input Selector is set to `all`
 
