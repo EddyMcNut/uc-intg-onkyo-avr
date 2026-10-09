@@ -921,5 +921,20 @@ describe("OnkyoDriver", () => {
 
       expect(mockLog.info).toHaveBeenCalledWith(expect.stringContaining("Initializing"), expect.any(String));
     });
+
+    it("connects persisted AVRs during initialization", async () => {
+      const configModule = await import("../src/configManager.js");
+      (configModule.ConfigManager.load as any).mockReturnValue({
+        avrs: [{ model: "TX-RZ50", ip: "1.2.3.4", zone: "main" }],
+        logLevel: "info"
+      });
+
+      const driver = await createDriver();
+      mockConnectCoordinator.connect.mockClear();
+
+      await driver.init();
+
+      expect(mockConnectCoordinator.connect).toHaveBeenCalledTimes(1);
+    });
   });
 });

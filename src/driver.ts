@@ -730,6 +730,15 @@ export default class OnkyoDriver {
 
   async init() {
     log.info("%s Initializing...", integrationName);
+
+    // The integration can be upgraded while the remote is already connected. In that case the
+    // Integration API may not emit a new Connect event, leaving NRI-only data (reported input
+    // names and tuner presets) uncollected until the user reboots the remote. Run the normal
+    // idempotent connection flow during initialization as well; a later Connect event will only
+    // refresh the existing connection.
+    if (this.config.avrs && this.config.avrs.length > 0) {
+      await this.handleConnect();
+    }
   }
 }
 
