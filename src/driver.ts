@@ -498,6 +498,11 @@ export default class OnkyoDriver {
             log.debug("%s [%s] Input source list 'auto' resolved: %s", integrationName, zoneEntry, inputResolution.reason);
           }
         }
+
+        // Push the AVR spelling directly to already-instantiated entities. Re-registering the
+        // available definitions is needed for entities not instantiated yet, but an existing
+        // remote entity may otherwise keep the old built-in alias list.
+        this.updateInputSourceOptions(avrConfig);
       }
 
       if (avrConfig.createTunerPresets !== false && !presetsCollected) {
@@ -544,6 +549,18 @@ export default class OnkyoDriver {
       log.debug("%s [%s] Updating Tuner Presets select with %d station(s)", integrationName, avrEntry, options.length);
     }
     this.driver.updateEntityAttributes(`${avrEntry}_tuner_presets`, { [SelectAttributes.Options]: options });
+  }
+
+  /** Push the current AVR-reported names to both entities that expose source options. */
+  private updateInputSourceOptions(avrConfig: AvrConfig): void {
+    if (typeof this.driver.updateEntityAttributes !== "function") {
+      return;
+    }
+
+    const avrEntry = buildEntityId(avrConfig.model, avrConfig.ip, avrConfig.zone);
+    const options = this.entityRegistrar.getInputSelectorOptions(avrEntry);
+    this.driver.updateEntityAttributes(`${avrEntry}_input_selector`, { [SelectAttributes.Options]: options });
+    this.driver.updateEntityAttributes(avrEntry, { [uc.MediaPlayerAttributes.SourceList]: options });
   }
 
   /** Replace the available definition so managers that ignore updates to uninstantiated entities refresh it. */

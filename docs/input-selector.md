@@ -17,6 +17,7 @@ As from v0.7.3 you can select the 'sub-sources'of `NET` directly, let's say you 
 ![](/screenshots/net-subsource-delay.png)
 
 For the following sources, the integration will first send the `input-selector net` command automatically _before_ sending the second command for switching to the sub-source:
+
 - TuneIn
 - Spotify
 - Deezer
