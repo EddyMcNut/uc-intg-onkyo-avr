@@ -72,6 +72,7 @@ export default class OnkyoDriver {
   private inputSelectorHandler: SelectEntityHandler;
   private tunerPresetsHandler: SelectEntityHandler;
   private setupAvrInfoTimer: ReturnType<typeof setTimeout> | null = null;
+  private setupAvrInfoSecondRetryTimer: ReturnType<typeof setTimeout> | null = null;
   private diracHandler: SelectEntityHandler;
   private remoteEntityCommandHandler: remoteEntityCommandHandler;
   private subscriptionHandler: SubscriptionHandler;
@@ -417,9 +418,20 @@ export default class OnkyoDriver {
     if (this.setupAvrInfoTimer) {
       clearTimeout(this.setupAvrInfoTimer);
     }
+    if (this.setupAvrInfoSecondRetryTimer) {
+      clearTimeout(this.setupAvrInfoSecondRetryTimer);
+    }
     this.setupAvrInfoTimer = setTimeout(() => {
       this.setupAvrInfoTimer = null;
       void this.triggerAvrInfoQuery();
+
+      // Some AVRs answer the first NRI request with an incomplete preset snapshot while their
+      // tuner database is still settling. Give them one more chance without requiring a remote
+      // reboot; later complete replies replace the transient list normally.
+      this.setupAvrInfoSecondRetryTimer = setTimeout(() => {
+        this.setupAvrInfoSecondRetryTimer = null;
+        void this.triggerAvrInfoQuery();
+      }, 20_000);
     }, 10_000);
   }
 
