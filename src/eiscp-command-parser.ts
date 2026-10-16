@@ -242,23 +242,23 @@ export class IscpCommandParser {
     const inputFormat = this.getAvPart(parts, 1);
     const inputRate = this.getAvPart(parts, 2);
     const inputChannels = this.getAvPart(parts, 3);
-    const outputFormat = this.getAvPart(parts, 4);
+    // IFA fields: input, format, rate, input channels, listening mode, output channels.
+    const listeningMode = this.getAvPart(parts, 4);
     const outputChannels = this.getAvPart(parts, 5);
 
     const inputRateChannels = inputFormat === "" ? inputSource : this.joinFiltered([inputRate, inputChannels], " ");
     const audioInputValue = this.joinFiltered([inputFormat, inputRateChannels]);
-    const audioOutputValue = this.joinFiltered([outputFormat, outputChannels]);
 
     result.command = "IFA";
     result.argument = {
       inputSource,
       inputFormat,
+      listeningMode,
       inputRate,
       inputChannels,
-      outputFormat,
       outputChannels,
       audioInputValue,
-      audioOutputValue
+      audioOutputValue: outputChannels
     };
     return result;
   }

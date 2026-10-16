@@ -221,15 +221,16 @@ it("IscpCommandParser parses IFA payload into normalized audio fields", async ()
   const h = makeParserHarness({ source: "net", subSource: "spotify" });
   const parser = new IscpCommandParser(h.getEntityId, h.stateReader, h.deezerStoreApi, h.tidalStoreApi, h.tuneInStoreApi);
 
-  const result = parser.parse("IFA", " HDMI1 ,PCM,48kHz,2ch,PCM,2ch");
+  const result = parser.parse("IFA", " HDMI1 ,PCM,48kHz,2ch,AllCh Stereo,5.1.4ch");
   expect(result?.command).toBe("IFA");
   const audio = result?.argument as Record<string, string>;
   expect(audio.inputSource).toBe("HDMI1");
   expect(audio.inputFormat).toBe("PCM");
+  expect(audio.listeningMode).toBe("AllCh Stereo");
   expect(audio.audioInputValue).toBe("PCM | 48kHz 2ch");
-  expect(audio.audioOutputValue).toBe("PCM | 2ch");
+  expect(audio.audioOutputValue).toBe("5.1.4ch");
 
-  const noFormat = parser.parse("IFA", "NET,,, ,PCM,2ch");
+  const noFormat = parser.parse("IFA", "NET,,, ,AllCh Stereo,2ch");
   const noFormatAudio = noFormat?.argument as Record<string, string>;
   expect(noFormatAudio.audioInputValue).toBe("NET");
 });
