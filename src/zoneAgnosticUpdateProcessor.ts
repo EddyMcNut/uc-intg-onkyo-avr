@@ -162,6 +162,7 @@ export class ZoneAgnosticUpdateProcessor {
   ): Promise<void> {
     const audioInputValue = argument?.audioInputValue ?? "";
     const audioOutputValue = argument?.audioOutputValue ?? "";
+    const listeningMode = argument?.listeningMode ?? "";
     const source = this.state.getSource(sourceEntityId);
     const affectedZones = this.state.getEntitiesBySource(source);
     const targetZones = affectedZones.length > 0 ? affectedZones : [sourceEntityId];
@@ -182,6 +183,12 @@ export class ZoneAgnosticUpdateProcessor {
         this.driver.updateEntityAttributes(audioOutputSensorId, {
           [uc.SensorAttributes.State]: uc.SensorStates.On,
           [uc.SensorAttributes.Value]: audioOutputValue
+        });
+      }
+
+      if (listeningMode) {
+        this.driver.updateEntityAttributes(`${zoneEntityId}_listening_mode`, {
+          [uc.SelectAttributes.CurrentOption]: listeningMode
         });
       }
 
