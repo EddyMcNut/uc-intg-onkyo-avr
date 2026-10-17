@@ -20,7 +20,7 @@ describe("ManualConfigParser", () => {
       tuneinPresetPosition: 3,
       entityNameStyle: "short",
       tuneinMenuStyle: "full",
-      listeningModeOptions: "stereo; straight-decode",
+      listeningModePreferences: { "00": "stereo", "40": "straight-decode" },
       logLevel: "debug"
     });
     expect(result.modelName).toBe("TX-RZ50");
@@ -36,7 +36,7 @@ describe("ManualConfigParser", () => {
     expect(result.netMenuDelayValue).toBe(300);
     expect(result.tuneinPresetPositionValue).toBe(3);
     expect(result.entityNameStyleValue).toBe("short");
-    expect(result.listeningModeOptions).toBe("stereo; straight-decode");
+    expect(result.listeningModePreferences).toEqual({ "00": "stereo", "40": "straight-decode" });
     expect(result.logLevelValue).toBe("debug");
   });
 
@@ -60,7 +60,7 @@ describe("ManualConfigParser", () => {
     expect(result.netMenuDelayValue).toBe(500);
     expect(result.tuneinPresetPositionValue).toBe(1);
     expect(result.entityNameStyleValue).toBe("short");
-    expect(result.listeningModeOptions).toBe("");
+    expect(result.listeningModePreferences).toEqual({});
     expect(result.logLevelValue).toBe("warn");
   });
 
@@ -100,8 +100,8 @@ describe("ManualConfigParser", () => {
     const mod = await import("../src/manualConfigParser.js");
     const { ManualConfigParser } = mod as { ManualConfigParser: new () => any };
     const parser = new ManualConfigParser();
-    const result = parser.parse({ useAvrReportedInputs: true, inputSelectorOptions: "cd; dvd" });
-    expect(result.inputSelectorOptions).toBe("all");
+    const result = parser.parse({ useAvrReportedInputs: true });
+    expect(result.useAvrReportedInputsValue).toBe(true);
   });
 
   it("validates tuneinPresetPosition (1-10 range)", async () => {

@@ -125,17 +125,10 @@ describe("ConfigManager static methods", () => {
       expect(result.normalized!.useAvrReportedInputs).toBe(true);
     });
 
-    it("forces all input options when AVR-reported names are enabled", () => {
-      const result = ConfigManager.validateAvrPayload({
-        model: "TX-RZ50",
-        ip: "1.2.3.4",
-        port: 60128,
-        useAvrReportedInputs: true,
-        inputSelectorOptions: ["cd", "dvd"]
-      });
-
+    it("keeps AVR-reported input mode enabled when requested", () => {
+      const result = ConfigManager.validateAvrPayload({ model: "TX-RZ50", ip: "1.2.3.4", port: 60128, useAvrReportedInputs: true });
       expect(result.errors).toEqual([]);
-      expect(result.normalized!.inputSelectorOptions).toBe("all");
+      expect(result.normalized!.useAvrReportedInputs).toBe(true);
     });
 
     it("defaults an absent volumeScale to auto", () => {
@@ -168,9 +161,15 @@ describe("ConfigManager static methods", () => {
       expect(result.errors).toContain('tuneinMenuStyle must be "mypresets" or "full"');
     });
 
-    it("rejects invalid listeningModeOptions type", () => {
-      const result = ConfigManager.validateAvrPayload({ model: "TX-RZ50", ip: "1.2.3.4", port: 60128, listeningModeOptions: 42 });
-      expect(result.errors).toContain("listeningModeOptions must be an array of strings or a semicolon-separated string");
+    it("normalizes persisted listening modes", () => {
+      const result = ConfigManager.validateAvrPayload({
+        model: "TX-RZ50",
+        ip: "1.2.3.4",
+        port: 60128,
+        listeningModes: { "00": { name: "stereo", setting: "stereo" } }
+      });
+      expect(result.errors).toEqual([]);
+      expect(result.normalized!.listeningModes["00"]).toEqual({ name: "stereo", setting: "stereo" });
     });
 
     it("accepts valid input and returns normalized config", () => {
@@ -305,19 +304,7 @@ describe("ConfigManager static methods", () => {
       expect(result.errors).toContain("tuneinPresetPosition must be an integer between 1 and 10");
     });
 
-    it("rejects invalid input selector option", () => {
-      const result = ConfigManager.validateAvrPayload({ model: "TX-RZ50", ip: "1.2.3.4", port: 60128, inputSelectorOptions: [""] });
-      expect(result.errors.length).toBe(0);
-      expect(result.normalized.inputSelectorOptions).toEqual("all");
-    });
-
-    it("handles listeningModeOptions with null sentinel", () => {
-      const result = ConfigManager.validateAvrPayload({ model: "TX-RZ50", ip: "1.2.3.4", port: 60128, listeningModeOptions: null });
-      expect(result.errors.length).toBe(0);
-      expect(result.normalized.listeningModeOptions).toBeNull();
-    });
-
-    it("normalizes string fields correctly", () => {
+    it("normalizes numeric string fields correctly", () => {
       const result = ConfigManager.validateAvrPayload({
         model: "TX-RZ50",
         ip: "1.2.3.4",
@@ -326,14 +313,14 @@ describe("ConfigManager static methods", () => {
         netMenuDelay: "5",
         tuneinPresetPosition: "3",
         useAvrReportedInputs: false,
-        inputSelectorOptions: ["opt1", "opt2"]
+        listeningModes: { "00": { name: "stereo", setting: "stereo" } }
       });
       expect(result.errors.length).toBe(0);
       expect(result.normalized.port).toBe(60128);
       expect(result.normalized.volumeScale).toBe(80);
       expect(result.normalized.netMenuDelay).toBe(5);
       expect(result.normalized.tuneinPresetPosition).toBe(3);
-      expect(result.normalized.inputSelectorOptions).toEqual(["opt1", "opt2"]);
+      expect(result.normalized.listeningModes["00"].setting).toBe("stereo");
     });
 
     it("normalizes volumeDisplay, entityNameStyle, tuneinMenuStyle correctly", () => {
@@ -368,28 +355,6 @@ describe("ConfigManager static methods", () => {
       expect(result.normalized.avrs).toHaveLength(2);
       expect(result.normalized.logLevel).toBe("error");
     });
-
-    it("rejects selector option with invalid characters", () => {
-      const result = ConfigManager.validateAvrPayload({
-        model: "TX-RZ50",
-        ip: "1.2.3.4",
-        port: 60128,
-        listeningModeOptions: ["invalid!!"]
-      });
-      expect(result.errors.length).toBeGreaterThan(0);
-      expect(result.errors[0]).toMatch(/invalid characters/);
-    });
-
-    it("rejects selector option too long", () => {
-      const result = ConfigManager.validateAvrPayload({
-        model: "TX-RZ50",
-        ip: "1.2.3.4",
-        port: 60128,
-        listeningModeOptions: ["a".repeat(251)]
-      });
-      expect(result.errors.length).toBeGreaterThan(0);
-      expect(result.errors[0]).toMatch(/too long/);
-    });
   });
 
   describe("load() with mocked fs", () => {
@@ -406,7 +371,6 @@ describe("ConfigManager static methods", () => {
       const result = ConfigManager.load();
       expect(result.avrs).toHaveLength(1);
       expect(result.avrs[0].model).toBe("TX-RZ50");
-      expect(result.configVersion).toBe("0.9.6");
       expect(result.avrs[0].createTunerPresets).toBe(true);
       expect(result.avrs[0].createRemoteEntity).toBe(true);
       expect(result.avrs[0].createDiracSelectEntity).toBe(true);
@@ -424,7 +388,6 @@ describe("ConfigManager static methods", () => {
 
       expect(mockWriteFileSync).toHaveBeenCalledTimes(1);
       const written = JSON.parse(mockWriteFileSync.mock.calls[0][1]);
-      expect(written.configVersion).toBe("0.9.6");
       expect(written.avrs[0].createTunerPresets).toBe(true);
       expect(written.avrs[0].netMenuDelay).toBe(500);
       expect(result.avrs[0].createTunerPresets).toBe(true);

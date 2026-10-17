@@ -126,6 +126,6 @@ describe("inputSourceResolver", () => {
     ]);
     const config = { ...AVR_CONFIG, inputSelectorOptions: ["bd", "tv", "cd"] };
 
-    expect(getEffectiveInputSourceOptions(config, "TX-RZ50 192.168.2.103", ["bd", "tv", "cd"])).toEqual(["Blu-ray", "Television", "cd"]);
+    expect(getEffectiveInputSourceOptions(config, "TX-RZ50 192.168.2.103", ["bd", "tv", "cd"])).toEqual(["Blu-ray", "Television"]);
   });
 });
