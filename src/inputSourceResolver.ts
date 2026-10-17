@@ -23,25 +23,12 @@ export function resolveInputSourceId(physicalAvrId: string, option: string): str
 
 /** Build the options shown by the input selector for one configured AVR zone. */
 export function getEffectiveInputSourceOptions(avrConfig: AvrConfig, physicalAvrId: string, builtInOptions: string[]): string[] {
-  const configured = avrConfig.inputSelectorOptions;
   if (!avrConfig.useAvrReportedInputs) {
-    return configured === null ? [] : Array.isArray(configured) ? configured.map((option) => option.trim()) : builtInOptions;
+    return builtInOptions;
   }
 
   const reported = getAvrSourcesByPhysicalId(physicalAvrId);
-  if (configured === null) {
-    return [];
-  }
-  if (configured === undefined || configured === "all") {
-    return reported.length > 0 ? reported.map((input) => input.name) : builtInOptions;
-  }
-
-  // The configured aliases remain the allowlist. AVR names replace matching aliases, while
-  // aliases unknown to this AVR remain selectable through the existing hardcoded SLI mapping.
-  return configured.map((option) => {
-    const id = getInputSourceId(option);
-    return reported.find((input) => input.id === id || input.name.toLowerCase() === option.trim().toLowerCase())?.name ?? option.trim();
-  });
+  return reported.length > 0 ? reported.map((input) => input.name) : builtInOptions;
 }
 
 /** Resolve the AVR's input list when AVR-reported names are enabled. */

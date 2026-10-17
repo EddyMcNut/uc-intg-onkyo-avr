@@ -18,11 +18,12 @@ import {
   LogLevel,
   ALL_OPTIONS,
   SelectOptions,
-  VOLUME_SCALE_AUTO
+  VOLUME_SCALE_AUTO,
+  normalizeLearnedListeningModes
 } from "./configConstants.js";
+import { normalizeListeningModes } from "./listeningModePreferences.js";
 
 const integrationName = "configManager:";
-const CURRENT_CONFIG_VERSION = "0.9.6";
 
 // Config directory is configurable at runtime to support integration manager backups/restores
 let CONFIG_DIR = process.env.UC_CONFIG_HOME || process.cwd();
@@ -63,8 +64,7 @@ export class ConfigManager {
       netMenuDelay: avr.netMenuDelay ?? AVR_DEFAULTS.netMenuDelay,
       tuneinPresetPosition: avr.tuneinPresetPosition ?? AVR_DEFAULTS.tuneinPresetPosition,
       tuneinMenuStyle: avr.tuneinMenuStyle ?? AVR_DEFAULTS.tuneinMenuStyle,
-      listeningModeOptions: avr.listeningModeOptions !== undefined ? parseSelectOptions(avr.listeningModeOptions) : undefined,
-      inputSelectorOptions: avr.inputSelectorOptions !== undefined ? parseSelectOptions(avr.inputSelectorOptions) : undefined
+      listeningModes: normalizeListeningModes(avr.listeningModes)
     };
   }
 
@@ -81,7 +81,7 @@ export class ConfigManager {
       if (fs.existsSync(CONFIG_PATH)) {
         const raw = fs.readFileSync(CONFIG_PATH, "utf-8");
         this.config = JSON.parse(raw);
-        let shouldPersistMigration = this.config.configVersion !== CURRENT_CONFIG_VERSION;
+        let shouldPersistMigration = false;
 
         // Remove legacy learning-store keys from the abandoned feature/learn experiment.
         // Not used at runtime; drop them from memory and persist the cleaned config so
@@ -139,7 +139,7 @@ export class ConfigManager {
           );
           // A config can already carry the current version while still having been written by an
           // older build that did not know the newer per-AVR fields. Persist the normalized shape,
-          // rather than relying only on configVersion, so a setup save is not required to activate
+          // rather than relying only on setup, so the normalized shape is persisted immediately.
           // the current runtime defaults.
           if (JSON.stringify(this.config.avrs) !== configBeforeDefaults) {
             shouldPersistMigration = true;
@@ -147,11 +147,10 @@ export class ConfigManager {
         }
 
         // Persist the normalized settings once so installations upgraded without opening setup
-        // receive the same per-AVR configuration as installations that saved the 0.9.6 form.
+        // receive the same per-AVR configuration as installations that saved an older form.
         if (shouldPersistMigration) {
-          this.config.configVersion = CURRENT_CONFIG_VERSION;
           this.save(this.config);
-          log.info("%s Migrated persisted configuration to schema %s", integrationName, CURRENT_CONFIG_VERSION);
+          log.info("%s Persisted normalized configuration", integrationName);
         }
       }
     } catch (err) {
@@ -373,32 +372,6 @@ export class ConfigManager {
       }
     }
 
-    // Validate a select-options field (listeningModeOptions / inputSelectorOptions)
-    const validateSelectOptions = (raw: unknown, fieldName: string): SelectOptions | undefined => {
-      if (raw === undefined) return undefined;
-      const parsed = parseSelectOptions(raw);
-      if (parsed === null) return null; // 'none' sentinel: don't create entity
-      if (parsed === ALL_OPTIONS) return ALL_OPTIONS; // 'all'/empty sentinel: show all known options
-      if (typeof raw !== "string" && !Array.isArray(raw) && raw !== null) {
-        errors.push(`${fieldName} must be an array of strings or a semicolon-separated string`);
-        return undefined;
-      }
-      for (const opt of parsed) {
-        if (opt.length > MAX_LENGTHS.USER_COMMAND) {
-          errors.push(`${fieldName} entry too long (max ${MAX_LENGTHS.USER_COMMAND}): ${opt}`);
-          return undefined;
-        }
-        if (!PATTERNS.SELECT_OPTION.test(opt)) {
-          errors.push(`${fieldName} entry contains invalid characters (only letters, numbers and hyphens allowed): ${opt}`);
-          return undefined;
-        }
-      }
-      return parsed;
-    };
-
-    const lmoParsed = validateSelectOptions(avr.listeningModeOptions, "listeningModeOptions");
-    const isoParsed = validateSelectOptions(avr.inputSelectorOptions, "inputSelectorOptions");
-
     if (errors.length > 0) {
       return { errors };
     }
@@ -424,8 +397,7 @@ export class ConfigManager {
       netMenuDelay: typeof avr.netMenuDelay === "string" ? parseInt(avr.netMenuDelay, 10) : avr.netMenuDelay,
       tuneinPresetPosition: typeof avr.tuneinPresetPosition === "string" ? parseInt(avr.tuneinPresetPosition, 10) : avr.tuneinPresetPosition,
       tuneinMenuStyle: String(avr.tuneinMenuStyle ?? AVR_DEFAULTS.tuneinMenuStyle).toLowerCase() === "full" ? "full" : "mypresets",
-      listeningModeOptions: lmoParsed,
-      inputSelectorOptions: useAvrReportedInputs ? ALL_OPTIONS : isoParsed
+      listeningModes: normalizeListeningModes(avr.listeningModes)
     });
 
     return { errors: [], normalized };
@@ -451,6 +423,8 @@ export class ConfigManager {
 
     const normalizedConfig: OnkyoConfig = {};
 
+    // Learned modes are stored on their corresponding AVR configuration.
+
     // Preserve global logLevel if present
     const validLogLevels = ["debug", "info", "warn", "error"];
     if (cfg.logLevel !== undefined) {
@@ -463,7 +437,7 @@ export class ConfigManager {
     if (Array.isArray(cfg.avrs)) {
       const normalizedAvrs: AvrConfig[] = [];
       for (let i = 0; i < cfg.avrs.length; i++) {
-        const avr = cfg.avrs[i];
+        const avr = { ...cfg.avrs[i] };
         const res = this.validateAvrPayload(avr);
         if (res.errors.length > 0) {
           errors.push(`avrs[${i}]: ${res.errors.join("; ")}`);

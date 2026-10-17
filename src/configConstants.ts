@@ -28,6 +28,40 @@ export const ALL_OPTIONS = "all";
 
 // Parsed value of a select-entity options field: "all" = show all, null = 'none' (don't create entity), else trimmed non-empty items.
 export type SelectOptions = string[] | "all" | null;
+export type ListeningModePreferences = Record<string, string>;
+
+/** One listening mode name/code learned from an AVR response. */
+export type LearnedListeningMode = {
+  code: string;
+  name: string;
+};
+
+/** Normalize persisted learned listening modes and drop malformed entries. */
+export function normalizeLearnedListeningModes(raw: unknown): LearnedListeningMode[] {
+  if (!Array.isArray(raw)) return [];
+  const modes: LearnedListeningMode[] = [];
+  for (const rawMode of raw) {
+    if (!rawMode || typeof rawMode !== "object") continue;
+    const mode = rawMode as Record<string, unknown>;
+    if (Array.isArray(mode.modes)) {
+      for (const nested of normalizeLearnedListeningModes(mode.modes)) {
+        const existingNested = modes.find((item) => item.code === nested.code);
+        if (existingNested) existingNested.name = nested.name;
+        else modes.push(nested);
+      }
+      continue;
+    }
+    const code = String(mode.code ?? "")
+      .trim()
+      .toUpperCase();
+    const name = String(mode.name ?? "").trim();
+    if (!code || !/^[0-9A-F]{2}$/i.test(code) || !name || name.length > MAX_LENGTHS.USER_COMMAND) continue;
+    const existing = modes.find((item) => item.code === code);
+    if (existing) existing.name = name;
+    else modes.push({ code, name });
+  }
+  return modes;
+}
 
 // Parse a select-entity options field: 'all'/empty/undefined = show all, 'none' = don't create entity, else trimmed non-empty items.
 export function parseSelectOptions(raw: unknown): SelectOptions {
@@ -168,16 +202,12 @@ export interface AvrConfig {
   tuneinPresetPosition?: number; // position of "My Presets" in TuneIn menu (1-10, default 1)
   tuneinMenuStyle?: TuneInMenuStyle; // choose TuneIn navigation mode: mypresets or full
   // undefined = all options, non-empty = exact options, null = don't create entity. Empty input is normalized to "all".
-  listeningModeOptions?: SelectOptions;
-  // undefined = all inputs, non-empty = exact options, null = don't create entity. Empty input is normalized to "all".
-  inputSelectorOptions?: SelectOptions;
+  listeningModes?: Record<string, { name: string; setting: string }>;
 }
 
 export interface OnkyoConfig {
   avrs?: AvrConfig[];
   logLevel?: LogLevel;
-  /** Version of the persisted configuration schema, not the driver package version. */
-  configVersion?: string;
   queueThreshold?: number;
   albumArtURL?: string;
   volumeScale?: VolumeScale; // "auto" (resolve from the AVR), 80 or 100
@@ -215,8 +245,7 @@ export interface NormalizedAvrConfig {
   netMenuDelay: number;
   tuneinPresetPosition: number;
   tuneinMenuStyle: TuneInMenuStyle;
-  listeningModeOptions: SelectOptions | undefined;
-  inputSelectorOptions: SelectOptions | undefined;
+  listeningModes: Record<string, { name: string; setting: string }>;
 }
 
 // Coerce and apply defaults to a raw AvrConfig. OCP: adding a field only requires touching this function and AvrConfig/NormalizedAvrConfig.
@@ -284,7 +313,7 @@ export function normalizeAvrConfig(raw: AvrConfig): NormalizedAvrConfig {
     netMenuDelay,
     tuneinPresetPosition,
     tuneinMenuStyle,
-    listeningModeOptions: Array.isArray(raw.listeningModeOptions) ? raw.listeningModeOptions.map((s) => s.trim()) : raw.listeningModeOptions,
-    inputSelectorOptions: raw.inputSelectorOptions
+    listeningModes:
+      raw.listeningModes && typeof raw.listeningModes === "object" && !Array.isArray(raw.listeningModes) ? { ...(raw.listeningModes as Record<string, { name: string; setting: string }>) } : {}
   };
 }

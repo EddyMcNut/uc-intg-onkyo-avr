@@ -65,6 +65,8 @@ export default class SetupHandler {
       if (selected === "restore") return this.handleRestorePayload(setupData.restore_data ?? setupData.backup_data);
       if (selected === "backup") return this.handleBackupPayload(setupData.backup_data);
       if (selected === "delete_config") return this.handleDeleteConfigPayload(parseBoolean(setupData.confirm_delete_config, false), true);
+      if (selected === "configure") return this.requestManualConfiguration();
+      if (selected === "configure_listening_modes") return this.requestListeningModeConfiguration();
     }
 
     if (!setupData || !Object.prototype.hasOwnProperty.call(setupData, "choice")) {
@@ -103,6 +105,31 @@ export default class SetupHandler {
       if (this.manualConfigPage === 2) {
         this.manualConfigPage = 3;
         return this.formBuilder.buildManualConfigPage3(parsed);
+      }
+
+      if (this.manualConfigPage === 3) {
+        this.manualConfigPage = 4;
+        return this.formBuilder.buildManualConfigPage4(parsed);
+      }
+
+      if (this.manualConfigPage === 4) {
+        this.manualConfigPage = 5;
+        return this.formBuilder.buildManualConfigPage5(parsed);
+      }
+
+      if (this.manualConfigPage === 5) {
+        this.manualConfigPage = 6;
+        return this.formBuilder.buildManualConfigPage6(parsed);
+      }
+
+      if (this.manualConfigPage === 6) {
+        this.manualConfigPage = 7;
+        return this.formBuilder.buildManualConfigPage7(parsed);
+      }
+
+      if (this.manualConfigPage === 7) {
+        this.manualConfigPage = 8;
+        return this.formBuilder.buildManualConfigPage8(parsed);
       }
 
       this.manualConfigPage = 0;
@@ -149,6 +176,14 @@ export default class SetupHandler {
     }
 
     if (action === "configure") {
+      return this.requestManualConfiguration();
+    }
+
+    if (action === "configure_listening_modes") {
+      return this.requestListeningModeConfiguration();
+    }
+
+    if (action === "configure") {
       const hasFields = this.hasManualConfigFields(input);
       if (!hasFields) {
         return this.requestManualConfiguration();
@@ -171,8 +206,7 @@ export default class SetupHandler {
       input.port ||
       input.queueThreshold ||
       input.albumArtURL ||
-      input.listeningModeOptions ||
-      input.inputSelectorOptions ||
+      Object.keys(input).some((key) => key.startsWith("lmd_")) ||
       input.createDiracSelectEntity ||
       input.volumeScale ||
       input.useAvrReportedInputs !== undefined ||
@@ -202,20 +236,8 @@ export default class SetupHandler {
         port: currentAvr?.port,
         queueThreshold: currentAvr?.queueThreshold,
         albumArtURL: currentAvr?.albumArtURL,
-        listeningModeOptions: Array.isArray(currentAvr?.listeningModeOptions)
-          ? currentAvr.listeningModeOptions.join("; ")
-          : currentAvr?.listeningModeOptions === "all"
-            ? "all"
-            : currentAvr?.listeningModeOptions === null
-              ? "none"
-              : "",
-        inputSelectorOptions: Array.isArray(currentAvr?.inputSelectorOptions)
-          ? currentAvr.inputSelectorOptions.join("; ")
-          : currentAvr?.inputSelectorOptions === "all"
-            ? "all"
-            : currentAvr?.inputSelectorOptions === null
-              ? "none"
-              : "",
+        listeningModePreferences: Object.fromEntries(Object.entries(currentAvr?.listeningModes ?? {}).map(([code, mode]) => [code, mode.setting])),
+        listeningModeNames: Object.fromEntries(Object.entries(currentAvr?.listeningModes ?? {}).map(([code, mode]) => [code, mode.name])),
         volumeScale: currentAvr?.volumeScale,
         useAvrReportedInputs: currentAvr?.useAvrReportedInputs,
         volumeDisplay: currentAvr?.volumeDisplay,
@@ -241,8 +263,8 @@ export default class SetupHandler {
       port: parsedConfig.portNum,
       queueThreshold: parsedConfig.queueThresholdValue,
       albumArtURL: parsedConfig.albumArtURLValue,
-      listeningModeOptions: parsedConfig.listeningModeOptions,
-      inputSelectorOptions: parsedConfig.inputSelectorOptions,
+      listeningModePreferences: parsedConfig.listeningModePreferences,
+      listeningModeNames: parsedConfig.listeningModeNames,
       volumeScale: parsedConfig.volumeScaleValue,
       useAvrReportedInputs: parsedConfig.useAvrReportedInputsValue,
       volumeDisplay: parsedConfig.volumeDisplayValue,
@@ -260,6 +282,17 @@ export default class SetupHandler {
     };
 
     return this.formBuilder.buildManualConfigForm(parsedConfig);
+  }
+
+  private requestListeningModeConfiguration(): uc.RequestUserInput {
+    // Reuse the normal loader to populate pendingManualConfig with every existing setting, then
+    // start directly at the first listening-mode page so other configuration is preserved.
+    this.requestManualConfiguration();
+    const parsed = this.configParser.parse(this.pendingManualConfig, ConfigManager.get().logLevel ?? "warn");
+    // Page 4 is the first listening-mode page; mark it as already displayed so the next
+    // response advances to page 5 instead of showing page 4 again.
+    this.manualConfigPage = 4;
+    return this.formBuilder.buildManualConfigPage4(parsed);
   }
 
   private async handleBackupPayload(backup_data?: string): Promise<uc.SetupAction> {

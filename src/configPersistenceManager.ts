@@ -1,6 +1,7 @@
 // Focused responsibility: Handle auto-discovery and configuration persistence
 import EiscpDriver from "./eiscp.js";
 import { ConfigManager, type AvrConfig, type AvrZone, AVR_DEFAULTS, parseSelectOptions, ALL_OPTIONS, type OnkyoConfig } from "./configManager.js";
+import { getKnownListeningModes, normalizeListeningModePreferences } from "./listeningModePreferences.js";
 import { setLogLevel } from "./loggers.js";
 import { type ParsedManualConfig } from "./manualConfigParser.js";
 
@@ -31,6 +32,7 @@ export class ConfigPersistenceManager {
   }
 
   async saveDiscoveredAvr(discovered: { model: string; host: string; port: number }, parsedConfig: ParsedManualConfig): Promise<void> {
+    const listeningModePreferences = parsedConfig.listeningModePreferences ?? {};
     const discoveredAvr: Partial<AvrConfig> = {
       model: discovered.model,
       ip: discovered.host,
@@ -46,14 +48,7 @@ export class ConfigPersistenceManager {
     };
 
     // Use parseSelectOptions which handles the 'none' sentinel (-> null = don't create entity) and 'all'/empty (-> "all" = show all)
-    const lmoResult = parseSelectOptions(parsedConfig.listeningModeOptions);
-    if (lmoResult === null || lmoResult === ALL_OPTIONS || (Array.isArray(lmoResult) && lmoResult.length > 0)) {
-      discoveredAvr.listeningModeOptions = lmoResult;
-    }
-    const isoResult = parseSelectOptions(parsedConfig.inputSelectorOptions);
-    if (isoResult === null || isoResult === ALL_OPTIONS || (Array.isArray(isoResult) && isoResult.length > 0)) {
-      discoveredAvr.inputSelectorOptions = isoResult;
-    }
+    discoveredAvr.listeningModes = this.buildListeningModes(listeningModePreferences, parsedConfig.listeningModeNames);
 
     ConfigManager.addAvr(discoveredAvr);
     ConfigManager.save({ logLevel: parsedConfig.logLevelValue });
@@ -62,14 +57,14 @@ export class ConfigPersistenceManager {
   }
 
   async saveManualConfiguration(parsedConfig: ParsedManualConfig): Promise<{ errors: string[]; success: boolean }> {
+    const listeningModePreferences = parsedConfig.listeningModePreferences ?? {};
     const basePayload = {
       model: parsedConfig.modelName,
       ip: parsedConfig.ipVal,
       port: parsedConfig.portNum,
       queueThreshold: parsedConfig.queueThresholdValue,
       albumArtURL: parsedConfig.albumArtURLValue,
-      listeningModeOptions: parsedConfig.listeningModeOptions,
-      inputSelectorOptions: parsedConfig.inputSelectorOptions,
+      listeningModes: this.buildListeningModes(listeningModePreferences, parsedConfig.listeningModeNames, parsedConfig.modelName, parsedConfig.ipVal),
       volumeScale: parsedConfig.volumeScaleValue,
       useAvrReportedInputs: parsedConfig.useAvrReportedInputsValue,
       volumeDisplay: parsedConfig.volumeDisplayValue,
@@ -113,6 +108,23 @@ export class ConfigPersistenceManager {
     setLogLevel(parsedConfig.logLevelValue);
     await this.onConfigSaved();
     return { errors: [], success: true };
+  }
+
+  private buildListeningModes(preferences: Record<string, string>, names: Record<string, string>, model?: string, ip?: string): Record<string, { name: string; setting: string }> {
+    const existing = ConfigManager.get().avrs?.find((avr) => avr.model === model && avr.ip === ip)?.listeningModes ?? {};
+    const rebuilt = Object.fromEntries(
+      getKnownListeningModes().map((mode) => [
+        mode.code,
+        {
+          name: preferences[mode.code] === "learn" ? mode.aliases[0] : (names[mode.code] ?? existing[mode.code]?.name ?? mode.aliases[0]),
+          setting: preferences[mode.code] ?? existing[mode.code]?.setting ?? "learn"
+        }
+      ])
+    );
+    for (const [code, entry] of Object.entries(existing)) {
+      if (!rebuilt[code]) rebuilt[code] = entry;
+    }
+    return rebuilt;
   }
 
   async restoreConfiguration(normalizedConfig: Partial<OnkyoConfig>): Promise<void> {

@@ -9,6 +9,9 @@ import { ConfigManager, buildEntityId, buildPhysicalAvrId } from "./configManage
 import { getAvrSourceCatalog } from "./avrSourceCatalog.js";
 import { getEffectiveInputSourceOptions } from "./inputSourceResolver.js";
 import { getTunerPresetNames } from "./tunerPresetStore.js";
+import { getLearnedListeningModes } from "./learnedListeningModeStore.js";
+import { resolveListeningModes } from "./listeningModePreferences.js";
+import { getKnownListeningModes } from "./listeningModePreferences.js";
 import {
   browseMedia,
   isTidalMainMenuRequest,
@@ -56,7 +59,7 @@ type EntityBrowseHandler = {
 export default class EntityRegistrar {
   private readonly browseHandlers: EntityBrowseHandler[];
 
-  constructor(avrStateApi: AvrStateApi) {
+  constructor(private readonly avrStateApi: AvrStateApi) {
     this.browseHandlers = [
       new TuneInBrowseHandler(avrStateApi),
       createMenuBrowseHandler({
@@ -136,7 +139,7 @@ export default class EntityRegistrar {
     return `${model} ${zoneLabel}`;
   }
 
-  // Return listening mode options. If an AVR-specific `listeningModeOptions` is configured, return it exactly. Otherwise fall back to dynamic filtering by audio format (or return all available modes).
+  // Return listening mode options from per-code preferences, learned AVR values, or static mappings.
   getListeningModeOptions(audioFormat?: string, avrEntry?: string): string[] {
     // If avrEntry provided and config contains user-specified options, return them
     if (avrEntry) {
@@ -144,8 +147,9 @@ export default class EntityRegistrar {
         const cfg = ConfigManager.get();
         if (cfg && Array.isArray(cfg.avrs)) {
           const match = cfg.avrs.find((a) => buildEntityId(a.model, a.ip, a.zone) === avrEntry);
-          if (match && Array.isArray(match.listeningModeOptions) && match.listeningModeOptions.length > 0) {
-            return match.listeningModeOptions.map((s) => s.trim());
+          if (match?.listeningModes) {
+            const learned = getLearnedListeningModes(avrEntry, this.avrStateApi.getSource(avrEntry), audioFormat ?? "");
+            return resolveListeningModes(match.listeningModes, learned);
           }
         }
       } catch {
@@ -153,9 +157,16 @@ export default class EntityRegistrar {
       }
     }
 
-    const lmdMappings = eiscpMappings.value_mappings.LMD;
+    if (avrEntry && audioFormat) {
+      const learned = getLearnedListeningModes(avrEntry, this.avrStateApi.getSource(avrEntry), audioFormat);
+      if (learned.length > 0) {
+        return learned.map((mode) => mode.name).sort((a, b) => a.localeCompare(b));
+      }
+    }
+
+    const lmdMappings = getKnownListeningModes();
     const excludeKeys = ["up", "down", "movie", "music", "game", "query"];
-    const allModes = Object.keys(lmdMappings).filter((key) => !excludeKeys.includes(key));
+    const allModes = lmdMappings.map((mode) => mode.aliases[0]).filter((key) => !excludeKeys.includes(key));
     const compatibleModes = getCompatibleListeningModes(audioFormat);
     if (compatibleModes) {
       return allModes.filter((mode) => compatibleModes.includes(mode)).sort();
@@ -285,7 +296,7 @@ export default class EntityRegistrar {
   //
   // In "auto" mode the inputs the AVR reported are authoritative, in the AVR's own spelling. Until
   // they are collected (or when they never are, because the setting was stored as "manual") the
-  // hardcoded SLI keys are used: a user-configured `inputSelectorOptions` list is returned exactly,
+  // hardcoded SLI keys are used when the AVR has not reported its input list,
   // `null` (disabled) returns empty.
   getInputSelectorOptions(avrEntry?: string): string[] {
     if (avrEntry) {

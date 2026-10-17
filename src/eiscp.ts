@@ -18,6 +18,7 @@ import { getZonePrefix } from "./zoneMappings.js";
 import { WAIT_FOR_CONNECT_TIMEOUT, CONNECTION_TIMEOUT } from "./constants.js";
 import type { AvrStateReader } from "./eiscp-command-parser.js";
 import { findNetServiceByName } from "./avrInfoStore.js";
+import { findLearnedListeningModeCode } from "./learnedListeningModeStore.js";
 
 export interface EiscpConfig {
   host?: string;
@@ -646,6 +647,16 @@ export class EiscpDriver extends EventEmitter {
       }
       log.error("%s Input source alias is not mapped: %s %s", integrationName, command, args);
       value = String(args ?? "");
+    } else if (prefix === "LMD" && typeof args === "string") {
+      const physicalAvrId = buildPhysicalAvrId(this.config.model ?? "", this.config.host ?? "");
+      const learnedCode = findLearnedListeningModeCode(physicalAvrId, args);
+      if (learnedCode) {
+        log.debug("%s Sending learned listening mode %s as LMD%s", integrationName, args, learnedCode);
+        value = learnedCode;
+      } else {
+        log.warn("%s Listening mode is not mapped: %s", integrationName, args);
+        value = String(args);
+      }
     } else if (valueMap && Object.prototype.hasOwnProperty.call(valueMap, "intgrRange")) {
       value = (+args!).toString(16).toUpperCase().padStart(2, "0");
     } else {
