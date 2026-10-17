@@ -17,10 +17,12 @@ During setup you can choose where the list of inputs comes from:
 - **`Use integration names`**: the integration uses its built-in input mappings, names an aliases.
 
 Use AVR-reported names:
+
 - AVR-reported names need an AVR that supports the NRI protocol. If the AVR does not report usable inputs, the setting is switched off and the integration mappings are used.
 - The collected list is only kept in memory; only the setting is saved and backed up.
 
 Use integration names:
+
 - You can configure a per‑AVR custom list of input source names during setup so you don't have to deal with a very long list of aliases.
 - During manual setup provide a semicolon-separated list in the **Input selector options** field, for example:
 

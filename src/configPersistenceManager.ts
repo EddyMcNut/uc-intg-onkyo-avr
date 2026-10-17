@@ -1,7 +1,7 @@
 // Focused responsibility: Handle auto-discovery and configuration persistence
 import EiscpDriver from "./eiscp.js";
-import { ConfigManager, type AvrConfig, type AvrZone, AVR_DEFAULTS, parseSelectOptions, ALL_OPTIONS, type OnkyoConfig } from "./configManager.js";
-import { getKnownListeningModes, normalizeListeningModePreferences } from "./listeningModePreferences.js";
+import { ConfigManager, type AvrConfig, type AvrZone, AVR_DEFAULTS, type OnkyoConfig } from "./configManager.js";
+import { getKnownListeningModes } from "./listeningModePreferences.js";
 import { setLogLevel } from "./loggers.js";
 import { type ParsedManualConfig } from "./manualConfigParser.js";
 

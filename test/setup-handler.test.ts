@@ -54,7 +54,7 @@ it("handleRestorePayload: applies valid payload and calls onConfigSaved", async 
   }
 });
 
-it("handleRestorePayload: forces restored input options to all when AVR names are enabled", async () => {
+it("handleRestorePayload: preserves AVR-reported input mode", async () => {
   const tmp = mkTmpDir();
   try {
     const configModule = await import("../src/configManager.js");
@@ -71,13 +71,13 @@ it("handleRestorePayload: forces restored input options to all when AVR names ar
     const setup = new SetupHandlerModule.default(host);
     const raw = JSON.stringify({
       config: {
-        avrs: [{ model: "TX-RZ50", ip: "192.168.2.103", port: 60128, zone: "main", useAvrReportedInputs: true, inputSelectorOptions: ["cd"] }]
+        avrs: [{ model: "TX-RZ50", ip: "192.168.2.103", port: 60128, zone: "main", useAvrReportedInputs: true }]
       }
     });
 
     const res = await (setup as any).handleRestorePayload(raw);
     expect(res).toBeInstanceOf(uc.SetupComplete);
-    expect(configModule.ConfigManager.load().avrs![0].inputSelectorOptions).toBe("all");
+    expect(configModule.ConfigManager.load().avrs![0].useAvrReportedInputs).toBe(true);
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
   }
@@ -316,8 +316,8 @@ it("handleRestorePayload: returns restore form for undefined payload", async () 
   expect(res).toBeInstanceOf(uc.RequestUserInput);
 });
 
-// Ensure listeningModeOptions provided during initial setup + autodiscovery are persisted
-it("handleManualConfiguration: autodiscovery should persist listeningModeOptions when supplied", async () => {
+// Ensure listening mode preferences provided during initial setup are persisted.
+it("handleManualConfiguration: autodiscovery should persist listening modes when supplied", async () => {
   const tmp = mkTmpDir();
   try {
     const configModule = await import("../src/configManager.js");
@@ -347,7 +347,7 @@ it("handleManualConfiguration: autodiscovery should persist listeningModeOptions
     const input = {
       model: "",
       ipAddress: "",
-      listeningModeOptions: "stereo; straight-decode",
+      listeningModePreferences: { "00": "stereo", "40": "straight-decode" },
       entityNameStyle: "short"
     };
 
@@ -356,8 +356,8 @@ it("handleManualConfiguration: autodiscovery should persist listeningModeOptions
     expect(saved).toBe(true);
 
     const reloaded = ConfigManager.load();
-    expect(reloaded.avrs && reloaded.avrs[0].listeningModeOptions).toBeTruthy();
-    expect(reloaded.avrs![0].listeningModeOptions).toEqual(["stereo", "straight-decode"]);
+    expect(reloaded.avrs && reloaded.avrs[0].listeningModes).toBeTruthy();
+    expect(reloaded.avrs![0].listeningModes!["00"].setting).toBe("stereo");
     expect(reloaded.avrs![0].entityNameStyle).toBe("short");
 
     // restore stub
@@ -367,8 +367,8 @@ it("handleManualConfiguration: autodiscovery should persist listeningModeOptions
   }
 });
 
-// Leaving the options fields empty should store the explicit "all" sentinel.
-it("handleManualConfiguration: autodiscovery persists 'all' when options fields are left empty", async () => {
+// Leaving listening-mode preferences empty creates the known catalog in learn mode.
+it("handleManualConfiguration: autodiscovery persists default listening modes", async () => {
   const tmp = mkTmpDir();
   try {
     const configModule = await import("../src/configManager.js");
@@ -391,12 +391,11 @@ it("handleManualConfiguration: autodiscovery persists 'all' when options fields 
 
     const setup = new SetupHandlerModule.default(host);
 
-    const res = await (setup as any).handleManualConfiguration({ model: "", ipAddress: "", listeningModeOptions: "", inputSelectorOptions: "all" });
+    const res = await (setup as any).handleManualConfiguration({ model: "", ipAddress: "" });
     expect(res).toBeInstanceOf(uc.SetupComplete);
 
     const reloaded = ConfigManager.load();
-    expect(reloaded.avrs![0].listeningModeOptions).toEqual("all");
-    expect(reloaded.avrs![0].inputSelectorOptions).toEqual("all");
+    expect(Object.keys(reloaded.avrs![0].listeningModes!)).toContain("00");
 
     // restore stub
     EiscpModule.default.prototype.discover = originalDiscover;

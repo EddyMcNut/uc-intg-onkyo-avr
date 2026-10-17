@@ -7,7 +7,7 @@ function mkTmpDir(prefix = "onkyo-test-") {
   return fs.mkdtempSync(path.join(os.tmpdir(), prefix));
 }
 
-it("ConfigManager validates and normalizes listeningModeOptions (semicolon string)", async () => {
+it("ConfigManager validates and normalizes listening modes", async () => {
   const tmp = mkTmpDir();
   try {
     const cfgModule = await import("../src/configManager.js");
@@ -19,19 +19,24 @@ it("ConfigManager validates and normalizes listeningModeOptions (semicolon strin
       ip: "192.168.2.103",
       port: 60128,
       zone: "main",
-      listeningModeOptions: "stereo; straight-decode; neural-thx; full-mono"
+      listeningModes: {
+        "00": { name: "stereo", setting: "stereo" },
+        "40": { name: "straight-decode", setting: "straight-decode" },
+        "88": { name: "neural-thx", setting: "neural-thx" },
+        "13": { name: "full-mono", setting: "full-mono" }
+      }
     };
 
     const res = ConfigManager.validateAvrPayload(payload);
     expect(res.errors.length === 0).toBe(true);
     expect(res.normalized).toBeTruthy();
-    expect(res.normalized!.listeningModeOptions).toEqual(["stereo", "straight-decode", "neural-thx", "full-mono"]);
+    expect(Object.keys(res.normalized!.listeningModes)).toHaveLength(4);
 
     // Save and reload to ensure persistence
     ConfigManager.save({ avrs: [res.normalized] });
     const loaded = ConfigManager.load();
-    expect(loaded.avrs && loaded.avrs[0].listeningModeOptions).toBeTruthy();
-    expect(loaded.avrs![0].listeningModeOptions).toEqual(["stereo", "straight-decode", "neural-thx", "full-mono"]);
+    expect(loaded.avrs && loaded.avrs[0].listeningModes).toBeTruthy();
+    expect(Object.keys(loaded.avrs![0].listeningModes!)).toHaveLength(4);
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
   }

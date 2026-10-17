@@ -1,6 +1,6 @@
 import * as uc from "@unfoldedcircle/integration-api";
 import { SelectAttributes } from "@unfoldedcircle/integration-api";
-import { OnkyoConfig, AvrConfig, buildEntityId, buildPhysicalAvrId, physicalAvrIdFromEntityId, resolveVolumeScale } from "./configManager.js";
+import { OnkyoConfig, buildEntityId, buildPhysicalAvrId, physicalAvrIdFromEntityId, resolveVolumeScale } from "./configManager.js";
 import { resolveInputSourceId } from "./inputSourceResolver.js";
 import { findTunerPresetByName, findTunerPresetNameBySlot } from "./tunerPresetStore.js";
 import { EiscpDriver } from "./eiscp.js";

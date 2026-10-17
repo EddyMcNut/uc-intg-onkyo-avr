@@ -4,23 +4,7 @@ import log, { setLogLevel } from "./loggers.js";
 
 // Re-export everything from configConstants so existing imports via configManager continue to work.
 export * from "./configConstants.js";
-import {
-  MAX_LENGTHS,
-  PATTERNS,
-  parseSelectOptions,
-  parseBoolean,
-  parseVolumeScale,
-  AvrZone,
-  AvrConfig,
-  OnkyoConfig,
-  AVR_DEFAULTS,
-  EntityNameStyle,
-  LogLevel,
-  ALL_OPTIONS,
-  SelectOptions,
-  VOLUME_SCALE_AUTO,
-  normalizeLearnedListeningModes
-} from "./configConstants.js";
+import { MAX_LENGTHS, PATTERNS, parseBoolean, parseVolumeScale, AvrZone, AvrConfig, OnkyoConfig, AVR_DEFAULTS, EntityNameStyle, LogLevel, VOLUME_SCALE_AUTO } from "./configConstants.js";
 import { normalizeListeningModes } from "./listeningModePreferences.js";
 
 const integrationName = "configManager:";

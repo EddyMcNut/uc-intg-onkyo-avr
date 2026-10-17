@@ -482,8 +482,8 @@ describe("OnkyoDriver", () => {
       const driver = await createDriver();
 
       expect(mockEntityRegistrar.createSensorEntities).not.toHaveBeenCalled();
-      expect(mockEntityRegistrar.createListeningModeSelectEntity).not.toHaveBeenCalled();
-      expect(mockEntityRegistrar.createInputSelectorSelectEntity).not.toHaveBeenCalled();
+      expect(mockEntityRegistrar.createListeningModeSelectEntity).toHaveBeenCalled();
+      expect(mockEntityRegistrar.createInputSelectorSelectEntity).toHaveBeenCalled();
     });
 
     it("registers remote entity when createRemoteEntity is true", async () => {

@@ -22,7 +22,10 @@ it("createAvrSpecificConfig coerces types correctly", async () => {
     createRemoteEntity: "true",
     netMenuDelay: "120",
     tuneinPresetPosition: "3",
-    listeningModeOptions: ["stereo", "straight-decode"]
+    listeningModes: {
+      "00": { name: "stereo", setting: "stereo" },
+      "40": { name: "straight-decode", setting: "straight-decode" }
+    }
   };
 
   const config = drv.createAvrSpecificConfig(avrPayload) as any;
@@ -36,7 +39,10 @@ it("createAvrSpecificConfig coerces types correctly", async () => {
   expect(config.avrs[0].tuneinPresetPosition).toBe(3);
   expect(config.avrs[0].port).toBe(60128);
   expect(config.avrs[0].albumArtURL).toBe("album_art.cgi");
-  expect(config.avrs[0].listeningModeOptions).toEqual(["stereo", "straight-decode"]);
+  expect(config.avrs[0].listeningModes).toEqual({
+    "00": { name: "stereo", setting: "stereo" },
+    "40": { name: "straight-decode", setting: "straight-decode" }
+  });
 });
 
 // Mock eISCP for capturing raw commands

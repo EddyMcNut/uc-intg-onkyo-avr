@@ -21,10 +21,9 @@ export function getKnownListeningModes(): KnownListeningMode[] {
   const byCode = new Map<string, string[]>();
   const values = eiscpCommands.commands.LMD.values as Record<string, { name: string | string[] }>;
   for (const [rawCode, definition] of Object.entries(values)) {
-    const normalizedRawCode = rawCode.toUpperCase();
     if (CONTROL_ALIASES.has(rawCode.toLowerCase()) || rawCode.toUpperCase() === "QSTN") continue;
     const code = rawCode.toUpperCase();
-    const aliases = Array.isArray(definition.name) ? definition.name : [definition.name];
+    const aliases = (Array.isArray(definition.name) ? definition.name : [definition.name]).filter((alias): alias is string => typeof alias === "string" && alias.length > 0);
     const existing = byCode.get(code) ?? [];
     for (const alias of aliases) {
       if (alias && !existing.includes(alias)) existing.push(alias);
