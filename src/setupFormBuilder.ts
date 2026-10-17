@@ -1,6 +1,7 @@
 // Focused responsibility: Generate UI forms for setup flows
 import * as uc from "@unfoldedcircle/integration-api";
 import { ParsedManualConfig } from "./manualConfigParser.js";
+import { DISABLE_LISTENING_MODE, getKnownListeningModes, LEARNED_LISTENING_MODE, LEARN_LISTENING_MODE } from "./listeningModePreferences.js";
 
 export class SetupFormBuilder {
   buildManualConfigForm(values: ParsedManualConfig): uc.RequestUserInput {
@@ -34,16 +35,55 @@ export class SetupFormBuilder {
   }
 
   buildManualConfigPage3(values: ParsedManualConfig): uc.RequestUserInput {
-    const ids = ["createRemoteEntity", "createSensors", "createTunerPresets", "createDiracSelectEntity", "listeningModeOptions", "inputSelectorOptions", "logLevel"];
-    if (values.useAvrReportedInputsValue) {
-      ids.splice(ids.indexOf("inputSelectorOptions"), 1);
-    }
-    return this.buildManualConfigFormPage(values, "Manual configuration (3/3)", ids);
+    const ids = ["createRemoteEntity", "createSensors", "createTunerPresets", "createDiracSelectEntity", "logLevel"];
+    return this.buildManualConfigFormPage(values, "Manual configuration (3/4)", ids);
+  }
+
+  buildManualConfigPage4(values: ParsedManualConfig): uc.RequestUserInput {
+    const modes = getKnownListeningModes();
+    const pageSize = Math.ceil(modes.length / 5);
+    const ids = modes.slice(0, pageSize).map((mode) => `lmd_${mode.code}`);
+    return this.buildManualConfigFormPage(values, "Listening Modes (1/5)", ids);
+  }
+
+  buildManualConfigPage5(values: ParsedManualConfig): uc.RequestUserInput {
+    const modes = getKnownListeningModes();
+    const pageSize = Math.ceil(modes.length / 5);
+    const ids = modes.slice(pageSize, pageSize * 2).map((mode) => `lmd_${mode.code}`);
+    return this.buildManualConfigFormPage(values, "Listening Modes (2/5)", ids);
+  }
+
+  buildManualConfigPage6(values: ParsedManualConfig): uc.RequestUserInput {
+    const modes = getKnownListeningModes();
+    const pageSize = Math.ceil(modes.length / 5);
+    const ids = modes.slice(pageSize * 2, pageSize * 3).map((mode) => `lmd_${mode.code}`);
+    return this.buildManualConfigFormPage(values, "Listening Modes (3/5)", ids);
+  }
+
+  buildManualConfigPage7(values: ParsedManualConfig): uc.RequestUserInput {
+    const modes = getKnownListeningModes();
+    const pageSize = Math.ceil(modes.length / 5);
+    const ids = modes.slice(pageSize * 3, pageSize * 4).map((mode) => `lmd_${mode.code}`);
+    return this.buildManualConfigFormPage(values, "Listening Modes (4/5)", ids);
+  }
+
+  buildManualConfigPage8(values: ParsedManualConfig): uc.RequestUserInput {
+    const modes = getKnownListeningModes();
+    const pageSize = Math.ceil(modes.length / 5);
+    const ids = modes.slice(pageSize * 4).map((mode) => `lmd_${mode.code}`);
+    return this.buildManualConfigFormPage(values, "Listening Modes (5/5)", ids);
   }
 
   private buildManualConfigFormPage(values: ParsedManualConfig, title: string, ids: string[]): uc.RequestUserInput {
     const form = this.buildManualConfigFormAll(values);
     const settings = (form.settings as Array<{ id: string }>).filter((setting) => ids.includes(setting.id));
+    if (title.startsWith("Listening Modes")) {
+      settings.unshift({
+        id: `listeningModesPageInfo_${title.replace(/\W/g, "_")}`,
+        label: { en: title },
+        field: { label: { value: { en: "Choose Learn from AVR, Disable, or an alternate alias for each mode." } } }
+      } as never);
+    }
     return new uc.RequestUserInput(title, settings);
   }
 
@@ -190,18 +230,6 @@ export class SetupFormBuilder {
         }
       },
       {
-        id: "listeningModeOptions",
-        label: { en: "Listening mode options (semicolon-separated, 'all' shows all, 'none' to disable)" },
-        field: { text: { value: values.listeningModeOptions } },
-        description: { en: "Optional — semicolon-separated list (e.g. stereo; straight-decode; neural-thx). Enter 'all' for dynamic options, enter 'none' to hide this entity." }
-      },
-      {
-        id: "inputSelectorOptions",
-        label: { en: "Input selector options (semicolon-separated, 'all' shows all, 'none' to disable)" },
-        field: { text: { value: values.inputSelectorOptions } },
-        description: { en: "Optional — semicolon-separated list (e.g. dvd; bd; net; bluetooth). Enter 'all' to show all inputs, enter 'none' to hide this entity." }
-      },
-      {
         id: "createRemoteEntity",
         label: { en: "Create remote entity?" },
         field: {
@@ -273,7 +301,33 @@ export class SetupFormBuilder {
           }
         },
         description: { en: "Lower levels log more, which costs slightly more CPU. Warn is recommended for normal use." }
-      }
+      },
+      ...getKnownListeningModes().map((mode) => ({
+        id: `lmd_${mode.code}`,
+        label: { en: values.listeningModeNames[mode.code] ?? mode.aliases[0] },
+        field: {
+          dropdown: {
+            value:
+              (values.listeningModePreferences[mode.code] === LEARN_LISTENING_MODE || values.listeningModePreferences[mode.code] === LEARNED_LISTENING_MODE) &&
+              values.listeningModeNames[mode.code] &&
+              values.listeningModeNames[mode.code] !== mode.aliases[0]
+                ? LEARNED_LISTENING_MODE
+                : (values.listeningModePreferences[mode.code] ?? LEARN_LISTENING_MODE),
+            items: [
+              ...(values.listeningModePreferences[mode.code] === LEARNED_LISTENING_MODE ||
+              (values.listeningModePreferences[mode.code] === LEARN_LISTENING_MODE && values.listeningModeNames[mode.code] && values.listeningModeNames[mode.code] !== mode.aliases[0])
+                ? [{ id: LEARNED_LISTENING_MODE, label: { en: "✓ learned from AVR" } }]
+                : []),
+              {
+                id: LEARN_LISTENING_MODE,
+                label: { en: "Learn from AVR (default)" }
+              },
+              { id: DISABLE_LISTENING_MODE, label: { en: "Disable" } },
+              ...mode.aliases.map((alias) => ({ id: alias, label: { en: alias } }))
+            ]
+          }
+        }
+      }))
     ]);
   }
 
@@ -287,6 +341,7 @@ export class SetupFormBuilder {
             value: "configure",
             items: [
               { id: "configure", label: { en: "Configure" } },
+              { id: "configure_listening_modes", label: { en: "Configure listening modes" } },
               { id: "backup", label: { en: "Create configuration backup" } },
               { id: "restore", label: { en: "Restore configuration from backup" } },
               { id: "delete_config", label: { en: "Delete config" } }

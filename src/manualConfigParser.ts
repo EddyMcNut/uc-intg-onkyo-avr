@@ -7,8 +7,8 @@ export interface ManualConfigInput {
   port?: unknown;
   queueThreshold?: unknown;
   albumArtURL?: unknown;
-  listeningModeOptions?: unknown;
-  inputSelectorOptions?: unknown;
+  listeningModePreferences?: unknown;
+  listeningModeNames?: unknown;
   volumeScale?: unknown;
   useAvrReportedInputs?: unknown;
   volumeDisplay?: unknown;
@@ -31,8 +31,8 @@ export interface ParsedManualConfig {
   portNum: number;
   queueThresholdValue: number;
   albumArtURLValue: string;
-  listeningModeOptions: string;
-  inputSelectorOptions: string;
+  listeningModePreferences: Record<string, string>;
+  listeningModeNames: Record<string, string>;
   volumeScaleValue: VolumeScale;
   useAvrReportedInputsValue: boolean;
   volumeDisplayValue: "absolute" | "relative";
@@ -59,8 +59,8 @@ export class ManualConfigParser {
       portNum: this.parsePort(input.port),
       queueThresholdValue: this.parseQueueThreshold(input.queueThreshold),
       albumArtURLValue: this.parseAlbumArtUrl(input.albumArtURL),
-      listeningModeOptions: String(input.listeningModeOptions ?? ""),
-      inputSelectorOptions: useAvrReportedInputsValue ? "all" : String(input.inputSelectorOptions ?? ""),
+      listeningModePreferences: this.parseListeningModePreferences(input),
+      listeningModeNames: this.parseListeningModeNames(input),
       volumeScaleValue: this.parseVolumeScale(input.volumeScale),
       useAvrReportedInputsValue,
       volumeDisplayValue: this.parseVolumeDisplay(input.volumeDisplay),
@@ -76,6 +76,24 @@ export class ManualConfigParser {
       logLevelValue: this.parseLogLevel(input.logLevel, fallbackLogLevel),
       zoneCountValue: this.parseZoneCount(input.zoneCount)
     };
+  }
+
+  private parseListeningModePreferences(input: ManualConfigInput): Record<string, string> {
+    const preferences: Record<string, string> = {};
+    if (input.listeningModePreferences && typeof input.listeningModePreferences === "object" && !Array.isArray(input.listeningModePreferences)) {
+      Object.assign(preferences, input.listeningModePreferences);
+    }
+    for (const [key, value] of Object.entries(input as Record<string, unknown>)) {
+      if (key.startsWith("lmd_") && value !== undefined) {
+        preferences[key.substring(4).toUpperCase()] = String(value);
+      }
+    }
+    return preferences;
+  }
+
+  private parseListeningModeNames(input: ManualConfigInput): Record<string, string> {
+    const names = input.listeningModeNames;
+    return names && typeof names === "object" && !Array.isArray(names) ? { ...(names as Record<string, string>) } : {};
   }
 
   private parsePort(port: unknown): number {

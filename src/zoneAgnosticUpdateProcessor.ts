@@ -24,6 +24,7 @@ export class ZoneAgnosticUpdateProcessor {
   private readonly serviceAdapters: ZoneAgnosticServiceAdapter[];
   private readonly serviceCommandRouter: ZoneAgnosticServiceCommandRouter;
   private readonly frontPanelRouter: ZoneAgnosticFrontPanelRouter;
+  private config: OnkyoConfig;
 
   constructor(
     private readonly driver: uc.IntegrationAPI,
@@ -31,6 +32,7 @@ export class ZoneAgnosticUpdateProcessor {
     private readonly eiscpInstance: EiscpDriver,
     private readonly state: AvrStateApi
   ) {
+    this.config = config;
     this.tuneInPreloader = new TuneInPreloader(eiscpInstance, (entityId) => this.mediaStateStore.getPhysicalAvrId(entityId));
     this.mediaRenderer = new ZoneMediaRenderer(driver, config, this.mediaStateStore, this.state);
     this.serviceAdapters = [
@@ -70,6 +72,7 @@ export class ZoneAgnosticUpdateProcessor {
   }
 
   public updateConfig(config: OnkyoConfig): void {
+    this.config = config;
     this.mediaRenderer.updateConfig(config);
   }
 

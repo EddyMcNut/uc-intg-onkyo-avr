@@ -207,9 +207,9 @@ export default class OnkyoDriver {
         disabledMessage: `${integrationName} [${avrEntry}] Remote entity disabled by user preference`
       },
 
-      // ── Listening Mode select — conditional on listeningModeOptions ─────────
+      // ── Listening Mode select ──────────────────────────────────────────────
       {
-        enabled: (cfg) => cfg.listeningModeOptions !== null,
+        enabled: () => true,
         create: () => {
           const handler = this.listeningModeHandler?.handle.bind(this.listeningModeHandler) ?? (async () => uc.StatusCodes.Ok);
           return this.entityRegistrar.createListeningModeSelectEntity(avrEntry, handler);
@@ -219,16 +219,16 @@ export default class OnkyoDriver {
           if (typeof this.driver.updateEntityAttributes === "function") {
             this.driver.updateEntityAttributes(`${avrEntry}_listening_mode`, { [SelectAttributes.Options]: options });
           }
-          if (Array.isArray(avrConfig.listeningModeOptions) && avrConfig.listeningModeOptions.length > 0) {
-            log.info("%s [%s] Loaded %d user-configured listeningModeOptions", integrationName, avrEntry, avrConfig.listeningModeOptions.length);
+          if (avrConfig.listeningModes) {
+            log.info("%s [%s] Loaded %d listeningModes", integrationName, avrEntry, Object.keys(avrConfig.listeningModes).length);
           }
         },
-        disabledMessage: `${integrationName} [${avrEntry}] Listening Mode select entity disabled by user preference (none)`
+        disabledMessage: `${integrationName} [${avrEntry}] Listening Mode select entity unavailable`
       },
 
-      // ── Input Selector select — conditional on inputSelectorOptions ─────────
+      // ── Input Selector select ───────────────────────────────────────────────
       {
-        enabled: (cfg) => cfg.inputSelectorOptions !== null,
+        enabled: () => true,
         create: () => {
           const handler = this.inputSelectorHandler?.handle.bind(this.inputSelectorHandler) ?? (async () => uc.StatusCodes.Ok);
           return this.entityRegistrar.createInputSelectorSelectEntity(avrEntry, handler);
@@ -238,11 +238,8 @@ export default class OnkyoDriver {
           if (typeof this.driver.updateEntityAttributes === "function") {
             this.driver.updateEntityAttributes(`${avrEntry}_input_selector`, { [SelectAttributes.Options]: isOptions });
           }
-          if (Array.isArray(avrConfig.inputSelectorOptions) && avrConfig.inputSelectorOptions.length > 0) {
-            log.info("%s [%s] Loaded %d user-configured inputSelectorOptions", integrationName, avrEntry, avrConfig.inputSelectorOptions.length);
-          }
         },
-        disabledMessage: `${integrationName} [${avrEntry}] Input Selector select entity disabled by user preference (none)`
+        disabledMessage: `${integrationName} [${avrEntry}] Input Selector select entity unavailable`
       },
 
       // ── Tuner Presets select — conditional on createTunerPresets flag ──────
@@ -324,9 +321,6 @@ export default class OnkyoDriver {
    * manager that has not instantiated it yet.
    */
   private registerInputSelector(avrConfig: AvrConfig): void {
-    if (avrConfig.inputSelectorOptions === null) {
-      return;
-    }
     const avrEntry = buildEntityId(avrConfig.model, avrConfig.ip, avrConfig.zone);
     const handler = this.inputSelectorHandler?.handle.bind(this.inputSelectorHandler);
     const entities = [this.entityRegistrar.createInputSelectorSelectEntity(avrEntry, handler)] as uc.Entity[];
