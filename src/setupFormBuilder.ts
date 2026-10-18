@@ -1,7 +1,8 @@
 // Focused responsibility: Generate UI forms for setup flows
 import * as uc from "@unfoldedcircle/integration-api";
 import { ParsedManualConfig } from "./manualConfigParser.js";
-import { DISABLE_LISTENING_MODE, getKnownListeningModes, LEARNED_LISTENING_MODE, LEARN_LISTENING_MODE } from "./listeningModePreferences.js";
+import { EXCLUDE_LISTENING_MODE, getKnownListeningModes, LEARNED_LISTENING_MODE, LEARN_LISTENING_MODE, normalizeListeningModeSetting } from "./listeningModePreferences.js";
+import { EXCLUDE_INPUT_SOURCE, getAliasesForReportedInput, getKnownInputSources, LEARNED_INPUT_SOURCE } from "./inputSourcePreferences.js";
 
 export class SetupFormBuilder {
   buildManualConfigForm(values: ParsedManualConfig): uc.RequestUserInput {
@@ -23,20 +24,30 @@ export class SetupFormBuilder {
   }
 
   buildManualConfigPage2(values: ParsedManualConfig): uc.RequestUserInput {
-    return this.buildManualConfigFormPage(values, "Manual configuration (2/3)", [
-      "entityNameStyle",
-      "volumeScale",
-      "volumeDisplay",
-      "adjustVolumeDispl",
-      "useAvrReportedInputs",
-      "tuneinPresetPosition",
-      "tuneinMenuStyle"
-    ]);
+    return this.buildManualConfigFormPage(values, "Manual configuration (2/3)", ["entityNameStyle", "volumeScale", "volumeDisplay", "adjustVolumeDispl", "tuneinPresetPosition", "tuneinMenuStyle"]);
   }
 
   buildManualConfigPage3(values: ParsedManualConfig): uc.RequestUserInput {
     const ids = ["createRemoteEntity", "createSensors", "createTunerPresets", "createDiracSelectEntity", "logLevel"];
     return this.buildManualConfigFormPage(values, "Manual configuration (3/4)", ids);
+  }
+
+  buildInputSourcePage(values: ParsedManualConfig, page: number, total: number): uc.RequestUserInput {
+    const sources = this.getInputSourceRows(values);
+    const pageSize = 12;
+    const ids = sources.slice((page - 1) * pageSize, page * pageSize).map((source) => `ids_${source.id}`);
+    return this.buildManualConfigFormPage(values, `Input Sources (${page}/${total})`, ids);
+  }
+
+  getInputSourcePageCount(values: ParsedManualConfig): number {
+    return Math.ceil(this.getInputSourceRows(values).length / 12);
+  }
+
+  buildListeningModePage(values: ParsedManualConfig, page: number): uc.RequestUserInput {
+    const modes = getKnownListeningModes();
+    const pageSize = Math.ceil(modes.length / 5);
+    const ids = modes.slice((page - 1) * pageSize, page * pageSize).map((mode) => `lmd_${mode.code}`);
+    return this.buildManualConfigFormPage(values, `Listening Modes (${page}/5)`, ids);
   }
 
   buildManualConfigPage4(values: ParsedManualConfig): uc.RequestUserInput {
@@ -82,6 +93,13 @@ export class SetupFormBuilder {
         id: `listeningModesPageInfo_${title.replace(/\W/g, "_")}`,
         label: { en: title },
         field: { label: { value: { en: "Choose Learn from AVR, Disable, or an alternate alias for each mode." } } }
+      } as never);
+    }
+    if (title.startsWith("Input Sources")) {
+      settings.unshift({
+        id: `inputSourcesPageInfo_${title.replace(/\W/g, "_")}`,
+        label: { en: title },
+        field: { label: { value: { en: "Choose the AVR name, an integration alias, or Exclude from integration." } } }
       } as never);
     }
     return new uc.RequestUserInput(title, settings);
@@ -176,22 +194,6 @@ export class SetupFormBuilder {
               { id: "long", label: { en: "Long (includes IP address)" } }
             ]
           }
-        }
-      },
-      {
-        id: "useAvrReportedInputs",
-        label: { en: "Input source names" },
-        field: {
-          dropdown: {
-            value: String(values.useAvrReportedInputsValue),
-            items: [
-              { id: "true", label: { en: "Use AVR names (default)" } },
-              { id: "false", label: { en: "Use integration names" } }
-            ]
-          }
-        },
-        description: {
-          en: "Use AVR-reported names and IDs when available. Older AVRs without a usable input list fall back to the integration mappings."
         }
       },
       {
@@ -308,11 +310,12 @@ export class SetupFormBuilder {
         field: {
           dropdown: {
             value:
-              (values.listeningModePreferences[mode.code] === LEARN_LISTENING_MODE || values.listeningModePreferences[mode.code] === LEARNED_LISTENING_MODE) &&
+              (normalizeListeningModeSetting(values.listeningModePreferences[mode.code] ?? LEARN_LISTENING_MODE) === LEARN_LISTENING_MODE ||
+                normalizeListeningModeSetting(values.listeningModePreferences[mode.code] ?? LEARN_LISTENING_MODE) === LEARNED_LISTENING_MODE) &&
               values.listeningModeNames[mode.code] &&
               values.listeningModeNames[mode.code] !== mode.aliases[0]
                 ? LEARNED_LISTENING_MODE
-                : (values.listeningModePreferences[mode.code] ?? LEARN_LISTENING_MODE),
+                : normalizeListeningModeSetting(values.listeningModePreferences[mode.code] ?? LEARN_LISTENING_MODE),
             items: [
               ...(values.listeningModePreferences[mode.code] === LEARNED_LISTENING_MODE ||
               (values.listeningModePreferences[mode.code] === LEARN_LISTENING_MODE && values.listeningModeNames[mode.code] && values.listeningModeNames[mode.code] !== mode.aliases[0])
@@ -322,13 +325,52 @@ export class SetupFormBuilder {
                 id: LEARN_LISTENING_MODE,
                 label: { en: "Learn from AVR (default)" }
               },
-              { id: DISABLE_LISTENING_MODE, label: { en: "Disable" } },
+              { id: EXCLUDE_LISTENING_MODE, label: { en: "Exclude from integration" } },
               ...mode.aliases.map((alias) => ({ id: alias, label: { en: alias } }))
             ]
           }
         }
+      })),
+      ...this.getInputSourceRows(values).map((source) => ({
+        id: `ids_${source.id}`,
+        label: { en: source.label },
+        field: {
+          dropdown: {
+            value: source.value,
+            items: source.items
+          }
+        }
       }))
     ]);
+  }
+
+  private getInputSourceRows(values: ParsedManualConfig): Array<{ id: string; label: string; value: string; items: Array<{ id: string; label: { en: string } }> }> {
+    const known = getKnownInputSources();
+    const reported = new Map(values.inputSources.map((source) => [source.id.toUpperCase(), source]));
+    const hasUsableReport = values.inputSourceDiscoveryAvailable && values.inputSources.length > 0;
+    const ids = hasUsableReport ? values.inputSources.map((source) => source.id.toUpperCase()) : [...new Set(known.map((source) => source.id))];
+    return ids.map((id) => {
+      const knownSource = known.find((source) => source.id === id);
+      const avrSource = reported.get(id);
+      const configured = values.idInputSources[id];
+      const aliases = avrSource ? getAliasesForReportedInput(id, avrSource.name) : (knownSource?.aliases ?? []);
+      const learned = avrSource?.name ?? (configured?.setting === LEARNED_INPUT_SOURCE ? configured.name : undefined);
+      const items = [
+        ...(learned ? [{ id: LEARNED_INPUT_SOURCE, label: { en: "✓ learned from AVR" } }] : []),
+        { id: EXCLUDE_INPUT_SOURCE, label: { en: "Exclude from integration" } },
+        ...aliases.map((alias) => ({ id: alias, label: { en: alias } }))
+      ];
+      const value = hasUsableReport
+        ? configured?.setting === EXCLUDE_INPUT_SOURCE
+          ? EXCLUDE_INPUT_SOURCE
+          : configured?.setting && aliases.includes(configured.setting)
+            ? configured.setting
+            : learned
+              ? LEARNED_INPUT_SOURCE
+              : EXCLUDE_INPUT_SOURCE
+        : configured?.setting || (learned ? LEARNED_INPUT_SOURCE : (aliases[0] ?? EXCLUDE_INPUT_SOURCE));
+      return { id, label: learned ?? aliases[0] ?? `AVR input ${id}`, value, items };
+    });
   }
 
   buildReconfigureForm(): uc.RequestUserInput {
@@ -340,7 +382,8 @@ export class SetupFormBuilder {
           dropdown: {
             value: "configure",
             items: [
-              { id: "configure", label: { en: "Configure" } },
+              { id: "configure", label: { en: "Configure integration" } },
+              { id: "configure_input_sources", label: { en: "Configure input sources" } },
               { id: "configure_listening_modes", label: { en: "Configure listening modes" } },
               { id: "backup", label: { en: "Create configuration backup" } },
               { id: "restore", label: { en: "Restore configuration from backup" } },
@@ -372,7 +415,7 @@ export class SetupFormBuilder {
           dropdown: {
             value: "false",
             items: [
-              { id: "false", label: { en: "Configure manually" } },
+              { id: "false", label: { en: "Configure" } },
               { id: "true", label: { en: "Restore from backup" } }
             ]
           }

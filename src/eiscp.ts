@@ -19,6 +19,8 @@ import { WAIT_FOR_CONNECT_TIMEOUT, CONNECTION_TIMEOUT } from "./constants.js";
 import type { AvrStateReader } from "./eiscp-command-parser.js";
 import { findNetServiceByName } from "./avrInfoStore.js";
 import { findLearnedListeningModeCode } from "./learnedListeningModeStore.js";
+import { findConfiguredInputId } from "./inputSourcePreferences.js";
+import type { InputSourceSettings } from "./configConstants.js";
 
 export interface EiscpConfig {
   host?: string;
@@ -31,6 +33,7 @@ export interface EiscpConfig {
   netMenuDelay?: number;
   tuneinPresetPosition?: number;
   configuredZones?: string[]; // Zones configured for this physical AVR (e.g., ["main", "zone2"])
+  idInputSources?: InputSourceSettings;
 }
 
 const NOOP_STATE_READER: AvrStateReader = {
@@ -130,7 +133,8 @@ export class EiscpDriver extends EventEmitter {
       receiveDelay: config?.receiveDelay ?? DEFAULT_QUEUE_THRESHOLD,
       netMenuDelay: config?.netMenuDelay ?? 2500,
       tuneinPresetPosition: config?.tuneinPresetPosition ?? 1,
-      configuredZones: config?.configuredZones
+      configuredZones: config?.configuredZones,
+      idInputSources: config?.idInputSources
     };
     this.commandParser = new IscpCommandParser(
       (zone) => buildEntityId(this.config.model!, this.config.host!, zone),
@@ -319,7 +323,7 @@ export class EiscpDriver extends EventEmitter {
           let command = iscpMessage.slice(0, 3);
           let value = iscpMessage.slice(3);
 
-          log.info("%s RAW (0) RECEIVE: [%s] %s %s", integrationName, command, value);
+          // log.info("%s RAW (0) RECEIVE: [%s] %s %s", integrationName, command, value);
 
           if (IGNORED_COMMANDS.has(command)) {
             continue;
@@ -640,7 +644,7 @@ export class EiscpDriver extends EventEmitter {
 
       // An input name the AVR reported itself ("BD/DVD", "CBL/SAT") is not in the hardcoded SLI
       // table: send the input id the AVR gave for it instead.
-      const inputId = findAvrInputId(buildPhysicalAvrId(this.config.model ?? "", this.config.host ?? ""), args);
+      const inputId = findAvrInputId(physicalAvrId, args) ?? findConfiguredInputId(this.config.idInputSources, args);
       if (inputId) {
         log.debug("%s Sending input-selector %s as %s%s (id reported by the AVR)", integrationName, args, getZonePrefix(prefix, zone), inputId);
         return getZonePrefix(prefix, zone) + inputId;

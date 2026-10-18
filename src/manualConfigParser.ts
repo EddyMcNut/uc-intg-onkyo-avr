@@ -1,5 +1,7 @@
 // Focused responsibility: Parse and validate manual configuration input
 import { LogLevel, AVR_DEFAULTS, parseBoolean, parseVolumeScale, type VolumeScale } from "./configManager.js";
+import type { AvrInput } from "./inputSourceStore.js";
+import type { InputSourceSettings } from "./configConstants.js";
 
 export interface ManualConfigInput {
   model?: unknown;
@@ -11,6 +13,9 @@ export interface ManualConfigInput {
   listeningModeNames?: unknown;
   volumeScale?: unknown;
   useAvrReportedInputs?: unknown;
+  idInputSources?: unknown;
+  inputSources?: unknown;
+  inputSourceDiscoveryAvailable?: unknown;
   volumeDisplay?: unknown;
   adjustVolumeDispl?: unknown;
   zoneCount?: unknown;
@@ -35,6 +40,9 @@ export interface ParsedManualConfig {
   listeningModeNames: Record<string, string>;
   volumeScaleValue: VolumeScale;
   useAvrReportedInputsValue: boolean;
+  idInputSources: InputSourceSettings;
+  inputSources: AvrInput[];
+  inputSourceDiscoveryAvailable: boolean;
   volumeDisplayValue: "absolute" | "relative";
   adjustVolumeDisplValue: boolean;
   entityNameStyleValue: "long" | "short";
@@ -63,6 +71,9 @@ export class ManualConfigParser {
       listeningModeNames: this.parseListeningModeNames(input),
       volumeScaleValue: this.parseVolumeScale(input.volumeScale),
       useAvrReportedInputsValue,
+      idInputSources: this.parseInputSourceSettings(input),
+      inputSources: Array.isArray(input.inputSources) ? (input.inputSources as AvrInput[]) : [],
+      inputSourceDiscoveryAvailable: Boolean(input.inputSourceDiscoveryAvailable),
       volumeDisplayValue: this.parseVolumeDisplay(input.volumeDisplay),
       adjustVolumeDisplValue: parseBoolean(input.adjustVolumeDispl, true),
       entityNameStyleValue: this.parseEntityNameStyle(input.entityNameStyle),
@@ -94,6 +105,21 @@ export class ManualConfigParser {
   private parseListeningModeNames(input: ManualConfigInput): Record<string, string> {
     const names = input.listeningModeNames;
     return names && typeof names === "object" && !Array.isArray(names) ? { ...(names as Record<string, string>) } : {};
+  }
+
+  private parseInputSourceSettings(input: ManualConfigInput): InputSourceSettings {
+    const settings: InputSourceSettings = {};
+    if (input.idInputSources && typeof input.idInputSources === "object" && !Array.isArray(input.idInputSources)) {
+      Object.assign(settings, input.idInputSources);
+    }
+    for (const [key, value] of Object.entries(input as Record<string, unknown>)) {
+      if (key.startsWith("ids_") && value !== undefined) {
+        const id = key.substring(4).toUpperCase();
+        const existing = settings[id];
+        settings[id] = { name: existing?.name ?? "", setting: String(value) };
+      }
+    }
+    return settings;
   }
 
   private parsePort(port: unknown): number {

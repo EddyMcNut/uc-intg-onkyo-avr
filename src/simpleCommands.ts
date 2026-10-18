@@ -1,5 +1,6 @@
 import { eiscpCommands } from "./eiscp-commands.js";
 import log from "./loggers.js";
+import { EXCLUDE_LISTENING_MODE, getKnownListeningModes } from "./listeningModePreferences.js";
 
 const integrationName = "simpleCommands:";
 
@@ -130,6 +131,34 @@ const COMMAND_DEFS: SimpleCommandDef[] = [
 
 export const SIMPLE_COMMANDS_MAP = generateSimpleCommands(COMMAND_DEFS);
 export const ALL_SIMPLE_COMMANDS = Object.keys(SIMPLE_COMMANDS_MAP);
+
+/** Add AVR-specific listening-mode names using the same IDs as generated simple commands. */
+export function addListeningModeSimpleCommands(modes: Record<string, { name: string; setting: string }> | undefined): void {
+  for (const [code, mode] of Object.entries(modes ?? {})) {
+    if (!mode.name || mode.setting === EXCLUDE_LISTENING_MODE || mode.setting === "disable") continue;
+    if (mode.setting === "learned") {
+      const known = getKnownListeningModes().find((candidate) => candidate.code === code.toUpperCase());
+      for (const alias of known?.aliases ?? []) {
+        const aliasId = `LISTENING_MODE_${alias
+          .replace(/[^a-zA-Z0-9]+/g, "_")
+          .replace(/^_+|_+$/g, "")
+          .toUpperCase()}`;
+        delete SIMPLE_COMMANDS_MAP[aliasId];
+        const index = ALL_SIMPLE_COMMANDS.indexOf(aliasId);
+        if (index >= 0) ALL_SIMPLE_COMMANDS.splice(index, 1);
+      }
+    }
+    const normalized = mode.name
+      .trim()
+      .replace(/[^a-zA-Z0-9]+/g, "_")
+      .replace(/^_+|_+$/g, "")
+      .toUpperCase();
+    if (!normalized) continue;
+    const id = `LISTENING_MODE_${normalized}`;
+    if (!SIMPLE_COMMANDS_MAP[id]) SIMPLE_COMMANDS_MAP[id] = `listening-mode ${mode.name}`;
+    if (!ALL_SIMPLE_COMMANDS.includes(id)) ALL_SIMPLE_COMMANDS.push(id);
+  }
+}
 
 export function logGeneratedCount(): void {
   log.info("%s generated %d simple commands", integrationName, ALL_SIMPLE_COMMANDS.length);

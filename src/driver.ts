@@ -22,7 +22,7 @@ import { AvrStateManager } from "./avrState.js";
 import { avrStateQueryService } from "./avrStateQuery.js";
 import { initMediaBrowser } from "./mediaBrowser.js";
 import log, { setLogLevel } from "./loggers.js";
-import { logGeneratedCount } from "./simpleCommands.js";
+import { addListeningModeSimpleCommands, logGeneratedCount } from "./simpleCommands.js";
 import SetupHandler from "./setupHandler.js";
 import EntityRegistrar from "./entityRegistrar.js";
 import ConnectionManager from "./connectionManager.js";
@@ -33,7 +33,7 @@ import SubscriptionHandler from "./subscriptionHandler.js";
 import ConnectCoordinator from "./connectCoordinator.js";
 import { AvrInstance, EiscpInstance, type AvrStateApi } from "./types.js";
 import { resolveAutoVolumeScale } from "./volumeScaleResolver.js";
-import { resolveInputSourceList } from "./inputSourceResolver.js";
+import { collectAvrInputSources, resolveInputSourceList } from "./inputSourceResolver.js";
 import { setAvrInputs, clearAvrInputs, hasAvrInputs } from "./inputSourceStore.js";
 import { findTunerPresetByName, getTunerPresetNames, setTunerPresets, tunerPresetCommandValue } from "./tunerPresetStore.js";
 import { listNamedPresets } from "./avrInfoStore.js";
@@ -41,6 +41,8 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { delay } from "./utils.js";
+import type { AvrInput } from "./inputSourceStore.js";
+import { getAvrInfo } from "./avrInfoStore.js";
 
 const integrationName = "driver:";
 
@@ -103,6 +105,7 @@ export default class OnkyoDriver {
 
     // Now load config from the correct path and continue setup
     this.config = ConfigManager.load();
+    for (const avr of this.config.avrs ?? []) addListeningModeSimpleCommands(avr.listeningModes);
     if (this.config.logLevel) setLogLevel(this.config.logLevel);
     logGeneratedCount();
 
@@ -164,9 +167,13 @@ export default class OnkyoDriver {
         getConfigDirPath: () => (this.driver.getConfigDirPath ? this.driver.getConfigDirPath() : undefined),
         onConfigSaved: async () => {
           this.config = ConfigManager.load();
+          for (const avr of this.config.avrs ?? []) addListeningModeSimpleCommands(avr.listeningModes);
           if (this.config.logLevel) setLogLevel(this.config.logLevel);
           this.registerAvailableEntities();
           await this.handleConnect();
+          for (const avrConfig of this.config.avrs ?? []) {
+            this.updateInputSourceOptions(avrConfig);
+          }
           this.schedulePostSetupAvrInfoQuery();
         },
         onConfigCleared: async () => {
@@ -176,6 +183,49 @@ export default class OnkyoDriver {
           this.avrInstances.clear();
           this.connectionManager.clearAllConnections();
           await this.driver.setDeviceState(uc.DeviceStates.Disconnected);
+        },
+        queryInputSources: async ({ model, ip, port }: { model: string; ip: string; port: number }) => {
+          let resolvedModel = model;
+          let resolvedIp = ip;
+          let resolvedPort = port;
+          const probe = new EiscpDriver({ host: resolvedIp, port: resolvedPort, model: resolvedModel });
+          try {
+            if (!resolvedModel && !resolvedIp) {
+              const found = await probe.discover({ address: "255.255.255.255", timeout: 3, devices: 1 });
+              if (!found?.length) return { inputs: [], available: false };
+              resolvedModel = found[0].model;
+              resolvedIp = found[0].host;
+              resolvedPort = Number(found[0].port) || 60128;
+            }
+            if (!resolvedIp) return { inputs: [], available: false };
+            const connected = await probe.connect({ model: resolvedModel, host: resolvedIp, port: resolvedPort });
+            if (!connected) return { inputs: [], available: false, model: resolvedModel, ip: resolvedIp, port: resolvedPort };
+            await probe.waitForConnect(5000);
+            const entityId = buildEntityId(resolvedModel, resolvedIp, "main");
+            const response = new Promise<void>((resolve) => {
+              const timer = setTimeout(resolve, 5000);
+              probe.on("data", (data: { command?: string }) => {
+                if (data.command === "avr-info") {
+                  clearTimeout(timer);
+                  resolve();
+                }
+              });
+            });
+            await probe.command({ zone: "main", command: "avr-info", args: "query" });
+            await response;
+            const info = getAvrInfo(entityId);
+            const inputs: AvrInput[] = collectAvrInputSources(
+              info?.selectors ?? [],
+              (info?.netServices ?? []).filter((service) => service.enabled).map((service) => ({ id: service.id, name: service.name }))
+            );
+            log.info("%s Setup NRI discovered %d input source(s) for %s %s", integrationName, inputs.length, resolvedModel, resolvedIp);
+            return { inputs, available: inputs.length > 0, model: resolvedModel, ip: resolvedIp, port: resolvedPort };
+          } catch (err) {
+            log.debug("%s Setup NRI query failed: %o", integrationName, err);
+            return { inputs: [], available: false, model: resolvedModel, ip: resolvedIp, port: resolvedPort };
+          } finally {
+            probe.disconnect();
+          }
         },
         log
       };

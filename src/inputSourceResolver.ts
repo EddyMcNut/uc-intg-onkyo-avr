@@ -4,11 +4,22 @@ import { type AvrConfig } from "./configManager.js";
 import { normalizeAvrInputs, type AvrInput } from "./inputSourceStore.js";
 import { getAvrInfo, listSelectors } from "./avrInfoStore.js";
 import { getAvrSourcesByPhysicalId } from "./avrSourceCatalog.js";
+import { resolveConfiguredInputSources } from "./inputSourcePreferences.js";
 
 export type InputSourceListResolution = {
   inputs?: AvrInput[];
   reason: string;
 };
+
+/** Combine selector and network-service sources without losing services whose IDs collide with selectors. */
+export function collectAvrInputSources(selectors: AvrInput[], services: AvrInput[]): AvrInput[] {
+  const selectorIds = new Set(selectors.map((input) => input.id.toLowerCase()));
+  const namespacedServices = services.map((service) => ({
+    ...service,
+    id: selectorIds.has(service.id.toLowerCase()) ? `NSV${service.id.toUpperCase()}` : service.id
+  }));
+  return normalizeAvrInputs([...selectors, ...namespacedServices]);
+}
 
 /** Return the stable SLI ID for a built-in integration alias. */
 export function getInputSourceId(option: string): string | undefined {
@@ -23,6 +34,9 @@ export function resolveInputSourceId(physicalAvrId: string, option: string): str
 
 /** Build the options shown by the input selector for one configured AVR zone. */
 export function getEffectiveInputSourceOptions(avrConfig: AvrConfig, physicalAvrId: string, builtInOptions: string[]): string[] {
+  if (avrConfig.idInputSources && Object.keys(avrConfig.idInputSources).length > 0) {
+    return resolveConfiguredInputSources(avrConfig.idInputSources);
+  }
   if (!avrConfig.useAvrReportedInputs) {
     return builtInOptions;
   }
@@ -40,7 +54,10 @@ export function resolveInputSourceList(avrConfig: AvrConfig, entityId: string): 
   const selectors = listSelectors(entityId);
   const info = getAvrInfo(entityId);
   const services = (info?.netServices ?? []).filter((service) => service.enabled && service.id && service.name).map((service) => ({ id: service.id, name: service.name }));
-  const inputs = normalizeAvrInputs([...selectors.map((selector) => ({ id: selector.id, name: selector.name })), ...services]);
+  const inputs = collectAvrInputSources(
+    selectors.map((selector) => ({ id: selector.id, name: selector.name })),
+    services
+  );
 
   if (inputs.length === 0) {
     return {
