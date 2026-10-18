@@ -4,7 +4,20 @@ import log, { setLogLevel } from "./loggers.js";
 
 // Re-export everything from configConstants so existing imports via configManager continue to work.
 export * from "./configConstants.js";
-import { MAX_LENGTHS, PATTERNS, parseBoolean, parseVolumeScale, AvrZone, AvrConfig, OnkyoConfig, AVR_DEFAULTS, EntityNameStyle, LogLevel, VOLUME_SCALE_AUTO } from "./configConstants.js";
+import {
+  MAX_LENGTHS,
+  PATTERNS,
+  parseBoolean,
+  parseVolumeScale,
+  AvrZone,
+  AvrConfig,
+  OnkyoConfig,
+  AVR_DEFAULTS,
+  EntityNameStyle,
+  LogLevel,
+  VOLUME_SCALE_AUTO,
+  normalizeInputSourceSettings
+} from "./configConstants.js";
 import { normalizeListeningModes } from "./listeningModePreferences.js";
 
 const integrationName = "configManager:";
@@ -48,7 +61,8 @@ export class ConfigManager {
       netMenuDelay: avr.netMenuDelay ?? AVR_DEFAULTS.netMenuDelay,
       tuneinPresetPosition: avr.tuneinPresetPosition ?? AVR_DEFAULTS.tuneinPresetPosition,
       tuneinMenuStyle: avr.tuneinMenuStyle ?? AVR_DEFAULTS.tuneinMenuStyle,
-      listeningModes: normalizeListeningModes(avr.listeningModes)
+      listeningModes: normalizeListeningModes(avr.listeningModes),
+      idInputSources: normalizeInputSourceSettings(avr.idInputSources)
     };
   }
 
@@ -381,7 +395,8 @@ export class ConfigManager {
       netMenuDelay: typeof avr.netMenuDelay === "string" ? parseInt(avr.netMenuDelay, 10) : avr.netMenuDelay,
       tuneinPresetPosition: typeof avr.tuneinPresetPosition === "string" ? parseInt(avr.tuneinPresetPosition, 10) : avr.tuneinPresetPosition,
       tuneinMenuStyle: String(avr.tuneinMenuStyle ?? AVR_DEFAULTS.tuneinMenuStyle).toLowerCase() === "full" ? "full" : "mypresets",
-      listeningModes: normalizeListeningModes(avr.listeningModes)
+      listeningModes: normalizeListeningModes(avr.listeningModes),
+      idInputSources: normalizeInputSourceSettings(avr.idInputSources)
     });
 
     return { errors: [], normalized };

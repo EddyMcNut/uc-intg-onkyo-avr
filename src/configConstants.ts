@@ -29,6 +29,22 @@ export const ALL_OPTIONS = "all";
 // Parsed value of a select-entity options field: "all" = show all, null = 'none' (don't create entity), else trimmed non-empty items.
 export type SelectOptions = string[] | "all" | null;
 export type ListeningModePreferences = Record<string, string>;
+export type InputSourceEntry = { name: string; setting: string };
+export type InputSourceSettings = Record<string, InputSourceEntry>;
+
+export function normalizeInputSourceSettings(raw: unknown): InputSourceSettings {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+  const result: InputSourceSettings = {};
+  for (const [rawId, rawEntry] of Object.entries(raw as Record<string, unknown>)) {
+    if (!rawEntry || typeof rawEntry !== "object" || Array.isArray(rawEntry)) continue;
+    const entry = rawEntry as Record<string, unknown>;
+    const id = rawId.trim().toUpperCase();
+    const name = String(entry.name ?? "").trim();
+    const setting = String(entry.setting ?? "").trim();
+    if (id && name && setting) result[id] = { name, setting };
+  }
+  return result;
+}
 
 /** One listening mode name/code learned from an AVR response. */
 export type LearnedListeningMode = {
@@ -203,6 +219,7 @@ export interface AvrConfig {
   tuneinMenuStyle?: TuneInMenuStyle; // choose TuneIn navigation mode: mypresets or full
   // undefined = all options, non-empty = exact options, null = don't create entity. Empty input is normalized to "all".
   listeningModes?: Record<string, { name: string; setting: string }>;
+  idInputSources?: InputSourceSettings;
 }
 
 export interface OnkyoConfig {
@@ -246,6 +263,7 @@ export interface NormalizedAvrConfig {
   tuneinPresetPosition: number;
   tuneinMenuStyle: TuneInMenuStyle;
   listeningModes: Record<string, { name: string; setting: string }>;
+  idInputSources: InputSourceSettings;
 }
 
 // Coerce and apply defaults to a raw AvrConfig. OCP: adding a field only requires touching this function and AvrConfig/NormalizedAvrConfig.
@@ -314,6 +332,7 @@ export function normalizeAvrConfig(raw: AvrConfig): NormalizedAvrConfig {
     tuneinPresetPosition,
     tuneinMenuStyle,
     listeningModes:
-      raw.listeningModes && typeof raw.listeningModes === "object" && !Array.isArray(raw.listeningModes) ? { ...(raw.listeningModes as Record<string, { name: string; setting: string }>) } : {}
+      raw.listeningModes && typeof raw.listeningModes === "object" && !Array.isArray(raw.listeningModes) ? { ...(raw.listeningModes as Record<string, { name: string; setting: string }>) } : {},
+    idInputSources: normalizeInputSourceSettings(raw.idInputSources)
   };
 }

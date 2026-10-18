@@ -4,6 +4,8 @@ import { ConfigManager, type AvrConfig, type AvrZone, AVR_DEFAULTS, type OnkyoCo
 import { getKnownListeningModes } from "./listeningModePreferences.js";
 import { setLogLevel } from "./loggers.js";
 import { type ParsedManualConfig } from "./manualConfigParser.js";
+import { getInputSourceAliases, EXCLUDE_INPUT_SOURCE, LEARNED_INPUT_SOURCE, getKnownInputSources } from "./inputSourcePreferences.js";
+import type { InputSourceSettings } from "./configConstants.js";
 
 export interface OnConfigSavedCallback {
   (): Promise<void>;
@@ -44,7 +46,8 @@ export class ConfigPersistenceManager {
       createTunerPresets: parsedConfig.createTunerPresetsValue,
       createDiracSelectEntity: parsedConfig.createDiracSelectEntityValue,
       tuneinMenuStyle: parsedConfig.tuneinMenuStyleValue,
-      useAvrReportedInputs: parsedConfig.useAvrReportedInputsValue
+      useAvrReportedInputs: parsedConfig.useAvrReportedInputsValue,
+      idInputSources: this.buildInputSources(parsedConfig, undefined, discovered.host)
     };
 
     // Use parseSelectOptions which handles the 'none' sentinel (-> null = don't create entity) and 'all'/empty (-> "all" = show all)
@@ -67,6 +70,7 @@ export class ConfigPersistenceManager {
       listeningModes: this.buildListeningModes(listeningModePreferences, parsedConfig.listeningModeNames, parsedConfig.modelName, parsedConfig.ipVal),
       volumeScale: parsedConfig.volumeScaleValue,
       useAvrReportedInputs: parsedConfig.useAvrReportedInputsValue,
+      idInputSources: this.buildInputSources(parsedConfig, parsedConfig.modelName, parsedConfig.ipVal),
       volumeDisplay: parsedConfig.volumeDisplayValue,
       adjustVolumeDispl: parsedConfig.adjustVolumeDisplValue,
       entityNameStyle: parsedConfig.entityNameStyleValue,
@@ -125,6 +129,24 @@ export class ConfigPersistenceManager {
       if (!rebuilt[code]) rebuilt[code] = entry;
     }
     return rebuilt;
+  }
+
+  private buildInputSources(parsed: ParsedManualConfig, model?: string, ip?: string): InputSourceSettings {
+    const existing = ConfigManager.get().avrs?.find((avr) => avr.model === model && avr.ip === ip)?.idInputSources ?? {};
+    const reported = new Map((parsed.inputSources ?? []).map((input) => [input.id.toUpperCase(), input.name]));
+    const ids = new Set([...getKnownInputSources().map((source) => source.id), ...Object.keys(parsed.idInputSources ?? {}), ...reported.keys()]);
+    const result: InputSourceSettings = {};
+    for (const id of ids) {
+      const aliases = getInputSourceAliases(id);
+      const name = reported.get(id) ?? existing[id]?.name ?? aliases[0];
+      if (!name) continue;
+      const selected =
+        parsed.idInputSources?.[id]?.setting ??
+        existing[id]?.setting ??
+        (parsed.inputSourceDiscoveryAvailable && (parsed.inputSources?.length ?? 0) > 0 ? EXCLUDE_INPUT_SOURCE : (aliases[0] ?? EXCLUDE_INPUT_SOURCE));
+      result[id] = { name, setting: selected || LEARNED_INPUT_SOURCE };
+    }
+    return result;
   }
 
   async restoreConfiguration(normalizedConfig: Partial<OnkyoConfig>): Promise<void> {

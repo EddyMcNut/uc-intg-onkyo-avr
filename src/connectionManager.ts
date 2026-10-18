@@ -47,7 +47,8 @@ export default class ConnectionManager {
         netMenuDelay: avrConfig.netMenuDelay,
         tuneinPresetPosition: avrConfig.tuneinPresetPosition,
         sendDelay: avrConfig.queueThreshold ?? DEFAULT_QUEUE_THRESHOLD,
-        configuredZones: configuredZones
+        configuredZones: configuredZones,
+        idInputSources: avrConfig.idInputSources
       });
       if (runtimeConfig) {
         connection.commandReceiver.updateConfig(runtimeConfig);
@@ -68,7 +69,8 @@ export default class ConnectionManager {
       sendDelay: avrConfig.queueThreshold ?? DEFAULT_QUEUE_THRESHOLD,
       netMenuDelay: avrConfig.netMenuDelay,
       tuneinPresetPosition: avrConfig.tuneinPresetPosition,
-      configuredZones: configuredZones
+      configuredZones: configuredZones,
+      idInputSources: avrConfig.idInputSources
     });
 
     const commandReceiver = createCommandReceiver(eiscpInstance);
