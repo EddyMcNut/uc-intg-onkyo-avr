@@ -6,7 +6,7 @@ import EiscpDriver from "./eiscp.js";
 import {
   ConfigManager,
   setConfigDir,
-  OnkyoConfig,
+  IntegrationConfig,
   AvrConfig,
   buildEntityId,
   buildPhysicalAvrId,
@@ -60,7 +60,7 @@ interface EntityRegistration {
 
 export default class OnkyoDriver {
   private driver: uc.IntegrationAPI;
-  private config: OnkyoConfig;
+  private config: IntegrationConfig;
   private reconnectionManager: ReconnectionManager = new ReconnectionManager();
   private connectionManager: import("./connectionManager.js").default;
   private readonly avrInstances = new Map<string, AvrInstance>();
@@ -721,8 +721,8 @@ export default class OnkyoDriver {
     }
   }
 
-  // Create OnkyoConfig for a specific AVR zone. OCP: field coercion lives in normalizeAvrConfig — this method never changes.
-  private createAvrSpecificConfig(avrConfig: AvrConfig): OnkyoConfig {
+  // Create IntegrationConfig for a specific AVR zone. OCP: field coercion lives in normalizeAvrConfig — this method never changes.
+  private createAvrSpecificConfig(avrConfig: AvrConfig): IntegrationConfig {
     const n = normalizeAvrConfig(avrConfig);
     return {
       avrs: [{ ...n }],

@@ -222,7 +222,7 @@ export interface AvrConfig {
   idInputSources?: InputSourceSettings;
 }
 
-export interface OnkyoConfig {
+export interface IntegrationConfig {
   avrs?: AvrConfig[];
   logLevel?: LogLevel;
   queueThreshold?: number;

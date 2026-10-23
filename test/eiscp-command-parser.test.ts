@@ -577,3 +577,131 @@ it("IscpCommandParser reports the input name the AVR gave for an input it collec
 
   inputSourceStore.clearAllAvrInputs();
 });
+
+it("IscpCommandParser covers status, level, navigation and source fallbacks", async () => {
+  const { IscpCommandParser } = (await import("../src/eiscp-command-parser.js")) as { IscpCommandParser: new (...deps: any) => any };
+  const musicState = { harvestMode: false, nlsCursorOffset: 0, totalListItemCount: 0, nlsLayerNumber: 0 };
+  const h = makeParserHarness({ source: "net", subSource: "spotify" });
+  const musicServerStore = { getBrowseState: () => musicState };
+  const parser = new IscpCommandParser(h.getEntityId, h.stateReader, h.deezerStoreApi, h.tidalStoreApi, h.tuneInStoreApi, musicServerStore);
+
+  expect(parser.parse("DSN", "source")?.argument).toBe("source");
+  expect(parser.parse("ABZ", "x")).toBeNull();
+  expect(parser.parse("AB3", "x")).toBeNull();
+  expect(parser.parse("AB4", "x")).toBeNull();
+  expect(parser.parse("ZXX", "x")).toBeNull();
+  for (const [value, expected] of [
+    ["P", "playing"],
+    ["p", "paused"],
+    ["S", "stopped"],
+    ["F", "ff"],
+    ["R", "fr"]
+  ]) {
+    expect(parser.parse("NST", value)?.argument).toBe(expected);
+  }
+  expect(parser.parse("NST", "?")).toBeNull();
+  expect(parser.parse("NTM", "").argument).toBe("0/0");
+  expect(parser.parse("NTM", "1").argument).toBe("1/0");
+  expect(parser.parse("NTM", "1:02").argument).toBe("62/0");
+  expect(parser.parse("NTM", "1:2:3:4").argument).toBe("0/0");
+  expect(parser.parse("NLS", "bad")).toBeNull();
+  expect(parser.parse("NLS", "U1-Menu")?.argument).toBe("U1-Menu");
+  expect(parser.parse("SLI", "ZZ")).toBeTruthy();
+
+  expect(parser.parse("NLA", "short")).toBeNull();
+  expect(parser.parse("NLA", "A0001S<xml/>")).toBeNull();
+  expect(parser.parse("NLA", "X0001S<xml/>")?.argument).toBe("<xml/>");
+  expect(parser.parse("VOC", "bad")?.argument).toBe(0xbad);
+  expect(parser.parse("VOC", "ZZZZ")?.argument).toBe("ZZZZ");
+  expect(parser.parse("TFR", "B?0T00")).toBeNull();
+  expect(parser.parse("CTL", "bad")).toBeNull();
+  expect(parser.parse("SWL", "bad")).toBeNull();
+  expect(parser.parse("CTL", "")).toBeNull();
+  expect(parser.parse("CTL", "?0")).toBeNull();
+
+  expect(parser.parse("NLT", "short")).toBeNull();
+  expect(parser.parse("NLT", "0101ZZZZ000100")).toBeNull();
+  expect(parser.parse("NLT", "0101000A0014Title")).toBeNull();
+  expect(parser.parse("NLT", "0101000A0014     ")).toBeNull();
+  expect(parser.parse("NLT", "0101000A0014")).toBeNull();
+  const musicHarness = makeParserHarness({ source: "net", subSource: "music-server" });
+  const musicParser = new IscpCommandParser(musicHarness.getEntityId, musicHarness.stateReader, musicHarness.deezerStoreApi, musicHarness.tidalStoreApi, musicHarness.tuneInStoreApi, musicServerStore);
+  const musicResult = musicParser.parse("NLT", "0101000A001404Music Server");
+  expect(musicResult?.argument).toBe("Music Server");
+  expect(musicState.totalListItemCount).toBe(20);
+  expect(musicState.nlsLayerNumber).toBe(4);
+
+  const noStateHarness = makeParserHarness({ source: "net", subSource: "deezer" });
+  const noStateParser = new IscpCommandParser(
+    noStateHarness.getEntityId,
+    noStateHarness.stateReader,
+    { getBrowseState: () => null },
+    noStateHarness.tidalStoreApi,
+    noStateHarness.tuneInStoreApi,
+    musicServerStore
+  );
+  expect(noStateParser.parse("NLT", "0101000A001400Title")).toBeNull();
+  const deezerHarvest = { harvestMode: true, nlsCursorOffset: 7, totalListItemCount: 0, nlsLayerNumber: 0 };
+  const deezerHarness = makeParserHarness({ source: "net", subSource: "deezer", deezerState: deezerHarvest });
+  const deezerParser = new IscpCommandParser(
+    deezerHarness.getEntityId,
+    deezerHarness.stateReader,
+    deezerHarness.deezerStoreApi,
+    deezerHarness.tidalStoreApi,
+    deezerHarness.tuneInStoreApi,
+    musicServerStore
+  );
+  expect(deezerParser.parse("NLT", "0101000A0014Title")).toBeNull();
+  const noLayer = { harvestMode: true, nlsCursorOffset: 0, totalListItemCount: 0, nlsLayerNumber: 0 };
+  const harvestHarness = makeParserHarness({ source: "net", subSource: "tidal", tidalState: noLayer });
+  const harvestParser = new IscpCommandParser(
+    harvestHarness.getEntityId,
+    harvestHarness.stateReader,
+    harvestHarness.deezerStoreApi,
+    harvestHarness.tidalStoreApi,
+    harvestHarness.tuneInStoreApi,
+    musicServerStore
+  );
+  expect(harvestParser.parse("NLT", "0101000A001400Title")).toBeNull();
+  const tidalLive = { harvestMode: false, nlsCursorOffset: 0, totalListItemCount: 0, nlsLayerNumber: 0 };
+  const tidalLiveHarness = makeParserHarness({ source: "net", subSource: "tidal", tidalState: tidalLive });
+  const tidalLiveParser = new IscpCommandParser(
+    tidalLiveHarness.getEntityId,
+    tidalLiveHarness.stateReader,
+    tidalLiveHarness.deezerStoreApi,
+    tidalLiveHarness.tidalStoreApi,
+    tidalLiveHarness.tuneInStoreApi,
+    musicServerStore
+  );
+  expect(tidalLiveParser.parse("NLT", "0101000A0014Title")).toBeNull();
+  const tuneState = { harvestMode: true, nlsCursorOffset: 0, totalListItemCount: 0, nlsLayerNumber: 0 };
+  const tuneHarness = makeParserHarness({ source: "net", subSource: "tunein", tuneInMenuState: tuneState });
+  const tuneParser = new IscpCommandParser(tuneHarness.getEntityId, tuneHarness.stateReader, tuneHarness.deezerStoreApi, tuneHarness.tidalStoreApi, tuneHarness.tuneInStoreApi, musicServerStore);
+  expect(tuneParser.parse("NLT", "0101000A001400Title")).toBeNull();
+  const musicHarvest = { harvestMode: true, nlsCursorOffset: 0, totalListItemCount: 0, nlsLayerNumber: 0 };
+  const musicHarvestHarness = makeParserHarness({ source: "net", subSource: "music-server", tuneInMenuState: null });
+  const musicHarvestParser = new IscpCommandParser(
+    musicHarvestHarness.getEntityId,
+    musicHarvestHarness.stateReader,
+    musicHarvestHarness.deezerStoreApi,
+    musicHarvestHarness.tidalStoreApi,
+    musicHarvestHarness.tuneInStoreApi,
+    { getBrowseState: () => musicHarvest }
+  );
+  expect(musicHarvestParser.parse("NLT", "0101000A0014Title")).toBeNull();
+
+  expect(parser.parse("PWR", "N/A")?.argument).toBe("undefined");
+  expect(parser.parse("SLI", "4142")?.argument).toBe("AB");
+  expect(parser.parse("nat", "fallback")?.argument).toEqual({});
+  expect(parser.parse("NJA", "")).toBeNull();
+
+  expect(parser.parse("FLD", Buffer.from("Spotify / song", "utf8").toString("hex"))).toBeNull();
+  expect(parser.parse("FLD", Buffer.from("Random text", "utf8").toString("hex"))).toBeNull();
+  const fm = makeParserHarness({ source: "fm", subSource: "fm" });
+  const fmParser = new IscpCommandParser(fm.getEntityId, fm.stateReader, fm.deezerStoreApi, fm.tidalStoreApi, fm.tuneInStoreApi, musicServerStore);
+  expect(fmParser.parse("FLD", Buffer.from("StationAB", "utf8").toString("hex"))?.argument).toBe("Station");
+  expect(fmParser.parse("FLD", Buffer.from("Spotify", "utf8").toString("hex"))).toBeNull();
+  const cd = makeParserHarness({ source: "cd", subSource: "cd" });
+  const cdParser = new IscpCommandParser(cd.getEntityId, cd.stateReader, cd.deezerStoreApi, cd.tidalStoreApi, cd.tuneInStoreApi, musicServerStore);
+  expect(cdParser.parse("FLD", Buffer.from("Display1234", "utf8").toString("hex"))?.argument).toBe("Display");
+});

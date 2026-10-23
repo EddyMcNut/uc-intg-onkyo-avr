@@ -1,5 +1,5 @@
 import * as uc from "@unfoldedcircle/integration-api";
-import { ConfigManager, OnkyoConfig, buildEntityId } from "./configManager.js";
+import { ConfigManager, IntegrationConfig, buildEntityId } from "./configManager.js";
 import { EiscpDriver } from "./eiscp.js";
 import log from "./loggers.js";
 import { SONG_INFO } from "./constants.js";
@@ -24,11 +24,11 @@ export class ZoneAgnosticUpdateProcessor {
   private readonly serviceAdapters: ZoneAgnosticServiceAdapter[];
   private readonly serviceCommandRouter: ZoneAgnosticServiceCommandRouter;
   private readonly frontPanelRouter: ZoneAgnosticFrontPanelRouter;
-  private config: OnkyoConfig;
+  private config: IntegrationConfig;
 
   constructor(
     private readonly driver: uc.IntegrationAPI,
-    config: OnkyoConfig,
+    config: IntegrationConfig,
     private readonly eiscpInstance: EiscpDriver,
     private readonly state: AvrStateApi
   ) {
@@ -71,7 +71,7 @@ export class ZoneAgnosticUpdateProcessor {
     });
   }
 
-  public updateConfig(config: OnkyoConfig): void {
+  public updateConfig(config: IntegrationConfig): void {
     this.config = config;
     this.mediaRenderer.updateConfig(config);
   }

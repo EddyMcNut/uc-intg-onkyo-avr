@@ -37,5 +37,6 @@ describe("avrSourceCatalog", () => {
   it("does not claim complete data when a list is missing", () => {
     setAvrInfo(ENTITY, parseAvrInfo('<response><device><selectorlist><selector id="2b" name="NET" /></selectorlist></device></response>'));
     expect(getAvrSourceCatalog(ENTITY).complete).toBe(false);
+    expect(getAvrSourceCatalog("invalid").sources).toEqual([]);
   });
 });

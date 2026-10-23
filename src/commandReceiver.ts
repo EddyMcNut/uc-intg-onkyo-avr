@@ -1,6 +1,6 @@
 import * as uc from "@unfoldedcircle/integration-api";
 import { SelectAttributes } from "@unfoldedcircle/integration-api";
-import { OnkyoConfig, buildEntityId, buildPhysicalAvrId, physicalAvrIdFromEntityId, resolveVolumeScale } from "./configManager.js";
+import { IntegrationConfig, buildEntityId, buildPhysicalAvrId, physicalAvrIdFromEntityId, resolveVolumeScale } from "./configManager.js";
 import { resolveInputSourceId } from "./inputSourceResolver.js";
 import { findTunerPresetByName, findTunerPresetNameBySlot } from "./tunerPresetStore.js";
 import { EiscpDriver } from "./eiscp.js";
@@ -37,7 +37,7 @@ function extractMetadataArgument(arg: string | number | Record<string, string>):
 
 export class CommandReceiver {
   private driver: uc.IntegrationAPI;
-  private config: OnkyoConfig;
+  private config: IntegrationConfig;
   private eiscpInstance: EiscpDriver;
   private avrPreset: string = "unknown";
   private driverVersion: string;
@@ -48,7 +48,7 @@ export class CommandReceiver {
   private onAvrInfo?: (entityId: string) => void;
   private readonly pendingListeningModeCodes = new Map<string, string>();
 
-  constructor(driver: uc.IntegrationAPI, config: OnkyoConfig, eiscpInstance: EiscpDriver, avrStateApi: AvrStateApi, driverVersion: string = "unknown", onAvrInfo?: (entityId: string) => void) {
+  constructor(driver: uc.IntegrationAPI, config: IntegrationConfig, eiscpInstance: EiscpDriver, avrStateApi: AvrStateApi, driverVersion: string = "unknown", onAvrInfo?: (entityId: string) => void) {
     this.driver = driver;
     this.config = config;
     this.eiscpInstance = eiscpInstance;
@@ -104,7 +104,7 @@ export class CommandReceiver {
     };
   }
 
-  public updateConfig(config: OnkyoConfig): void {
+  public updateConfig(config: IntegrationConfig): void {
     this.config = config;
     this.zoneAgnosticProcessor.updateConfig(config);
   }

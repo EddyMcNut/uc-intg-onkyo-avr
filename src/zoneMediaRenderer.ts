@@ -1,6 +1,6 @@
 import * as uc from "@unfoldedcircle/integration-api";
 import crypto from "crypto";
-import { OnkyoConfig } from "./configManager.js";
+import { IntegrationConfig } from "./configManager.js";
 import type { AvrStateApi } from "./types.js";
 import log from "./loggers.js";
 import { delay } from "./utils.js";
@@ -12,12 +12,12 @@ const integrationName = "zoneMediaRenderer:";
 export class ZoneMediaRenderer {
   constructor(
     private readonly driver: uc.IntegrationAPI,
-    private config: OnkyoConfig,
+    private config: IntegrationConfig,
     private readonly mediaStateStore: ZoneAgnosticMediaStateStore,
     private readonly avrStateApi: AvrStateApi
   ) {}
 
-  public updateConfig(config: OnkyoConfig): void {
+  public updateConfig(config: IntegrationConfig): void {
     this.config = config;
   }
 

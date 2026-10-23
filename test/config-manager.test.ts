@@ -393,7 +393,7 @@ describe("ConfigManager static methods", () => {
       expect(result.avrs[0].createTunerPresets).toBe(true);
     });
 
-    it("persists missing defaults even when the config version is already current", () => {
+    it("removes the redundant config version and persists missing defaults", () => {
       mockExistsSync.mockReturnValue(true);
       mockReadFileSync.mockReturnValue(
         JSON.stringify({
@@ -406,6 +406,7 @@ describe("ConfigManager static methods", () => {
 
       expect(mockWriteFileSync).toHaveBeenCalledTimes(1);
       const written = JSON.parse(mockWriteFileSync.mock.calls[0][1]);
+      expect(written.configVersion).toBeUndefined();
       expect(written.avrs[0].useAvrReportedInputs).toBe(true);
       expect(written.avrs[0].createTunerPresets).toBe(true);
     });
