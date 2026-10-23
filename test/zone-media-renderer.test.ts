@@ -226,4 +226,24 @@ describe("maybeUpdateImage", () => {
     await mocks.renderer.maybeUpdateImage("M 1.2.3.4 main");
     expect(mocks.driverMock.updateEntityAttributes).not.toHaveBeenCalled();
   });
+
+  it("uses HTTP validators and falls back to streaming image hashes", async () => {
+    const mocks = await createRenderer({ config: makeConfig({ albumArtURL: "album_art.cgi" }) });
+    const fetchMock = vi.spyOn(globalThis, "fetch");
+
+    fetchMock.mockResolvedValueOnce(new Response(null, { headers: { etag: "etag-1" } }));
+    expect(await (mocks.renderer as any).getImageHash("http://avr/image")).toBe("etag-1");
+
+    fetchMock.mockResolvedValueOnce(new Response(null, { headers: { "last-modified": "yesterday" } }));
+    expect(await (mocks.renderer as any).getImageHash("http://avr/image")).toBe("yesterday");
+
+    fetchMock.mockRejectedValueOnce(new Error("HEAD unsupported"));
+    fetchMock.mockResolvedValueOnce(new Response(null, { status: 404 }));
+    expect(await (mocks.renderer as any).getImageHash("http://avr/image")).toBe("");
+
+    fetchMock.mockRejectedValueOnce(new Error("HEAD unsupported"));
+    fetchMock.mockResolvedValueOnce(new Response(null, { status: 200 }));
+    expect(await (mocks.renderer as any).getImageHash("http://avr/image")).toBe("");
+    fetchMock.mockRestore();
+  });
 });

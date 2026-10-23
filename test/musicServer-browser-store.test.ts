@@ -85,6 +85,18 @@ describe("MusicServerMediaBrowser", () => {
     expect(result).toBeDefined();
   });
 
+  it("marks fuzzy-matching music server tracks as now playing", async () => {
+    const store = await import("../src/musicServerBrowserStore.js");
+    const { MusicServerMediaBrowser } = await import("../src/musicServerMediaBrowser.js");
+    const browser = new MusicServerMediaBrowser();
+    browser.ingestListEntry(ENTITY_ID, "U0-Song - Artist");
+    const state = store.getMusicServerBrowseState(ENTITY_ID)!;
+    state.nowPlayingTitle = "Song - Artist";
+    await browser.browse(ENTITY_ID, { media_id: "music-server:root", media_type: "music-server://menu", paging: new uc.Paging(1, 25) });
+    state.nowPlayingTitle = "Song";
+    await browser.browse(ENTITY_ID, { media_id: "music-server:root", media_type: "music-server://menu", paging: new uc.Paging(1, 25) });
+  });
+
   it("ingestXmlEntries parses XML items", async () => {
     const { MusicServerMediaBrowser } = await import("../src/musicServerMediaBrowser.js");
     const browser = new MusicServerMediaBrowser();

@@ -1,6 +1,6 @@
 import * as uc from "@unfoldedcircle/integration-api";
 import { EiscpDriver } from "./eiscp.js";
-import { buildEntityId, DEFAULT_QUEUE_THRESHOLD, OnkyoConfig, physicalAvrIdFromEntityId, resolveVolumeScale } from "./configManager.js";
+import { buildEntityId, DEFAULT_QUEUE_THRESHOLD, IntegrationConfig, physicalAvrIdFromEntityId, resolveVolumeScale } from "./configManager.js";
 import { MAX_LENGTHS, PATTERNS } from "./configConstants.js";
 import { ICommandReceiver, AvrStateApi } from "./types.js";
 import { ZONE_VOLUME_PREFIX, ZONE_VOLUME_UP_DOWN } from "./zoneMappings.js";
@@ -16,14 +16,14 @@ const integrationName = "commandSender:";
 
 export class CommandSender {
   private driver: uc.IntegrationAPI;
-  private config: OnkyoConfig;
+  private config: IntegrationConfig;
   private eiscp: EiscpDriver;
   private avrStateApi: AvrStateApi;
   private lastCommandTime: number = 0;
   private commandReceiver: ICommandReceiver | undefined;
   private playMediaCommandHandler: PlayMediaCommandHandler;
 
-  constructor(driver: uc.IntegrationAPI, config: OnkyoConfig, eiscp: EiscpDriver, avrStateApi: AvrStateApi, commandReceiver: ICommandReceiver | undefined) {
+  constructor(driver: uc.IntegrationAPI, config: IntegrationConfig, eiscp: EiscpDriver, avrStateApi: AvrStateApi, commandReceiver: ICommandReceiver | undefined) {
     this.driver = driver;
     this.config = config;
     this.eiscp = eiscp;
@@ -32,7 +32,7 @@ export class CommandSender {
     this.playMediaCommandHandler = new PlayMediaCommandHandler(this.eiscp, this.avrStateApi, this.commandReceiver);
   }
 
-  public updateConfig(config: OnkyoConfig): void {
+  public updateConfig(config: IntegrationConfig): void {
     this.config = config;
   }
 

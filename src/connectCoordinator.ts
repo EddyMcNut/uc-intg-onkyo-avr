@@ -1,7 +1,7 @@
 /*jslint node:true nomen:true*/
 "use strict";
 import log from "./loggers.js";
-import { OnkyoConfig, AvrConfig, buildPhysicalAvrId, buildEntityId } from "./configManager.js";
+import { IntegrationConfig, AvrConfig, buildPhysicalAvrId, buildEntityId } from "./configManager.js";
 import ConnectionManager from "./connectionManager.js";
 import { DEFAULT_QUEUE_THRESHOLD } from "./configManager.js";
 import { delay } from "./utils.js";
@@ -15,7 +15,7 @@ export async function ensureZoneInstances(
   instances: Map<string, AvrInstance>,
   avrs: AvrConfig[],
   getPhysicalConnection: (physicalAvr: string) => PhysicalConnection | undefined,
-  createAvrSpecificConfig: (cfg: AvrConfig) => OnkyoConfig,
+  createAvrSpecificConfig: (cfg: AvrConfig) => IntegrationConfig,
   createCommandSender: CreateCommandSenderFn
 ): Promise<void> {
   for (const avrConfig of avrs) {
@@ -48,24 +48,24 @@ export default class ConnectCoordinator {
   private avrInstances: Map<string, AvrInstance>;
   private queryAvrState: QueryAvrStateFn;
   private queryAllZonesState: QueryAllZonesStateFn;
-  private readonly createAvrSpecificConfig: (cfg: AvrConfig) => OnkyoConfig;
+  private readonly createAvrSpecificConfig: (cfg: AvrConfig) => IntegrationConfig;
 
   constructor(
     connectionManager: ConnectionManager,
     avrInstances: Map<string, AvrInstance>,
     queryAvrState: QueryAvrStateFn,
     queryAllZonesState: QueryAllZonesStateFn,
-    createAvrSpecificConfig?: (cfg: AvrConfig) => OnkyoConfig
+    createAvrSpecificConfig?: (cfg: AvrConfig) => IntegrationConfig
   ) {
     this.connectionManager = connectionManager;
     this.avrInstances = avrInstances;
     this.queryAvrState = queryAvrState;
     this.queryAllZonesState = queryAllZonesState;
-    this.createAvrSpecificConfig = createAvrSpecificConfig ?? ((c) => ({ ...c, queueThreshold: c.queueThreshold ?? DEFAULT_QUEUE_THRESHOLD }) as OnkyoConfig);
+    this.createAvrSpecificConfig = createAvrSpecificConfig ?? ((c) => ({ ...c, queueThreshold: c.queueThreshold ?? DEFAULT_QUEUE_THRESHOLD }) as IntegrationConfig);
   }
 
   /** Orchestrate connecting physical AVRs and creating zone instances. Returns true if any zone instances exist after connect. */
-  async connect(config: OnkyoConfig, createCommandReceiverFactory: CreateCommandReceiverFactory, createCommandSender: CreateCommandSenderFn): Promise<boolean> {
+  async connect(config: IntegrationConfig, createCommandReceiverFactory: CreateCommandReceiverFactory, createCommandSender: CreateCommandSenderFn): Promise<boolean> {
     if (!config || !config.avrs || config.avrs.length === 0) {
       log.info("%s No AVRs configured", integrationName);
       return false;

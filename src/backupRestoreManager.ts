@@ -1,7 +1,7 @@
 // Focused responsibility: Backup and restore configuration data with file I/O
 import { readFileSync, existsSync } from "fs";
 import { resolve } from "path";
-import { ConfigManager, OnkyoConfig } from "./configManager.js";
+import { ConfigManager, IntegrationConfig } from "./configManager.js";
 
 interface BackupPayload {
   meta: {
@@ -42,7 +42,7 @@ export class BackupRestoreManager {
   }
 
   validateAndNormalizeRestorePayload(rawData: string): {
-    normalized: Partial<OnkyoConfig> | null;
+    normalized: Partial<IntegrationConfig> | null;
     isValid: boolean;
     errors: string[];
   } {
@@ -58,7 +58,7 @@ export class BackupRestoreManager {
       return { normalized: null, isValid: false, errors: validation.errors };
     }
 
-    return { normalized: validation.normalized as Partial<OnkyoConfig>, isValid: true, errors: [] };
+    return { normalized: validation.normalized as Partial<IntegrationConfig>, isValid: true, errors: [] };
   }
 
   private async readDriverMetadata(): Promise<{ driverId: string; driverVersion: string }> {
@@ -80,11 +80,17 @@ export class BackupRestoreManager {
       const cfgPath = resolve(getConfigDirPath() ?? process.cwd(), "config.json");
       if (existsSync(cfgPath)) {
         const rawCfg = readFileSync(cfgPath, "utf-8");
-        return JSON.parse(rawCfg);
+        return this.removeLegacyConfigVersion(JSON.parse(rawCfg));
       }
-      return ConfigManager.get();
+      return this.removeLegacyConfigVersion(ConfigManager.get());
     } catch (_err) {
-      return ConfigManager.get();
+      return this.removeLegacyConfigVersion(ConfigManager.get());
     }
+  }
+
+  private removeLegacyConfigVersion(config: any): any {
+    if (!config || typeof config !== "object" || Array.isArray(config)) return config;
+    const { configVersion: _configVersion, ...withoutVersion } = config;
+    return withoutVersion;
   }
 }

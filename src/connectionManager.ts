@@ -2,7 +2,7 @@
 "use strict";
 import log from "./loggers.js";
 import { ReconnectionManager } from "./reconnectionManager.js";
-import { AvrConfig, OnkyoConfig, DEFAULT_QUEUE_THRESHOLD } from "./configManager.js";
+import { AvrConfig, IntegrationConfig, DEFAULT_QUEUE_THRESHOLD } from "./configManager.js";
 import EiscpDriver from "./eiscp.js";
 import { PhysicalConnection, CreateCommandReceiverFn, QueryAllZonesStateFn, EiscpDriverFactory, type AvrStateApi } from "./types.js";
 import { CONNECTION_TIMEOUT } from "./constants.js";
@@ -37,7 +37,7 @@ export default class ConnectionManager {
     this.physicalConnections.set(physicalAVR, connection);
   }
 
-  updateConnectionConfig(physicalAVR: string, avrConfig: AvrConfig, configuredZones?: string[], runtimeConfig?: OnkyoConfig): void {
+  updateConnectionConfig(physicalAVR: string, avrConfig: AvrConfig, configuredZones?: string[], runtimeConfig?: IntegrationConfig): void {
     const connection = this.physicalConnections.get(physicalAVR);
     if (connection) {
       // Update the stored config

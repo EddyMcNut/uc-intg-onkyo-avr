@@ -5,7 +5,7 @@ import * as uc from "@unfoldedcircle/integration-api";
 import { EiscpDriver, EiscpConfig } from "./eiscp.js";
 import { CommandSender as CommandSenderClass } from "./commandSender.js";
 import { CommandReceiver as CommandReceiverClass } from "./commandReceiver.js";
-import { AvrConfig, OnkyoConfig } from "./configManager.js";
+import { AvrConfig, IntegrationConfig } from "./configManager.js";
 
 export type EiscpInstance = EiscpDriver;
 export type CommandSender = CommandSenderClass;
@@ -24,7 +24,7 @@ export type PhysicalConnection = {
 
 export type CreateCommandReceiverFn = (eiscp: EiscpInstance) => CommandReceiver;
 export type CreateCommandReceiverFactory = (avrConfig: AvrConfig) => CreateCommandReceiverFn;
-export type CreateCommandSenderFn = (avrSpecificConfig: OnkyoConfig, eiscp: EiscpInstance, commandReceiver: CommandReceiver) => CommandSender;
+export type CreateCommandSenderFn = (avrSpecificConfig: IntegrationConfig, eiscp: EiscpInstance, commandReceiver: CommandReceiver) => CommandSender;
 export type QueryAvrStateFn = (avrEntry: string, eiscp: EiscpInstance, context: string) => Promise<void>;
 export type QueryAllZonesStateFn = (physicalAvr: string, eiscp: EiscpInstance, context: string) => Promise<void>;
 

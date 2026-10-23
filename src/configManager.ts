@@ -11,7 +11,7 @@ import {
   parseVolumeScale,
   AvrZone,
   AvrConfig,
-  OnkyoConfig,
+  IntegrationConfig,
   AVR_DEFAULTS,
   EntityNameStyle,
   LogLevel,
@@ -38,7 +38,7 @@ export function getConfigPath(): string {
 }
 
 export class ConfigManager {
-  private static config: OnkyoConfig = {};
+  private static config: IntegrationConfig = {};
 
   /** Apply default values to an AVR config */
   private static applyDefaults(avr: Partial<AvrConfig>): AvrConfig {
@@ -74,7 +74,7 @@ export class ConfigManager {
     return "main";
   }
 
-  static load(): OnkyoConfig {
+  static load(): IntegrationConfig {
     try {
       if (fs.existsSync(CONFIG_PATH)) {
         const raw = fs.readFileSync(CONFIG_PATH, "utf-8");
@@ -85,6 +85,12 @@ export class ConfigManager {
         // Not used at runtime; drop them from memory and persist the cleaned config so
         // startup logs and subsequent backup/restore payloads stay clean.
         const rawConfig = this.config as Record<string, unknown>;
+        // The backup envelope already carries the driver version in meta.version.  Do not
+        // keep a second, stale version inside the persisted configuration.
+        if ("configVersion" in rawConfig) {
+          delete rawConfig.configVersion;
+          shouldPersistMigration = true;
+        }
         if ("learning" in rawConfig || "learningEnabled" in rawConfig) {
           delete rawConfig.learning;
           delete rawConfig.learningEnabled;
@@ -161,8 +167,10 @@ export class ConfigManager {
     return this.config;
   }
 
-  static save(newConfig: Partial<OnkyoConfig>) {
+  static save(newConfig: Partial<IntegrationConfig>) {
     this.config = { ...this.config, ...newConfig };
+    // configVersion was an old, redundant field. Versioning belongs to the backup metadata.
+    delete (this.config as Record<string, unknown>).configVersion;
     try {
       fs.writeFileSync(CONFIG_PATH, JSON.stringify(this.config, null, 2), "utf-8");
     } catch (err) {
@@ -215,7 +223,7 @@ export class ConfigManager {
 
   /** Clear all configuration and persist empty config */
   static clear(): void {
-    this.config = {} as OnkyoConfig;
+    this.config = {} as IntegrationConfig;
     try {
       fs.writeFileSync(CONFIG_PATH, JSON.stringify(this.config, null, 2), "utf-8");
       log.info(`${integrationName} Cleared configuration and persisted empty config file`);
@@ -224,7 +232,7 @@ export class ConfigManager {
     }
   }
 
-  static get(): OnkyoConfig {
+  static get(): IntegrationConfig {
     return this.config;
   }
 
@@ -403,9 +411,9 @@ export class ConfigManager {
   }
 
   /**
-   * Validate an entire restored config payload. Returns errors if any and a normalized OnkyoConfig when valid.
+   * Validate an entire restored config payload. Returns errors if any and a normalized IntegrationConfig when valid.
    */
-  static validateConfigPayload(payload: any): { errors: string[]; normalized?: OnkyoConfig } {
+  static validateConfigPayload(payload: any): { errors: string[]; normalized?: IntegrationConfig } {
     const errors: string[] = [];
     if (!payload || typeof payload !== "object") {
       errors.push("Payload must be an object");
@@ -420,7 +428,7 @@ export class ConfigManager {
       return { errors };
     }
 
-    const normalizedConfig: OnkyoConfig = {};
+    const normalizedConfig: IntegrationConfig = {};
 
     // Learned modes are stored on their corresponding AVR configuration.
 
