@@ -81,6 +81,26 @@ describe("configPersistenceManager", () => {
       expect(written.avrs[0].useAvrReportedInputs).toBe(false);
     });
 
+    it("excludes known inputs absent from a discovered AVR input list", async () => {
+      const mgr = new ConfigPersistenceManager(onConfigSaved);
+      await mgr.saveManualConfiguration({
+        ...baseParsedConfig,
+        ipVal: "9.8.7.6",
+        zoneCountValue: 1,
+        useAvrReportedInputsValue: true,
+        inputSources: [
+          { id: "10", name: "Blu-ray" },
+          { id: "12", name: "Television" }
+        ],
+        inputSourceDiscoveryAvailable: true
+      });
+
+      const written = JSON.parse(mockWriteFileSync.mock.calls[0][1] as string);
+      const avr = written.avrs.find((entry: any) => entry.ip === "9.8.7.6");
+      expect(avr.idInputSources["10"]).toEqual({ name: "Blu-ray", setting: "learned" });
+      expect(avr.idInputSources["02"].setting).toBe("exclude");
+    });
+
     it("persists an empty input selector filter as all", async () => {
       const mgr = new ConfigPersistenceManager(onConfigSaved);
       await mgr.saveManualConfiguration({
