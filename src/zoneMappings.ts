@@ -1,7 +1,7 @@
 // Single source of truth for zone-specific command prefix mappings.
 // All zone→command prefix lookups should import from here.
 
-/** NRI zone id (1-based) per configured zone name. The AVR numbers its zones in this order. */
+// NRI zone id (1-based) per configured zone name. The AVR numbers its zones in this order.
 export const ZONE_ID_BY_ZONE: Record<string, number> = {
   main: 1,
   zone2: 2,
@@ -9,7 +9,7 @@ export const ZONE_ID_BY_ZONE: Record<string, number> = {
   zone4: 4
 };
 
-/** Volume set/query command prefix per zone (MVL → main, ZVL → zone2, etc.) */
+// Volume set/query command prefix per zone (MVL → main, ZVL → zone2, etc.)
 export const ZONE_VOLUME_PREFIX: Record<string, string> = {
   main: "MVL",
   zone2: "ZVL",
@@ -17,7 +17,7 @@ export const ZONE_VOLUME_PREFIX: Record<string, string> = {
   zone4: "VL4"
 };
 
-/** Volume up/down commands per zone */
+// Volume up/down commands per zone
 export const ZONE_VOLUME_UP_DOWN: Record<string, { up: string; down: string }> = {
   main: { up: "MVLUP1", down: "MVLDOWN1" },
   zone2: { up: "ZVLUP1", down: "ZVLDOWN1" },
@@ -25,7 +25,7 @@ export const ZONE_VOLUME_UP_DOWN: Record<string, { up: string; down: string }> =
   zone4: { up: "VL4UP1", down: "VL4DOWN1" }
 };
 
-/** Mute commands per zone */
+// Mute commands per zone
 export const ZONE_MUTE: Record<string, { on: string; off: string; toggle: string }> = {
   main: { on: "AMT01", off: "AMT00", toggle: "AMTTG" },
   zone2: { on: "ZMT01", off: "ZMT00", toggle: "ZMTTG" },
@@ -33,7 +33,7 @@ export const ZONE_MUTE: Record<string, { on: string; off: string; toggle: string
   zone4: { on: "MT401", off: "MT400", toggle: "MT4TG" }
 };
 
-/** Generic command prefix translations from main-zone prefix to zone-specific prefix. */
+// Generic command prefix translations from main-zone prefix to zone-specific prefix.
 export const ZONE_COMMAND_MAP: Record<string, Record<string, string>> = {
   zone2: {
     MVL: "ZVL",
@@ -58,7 +58,7 @@ export const ZONE_COMMAND_MAP: Record<string, Record<string, string>> = {
   }
 };
 
-/** Translate a main-zone command prefix to its zone-specific equivalent. Falls back to the original prefix for unknown zones. */
+// Translate a main-zone command prefix to its zone-specific equivalent. Falls back to the original prefix for unknown zones.
 export function getZonePrefix(prefix: string, zone: string): string {
   return ZONE_COMMAND_MAP[zone]?.[prefix] ?? prefix;
 }

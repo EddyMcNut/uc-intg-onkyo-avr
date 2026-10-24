@@ -51,7 +51,7 @@ interface EntityState {
 export class AvrStateManager {
   private states: Map<string, EntityState> = new Map();
 
-  /** Get or create state for an entity */
+  // Get or create state for an entity
   private getState(entityId: string): EntityState {
     let state = this.states.get(entityId);
     if (!state) {
@@ -61,12 +61,12 @@ export class AvrStateManager {
     return state;
   }
 
-  /** Get current source for an entity */
+  // Get current source for an entity
   getSource(entityId: string): string {
     return this.getState(entityId).source;
   }
 
-  /** Get current sub-source for an entity */
+  // Get current sub-source for an entity
   getSubSource(entityId: string): string {
     return this.getState(entityId).subSource;
   }
@@ -75,22 +75,22 @@ export class AvrStateManager {
     return this.getState(entityId).volume;
   }
 
-  /** Get current audio format for an entity */
+  // Get current audio format for an entity
   getAudioFormat(entityId: string): string {
     return this.getState(entityId).audioFormat;
   }
 
-  /** Get current power state for an entity */
+  // Get current power state for an entity
   getPowerState(entityId: string): string {
     return this.getState(entityId).powerState;
   }
 
-  /** Get current playback status for an entity */
+  // Get current playback status for an entity
   getPlaybackStatus(entityId: string): string {
     return this.getState(entityId).playbackStatus;
   }
 
-  /** Set audio format for an entity, returns true if changed */
+  // Set audio format for an entity, returns true if changed
   setAudioFormat(entityId: string, audioFormat: string): boolean {
     const state = this.getState(entityId);
     const normalizedFormat = audioFormat.toLowerCase();
@@ -103,7 +103,7 @@ export class AvrStateManager {
     return false;
   }
 
-  /** Set power state for an entity, returns true if changed */
+  // Set power state for an entity, returns true if changed
   setPowerState(entityId: string, powerState: string, driver?: uc.IntegrationAPI): boolean {
     const state = this.getState(entityId);
     const normalizedPowerState = powerState.toLowerCase();
@@ -132,7 +132,7 @@ export class AvrStateManager {
     return false;
   }
 
-  /** Check if entity is powered on */
+  // Check if entity is powered on
   isEntityOn(entityId: string): boolean {
     const powerState = this.getState(entityId).powerState;
     return powerState === "on";
@@ -181,7 +181,7 @@ export class AvrStateManager {
     return entities;
   }
 
-  /** Set source for an entity, returns true if changed */
+  // Set source for an entity, returns true if changed
   setSource(entityId: string, source: string, eiscpInstance?: EiscpDriver, zone?: string, _driver?: uc.IntegrationAPI): boolean {
     const state = this.getState(entityId);
     const normalizedSource = normalizeSource(source);
@@ -206,7 +206,7 @@ export class AvrStateManager {
     return false;
   }
 
-  /** Set sub-source for an entity, returns true if changed */
+  // Set sub-source for an entity, returns true if changed
   setSubSource(entityId: string, subSource: string, eiscpInstance?: EiscpDriver, zone?: string, _driver?: uc.IntegrationAPI): boolean {
     const state = this.getState(entityId);
     const normalizedSubSource = subSource.toLowerCase().replace(/\s+/g, "-");
@@ -292,7 +292,7 @@ export class AvrStateManager {
     return uc.RemoteStates.Unknown;
   }
 
-  /** Push the AVR power state onto the remote entity (if registered). */
+  // Push the AVR power state onto the remote entity (if registered).
   public applyRemoteState(entityId: string, driver?: uc.IntegrationAPI): void {
     if (!driver) {
       return;
@@ -303,17 +303,17 @@ export class AvrStateManager {
     });
   }
 
-  /** Clear state for an entity (e.g., on disconnect) */
+  // Clear state for an entity (e.g., on disconnect)
   clearState(entityId: string): void {
     this.states.delete(entityId);
   }
 
-  /** Clear all state */
+  // Clear all state
   clearAllState(): void {
     this.states.clear();
   }
 
-  /** Query AVR state and clear media attributes on source change */
+  // Query AVR state and clear media attributes on source change
   async refreshAvrState(entityId: string, eiscpInstance?: EiscpDriver, zone?: string, driver?: uc.IntegrationAPI, queueThreshold?: number, commandReceiver?: ICommandReceiver): Promise<void> {
     if (!eiscpInstance || !zone || !driver || !entityId) {
       return;
@@ -393,5 +393,5 @@ export class AvrStateManager {
   }
 }
 
-/** Singleton instance of the state manager */
+// Singleton instance of the state manager
 export const avrStateManager = new AvrStateManager();

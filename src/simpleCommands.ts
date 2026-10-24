@@ -132,7 +132,7 @@ const COMMAND_DEFS: SimpleCommandDef[] = [
 export const SIMPLE_COMMANDS_MAP = generateSimpleCommands(COMMAND_DEFS);
 export const ALL_SIMPLE_COMMANDS = Object.keys(SIMPLE_COMMANDS_MAP);
 
-/** Add AVR-specific listening-mode names using the same IDs as generated simple commands. */
+// Add AVR-specific listening-mode names using the same IDs as generated simple commands.
 export function addListeningModeSimpleCommands(modes: Record<string, { name: string; setting: string }> | undefined): void {
   for (const [code, mode] of Object.entries(modes ?? {})) {
     if (!mode.name || mode.setting === EXCLUDE_LISTENING_MODE || mode.setting === "disable") continue;

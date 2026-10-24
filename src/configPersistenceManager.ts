@@ -147,11 +147,7 @@ export class ConfigPersistenceManager {
         // reported. Sources known to the integration but absent from that report
         // must remain excluded; otherwise saving setup adds legacy names back into
         // the selector alongside the learned AVR names.
-        (parsed.inputSourceDiscoveryAvailable && (parsed.inputSources?.length ?? 0) > 0
-          ? reported.has(id)
-            ? LEARNED_INPUT_SOURCE
-            : EXCLUDE_INPUT_SOURCE
-          : (aliases[0] ?? EXCLUDE_INPUT_SOURCE));
+        (parsed.inputSourceDiscoveryAvailable && (parsed.inputSources?.length ?? 0) > 0 ? (reported.has(id) ? LEARNED_INPUT_SOURCE : EXCLUDE_INPUT_SOURCE) : (aliases[0] ?? EXCLUDE_INPUT_SOURCE));
       result[id] = { name, setting: selected || LEARNED_INPUT_SOURCE };
     }
     return result;

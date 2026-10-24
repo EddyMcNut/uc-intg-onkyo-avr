@@ -2,7 +2,7 @@
 
 export const DEFAULT_QUEUE_THRESHOLD = 100;
 
-/** Security: Maximum input lengths for validation */
+// Security: Maximum input lengths for validation
 export const MAX_LENGTHS = {
   MODEL_NAME: 50,
   IP_ADDRESS: 15,
@@ -12,7 +12,7 @@ export const MAX_LENGTHS = {
   RAW_COMMAND: 20 // raw MVL20, etc.
 } as const;
 
-/** Security: Validation patterns */
+// Security: Validation patterns
 export const PATTERNS = {
   IP_ADDRESS: /^(\d{1,3}\.){3}\d{1,3}$/,
   MODEL_NAME: /^[a-zA-Z0-9\-_.() ]+$/,
@@ -46,13 +46,13 @@ export function normalizeInputSourceSettings(raw: unknown): InputSourceSettings 
   return result;
 }
 
-/** One listening mode name/code learned from an AVR response. */
+// One listening mode name/code learned from an AVR response.
 export type LearnedListeningMode = {
   code: string;
   name: string;
 };
 
-/** Normalize persisted learned listening modes and drop malformed entries. */
+// Normalize persisted learned listening modes and drop malformed entries.
 export function normalizeLearnedListeningModes(raw: unknown): LearnedListeningMode[] {
   if (!Array.isArray(raw)) return [];
   const modes: LearnedListeningMode[] = [];
@@ -104,7 +104,7 @@ export function parseSelectOptions(raw: unknown): SelectOptions {
   return [];
 }
 
-/** Parse a boolean-like value from string/boolean/undefined */
+// Parse a boolean-like value from string/boolean/undefined
 export function parseBoolean(value: unknown, defaultValue: boolean): boolean {
   if (value === undefined || value === null || value === "") {
     return defaultValue;
@@ -118,7 +118,7 @@ export function parseBoolean(value: unknown, defaultValue: boolean): boolean {
   return defaultValue;
 }
 
-/** Valid zone identifiers */
+// Valid zone identifiers
 export type AvrZone = "main" | "zone2" | "zone3" | "zone4";
 
 // Construct entity ID: "MODEL IP ZONE" (e.g. "TX-RZ50 192.168.2.103 main").
@@ -142,20 +142,14 @@ export function physicalAvrIdFromEntityId(entityId: string): string | null {
   return buildPhysicalAvrId(model, host);
 }
 
-/**
- * Volume scale setting.
- *
- * `VOLUME_SCALE_AUTO` is stored in the config until the AVR itself has reported its own maximum
- * display volume through NRI. From then on the resolved 0-80 or 0-100 is stored, exactly like a
- * manually chosen value, so it is never re-evaluated afterwards.
- */
+// Volume scale setting. `VOLUME_SCALE_AUTO` is stored in the config until the AVR itself has reported its own maximum display volume through NRI. From then on the resolved 0-80 or 0-100 is stored, exactly like a manually chosen value, so it is never re-evaluated afterwards.
 export const VOLUME_SCALE_AUTO = "auto";
 export type VolumeScale = 80 | 100 | typeof VOLUME_SCALE_AUTO;
 
-/** Used for volume arithmetic as long as the setting is still "auto" and no AVR report is available. */
+// Used for volume arithmetic as long as the setting is still "auto" and no AVR report is available.
 export const VOLUME_SCALE_FALLBACK = 100;
 
-/** Coerce any stored or user-supplied volume scale to "auto", 80 or 100. Anything unknown becomes the default ("auto"). */
+// Coerce any stored or user-supplied volume scale to "auto", 80 or 100. Anything unknown becomes the default ("auto").
 export function parseVolumeScale(raw: unknown): VolumeScale {
   if (typeof raw === "string" && raw.trim().toLowerCase() === VOLUME_SCALE_AUTO) {
     return VOLUME_SCALE_AUTO;
@@ -164,17 +158,13 @@ export function parseVolumeScale(raw: unknown): VolumeScale {
   return parsed === 80 || parsed === 100 ? parsed : VOLUME_SCALE_AUTO;
 }
 
-/**
- * Numeric volume scale for volume arithmetic.
- * An unresolved "auto" (or anything unusable) falls back to VOLUME_SCALE_FALLBACK, which is also the
- * documented default for AVRs that do not report their own maximum.
- */
+// Numeric volume scale for volume arithmetic. An unresolved "auto" (or anything unusable) falls back to VOLUME_SCALE_FALLBACK, which is also the documented default for AVRs that do not report their own maximum.
 export function resolveVolumeScale(raw: unknown): number {
   const parsed = typeof raw === "number" ? raw : parseInt(String(raw ?? "").trim(), 10);
   return isNaN(parsed) || parsed <= 0 ? VOLUME_SCALE_FALLBACK : parsed;
 }
 
-/** Default values for AVR configuration */
+// Default values for AVR configuration
 export const AVR_DEFAULTS = {
   queueThreshold: DEFAULT_QUEUE_THRESHOLD,
   albumArtURL: "album_art.cgi",

@@ -40,7 +40,7 @@ export function getConfigPath(): string {
 export class ConfigManager {
   private static config: IntegrationConfig = {};
 
-  /** Apply default values to an AVR config */
+  // Apply default values to an AVR config
   private static applyDefaults(avr: Partial<AvrConfig>): AvrConfig {
     return {
       model: avr.model ?? "",
@@ -66,7 +66,7 @@ export class ConfigManager {
     };
   }
 
-  /** Validate zone string and return typed zone or default */
+  // Validate zone string and return typed zone or default
   private static validateZone(zone: string | undefined): AvrZone {
     if (zone === "main" || zone === "zone2" || zone === "zone3" || zone === "zone4") {
       return zone;
@@ -203,11 +203,7 @@ export class ConfigManager {
     this.save(this.config);
   }
 
-  /**
-   * Merge a partial update into one configured AVR zone and persist it.
-   * Used for values the integration determines itself (e.g. a volume scale resolved from the AVR),
-   * so the other settings of that AVR are left untouched. Returns false when the zone is not configured.
-   */
+  // Merge a partial update into one configured AVR zone and persist it. Used for values the integration determines itself (e.g. a volume scale resolved from the AVR), so the other settings of that AVR are left untouched. Returns false when the zone is not configured.
   static patchAvr(ip: string, zone: AvrZone, patch: Partial<AvrConfig>): boolean {
     if (!this.config.avrs) {
       return false;
@@ -221,7 +217,7 @@ export class ConfigManager {
     return true;
   }
 
-  /** Clear all configuration and persist empty config */
+  // Clear all configuration and persist empty config
   static clear(): void {
     this.config = {} as IntegrationConfig;
     try {
@@ -410,9 +406,7 @@ export class ConfigManager {
     return { errors: [], normalized };
   }
 
-  /**
-   * Validate an entire restored config payload. Returns errors if any and a normalized IntegrationConfig when valid.
-   */
+  // Validate an entire restored config payload. Returns errors if any and a normalized IntegrationConfig when valid.
   static validateConfigPayload(payload: any): { errors: string[]; normalized?: IntegrationConfig } {
     const errors: string[] = [];
     if (!payload || typeof payload !== "object") {

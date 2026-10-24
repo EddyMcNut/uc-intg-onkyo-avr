@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 
 let counter = 0;
-/** Each test gets a unique physical AVR ID so the internal Map doesn't collide. */
+// Each test gets a unique physical AVR ID so the internal Map doesn't collide.
 function uid(): string {
   counter++;
   return `M${counter}.${Date.now()}`;

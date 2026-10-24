@@ -3,46 +3,46 @@ import log from "./loggers.js";
 
 const integrationName = "reconnectionManager:";
 
-/** Configuration for reconnection behavior */
+// Configuration for reconnection behavior
 export interface ReconnectionConfig {
-  /** Progressive timeouts for each attempt (ms) */
+  // Progressive timeouts for each attempt (ms)
   timeouts: readonly number[];
-  /** Delay before scheduled reconnection (ms) */
+  // Delay before scheduled reconnection (ms)
   scheduleDelay: number;
-  /** Optional cap for the exponential backoff between consecutive scheduled reconnect failures (ms). */
+  // Optional cap for the exponential backoff between consecutive scheduled reconnect failures (ms).
   maxDelay?: number;
-  /** Optional exponent cap for the backoff growth (delay = scheduleDelay * 2^min(attempt, maxBackoffExponent)). */
+  // Optional exponent cap for the backoff growth (delay = scheduleDelay * 2^min(attempt, maxBackoffExponent)).
   maxBackoffExponent?: number;
 }
 
-/** Default reconnection configuration */
+// Default reconnection configuration
 export const DEFAULT_RECONNECTION_CONFIG: ReconnectionConfig = {
   timeouts: [3000, 5000, 8000],
   scheduleDelay: 30000
 };
 
-/** Cap for the exponential backoff (5 minutes) so long outages don't busy-poll the network. */
+// Cap for the exponential backoff (5 minutes) so long outages don't busy-poll the network.
 export const DEFAULT_MAX_RECONNECTION_DELAY = 300000;
-/** How far the backoff can grow: 30s → 60s → 120s → 240s before hitting the cap. */
+// How far the backoff can grow: 30s → 60s → 120s → 240s before hitting the cap.
 const DEFAULT_MAX_BACKOFF_EXPONENT = 3;
 
-/** Connection info needed for reconnection attempts */
+// Connection info needed for reconnection attempts
 export interface ConnectionInfo {
   model: string;
   host: string;
   port: number;
 }
 
-/** Result of a reconnection attempt */
+// Result of a reconnection attempt
 export interface ReconnectionResult {
   success: boolean;
   attempts: number;
 }
 
-/** Callback invoked after successful reconnection */
+// Callback invoked after successful reconnection
 export type OnReconnectedCallback = (physicalAVR: string) => Promise<void>;
 
-/** Callback to check if reconnection should be skipped */
+// Callback to check if reconnection should be skipped
 export type ShouldSkipCallback = () => boolean;
 
 // Manages reconnection logic: progressive timeouts, scheduled retries, and timer management.

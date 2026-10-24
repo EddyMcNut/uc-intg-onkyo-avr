@@ -2,10 +2,10 @@ import EiscpDriver from "./eiscp.js";
 import log from "./loggers.js";
 import { CONNECTION_TIMEOUT } from "./constants.js";
 
-/** Helper to create a delay promise */
+// Helper to create a delay promise
 export const delay = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
-/** Format a non-negative integer as uppercase hexadecimal with a fixed character width. */
+// Format a non-negative integer as uppercase hexadecimal with a fixed character width.
 export function toHex(n: number, width: number): string {
   return n.toString(16).toUpperCase().padStart(width, "0");
 }

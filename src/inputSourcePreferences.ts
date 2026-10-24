@@ -23,7 +23,7 @@ function normalizeSourceName(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9]/g, "");
 }
 
-/** Return the integration aliases grouped by their stable SLI/NSS value. */
+// Return the integration aliases grouped by their stable SLI/NSS value.
 export function getKnownInputSources(): KnownInputSource[] {
   const byId = new Map<string, string[]>();
   const values = eiscpMappings.value_mappings.SLI as Record<string, { value: string }>;
@@ -42,7 +42,7 @@ export function getInputSourceAliases(id: string): string[] {
   return getKnownInputSources().find((source) => source.id === id.toUpperCase())?.aliases ?? [];
 }
 
-/** Return SLI aliases for an NRI-reported source, including logical NSS aliases. */
+// Return SLI aliases for an NRI-reported source, including logical NSS aliases.
 export function getAliasesForReportedInput(id: string, name: string): string[] {
   const byId = getInputSourceAliases(id);
   if (byId.length > 0) return byId;
@@ -53,7 +53,7 @@ export function normalizeInputSources(raw: unknown): InputSourceSettings {
   return normalizeInputSourceSettings(raw);
 }
 
-/** Resolve configured input-source settings into the names exposed by a selector entity. */
+// Resolve configured input-source settings into the names exposed by a selector entity.
 export function resolveConfiguredInputSources(settings: InputSourceSettings | undefined): string[] {
   return Object.entries(settings ?? {})
     .filter(([, entry]) => entry.setting !== EXCLUDE_INPUT_SOURCE)

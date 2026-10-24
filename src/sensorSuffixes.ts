@@ -24,8 +24,8 @@ export const SELECT_SUFFIXES = {
   dirac: "_dirac"
 } as const;
 
-/** Suffix used for the optional remote entity. */
+// Suffix used for the optional remote entity.
 export const REMOTE_SUFFIX = "_remote";
 
-/** All sensor/select suffixes (for use in regex construction, etc.) */
+// All sensor/select suffixes (for use in regex construction, etc.)
 export const ALL_SUFFIXES = [...SENSOR_SUFFIXES, ...Object.values(SELECT_SUFFIXES), REMOTE_SUFFIX] as readonly string[];

@@ -15,7 +15,7 @@ describe("waitForNlaIngestion", () => {
 
   it("returns immediately when state is null (no browse state for entityId)", async () => {
     const { waitForNlaIngestion } = await import("../src/musicServerBrowserStore.js");
-    await waitForNlaIngestion("nonexistent nohost main");
+    await waitForNlaIngestion("invalid");
   });
 
   it("returns immediately when totalExpected is 0", async () => {
@@ -47,9 +47,9 @@ describe("waitForNlaIngestion", () => {
     const { waitForNlaIngestion } = await import("../src/musicServerBrowserStore.js");
     const p = waitForNlaIngestion(ENTITY_ID);
 
-    vi.advanceTimersByTime(350);
+    await vi.advanceTimersByTimeAsync(350);
     store.addMusicServerMenuOption(ENTITY_ID, 2, "Item 2");
-    vi.advanceTimersByTime(350);
+    await vi.advanceTimersByTimeAsync(350);
 
     await p;
   });
@@ -64,7 +64,7 @@ describe("waitForNlaIngestion", () => {
     const { waitForNlaIngestion } = await import("../src/musicServerBrowserStore.js");
     const p = waitForNlaIngestion(ENTITY_ID);
 
-    vi.advanceTimersByTime(4000);
+    await vi.advanceTimersByTimeAsync(4000);
 
     await p;
   });

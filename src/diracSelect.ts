@@ -12,16 +12,16 @@ const DIRAC_SERVICE_TO_LABEL: Record<string, string> = {
 
 const DSS_VALUES = eiscpMappings.value_mappings.DSS;
 
-/** Fixed Dirac options shown in the UC UI, in display order. */
+// Fixed Dirac options shown in the UC UI, in display order.
 export const DIRAC_OPTION_LABELS: string[] = DIRAC_DISPLAY_ORDER.filter((key) => Object.prototype.hasOwnProperty.call(DSS_VALUES, key)).map((key) => DIRAC_SERVICE_TO_LABEL[key]);
 
-/** Translate a UI option label ("Slot 1") to its eiscp service key ("slot1"). */
+// Translate a UI option label ("Slot 1") to its eiscp service key ("slot1").
 export function diracOptionToServiceKey(label: string): string {
   const entry = Object.entries(DIRAC_SERVICE_TO_LABEL).find(([, value]) => value === label);
   return entry ? entry[0] : label;
 }
 
-/** Translate an eiscp service key ("slot1") to its UI option label ("Slot 1"). */
+// Translate an eiscp service key ("slot1") to its UI option label ("Slot 1").
 export function diracServiceKeyToOption(key: string): string {
   return DIRAC_SERVICE_TO_LABEL[key] ?? key;
 }
@@ -34,7 +34,7 @@ const DIRAC_RESPONSE_TO_COMMAND_VALUE: Record<string, string> = {
   "400": "C03"
 };
 
-/** Translate a raw DSS query response value ("100", "200", ...) to its eiscp command value ("C00", "C01", ...). Unknown values pass through unchanged. */
+// Translate a raw DSS query response value ("100", "200", ...) to its eiscp command value ("C00", "C01", ...). Unknown values pass through unchanged.
 export function diracResponseToCommandValue(rawValue: string): string {
   return DIRAC_RESPONSE_TO_COMMAND_VALUE[rawValue] ?? rawValue;
 }

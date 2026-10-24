@@ -3,9 +3,9 @@ import { physicalAvrIdFromEntityId } from "./configManager.js";
 export type TuneInPreset = {
   presetIndex: number;
   title: string;
-  /** Part of the NLS label before the "|", matching the station name returned by NTI. Equals title when there is no pipe. */
+  // Part of the NLS label before the "|", matching the station name returned by NTI. Equals title when there is no pipe.
   stationKey: string;
-  /** Full raw NLS label before any normalization, used to match NTI values that themselves contain "|". */
+  // Full raw NLS label before any normalization, used to match NTI values that themselves contain "|".
   rawLabel: string;
   mediaId: string;
   thumbnail?: string;
@@ -18,7 +18,7 @@ export type TuneInBrowseState = {
   presetIndexByTitle: Map<string, number>;
   thumbnailByTitle: Map<string, string>;
   backgroundSignature: string;
-  /** Station name currently playing (from NTI), used to highlight it in the preset list. */
+  // Station name currently playing (from NTI), used to highlight it in the preset list.
   nowPlayingStation: string;
 };
 

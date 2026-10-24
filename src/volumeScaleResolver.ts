@@ -11,18 +11,13 @@ import { VOLUME_SCALE_AUTO, VOLUME_SCALE_FALLBACK, type AvrConfig, type VolumeSc
 import { getAvrVolumeScale } from "./avrInfoStore.js";
 
 export type VolumeScaleResolution = {
-  /** The concrete scale to store in the config. */
+  // The concrete scale to store in the config.
   scale: VolumeScale;
-  /** How this scale was arrived at, for the debug log. */
+  // How this scale was arrived at, for the debug log.
   reason: string;
 };
 
-/**
- * Resolve the volume scale of one AVR zone when it is set to "auto".
- *
- * Returns undefined when there is nothing to do: the zone already has a concrete scale, so a value
- * that was set manually (or resolved earlier) is never overwritten.
- */
+// Resolve the volume scale of one AVR zone when it is set to "auto". Returns undefined when there is nothing to do: the zone already has a concrete scale, so a value that was set manually (or resolved earlier) is never overwritten.
 export function resolveAutoVolumeScale(avrConfig: AvrConfig, entityId: string): VolumeScaleResolution | undefined {
   if (avrConfig.volumeScale !== VOLUME_SCALE_AUTO) {
     return undefined;
