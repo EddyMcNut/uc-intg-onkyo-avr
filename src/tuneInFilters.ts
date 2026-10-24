@@ -8,7 +8,7 @@ export function normalizeTuneInLabel(label: string): string {
   return label.substring(pipeIndex + 1).trim();
 }
 
-/** Returns the part before the first "|", or the full string if there is no pipe. Used to match NTI station names against preset entries. */
+// Returns the part before the first "|", or the full string if there is no pipe. Used to match NTI station names against preset entries.
 export function extractTuneInStationKey(label: string): string {
   const pipeIndex = label.indexOf("|");
   if (pipeIndex === -1) return label.trim();

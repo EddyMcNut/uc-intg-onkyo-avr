@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import * as uc from "@unfoldedcircle/integration-api";
 
 type MockEiscp = {
@@ -232,43 +232,50 @@ it("CommandSender handles known simple commands via handleSimpleCommand fallthro
 });
 
 it("CommandSender covers connection-failure, queueThreshold-fallback, main-zone volume, and edge SelectSource branches", async () => {
-  const commandSenderModule = await import("../src/commandSender.js");
-  const { CommandSender } = commandSenderModule as { CommandSender: new (...deps: any[]) => any };
+  vi.useFakeTimers();
+  try {
+    const commandSenderModule = await import("../src/commandSender.js");
+    const { CommandSender } = commandSenderModule as { CommandSender: new (...deps: any[]) => any };
 
-  // Eiscp that fails to connect (connect does not set connected, waitForConnect throws)
-  const failEiscp: MockEiscp = {
-    connected: false,
-    eiscpConfig: { sendDelay: 50 },
-    commands: [],
-    raws: [],
-    async command(cmd: string): Promise<void> {
-      this.commands.push(cmd);
-    },
-    async raw(cmd: string): Promise<void> {
-      this.raws.push(cmd);
-    },
-    async connect(): Promise<void> {
-      /* do nothing, stays disconnected */
-    },
-    async waitForConnect(): Promise<void> {
-      throw new Error("not connected");
-    }
-  };
+    // Eiscp that fails to connect (connect does not set connected, waitForConnect throws)
+    const failEiscp: MockEiscp = {
+      connected: false,
+      eiscpConfig: { sendDelay: 50 },
+      commands: [],
+      raws: [],
+      async command(cmd: string): Promise<void> {
+        this.commands.push(cmd);
+      },
+      async raw(cmd: string): Promise<void> {
+        this.raws.push(cmd);
+      },
+      async connect(): Promise<void> {
+        // do nothing, stays disconnected
+      },
+      async waitForConnect(): Promise<void> {
+        throw new Error("not connected");
+      }
+    };
 
-  // Config without queueThreshold, volumeScale, adjustVolumeDispl (so fallbacks are used)
-  const cfg = {
-    volumeDisplay: "absolute",
-    avrs: [{ model: "TX-RZ50", ip: "192.168.2.103", port: 60128, zone: "main" }]
-  } as any;
+    // Config without queueThreshold, volumeScale, adjustVolumeDispl (so fallbacks are used)
+    const cfg = {
+      volumeDisplay: "absolute",
+      avrs: [{ model: "TX-RZ50", ip: "192.168.2.103", port: 60128, zone: "main" }]
+    } as any;
 
-  const mockDriver = {} as any;
-  const mockAvrState = { getSubSource: () => "spotify", refreshAvrState: async () => undefined } as any;
-  const sender = new CommandSender(mockDriver, cfg, failEiscp as any, mockAvrState, undefined);
+    const mockDriver = {} as any;
+    const mockAvrState = { getSubSource: () => "spotify", refreshAvrState: async () => undefined } as any;
+    const sender = new CommandSender(mockDriver, cfg, failEiscp as any, mockAvrState, undefined);
 
-  const mainEntity = { id: "TX-RZ50 192.168.2.103 main", attributes: { state: uc.MediaPlayerStates.Off } } as any;
+    const mainEntity = { id: "TX-RZ50 192.168.2.103 main", attributes: { state: uc.MediaPlayerStates.Off } } as any;
 
-  // L55 — ensureEiscpConnected returns false → Timeout
-  expect(await sender.sharedCmdHandler(mainEntity, uc.MediaPlayerCommands.On)).toBe(uc.StatusCodes.Timeout);
+    // L55 — ensureEiscpConnected returns false → Timeout
+    const result = sender.sharedCmdHandler(mainEntity, uc.MediaPlayerCommands.On);
+    await vi.runAllTimersAsync();
+    expect(await result).toBe(uc.StatusCodes.Timeout);
+  } finally {
+    vi.useRealTimers();
+  }
 });
 
 it("CommandSender routes main-zone VolumeUp/Down and Volume with fallback settings", async () => {

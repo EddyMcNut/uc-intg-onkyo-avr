@@ -48,13 +48,13 @@ const integrationName = "driver:";
 
 // Descriptor for registering one group of entities for an AVR zone. OCP: add a type by appending to buildEntityRegistrations() — the loop never changes.
 interface EntityRegistration {
-  /** Return true when this entity group should be registered for the given AVR. */
+  // Return true when this entity group should be registered for the given AVR.
   enabled: (cfg: AvrConfig) => boolean;
-  /** Build and return the entity or entities to register. */
+  // Build and return the entity or entities to register.
   create: () => uc.Entity | uc.Entity[];
-  /** Called after all entities in the group have been added. Optional. */
+  // Called after all entities in the group have been added. Optional.
   afterRegister?: (entities: uc.Entity[]) => void;
-  /** Logged when `enabled` returns false. Omit for groups that are always enabled. */
+  // Logged when `enabled` returns false. Omit for groups that are always enabled.
   disabledMessage?: string;
 }
 
@@ -354,7 +354,7 @@ export default class OnkyoDriver {
     }
   }
 
-  /** Re-register a single media player, e.g. after the volume scale was resolved from the AVR. */
+  // Re-register a single media player, e.g. after the volume scale was resolved from the AVR.
   private registerMediaPlayer(avrConfig: AvrConfig): void {
     const avrEntry = buildEntityId(avrConfig.model, avrConfig.ip, avrConfig.zone);
     const registration = this.buildMediaPlayerRegistration(avrEntry, avrConfig, this.createRawSend(avrConfig));
@@ -365,11 +365,7 @@ export default class OnkyoDriver {
     registration.afterRegister?.(entities);
   }
 
-  /**
-   * Re-register a single input selector, e.g. after the input source list was resolved from the AVR.
-   * Its options are part of the entity definition, so a plain attribute update would not reach a
-   * manager that has not instantiated it yet.
-   */
+  // Re-register a single input selector, e.g. after the input source list was resolved from the AVR. Its options are part of the entity definition, so a plain attribute update would not reach a manager that has not instantiated it yet.
   private registerInputSelector(avrConfig: AvrConfig): void {
     const avrEntry = buildEntityId(avrConfig.model, avrConfig.ip, avrConfig.zone);
     const handler = this.inputSelectorHandler?.handle.bind(this.inputSelectorHandler);
@@ -379,21 +375,14 @@ export default class OnkyoDriver {
     }
   }
 
-  /** Re-register the remote so its reported-source page reflects the latest NRI snapshot. */
+  // Re-register the remote so its reported-source page reflects the latest NRI snapshot.
   private registerRemoteEntity(avrConfig: AvrConfig): void {
     const avrEntry = buildEntityId(avrConfig.model, avrConfig.ip, avrConfig.zone);
     const handler = this.remoteEntityCommandHandler?.handle.bind(this.remoteEntityCommandHandler);
     this.registerEntity(this.entityRegistrar.createRemoteEntity(avrEntry, handler), avrEntry);
   }
 
-  /**
-   * Recall a tuner preset slot: the station name from the select entity is mapped back to the slot
-   * number the AVR reported it in, and sent as `PRS<slot in hex>`.
-   *
-   * The raw command is used on purpose: `PRS` is documented as "Preset No. 1-40 in hexadecimal", so
-   * the value has to be exactly that hex slot. Presets are a property of the AVR, not of a zone, so
-   * the command is sent for the main zone.
-   */
+  // Recall a tuner preset slot: the station name from the select entity is mapped back to the slot number the AVR reported it in, and sent as `PRS<slot in hex>`. The raw command is used on purpose: `PRS` is documented as "Preset No. 1-40 in hexadecimal", so the value has to be exactly that hex slot. Presets are a property of the AVR, not of a zone, so the command is sent for the main zone.
   private async sendTunerPreset(eiscp: EiscpInstance, avrEntry: string, _zone: string, option: string): Promise<void> {
     const physicalAVR = physicalAvrIdFromEntityId(avrEntry);
     const preset = physicalAVR ? findTunerPresetByName(physicalAVR, option) : undefined;
@@ -427,13 +416,7 @@ export default class OnkyoDriver {
     };
   }
 
-  /**
-   * Ask every configured AVR for its info document (NRI), once per AVR.
-   *
-   * This is a deliberate collection on every setup save: the AVR info carries the presets, inputs,
-   * services and the maximum display volume, all of which can be relevant to a config the user just
-   * changed. It deliberately bypasses the staleness check of the regular state query.
-   */
+  // Ask every configured AVR for its info document (NRI), once per AVR. This is a deliberate collection on every setup save: the AVR info carries the presets, inputs, services and the maximum display volume, all of which can be relevant to a config the user just changed. It deliberately bypasses the staleness check of the regular state query.
   private async triggerAvrInfoQuery(): Promise<void> {
     const queried = new Set<string>();
     for (const avrConfig of this.config.avrs ?? []) {
@@ -479,20 +462,7 @@ export default class OnkyoDriver {
     }, 10_000);
   }
 
-  /**
-   * Act on what the AVR reported about itself: resolve the volume scale and the input source list
-   * that were left on "auto".
-   *
-   * NRI describes the AVR as a whole and is answered on the main zone, so the single reply resolves
-   * every configured zone of that AVR — each zone reading the volume scale the AVR reported for it,
-   * while the inputs it reports are shared by all zones of that AVR.
-   *
-   * A resolved volume scale replaces "auto" in the config and is saved, so it behaves exactly like
-   * a value the user entered: it is never determined again. An input source list that the AVR cannot
-   * provide is saved as "manual" for the same reason: there is nothing left to resolve. The entities
-   * carrying these settings are re-registered, since both are part of their entity options, and the
-   * runtime configs are refreshed so they take effect from the next update on.
-   */
+  // Act on what the AVR reported about itself: resolve the volume scale and the input source list that were left on "auto". NRI describes the AVR as a whole and is answered on the main zone, so the single reply resolves every configured zone of that AVR — each zone reading the volume scale the AVR reported for it, while the inputs it reports are shared by all zones of that AVR. A resolved volume scale replaces "auto" in the config and is saved, so it behaves exactly like a value the user entered: it is never determined again. An input source list that the AVR cannot provide is saved as "manual" for the same reason: there is nothing left to resolve. The entities carrying these settings are re-registered, since both are part of their entity options, and the runtime configs are refreshed so they take effect from the next update on.
   private handleAvrInfo(entityId: string): void {
     const physicalAVR = physicalAvrIdFromEntityId(entityId);
     if (!physicalAVR) {
@@ -597,7 +567,7 @@ export default class OnkyoDriver {
     }
   }
 
-  /** Push the stations the AVR reported into the existing tuner presets select entity. */
+  // Push the stations the AVR reported into the existing tuner presets select entity.
   private updateTunerPresetsOptions(avrConfig: AvrConfig, logUpdate = true): void {
     const avrEntry = buildEntityId(avrConfig.model, avrConfig.ip, avrConfig.zone);
     const options = this.entityRegistrar.getTunerPresetOptions(avrEntry);
@@ -607,7 +577,7 @@ export default class OnkyoDriver {
     this.driver.updateEntityAttributes(`${avrEntry}_tuner_presets`, { [SelectAttributes.Options]: options });
   }
 
-  /** Push the current AVR-reported names to both entities that expose source options. */
+  // Push the current AVR-reported names to both entities that expose source options.
   private updateInputSourceOptions(avrConfig: AvrConfig): void {
     if (typeof this.driver.updateEntityAttributes !== "function") {
       return;
@@ -619,7 +589,7 @@ export default class OnkyoDriver {
     this.driver.updateEntityAttributes(avrEntry, { [uc.MediaPlayerAttributes.SourceList]: options });
   }
 
-  /** Replace the available definition so managers that ignore updates to uninstantiated entities refresh it. */
+  // Replace the available definition so managers that ignore updates to uninstantiated entities refresh it.
   private registerTunerPresetsEntity(avrConfig: AvrConfig): void {
     const avrEntry = buildEntityId(avrConfig.model, avrConfig.ip, avrConfig.zone);
     const handler = this.tunerPresetsHandler?.handle.bind(this.tunerPresetsHandler);
@@ -627,7 +597,7 @@ export default class OnkyoDriver {
     this.registerEntity(entity, avrEntry);
   }
 
-  /** Rebuild tuner preset entities after setup connection handling, which may race the first NRI reply. */
+  // Rebuild tuner preset entities after setup connection handling, which may race the first NRI reply.
   private refreshTunerPresetEntities(): void {
     for (const avrConfig of this.config.avrs ?? []) {
       if (avrConfig.createTunerPresets === false) {
@@ -638,7 +608,7 @@ export default class OnkyoDriver {
     }
   }
 
-  /** Push a refreshed per-zone runtime config into the live command handlers after a config change. */
+  // Push a refreshed per-zone runtime config into the live command handlers after a config change.
   private refreshZoneRuntimeConfig(avrConfig: AvrConfig): void {
     const avrEntry = buildEntityId(avrConfig.model, avrConfig.ip, avrConfig.zone);
     const avrSpecificConfig = this.createAvrSpecificConfig(avrConfig);
@@ -690,7 +660,7 @@ export default class OnkyoDriver {
     await avrStateQueryService.queryAvrState(avrEntry, eiscp, zone, context, queueThreshold);
   }
 
-  /** Query state for all zones of a physical AVR */
+  // Query state for all zones of a physical AVR
   private async queryAllZonesState(physicalAVR: string, eiscp: EiscpDriver, context: string): Promise<void> {
     const queried: string[] = [];
     let firstZone = true;

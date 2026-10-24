@@ -6,9 +6,9 @@ import { hasCompleteInputSourceInfo } from "./avrInfoStore.js";
 import { findAvrInputId, getAvrInputs, type AvrInput } from "./inputSourceStore.js";
 
 export type AvrSourceCatalog = {
-  /** Normalized, alphabetically sorted selector and enabled network-service entries. */
+  // Normalized, alphabetically sorted selector and enabled network-service entries.
   sources: AvrInput[];
-  /** True when NRI supplied both selector and network-service lists. */
+  // True when NRI supplied both selector and network-service lists.
   complete: boolean;
 };
 

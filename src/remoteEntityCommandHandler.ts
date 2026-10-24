@@ -18,12 +18,12 @@ import { AvrConfig } from "./configManager.js";
 const integrationName = "remoteHandler:";
 const INPUT_NAMES_SET = new Set(ALL_INPUT_SELECTOR_NAMES);
 
-/** Vocal (Dialog Enhancement) absolute level range: 0 (off) .. 5. */
+// Vocal (Dialog Enhancement) absolute level range: 0 (off) .. 5.
 const VOCAL_LEVEL_MAX = 5;
-/** How long to wait for the VOCQSTN response before giving up. */
+// How long to wait for the VOCQSTN response before giving up.
 const VOCAL_QUERY_TIMEOUT_MS = 2000;
 
-/** Remote command params can also carry arrays (e.g. send_cmd_sequence). */
+// Remote command params can also carry arrays (e.g. send_cmd_sequence).
 type RemoteParams = { [key: string]: string | number | boolean | string[] } | undefined;
 
 export class remoteEntityCommandHandler {

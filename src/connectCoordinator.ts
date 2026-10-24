@@ -64,7 +64,7 @@ export default class ConnectCoordinator {
     this.createAvrSpecificConfig = createAvrSpecificConfig ?? ((c) => ({ ...c, queueThreshold: c.queueThreshold ?? DEFAULT_QUEUE_THRESHOLD }) as IntegrationConfig);
   }
 
-  /** Orchestrate connecting physical AVRs and creating zone instances. Returns true if any zone instances exist after connect. */
+  // Orchestrate connecting physical AVRs and creating zone instances. Returns true if any zone instances exist after connect.
   async connect(config: IntegrationConfig, createCommandReceiverFactory: CreateCommandReceiverFactory, createCommandSender: CreateCommandSenderFn): Promise<boolean> {
     if (!config || !config.avrs || config.avrs.length === 0) {
       log.info("%s No AVRs configured", integrationName);

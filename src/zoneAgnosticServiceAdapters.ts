@@ -33,7 +33,7 @@ export type ZoneAgnosticServiceAdapter = {
   handleNls(sourceEntityId: string, entry: string): void;
   handleNla(sourceEntityId: string, xmlPayload: string): void;
   handleMetadata(zoneEntityId: string, artist: string): void;
-  /** Drop stale now-playing marks so a fresh (re-)entry of the service starts with a clean browser. */
+  // Drop stale now-playing marks so a fresh (re-)entry of the service starts with a clean browser.
   clearNowPlayingForZones?(zoneEntityIds: string[]): void;
 };
 

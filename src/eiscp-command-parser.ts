@@ -92,12 +92,12 @@ export class IscpCommandParser {
     };
   }
 
-  /** Read the current metadata snapshot (title, artist, album). */
+  // Read the current metadata snapshot (title, artist, album).
   getMetadata(): Readonly<Metadata> {
     return { ...this.currentMetadata };
   }
 
-  /** Partially update the current metadata (used by the driver during TuneIn navigation). */
+  // Partially update the current metadata (used by the driver during TuneIn navigation).
   patchMetadata(patch: Partial<Metadata>): void {
     Object.assign(this.currentMetadata, patch);
   }

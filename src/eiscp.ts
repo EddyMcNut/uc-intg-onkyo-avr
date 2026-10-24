@@ -63,10 +63,10 @@ const NSS_SERVICE_NAMES: Record<string, string[]> = {
 // Re-export zone prefix lookup for backward compatibility — canonical definition is in zoneMappings.ts
 export { getZonePrefix, ZONE_COMMAND_MAP, ZONE_VOLUME_PREFIX, ZONE_VOLUME_UP_DOWN, ZONE_MUTE } from "./zoneMappings.js";
 
-/** Result from parsing an ISCP command — re-exported from eiscp-command-parser.ts */
+// Result from parsing an ISCP command — re-exported from eiscp-command-parser.ts
 export type { CommandResult };
 
-/** Data payload emitted on 'data' event */
+// Data payload emitted on 'data' event
 interface DataPayload {
   command: string | undefined;
   argument: string | number | string[] | Record<string, string> | undefined;
@@ -77,7 +77,7 @@ interface DataPayload {
   model: string | undefined;
 }
 
-/** Discovered AVR device info */
+// Discovered AVR device info
 interface DiscoveredDevice {
   host: string;
   port: string;
@@ -86,7 +86,7 @@ interface DiscoveredDevice {
   areacode: string;
 }
 
-/** Command input as object */
+// Command input as object
 interface CommandInput {
   zone?: string;
   command: string;
@@ -98,12 +98,12 @@ export class EiscpDriver extends EventEmitter {
     return this.isConnected;
   }
 
-  /** Read-only access to the current driver configuration. */
+  // Read-only access to the current driver configuration.
   public get eiscpConfig(): Readonly<EiscpConfig> {
     return this.config;
   }
 
-  /** Merge a partial config patch into the current configuration. */
+  // Merge a partial config patch into the current configuration.
   public updateConfig(patch: Partial<EiscpConfig>): void {
     this.config = { ...this.config, ...patch };
   }
@@ -323,7 +323,7 @@ export class EiscpDriver extends EventEmitter {
           let command = iscpMessage.slice(0, 3);
           let value = iscpMessage.slice(3);
 
-          // log.info("%s RAW (0) RECEIVE: [%s] %s %s", integrationName, command, value);
+          log.info("%s RAW (0) RECEIVE: [%s] %s %s", integrationName, command, value);
 
           if (IGNORED_COMMANDS.has(command)) {
             continue;
@@ -371,7 +371,7 @@ export class EiscpDriver extends EventEmitter {
     }
   }
 
-  /** Enqueue a command to be sent with proper delay between commands */
+  // Enqueue a command to be sent with proper delay between commands
   private enqueueSend(data: string | string[]): Promise<void> {
     const prevQueue = this.sendQueue;
     const task = (async () => {
@@ -393,7 +393,7 @@ export class EiscpDriver extends EventEmitter {
     return task;
   }
 
-  /** Enqueue an incoming message to be emitted with throttle delay */
+  // Enqueue an incoming message to be emitted with throttle delay
   private enqueueIncoming(data: DataPayload): void {
     // Coalesce throttled stream commands: only the latest value per command matters,
     // so stale intermediate frames (e.g. FLD scroll text) are dropped. This reduces
@@ -421,7 +421,7 @@ export class EiscpDriver extends EventEmitter {
     })();
   }
 
-  /** Send a raw ISCP command */
+  // Send a raw ISCP command
   async raw(data: string): Promise<void> {
     if (!data) {
       throw new Error("No data provided");
@@ -459,7 +459,7 @@ export class EiscpDriver extends EventEmitter {
     await this.raw(`NLSI${presetIndex}`); // Select preset by index
   }
 
-  /** Fast TIP detector with validation only when prefix matches */
+  // Fast TIP detector with validation only when prefix matches
   private isTIPCommand(iscpCommand: string): boolean {
     if (!iscpCommand.startsWith("TIP")) {
       return false;
@@ -468,7 +468,7 @@ export class EiscpDriver extends EventEmitter {
     return presetHex.length > 0 && /^[0-9A-Fa-f]+$/.test(presetHex);
   }
 
-  /** Fast NSS extractor supporting both direct NSSxx and embedded command forms */
+  // Fast NSS extractor supporting both direct NSSxx and embedded command forms
   private extractNSSCode(iscpCommand: string): string | undefined {
     const nssIndex = iscpCommand.indexOf("NSS");
     if (nssIndex === -1 || nssIndex + 5 > iscpCommand.length) {
@@ -556,7 +556,7 @@ export class EiscpDriver extends EventEmitter {
     }
   }
 
-  /** Send a command to the AVR */
+  // Send a command to the AVR
   async command(data: string | CommandInput): Promise<void> {
     let command: string, args: string | number, zone: string;
 
@@ -674,13 +674,13 @@ export class EiscpDriver extends EventEmitter {
     return zonePrefix + value;
   }
 
-  /** Get all available commands */
+  // Get all available commands
   getCommands(): string[] {
     const mappings = COMMAND_MAPPINGS as Record<string, string>;
     return Object.keys(mappings);
   }
 
-  /** Get all available values for a command */
+  // Get all available values for a command
   getCommandValues(command: string): string[] {
     const parts = command.split(".");
     const cmd = parts.length === 2 ? parts[1] : parts[0];

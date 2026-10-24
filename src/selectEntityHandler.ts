@@ -15,20 +15,17 @@ export class SelectEntityHandler {
     private readonly driver: uc.IntegrationAPI,
     private readonly connectionManager: IPhysicalConnectionLookup,
     private readonly avrInstanceManager: IAvrInstanceLookup,
-    /** Entity ID suffix to strip when deriving the AVR entry (e.g. "_listening_mode"). */
+    // Entity ID suffix to strip when deriving the AVR entry (e.g. "_listening_mode").
     private readonly entitySuffix: string,
-    /** EISCP command name to send (e.g. "listening-mode"). */
+    // EISCP command name to send (e.g. "listening-mode").
     private readonly eiscpCommand: string,
-    /** Human-readable label used in log messages (e.g. "Listening Mode"). */
+    // Human-readable label used in log messages (e.g. "Listening Mode").
     private readonly logLabel: string,
-    /** Returns the ordered list of valid option strings for the given AVR entry. */
+    // Returns the ordered list of valid option strings for the given AVR entry.
     private readonly getOptions: (avrEntry: string) => string[],
-    /** Optional: translate a UI option label to the eiscp argument sent to the AVR (default: identity). */
+    // Optional: translate a UI option label to the eiscp argument sent to the AVR (default: identity).
     private readonly optionToArg: (option: string) => string = (o) => o,
-    /**
-     * Optional: send a selection to the AVR in a way the command table cannot express. Defaults to
-     * `eiscp.command()` with the configured command and `optionToArg`.
-     */
+    // Optional: send a selection to the AVR in a way the command table cannot express. Defaults to `eiscp.command()` with the configured command and `optionToArg`.
     private readonly sendOptionToAvr?: (eiscp: EiscpInstance, avrEntry: string, zone: string, option: string) => Promise<void>
   ) {
     // Derive "listeningModeHandler:" / "inputSelectorHandler:" from the suffix.

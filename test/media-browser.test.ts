@@ -495,6 +495,7 @@ it("TuneIn service selection preloads My Presets for browsing", async () => {
   const mockDriver = { updateEntityAttributes: () => true } as any;
   const mockEiscp = {
     config: { netMenuDelay: 0, tuneinPresetPosition: 1 },
+    eiscpConfig: { netMenuDelay: 0, tuneinPresetPosition: 1 },
     command: async () => undefined,
     raw: async (cmd: string) => {
       rawCommands.push(cmd);
@@ -530,7 +531,7 @@ it("clears the stale TuneIn now-playing mark after switching to DAB and back to 
   const mockDriver = { updateEntityAttributes: () => true } as any;
   const mockEiscp = {
     config: { netMenuDelay: 0, tuneinPresetPosition: 1 },
-    eiscpConfig: { sendDelay: 0 },
+    eiscpConfig: { sendDelay: 0, netMenuDelay: 0, tuneinPresetPosition: 1 },
     command: async () => undefined,
     raw: async (cmd: string) => {
       rawCommands.push(cmd);

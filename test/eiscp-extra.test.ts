@@ -1,5 +1,12 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 
+// The routing tests are not testing the AVR pacing delays. Keep those delays
+// asynchronous but immediate so TIP/NSS routing does not cost several seconds.
+vi.mock("../src/utils.js", async () => ({
+  ...(await vi.importActual<typeof import("../src/utils.js")>("../src/utils.js")),
+  delay: vi.fn().mockResolvedValue(undefined)
+}));
+
 afterEach(() => {
   vi.restoreAllMocks();
 });

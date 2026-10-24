@@ -25,7 +25,7 @@ export type KnownListeningMode = {
 
 const CONTROL_ALIASES = new Set(["up", "down", "movie", "music", "game", "thx", "auto", "surr", "stereo", "query"]);
 
-/** Known LMD settings grouped by code, preserving the mapping's alias order. */
+// Known LMD settings grouped by code, preserving the mapping's alias order.
 export function getKnownListeningModes(): KnownListeningMode[] {
   const byCode = new Map<string, string[]>();
   const values = eiscpCommands.commands.LMD.values as Record<string, { name: string | string[] }>;
@@ -45,7 +45,7 @@ export function getKnownListeningModes(): KnownListeningMode[] {
     .sort((a, b) => a.aliases[0].localeCompare(b.aliases[0]));
 }
 
-/** Normalize one persisted preference map, retaining only known codes and valid aliases. */
+// Normalize one persisted preference map, retaining only known codes and valid aliases.
 export function normalizeListeningModePreferences(raw: unknown): ListeningModePreferences {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
   const input = raw as Record<string, unknown>;
@@ -87,7 +87,7 @@ export function normalizeListeningModes(raw: unknown): ListeningModes {
   return result;
 }
 
-/** Resolve configured options, using the learned AVR name for the default "learn" choice. */
+// Resolve configured options, using the learned AVR name for the default "learn" choice.
 export function resolveListeningModePreferences(preferences: ListeningModePreferences | undefined, learned: LearnedListeningMode[]): string[] | undefined {
   if (!preferences) return undefined;
   const learnedByCode = new Map(learned.map((mode) => [mode.code.toUpperCase(), mode.name]));

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { getEffectiveInputSourceOptions, resolveInputSourceList } from "../src/inputSourceResolver.js";
+import { getEffectiveInputSourceOptions, resolveCanonicalInputSource, resolveInputSourceList } from "../src/inputSourceResolver.js";
 import { clearAllAvrInputs, setAvrInputs } from "../src/inputSourceStore.js";
 import { parseAvrInfo, setAvrInfo, resetAvrInfo } from "../src/avrInfoStore.js";
 import { readFileSync } from "node:fs";
@@ -127,5 +127,11 @@ describe("inputSourceResolver", () => {
     const config = { ...AVR_CONFIG, inputSelectorOptions: ["bd", "tv", "cd"] };
 
     expect(getEffectiveInputSourceOptions(config, "TX-RZ50 192.168.2.103", ["bd", "tv", "cd"])).toEqual(["Blu-ray", "Television"]);
+  });
+
+  it("keeps AVR-learned display names separate from canonical source state", () => {
+    setAvrInputs("TX-RZ50 192.168.2.103", [{ id: "2b", name: "Network" }]);
+
+    expect(resolveCanonicalInputSource("TX-RZ50 192.168.2.103", "Network")).toBe("net");
   });
 });

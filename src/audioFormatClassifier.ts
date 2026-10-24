@@ -1,6 +1,6 @@
 // Shared audio format classification — single source of truth for detecting format type from an IFA audio input string.
 
-/** Audio format type categories for listening-mode filtering */
+// Audio format type categories for listening-mode filtering
 export enum AudioFormatType {
   Analog = "analog",
   DTS = "dts",
@@ -47,7 +47,7 @@ export function classifyAudioFormat(audioInput: string): AudioFormatType | null 
   return AudioFormatType.Stereo;
 }
 
-/** Human-readable display name for each audio format type. */
+// Human-readable display name for each audio format type.
 export function formatAudioTypeName(type: AudioFormatType | null): string {
   switch (type) {
     case AudioFormatType.DolbyAtmos:

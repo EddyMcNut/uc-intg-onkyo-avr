@@ -50,7 +50,7 @@ export async function waitForNlaIngestion(entityId: string): Promise<void> {
   const state = getMusicServerBrowseState(entityId);
   const totalExpected = state?.totalListItemCount ?? 0;
   const currentCount = listMusicServerMenuOptions(entityId).length;
-  if (totalExpected > 0 && currentCount >= totalExpected) {
+  if (totalExpected === 0 || currentCount >= totalExpected) {
     return;
   }
 

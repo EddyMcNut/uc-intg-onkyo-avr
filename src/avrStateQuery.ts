@@ -12,7 +12,7 @@ const QUERY_TTL = WAIT_FOR_CONNECT_TIMEOUT;
 class AvrStateQueryService {
   private readonly lastQueries: Map<string, number> = new Map();
 
-  /** Returns true when enough time has passed since the last query for this entity. */
+  // Returns true when enough time has passed since the last query for this entity.
   shouldQuery(entityId: string): boolean {
     const now = Date.now();
     const last = this.lastQueries.get(entityId) ?? 0;
@@ -24,12 +24,12 @@ class AvrStateQueryService {
     return false;
   }
 
-  /** Record that the given entity was just queried. */
+  // Record that the given entity was just queried.
   recordQuery(entityId: string): void {
     this.lastQueries.set(entityId, Date.now());
   }
 
-  /** Record multiple queries at once (used by batch operations). */
+  // Record multiple queries at once (used by batch operations).
   recordQueries(avrEntries: Iterable<string>): void {
     const now = Date.now();
     for (const e of avrEntries) {
@@ -78,5 +78,5 @@ class AvrStateQueryService {
   }
 }
 
-/** Singleton instance shared by all callers. */
+// Singleton instance shared by all callers.
 export const avrStateQueryService = new AvrStateQueryService();

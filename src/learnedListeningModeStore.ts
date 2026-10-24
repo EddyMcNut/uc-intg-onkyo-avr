@@ -10,7 +10,7 @@ function modesForAvr(avrId: string): LearnedListeningMode[] {
   return Object.entries(avr?.listeningModes ?? {}).map(([code, mode]) => ({ code, name: mode.name }));
 }
 
-/** Return all observed modes for an AVR. Context is intentionally not tracked. */
+// Return all observed modes for an AVR. Context is intentionally not tracked.
 export function getLearnedListeningModes(entityId: string, _source?: string, _audioFormat?: string): LearnedListeningMode[] {
   const avrId = physicalAvrIdFromEntityId(entityId);
   return avrId ? modesForAvr(avrId).map((mode) => ({ ...mode })) : [];
@@ -26,7 +26,7 @@ export function findLearnedListeningModeName(physicalAvrId: string, code: string
   return modesForAvr(physicalAvrId).find((mode) => mode.code === wanted)?.name;
 }
 
-/** Learn an observed mode and persist it on the matching AVR configuration. */
+// Learn an observed mode and persist it on the matching AVR configuration.
 export function learnListeningMode(entityId: string, mode: LearnedListeningMode): boolean {
   const avrId = physicalAvrIdFromEntityId(entityId);
   if (!avrId) return false;

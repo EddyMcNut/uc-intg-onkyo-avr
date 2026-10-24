@@ -2,7 +2,7 @@
 
 import { AudioFormatType, classifyAudioFormat } from "./audioFormatClassifier.js";
 
-/** Listening modes that work with stereo sources (2.0 audio) */
+// Listening modes that work with stereo sources (2.0 audio)
 const stereoCompatibleModes = [
   "all-ch-stereo",
   "extended-stereo",
@@ -46,7 +46,7 @@ const stereoCompatibleModes = [
   "whole-house"
 ];
 
-/** Listening modes that work with Dolby Digital (AC3) sources */
+// Listening modes that work with Dolby Digital (AC3) sources
 const dolbyDigitalModes = [
   ...stereoCompatibleModes,
   "action",
@@ -80,7 +80,7 @@ const dolbyDigitalModes = [
   "thx-u2"
 ];
 
-/** Listening modes that work with DTS sources */
+// Listening modes that work with DTS sources
 const dtsModes = [
   ...stereoCompatibleModes,
   "action",
@@ -114,10 +114,10 @@ const dtsModes = [
   "thx-music"
 ];
 
-/** Listening modes that work with Dolby TrueHD sources */
+// Listening modes that work with Dolby TrueHD sources
 const dolbyTrueHDModes = [...dolbyDigitalModes, "pliiz-height", "pliiz-height-thx-cinema", "pliiz-height-thx-games", "pliiz-height-thx-music", "pliiz-height-thx-u2"];
 
-/** Listening modes that work with DTS-HD sources */
+// Listening modes that work with DTS-HD sources
 const dtsHDModes = [
   ...dtsModes,
   "audyssey-dsx",
@@ -131,16 +131,16 @@ const dtsHDModes = [
   "plii-music-audyssey-dsx"
 ];
 
-/** Listening modes that work with Dolby Atmos sources */
+// Listening modes that work with Dolby Atmos sources
 const dolbyAtmosModes = [...dolbyTrueHDModes];
 
-/** Listening modes that work with DTS:X sources */
+// Listening modes that work with DTS:X sources
 const dtsXModes = [...dtsHDModes];
 
-/** Listening modes that work with multichannel PCM */
+// Listening modes that work with multichannel PCM
 const multichannelPCMModes = [...stereoCompatibleModes, "action", "film", "mono-movie", "musical", "straight-decode", "surround"];
 
-/** Listening modes that work with analog inputs */
+// Listening modes that work with analog inputs
 const analogModes = [...stereoCompatibleModes];
 
 // Returns compatible listening modes for the given audio format string, or null if format is unknown.

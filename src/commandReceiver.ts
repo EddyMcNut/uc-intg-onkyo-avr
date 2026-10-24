@@ -1,7 +1,7 @@
 import * as uc from "@unfoldedcircle/integration-api";
 import { SelectAttributes } from "@unfoldedcircle/integration-api";
 import { IntegrationConfig, buildEntityId, buildPhysicalAvrId, physicalAvrIdFromEntityId, resolveVolumeScale } from "./configManager.js";
-import { resolveInputSourceId } from "./inputSourceResolver.js";
+import { resolveCanonicalInputSource, resolveInputSourceId } from "./inputSourceResolver.js";
 import { findTunerPresetByName, findTunerPresetNameBySlot } from "./tunerPresetStore.js";
 import { EiscpDriver } from "./eiscp.js";
 import { getCompatibleListeningModes } from "./listeningModeFilters.js";
@@ -306,14 +306,16 @@ export class CommandReceiver {
 
   private async handleInputSelector(avrUpdates: AvrUpdateEvent, entityId: string, eventZone: string): Promise<void> {
     const aliases = Array.isArray(avrUpdates.argument) ? (avrUpdates.argument as string[]) : [avrUpdates.argument.toString()];
-    let source = aliases[0];
+    const displaySource = aliases[0];
+    const physicalAvr = physicalAvrIdFromEntityId(entityId);
+    const source = physicalAvr ? resolveCanonicalInputSource(physicalAvr, displaySource) : displaySource;
     this.avrStateApi.setSource(entityId, source, this.eiscpInstance, eventZone, this.driver);
     this.driver.updateEntityAttributes(entityId, {
-      [uc.MediaPlayerAttributes.Source]: source
+      [uc.MediaPlayerAttributes.Source]: displaySource
     });
-    log.info("%s [%s] input-selector (source) set to: %s", integrationName, entityId, source);
+    log.info("%s [%s] input-selector (source) set to: %s (canonical: %s)", integrationName, entityId, displaySource, source);
     this.driver.updateEntityAttributes(`${entityId}_input_selector`, {
-      [SelectAttributes.CurrentOption]: source
+      [SelectAttributes.CurrentOption]: displaySource
     });
     this.zoneAgnosticProcessor.resetZone(entityId);
     await this.zoneAgnosticProcessor.renderEntity(entityId);
