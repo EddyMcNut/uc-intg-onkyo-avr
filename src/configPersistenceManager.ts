@@ -143,10 +143,15 @@ export class ConfigPersistenceManager {
       const selected =
         parsed.idInputSources?.[id]?.setting ??
         existing[id]?.setting ??
-        // A discovered AVR name is the default choice.  The setup form presents it
-        // as "learned from AVR"; defaulting the persisted value to exclude here
-        // caused an unchanged setup page to turn every discovered source off.
-        (parsed.inputSourceDiscoveryAvailable && (parsed.inputSources?.length ?? 0) > 0 ? LEARNED_INPUT_SOURCE : (aliases[0] ?? EXCLUDE_INPUT_SOURCE));
+        // A discovered AVR name is the default choice for sources the AVR actually
+        // reported. Sources known to the integration but absent from that report
+        // must remain excluded; otherwise saving setup adds legacy names back into
+        // the selector alongside the learned AVR names.
+        (parsed.inputSourceDiscoveryAvailable && (parsed.inputSources?.length ?? 0) > 0
+          ? reported.has(id)
+            ? LEARNED_INPUT_SOURCE
+            : EXCLUDE_INPUT_SOURCE
+          : (aliases[0] ?? EXCLUDE_INPUT_SOURCE));
       result[id] = { name, setting: selected || LEARNED_INPUT_SOURCE };
     }
     return result;
