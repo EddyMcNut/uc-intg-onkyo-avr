@@ -51,7 +51,9 @@ describe("SetupFormBuilder", () => {
     const reported = Array.from({ length: 25 }, (_, index) => ({ id: `${index + 1}`, name: `Input ${index + 1}` }));
     const reportedValues = values({ inputSources: reported, inputSourceDiscoveryAvailable: true });
     expect(builder.getInputSourcePageCount(reportedValues)).toBe(3);
-    expect((builder.buildInputSourcePage(reportedValues, 1, 3).settings as unknown[]).length).toBe(13);
+    const firstInputPage = builder.buildInputSourcePage(reportedValues, 1, 3);
+    expect((firstInputPage.settings as unknown[]).length).toBe(13);
+    expect((firstInputPage.settings[1] as any).field.dropdown.value).toBe("learned");
     expect((builder.buildInputSourcePage(reportedValues, 3, 3).settings as unknown[]).length).toBe(2);
   });
 });
