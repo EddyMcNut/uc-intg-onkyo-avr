@@ -319,13 +319,13 @@ export class SetupFormBuilder {
             items: [
               ...(values.listeningModePreferences[mode.code] === LEARNED_LISTENING_MODE ||
               (values.listeningModePreferences[mode.code] === LEARN_LISTENING_MODE && values.listeningModeNames[mode.code] && values.listeningModeNames[mode.code] !== mode.aliases[0])
-                ? [{ id: LEARNED_LISTENING_MODE, label: { en: "✓ learned from AVR" } }]
+                ? [{ id: LEARNED_LISTENING_MODE, label: { en: "✅ Learned from AVR" } }]
                 : []),
               {
                 id: LEARN_LISTENING_MODE,
-                label: { en: "Learn from AVR (default)" }
+                label: { en: "✨ Learn from AVR (default)" }
               },
-              { id: EXCLUDE_LISTENING_MODE, label: { en: "Exclude from integration" } },
+              { id: EXCLUDE_LISTENING_MODE, label: { en: "🚫 Exclude from integration" } },
               ...mode.aliases.map((alias) => ({ id: alias, label: { en: alias } }))
             ]
           }
@@ -356,8 +356,8 @@ export class SetupFormBuilder {
       const aliases = avrSource ? getAliasesForReportedInput(id, avrSource.name) : (knownSource?.aliases ?? []);
       const learned = avrSource?.name ?? (configured?.setting === LEARNED_INPUT_SOURCE ? configured.name : undefined);
       const items = [
-        ...(learned ? [{ id: LEARNED_INPUT_SOURCE, label: { en: "✓ learned from AVR" } }] : []),
-        { id: EXCLUDE_INPUT_SOURCE, label: { en: "Exclude from integration" } },
+        ...(learned ? [{ id: LEARNED_INPUT_SOURCE, label: { en: "✅ Learned from AVR" } }] : []),
+        { id: EXCLUDE_INPUT_SOURCE, label: { en: "🚫 Exclude from integration" } },
         ...aliases.map((alias) => ({ id: alias, label: { en: alias } }))
       ];
       const value = hasUsableReport
