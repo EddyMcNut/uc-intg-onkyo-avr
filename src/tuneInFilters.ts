@@ -30,6 +30,8 @@ export function looksLikeTuneInDirectory(title: string, iconId?: string): boolea
 
   return [
     "login",
+    "logout",
+    "log out",
     "search",
     "browse",
     "my presets",
