@@ -124,9 +124,10 @@ it("TuneIn adapter contract clears stale now-playing marks on fresh entry (even 
     getTuneInMenuBrowseState: (entityId: string) => { nowPlayingTitle: string } | null;
     setTuneInMenuNowPlayingStation: (entityId: string, station: string) => void;
   };
-  const { addTuneInPreset, getTuneInBrowseState, updateNowPlayingStation } = tuneInBrowserStoreModule as {
+  const { addTuneInPreset, getTuneInBrowseState, listTuneInPresets, updateNowPlayingStation } = tuneInBrowserStoreModule as {
     addTuneInPreset: (entityId: string, title: string, stationKey: string, rawLabel: string, resolver: () => string) => void;
     getTuneInBrowseState: (entityId: string) => { nowPlayingStation: string } | null;
+    listTuneInPresets: (entityId: string) => unknown[];
     updateNowPlayingStation: (entityId: string, candidate: string) => void;
   };
 
@@ -165,6 +166,7 @@ it("TuneIn adapter contract clears stale now-playing marks on fresh entry (even 
 
   expect(getTuneInBrowseState(activeZone)?.nowPlayingStation).toBe("");
   expect(getTuneInMenuBrowseState(activeZone)?.nowPlayingTitle).toBe("");
+  expect(listTuneInPresets(activeZone)).toHaveLength(0);
 });
 
 it("Tidal adapter contract ingests NLA and metadata for active zones", async () => {

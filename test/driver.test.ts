@@ -893,7 +893,7 @@ describe("OnkyoDriver", () => {
       await driver.handleDriverSetup({ command: "start" } as any);
 
       const command = vi.fn();
-      mockConnectionManager.getPhysicalConnection.mockImplementation((physicalAVR: string) => ({ eiscp: { command } }));
+      mockConnectionManager.getPhysicalConnection.mockImplementation((physicalAVR: string) => ({ eiscp: { command, connected: true } }));
 
       await mockSetupHost.current.onConfigSaved();
 

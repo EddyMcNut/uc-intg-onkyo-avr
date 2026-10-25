@@ -127,6 +127,18 @@ export function resetTuneInBrowseState(entityId: string): void {
   state.nowPlayingStation = "";
 }
 
+// Clear the cached preset list before a fresh TuneIn service entry. The cache is
+// intentionally retained during normal updates, but a new entry must re-harvest
+// the AVR's current My Presets list so newly added or removed stations appear.
+export function clearTuneInPresets(entityId: string): void {
+  const state = getTuneInBrowseState(entityId);
+  if (!state) {
+    return;
+  }
+  state.presetsByMenuIndex.clear();
+  state.presetIndexByTitle.clear();
+}
+
 export function listTuneInPresets(entityId: string): TuneInPreset[] {
   const state = getTuneInBrowseState(entityId);
   if (!state) {

@@ -10,6 +10,8 @@ import { ZoneAgnosticMediaStateStore } from "./zoneAgnosticMediaState.js";
 const integrationName = "zoneMediaRenderer:";
 
 export class ZoneMediaRenderer {
+  private readonly imageHashInFlight = new Map<string, Promise<string>>();
+
   constructor(
     private readonly driver: uc.IntegrationAPI,
     private config: IntegrationConfig,
@@ -118,6 +120,23 @@ export class ZoneMediaRenderer {
   }
 
   private async getImageHash(url: string, entityId: string): Promise<string> {
+    const existingRequest = this.imageHashInFlight.get(url);
+    if (existingRequest) {
+      return existingRequest;
+    }
+
+    const request = this.fetchImageHash(url, entityId);
+    this.imageHashInFlight.set(url, request);
+    try {
+      return await request;
+    } finally {
+      if (this.imageHashInFlight.get(url) === request) {
+        this.imageHashInFlight.delete(url);
+      }
+    }
+  }
+
+  private async fetchImageHash(url: string, entityId: string): Promise<string> {
     // Fast path: cheap conditional check via HTTP headers so an unchanged image is never
     // fully re-downloaded. Most AVR web servers expose an ETag or Last-Modified header.
     try {

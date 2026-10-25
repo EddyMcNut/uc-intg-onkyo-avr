@@ -15,7 +15,7 @@ import {
 import { getDeezerBrowseState, resetDeezerBrowseState } from "./deezerBrowserStore.js";
 import { getMusicServerBrowseState, resetMusicServerBrowseState } from "./musicServerBrowserStore.js";
 import { getTidalBrowseState, resetTidalBrowseState } from "./tidalBrowserStore.js";
-import { resetTuneInBrowseState, updateNowPlayingStation } from "./tuneInBrowserStore.js";
+import { clearTuneInPresets, resetTuneInBrowseState, updateNowPlayingStation } from "./tuneInBrowserStore.js";
 import { resetTuneInMenuBrowseState, setTuneInMenuNowPlayingStation, updateTuneInMenuNowPlayingStation } from "./tuneInMenuStore.js";
 import { DEEZER_SERVICE_ID, MUSIC_SERVER_SERVICE_ID, TIDAL_SERVICE_ID, TUNEIN_SERVICE_ID } from "./browseServiceContract.js";
 
@@ -70,7 +70,11 @@ export class TuneInZoneAgnosticAdapter implements ZoneAgnosticServiceAdapter {
     // Use the full affected zone list: if the internal sub-source still reports TuneIn (e.g. after
     // AVR standby or re-selecting the same source), enteringZones can be empty and the stale mark
     // would otherwise survive.
-    this.clearNowPlayingForZones(affectedZones.length > 0 ? affectedZones : enteringZones);
+    const refreshedZones = affectedZones.length > 0 ? affectedZones : enteringZones;
+    this.clearNowPlayingForZones(refreshedZones);
+    for (const zoneEntityId of refreshedZones) {
+      clearTuneInPresets(zoneEntityId);
+    }
 
     await this.maybePreloadTuneIn(sourceEntityId, affectedZones);
   }

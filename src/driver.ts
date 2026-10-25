@@ -427,7 +427,7 @@ export default class OnkyoDriver {
       queried.add(physicalAVR);
 
       const eiscp = this.connectionManager?.getPhysicalConnection(physicalAVR)?.eiscp;
-      if (!eiscp) {
+      if (!eiscp || !eiscp.connected) {
         log.debug("%s [%s] Not connected, cannot collect the AVR info", integrationName, buildEntityId(avrConfig.model, avrConfig.ip, avrConfig.zone));
         continue;
       }
