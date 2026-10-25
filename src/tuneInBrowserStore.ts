@@ -65,14 +65,23 @@ export function setTuneInBrowseContextState(entityId: string, title: string): vo
   }
 }
 
-export function addTuneInPreset(entityId: string, title: string, stationKey: string, rawLabel: string, thumbnailResolver: (state: TuneInBrowseState, title: string) => string): void {
+export function addTuneInPreset(
+  entityId: string,
+  title: string,
+  stationKey: string,
+  rawLabel: string,
+  thumbnailResolver: (state: TuneInBrowseState, title: string) => string,
+  reportedIndex?: number
+): void {
   const state = getTuneInBrowseState(entityId);
   if (!state) {
     return;
   }
 
-  const existingPresetIndex = state.presetIndexByTitle.get(title);
-  const presetIndex = existingPresetIndex ?? state.presetIndexByTitle.size + 1;
+  const existingPresetIndex =
+    state.presetIndexByTitle.get(title) ??
+    [...state.presetsByMenuIndex.values()].find((preset) => preset.stationKey.toLowerCase() === stationKey.toLowerCase() || preset.rawLabel.toLowerCase() === rawLabel.toLowerCase())?.presetIndex;
+  const presetIndex = existingPresetIndex ?? reportedIndex ?? state.presetIndexByTitle.size + 1;
 
   if (existingPresetIndex === undefined) {
     state.presetIndexByTitle.set(title, presetIndex);

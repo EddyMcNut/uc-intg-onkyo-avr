@@ -109,4 +109,13 @@ describe("tuneInBrowserStore", () => {
     expect(presets[0].title).toBe("A Station");
     expect(presets[1].title).toBe("Z Station");
   });
+
+  it("keeps the AVR-reported menu index when ingesting entries in multiple formats", () => {
+    const id = "I 1.2.3.4 main";
+    store.addTuneInPreset(id, "Station A", "a", "Station A", vi.fn(), 1);
+    store.addTuneInPreset(id, "Station B", "b", "Station B", vi.fn(), 2);
+    store.addTuneInPreset(id, "Station A", "a", "Station A", vi.fn(), 1);
+
+    expect(store.listTuneInPresets(id).map((preset: any) => preset.presetIndex)).toEqual([1, 2]);
+  });
 });

@@ -83,6 +83,7 @@ export class TuneInMediaBrowser {
       return;
     }
 
+    // NLS indices are relative to the current window; use the XML list index when it arrives.
     addTuneInPreset(entityId, title, extractTuneInStationKey(rawTitle), rawTitle, getOrCreateTuneInThumbnail);
   }
 
@@ -135,12 +136,13 @@ export class TuneInMediaBrowser {
       return;
     }
 
-    for (const item of parseTuneInXmlItems(xmlPayload)) {
+    const xmlOffset = getXmlOffset(xmlPayload);
+    for (const [i, item] of parseTuneInXmlItems(xmlPayload).entries()) {
       if (!item.title || looksLikeTuneInDirectory(item.title, item.iconId)) {
         continue;
       }
 
-      addTuneInPreset(entityId, item.title, item.stationKey, item.rawLabel, getOrCreateTuneInThumbnail);
+      addTuneInPreset(entityId, item.title, item.stationKey, item.rawLabel, getOrCreateTuneInThumbnail, xmlOffset + i + 1);
     }
   }
 
