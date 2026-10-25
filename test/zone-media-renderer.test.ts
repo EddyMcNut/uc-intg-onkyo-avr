@@ -68,6 +68,36 @@ describe("renderZoneMedia", () => {
     );
   });
 
+  it("collects album art after Network is normalized to the internal net source", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      headers: { get: () => '"tunein-art"' },
+      ok: true
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    try {
+      const { avrStateManager } = await import("../src/avrState.js");
+      const entityId = `M 1.2.3.4 main network-normalization-${Date.now()}`;
+      avrStateManager.setSource(entityId, "Network");
+
+      const mocks = await createRenderer({
+        config: makeConfig({ albumArtURL: "album_art.cgi" }),
+        avrStateApiMock: makeAvrStateApiMock({ getSource: vi.fn(() => avrStateManager.getSource(entityId)) }),
+        mediaStateStoreMock: makeMediaStateStoreMock({
+          getNowPlaying: vi.fn().mockReturnValue({ title: "TuneIn station", album: "", artist: "TuneIn" }),
+          getCurrentTrackId: vi.fn().mockReturnValue("old|track|id"),
+          getSharedAvrMediaState: vi.fn().mockReturnValue({ currentImageUrl: "", lastImageHash: "" })
+        })
+      });
+
+      await mocks.renderer.renderZoneMedia(entityId, false);
+
+      expect(avrStateManager.getSource(entityId)).toBe("net");
+      expect(fetchMock).toHaveBeenCalledWith("http://1.2.3.4/album_art.cgi", { method: "HEAD" });
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("does not update attributes for net source when track unchanged and not forced", async () => {
     const mocks = await createRenderer({
       avrStateApiMock: makeAvrStateApiMock({ getSource: vi.fn().mockReturnValue("net") }),
