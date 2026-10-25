@@ -12,6 +12,31 @@ import { REMOTE_SUFFIX } from "./sensorSuffixes.js";
 
 const integrationName = "avrState:";
 
+// The AVR may report friendly input names instead of the short aliases used by the
+// integration internally. Keep the state vocabulary canonical so source-dependent
+// features (NET browsing, metadata and album art) work with AVR-reported inputs too.
+const SOURCE_ALIASES: Record<string, string> = {
+  network: "net",
+  net: "net",
+  "music-server": "music-server",
+  musicserver: "music-server",
+  "internet-radio": "internet-radio",
+  internetradio: "internet-radio",
+  "iradio-favorite": "internet-radio-favorite",
+  iradiofavorite: "internet-radio-favorite",
+  usb: "usb",
+  bluetooth: "bluetooth",
+  tuner: "tuner",
+  fm: "fm",
+  am: "am",
+  dab: "dab"
+};
+
+function normalizeSource(source: string): string {
+  const normalized = source.trim().toLowerCase().replace(/\s+/g, "-");
+  return SOURCE_ALIASES[normalized] ?? normalized;
+}
+
 /** State for a single AVR entity */
 interface EntityState {
   source: string;
@@ -159,7 +184,7 @@ export class AvrStateManager {
   /** Set source for an entity, returns true if changed */
   setSource(entityId: string, source: string, eiscpInstance?: EiscpDriver, zone?: string, _driver?: uc.IntegrationAPI): boolean {
     const state = this.getState(entityId);
-    const normalizedSource = source.toLowerCase();
+    const normalizedSource = normalizeSource(source);
 
     if (state.source !== normalizedSource) {
       log.info("%s [%s] source changed from '%s' to '%s'", integrationName, entityId, state.source, source);

@@ -32,17 +32,21 @@ export class ZoneMediaRenderer {
     const imageUrl = `http://${this.config.ip}/${this.config.albumArtURL}`;
     const previousHash = sharedState.lastImageHash;
 
-    let newHash = await this.getImageHash(imageUrl);
+    log.debug("%s [%s] collecting album art from %s", integrationName, entityId, imageUrl);
+    let newHash = await this.getImageHash(imageUrl, entityId);
     let attempts = 0;
     while (newHash === previousHash && attempts < 3) {
       attempts += 1;
       await delay(500);
-      newHash = await this.getImageHash(imageUrl);
+      newHash = await this.getImageHash(imageUrl, entityId);
     }
 
     if (newHash !== previousHash) {
       sharedState.lastImageHash = newHash;
       sharedState.currentImageUrl = `${imageUrl}?hash=${newHash}`;
+      log.debug("%s [%s] album art URL updated to %s", integrationName, entityId, sharedState.currentImageUrl);
+    } else {
+      log.debug("%s [%s] album art unchanged (hash %s)", integrationName, entityId, newHash || "empty");
     }
 
     if (sharedState.currentImageUrl) {
@@ -113,11 +117,12 @@ export class ZoneMediaRenderer {
     }
   }
 
-  private async getImageHash(url: string): Promise<string> {
+  private async getImageHash(url: string, entityId: string): Promise<string> {
     // Fast path: cheap conditional check via HTTP headers so an unchanged image is never
     // fully re-downloaded. Most AVR web servers expose an ETag or Last-Modified header.
     try {
       const headResponse = await fetch(url, { method: "HEAD" });
+      log.debug("%s [%s] album art HEAD %s -> HTTP %s", integrationName, entityId, url, headResponse.status);
       const etag = headResponse.headers.get("etag");
       const lastModified = headResponse.headers.get("last-modified");
       const token = etag ?? lastModified;
@@ -130,6 +135,7 @@ export class ZoneMediaRenderer {
 
     try {
       const response = await fetch(url);
+      log.debug("%s [%s] album art GET %s -> HTTP %s", integrationName, entityId, url, response.status);
       if (!response.ok) {
         return "";
       }
