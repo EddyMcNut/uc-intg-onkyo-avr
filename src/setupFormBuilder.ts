@@ -2,7 +2,7 @@
 import * as uc from "@unfoldedcircle/integration-api";
 import { ParsedManualConfig } from "./manualConfigParser.js";
 import { EXCLUDE_LISTENING_MODE, getKnownListeningModes, LEARNED_LISTENING_MODE, LEARN_LISTENING_MODE, normalizeListeningModeSetting } from "./listeningModePreferences.js";
-import { EXCLUDE_INPUT_SOURCE, getAliasesForReportedInput, getKnownInputSources, LEARNED_INPUT_SOURCE } from "./inputSourcePreferences.js";
+import { EXCLUDE_INPUT_SOURCE, getAliasesForReportedInput, getKnownInputSources, LEARNED_INPUT_SOURCE, LEARN_INPUT_SOURCE } from "./inputSourcePreferences.js";
 
 export class SetupFormBuilder {
   buildManualConfigForm(values: ParsedManualConfig): uc.RequestUserInput {
@@ -357,17 +357,22 @@ export class SetupFormBuilder {
       const learned = avrSource?.name ?? (configured?.setting === LEARNED_INPUT_SOURCE ? configured.name : undefined);
       const items = [
         ...(learned ? [{ id: LEARNED_INPUT_SOURCE, label: { en: "✅ Learned from AVR" } }] : []),
+        ...(learned ? [{ id: LEARN_INPUT_SOURCE, label: { en: "✨ Learn from AVR (default)" } }] : []),
         { id: EXCLUDE_INPUT_SOURCE, label: { en: "🚫 Exclude from integration" } },
         ...aliases.map((alias) => ({ id: alias, label: { en: alias } }))
       ];
       const value = hasUsableReport
         ? configured?.setting === EXCLUDE_INPUT_SOURCE
           ? EXCLUDE_INPUT_SOURCE
-          : configured?.setting && aliases.includes(configured.setting)
-            ? configured.setting
-            : learned
-              ? LEARNED_INPUT_SOURCE
-              : EXCLUDE_INPUT_SOURCE
+          : configured?.setting === LEARNED_INPUT_SOURCE
+            ? LEARNED_INPUT_SOURCE
+            : configured?.setting === LEARN_INPUT_SOURCE
+              ? LEARN_INPUT_SOURCE
+              : configured?.setting && aliases.includes(configured.setting)
+                ? configured.setting
+                : learned
+                  ? LEARNED_INPUT_SOURCE
+                  : EXCLUDE_INPUT_SOURCE
         : configured?.setting || (learned ? LEARNED_INPUT_SOURCE : (aliases[0] ?? EXCLUDE_INPUT_SOURCE));
       return { id, label: learned ?? aliases[0] ?? `AVR input ${id}`, value, items };
     });

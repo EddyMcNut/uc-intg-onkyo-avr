@@ -4,7 +4,7 @@ import { ConfigManager, type AvrConfig, type AvrZone, AVR_DEFAULTS, type Integra
 import { getKnownListeningModes } from "./listeningModePreferences.js";
 import { setLogLevel } from "./loggers.js";
 import { type ParsedManualConfig } from "./manualConfigParser.js";
-import { getInputSourceAliases, EXCLUDE_INPUT_SOURCE, LEARNED_INPUT_SOURCE, getKnownInputSources } from "./inputSourcePreferences.js";
+import { getInputSourceAliases, EXCLUDE_INPUT_SOURCE, LEARN_INPUT_SOURCE, LEARNED_INPUT_SOURCE, getKnownInputSources } from "./inputSourcePreferences.js";
 import type { InputSourceSettings } from "./configConstants.js";
 
 export interface OnConfigSavedCallback {
@@ -120,7 +120,10 @@ export class ConfigPersistenceManager {
       getKnownListeningModes().map((mode) => [
         mode.code,
         {
-          name: preferences[mode.code] === "learn" ? mode.aliases[0] : (names[mode.code] ?? existing[mode.code]?.name ?? mode.aliases[0]),
+          // Keep the AVR-learned name when the user selects "learn" again. The
+          // setting controls whether the learned value is used; replacing its
+          // name here would erase the learned mode during setup reconfiguration.
+          name: names[mode.code] ?? existing[mode.code]?.name ?? mode.aliases[0],
           setting: preferences[mode.code] ?? existing[mode.code]?.setting ?? "learn"
         }
       ])

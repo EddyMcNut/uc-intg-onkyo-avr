@@ -2,6 +2,7 @@ import { eiscpMappings } from "./eiscp-mappings.js";
 import { normalizeInputSourceSettings, type InputSourceSettings } from "./configConstants.js";
 
 export const LEARNED_INPUT_SOURCE = "learned";
+export const LEARN_INPUT_SOURCE = "learn";
 export const EXCLUDE_INPUT_SOURCE = "exclude";
 
 export type KnownInputSource = { id: string; aliases: string[] };
@@ -57,7 +58,7 @@ export function normalizeInputSources(raw: unknown): InputSourceSettings {
 export function resolveConfiguredInputSources(settings: InputSourceSettings | undefined): string[] {
   return Object.entries(settings ?? {})
     .filter(([, entry]) => entry.setting !== EXCLUDE_INPUT_SOURCE)
-    .map(([id, entry]) => (entry.setting === LEARNED_INPUT_SOURCE ? entry.name : entry.setting || entry.name || getInputSourceAliases(id)[0]))
+    .map(([id, entry]) => ([LEARN_INPUT_SOURCE, LEARNED_INPUT_SOURCE].includes(entry.setting) ? entry.name : entry.setting || entry.name || getInputSourceAliases(id)[0]))
     .filter((name, index, all) => Boolean(name) && all.indexOf(name) === index)
     .sort((a, b) => a.localeCompare(b));
 }

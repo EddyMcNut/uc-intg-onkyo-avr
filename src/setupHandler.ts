@@ -8,6 +8,7 @@ import { SetupFormBuilder } from "./setupFormBuilder.js";
 import { BackupRestoreManager } from "./backupRestoreManager.js";
 import { ConfigPersistenceManager } from "./configPersistenceManager.js";
 import type { AvrInput } from "./inputSourceStore.js";
+import { LEARNED_INPUT_SOURCE, LEARN_INPUT_SOURCE } from "./inputSourcePreferences.js";
 
 const _integrationName = "setupHandler:";
 
@@ -115,7 +116,7 @@ export default class SetupHandler {
         if (discovery.model && discovery.ip) {
           this.pendingManualConfig = { ...this.pendingManualConfig, model: discovery.model, ipAddress: discovery.ip, port: discovery.port ?? 60128 };
         }
-        this.pendingManualConfig = { ...this.pendingManualConfig, inputSources: discovery.inputs, inputSourceDiscoveryAvailable: discovery.available };
+        this.pendingManualConfig = this.applyInputSourceDiscovery(this.pendingManualConfig, discovery.inputs, discovery.available);
         const refreshed = this.configParser.parse(this.pendingManualConfig, ConfigManager.get().logLevel ?? "warn");
         this.manualConfigPage = 2;
         return this.formBuilder.buildManualConfigPage2(refreshed);
@@ -355,13 +356,26 @@ export default class SetupHandler {
           port: Number(this.pendingManualConfig.port ?? 60128)
         })
       : { inputs: [], available: false };
-    this.pendingManualConfig = { ...this.pendingManualConfig, inputSources: discovery.inputs, inputSourceDiscoveryAvailable: discovery.available };
+    this.pendingManualConfig = this.applyInputSourceDiscovery(this.pendingManualConfig, discovery.inputs, discovery.available);
     const parsed = this.configParser.parse(this.pendingManualConfig, ConfigManager.get().logLevel ?? "warn");
     this.inputSourcePageCount = this.formBuilder.getInputSourcePageCount(parsed);
     this.inputSourcesOnlyConfiguration = true;
     this.integrationOnlyConfiguration = false;
     this.manualConfigPage = 4;
     return this.formBuilder.buildInputSourcePage(parsed, 1, this.inputSourcePageCount);
+  }
+
+  private applyInputSourceDiscovery(config: ManualConfigInput, inputs: AvrInput[], available: boolean): ManualConfigInput {
+    if (!available || inputs.length === 0) return { ...config, inputSources: inputs, inputSourceDiscoveryAvailable: available };
+    const reportedIds = new Set(inputs.map((input) => input.id.toUpperCase()));
+    const idInputSources = { ...((config.idInputSources as Record<string, { name: string; setting: string }> | undefined) ?? {}) };
+    for (const id of reportedIds) {
+      const entry = idInputSources[id];
+      if (entry?.setting === LEARN_INPUT_SOURCE) {
+        idInputSources[id] = { ...entry, setting: LEARNED_INPUT_SOURCE };
+      }
+    }
+    return { ...config, idInputSources, inputSources: inputs, inputSourceDiscoveryAvailable: available };
   }
 
   private requestIntegrationConfiguration(): uc.RequestUserInput {
