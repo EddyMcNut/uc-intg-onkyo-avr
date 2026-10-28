@@ -8,8 +8,7 @@ import { SetupFormBuilder } from "./setupFormBuilder.js";
 import { BackupRestoreManager } from "./backupRestoreManager.js";
 import { ConfigPersistenceManager } from "./configPersistenceManager.js";
 import type { AvrInput } from "./inputSourceStore.js";
-import { EXCLUDE_INPUT_SOURCE, LEARNED_INPUT_SOURCE, LEARN_INPUT_SOURCE } from "./inputSourcePreferences.js";
-import { EXCLUDE_LISTENING_MODE, LEARN_LISTENING_MODE } from "./listeningModePreferences.js";
+import { LEARNED_INPUT_SOURCE, LEARN_INPUT_SOURCE } from "./inputSourcePreferences.js";
 import { IDLE_SETUP_PAGE, type SetupFlowPage } from "./setupFlowState.js";
 
 const logSource = "setupHandler:";
@@ -106,7 +105,7 @@ export default class SetupHandler {
     }
 
     if (this.setupPage.kind !== "idle" && this.hasManualConfigFields(input)) {
-      this.pendingManualConfig = { ...this.pendingManualConfig, ...this.applyPageWideSelection(input) };
+      this.pendingManualConfig = { ...this.pendingManualConfig, ...input };
       const parsed = this.configParser.parse(this.pendingManualConfig, ConfigManager.get().logLevel ?? "warn");
       if (this.setupPage.kind === "manual" && this.setupPage.page === 1) {
         const discovery = this.host.queryInputSources
@@ -368,23 +367,6 @@ export default class SetupHandler {
       }
     }
     return { ...config, idInputSources, inputSources: inputs, inputSourceDiscoveryAvailable: available };
-  }
-
-  private applyPageWideSelection(input: Record<string, string>): Record<string, string> {
-    const selection = input.set_all_page;
-    if (selection !== LEARN_LISTENING_MODE && selection !== EXCLUDE_LISTENING_MODE) {
-      return input;
-    }
-
-    const isInputSourcePage = this.setupPage.kind === "inputSources";
-    const prefix = isInputSourcePage ? "ids_" : "lmd_";
-    const value = isInputSourcePage ? (selection === LEARN_LISTENING_MODE ? LEARN_INPUT_SOURCE : EXCLUDE_INPUT_SOURCE) : selection;
-    const updated = { ...input };
-    for (const id of Object.keys(updated)) {
-      if (id.startsWith(prefix)) updated[id] = value;
-    }
-    delete updated.set_all_page;
-    return updated;
   }
 
   private requestIntegrationConfiguration(): uc.RequestUserInput {

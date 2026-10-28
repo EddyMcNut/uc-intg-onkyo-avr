@@ -108,22 +108,6 @@ export class SetupFormBuilder {
         field: { label: { value: { en: "Choose the AVR name, an integration alias, or Exclude from integration." } } }
       });
     }
-    if (title.startsWith("Listening Modes") || title.startsWith("Input Sources")) {
-      settings.unshift({
-        id: "set_all_page",
-        label: { en: "Set all entries on this page" },
-        field: {
-          dropdown: {
-            value: "none",
-            items: [
-              { id: "none", label: { en: "Keep individual selections" } },
-              { id: "learn", label: { en: "Learn all entries" } },
-              { id: "exclude", label: { en: "Exclude all entries" } }
-            ]
-          }
-        }
-      });
-    }
     return new uc.RequestUserInput(title, settings);
   }
 
@@ -219,6 +203,32 @@ export class SetupFormBuilder {
         }
       },
       {
+        id: "inputSourceLayout",
+        label: { en: "Input source layout" },
+        field: {
+          dropdown: {
+            value: values.inputSourceLayoutValue,
+            items: [
+              { id: "combined", label: { en: "Combined (default)" } },
+              { id: "network-first", label: { en: "Network first" } },
+              { id: "network-last", label: { en: "Network last" } }
+            ]
+          }
+        },
+        description: { en: "Choose whether network sources appear mixed with regular input sources or after them." }
+      },
+      {
+        id: "networkInputMarker",
+        label: { en: "Mark network subsources" },
+        field: {
+          dropdown: {
+            value: values.networkInputMarkerValue,
+            items: NETWORK_INPUT_MARKERS.map((icon) => ({ id: icon, label: { en: icon === "none" ? "No (default)" : icon } }))
+          }
+        },
+        description: { en: "Add the selected visual marker to network sources in the input-source selector." }
+      },
+      {
         id: "tuneinPresetPosition",
         label: { en: "TuneIn 'My Presets' menu position (default 1)" },
         field: { dropdown: { value: String(values.tuneinPresetPositionValue), items: Array.from({ length: 10 }, (_, i) => ({ id: String(i + 1), label: { en: String(i + 1) } })) } },
@@ -237,31 +247,6 @@ export class SetupFormBuilder {
           }
         },
         description: { en: "Choose how TuneIn navigation is handled when selecting presets." }
-      },
-      {
-        id: "inputSourceLayout",
-        label: { en: "Input source layout" },
-        field: {
-          dropdown: {
-            value: values.inputSourceLayoutValue,
-            items: [
-              { id: "combined", label: { en: "Combined list (default)" } },
-              { id: "separate", label: { en: "Separate network sources" } }
-            ]
-          }
-        },
-        description: { en: "Choose whether network sources appear mixed with regular input sources or after them." }
-      },
-      {
-        id: "networkInputMarker",
-        label: { en: "Mark network subsources" },
-        field: {
-          dropdown: {
-            value: values.networkInputMarkerValue,
-            items: NETWORK_INPUT_MARKERS.map((icon) => ({ id: icon, label: { en: icon === "none" ? "No (default)" : icon } }))
-          }
-        },
-        description: { en: "Add the selected visual marker to network sources in the input-source selector." }
       },
       {
         id: "zoneCount",

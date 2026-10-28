@@ -52,6 +52,19 @@ describe("inputSourceResolver", () => {
     expect(getEffectiveInputSourceOptions(config, "TX-RZ50 192.168.2.103", ["BD/DVD", "Spotify"])).toEqual(["bd/dvd", "🌐 spotify"]);
   });
 
+  it("puts network sources first when requested", () => {
+    const config = {
+      ...AVR_CONFIG,
+      inputSourceLayout: "network-first",
+      idInputSources: {
+        BD: { name: "BD/DVD", setting: "bd/dvd" },
+        SPOTIFY: { name: "Spotify", setting: "spotify" }
+      }
+    } as AvrConfig;
+
+    expect(getEffectiveInputSourceOptions(config, "TX-RZ50 192.168.2.103", ["BD/DVD", "Spotify"])).toEqual(["spotify", "bd/dvd"]);
+  });
+
   it("falls back to integration mappings when the AVR reports no inputs", () => {
     setAvrInfo(ENTITY_ID, parseAvrInfo(nriXml("")));
 

@@ -27,7 +27,8 @@ export function presentInputSourceOptions(avrConfig: AvrConfig, physicalAvrId: s
     return { option, network: reportedInput?.network || isNetworkInputSource(id, reportedInput?.name ?? option, aliases) };
   });
 
-  if (avrConfig.inputSourceLayout === "separate") decorated.sort((a, b) => Number(a.network) - Number(b.network));
+  if (avrConfig.inputSourceLayout === "network-first") decorated.sort((a, b) => Number(b.network) - Number(a.network));
+  if (avrConfig.inputSourceLayout === "network-last" || avrConfig.inputSourceLayout === "separate") decorated.sort((a, b) => Number(a.network) - Number(b.network));
   const marker = avrConfig.networkInputMarker ?? "none";
   return decorated.map(({ option, network }) => (network && marker !== "none" ? `${marker} ${option}` : option));
 }

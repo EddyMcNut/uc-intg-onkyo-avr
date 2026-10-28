@@ -64,6 +64,20 @@ export default class ConnectCoordinator {
     this.createAvrSpecificConfig = createAvrSpecificConfig ?? ((c) => ({ ...c, queueThreshold: c.queueThreshold ?? DEFAULT_QUEUE_THRESHOLD }) as IntegrationConfig);
   }
 
+  reconcile(config: IntegrationConfig): string[] {
+    const desiredPhysicalAvrs = new Set(config.avrs?.map((avr) => buildPhysicalAvrId(avr.model, avr.ip)) ?? []);
+    this.connectionManager.reconcilePhysicalConnections([...desiredPhysicalAvrs]);
+
+    const desiredZones = new Set(config.avrs?.map((avr) => buildEntityId(avr.model, avr.ip, avr.zone)) ?? []);
+    const removedZones: string[] = [];
+    for (const entityId of this.avrInstances.keys()) {
+      if (desiredZones.has(entityId)) continue;
+      this.avrInstances.delete(entityId);
+      removedZones.push(entityId);
+    }
+    return removedZones;
+  }
+
   // Orchestrate connecting physical AVRs and creating zone instances. Returns true if any zone instances exist after connect.
   async connect(config: IntegrationConfig, createCommandReceiverFactory: CreateCommandReceiverFactory, createCommandSender: CreateCommandSenderFn): Promise<boolean> {
     if (!config || !config.avrs || config.avrs.length === 0) {

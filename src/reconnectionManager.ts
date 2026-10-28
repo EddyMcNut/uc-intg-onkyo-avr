@@ -101,30 +101,46 @@ export class ReconnectionManager {
 
     const timer = setTimeout(async () => {
       log.info("%s [%s] Attempting scheduled reconnection...", logSource, physicalAVR);
+      try {
+        // Check if reconnection should be skipped
+        if (shouldSkip()) {
+          log.info("%s [%s] Skipping scheduled reconnection (standby or already connected)", logSource, physicalAVR);
+          this.timers.delete(physicalAVR);
+          this.retryCounts.delete(physicalAVR);
+          return;
+        }
 
-      // Check if reconnection should be skipped
-      if (shouldSkip()) {
-        log.info("%s [%s] Skipping scheduled reconnection (standby or already connected)", logSource, physicalAVR);
-        this.timers.delete(physicalAVR);
-        this.retryCounts.delete(physicalAVR);
-        return;
-      }
+        const result = await this.attemptReconnection(physicalAVR, eiscp, connectionInfo, "Scheduled reconnection");
 
-      const result = await this.attemptReconnection(physicalAVR, eiscp, connectionInfo, "Scheduled reconnection");
-
-      if (result.success) {
-        this.timers.delete(physicalAVR);
-        this.retryCounts.delete(physicalAVR);
-        await onReconnected(physicalAVR);
-      } else {
-        // Back off and schedule another attempt
-        this.retryCounts.set(physicalAVR, attemptIndex + 1);
-        log.info("%s [%s] All scheduled reconnection attempts failed, will retry again in %d seconds", logSource, physicalAVR, Math.round(this.getBackoffDelay(attemptIndex + 1) / 1000));
-        this.scheduleReconnection(physicalAVR, eiscp, connectionInfo, shouldSkip, onReconnected);
+        if (result.success) {
+          this.timers.delete(physicalAVR);
+          this.retryCounts.delete(physicalAVR);
+          await onReconnected(physicalAVR);
+        } else {
+          this.scheduleAfterFailure(physicalAVR, attemptIndex, eiscp, connectionInfo, shouldSkip, onReconnected);
+        }
+      } catch (err) {
+        // The timer callback is detached from its caller; never allow a callback
+        // failure to become an unhandled promise rejection.
+        log.warn("%s [%s] Scheduled reconnection callback failed: %s", logSource, physicalAVR, err);
+        this.scheduleAfterFailure(physicalAVR, attemptIndex, eiscp, connectionInfo, shouldSkip, onReconnected);
       }
     }, delayMs);
 
     this.timers.set(physicalAVR, timer);
+  }
+
+  private scheduleAfterFailure(
+    physicalAVR: string,
+    attemptIndex: number,
+    eiscp: EiscpDriver,
+    connectionInfo: ConnectionInfo,
+    shouldSkip: ShouldSkipCallback,
+    onReconnected: OnReconnectedCallback
+  ): void {
+    this.retryCounts.set(physicalAVR, attemptIndex + 1);
+    log.info("%s [%s] Reconnection failed, will retry again in %d seconds", logSource, physicalAVR, Math.round(this.getBackoffDelay(attemptIndex + 1) / 1000));
+    this.scheduleReconnection(physicalAVR, eiscp, connectionInfo, shouldSkip, onReconnected);
   }
 
   private clearReconnectionTimer(physicalAVR: string): void {

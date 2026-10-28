@@ -52,10 +52,9 @@ describe("SetupFormBuilder", () => {
     const reportedValues = values({ inputSources: reported, inputSourceDiscoveryAvailable: true });
     expect(builder.getInputSourcePageCount(reportedValues)).toBe(3);
     const firstInputPage = builder.buildInputSourcePage(reportedValues, 1, 3);
-    expect((firstInputPage.settings as unknown[]).length).toBe(12);
+    expect((firstInputPage.settings as unknown[]).length).toBe(11);
     expect((firstInputPage.settings as any[]).filter((setting) => setting.id.startsWith("ids_")).length).toBe(10);
-    expect((firstInputPage.settings as any[]).find((setting) => setting.id === "set_all_page")).toBeDefined();
     expect((firstInputPage.settings as any[]).find((setting) => setting.id.startsWith("ids_"))?.field.dropdown.value).toBe("learned");
-    expect((builder.buildInputSourcePage(reportedValues, 3, 3).settings as unknown[]).length).toBe(7);
+    expect((builder.buildInputSourcePage(reportedValues, 3, 3).settings as unknown[]).length).toBe(6);
   });
 });

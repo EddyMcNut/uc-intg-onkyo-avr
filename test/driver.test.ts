@@ -34,6 +34,7 @@ const h = vi.hoisted(() => {
 
   return {
     eventHandlers: handlers,
+    availableEntityIds: new Set<string>(),
     mockDriver: {
       init: vi.fn(),
       on: vi.fn((event: string, handler: (...args: any[]) => any) => {
@@ -42,8 +43,8 @@ const h = vi.hoisted(() => {
       getConfigDirPath: vi.fn(() => "/fake/config/dir"),
       addAvailableEntity: vi.fn(),
       getAvailableEntities: vi.fn(() => ({
-        contains: vi.fn(() => false),
-        removeEntity: vi.fn()
+        contains: vi.fn((id: string) => h.availableEntityIds.has(id)),
+        removeEntity: vi.fn((id: string) => h.availableEntityIds.delete(id))
       })),
       setDeviceState: vi.fn(),
       updateEntityAttributes: vi.fn()
@@ -68,10 +69,12 @@ const h = vi.hoisted(() => {
       getPhysicalConnection: vi.fn(() => undefined),
       disconnectAll: vi.fn(),
       clearAllConnections: vi.fn(),
-      cancelAllScheduledReconnections: vi.fn()
+      cancelAllScheduledReconnections: vi.fn(),
+      reconcilePhysicalConnections: vi.fn()
     },
     mockConnectCoordinator: {
-      connect: vi.fn()
+      connect: vi.fn(),
+      reconcile: vi.fn(() => [])
     },
     mockCommandSender: {
       sharedCmdHandler: vi.fn()
@@ -218,6 +221,7 @@ let OnkyoDriver: any;
 
 beforeEach(() => {
   vi.clearAllMocks();
+  h.availableEntityIds.clear();
 });
 
 async function createDriver() {
@@ -910,6 +914,34 @@ describe("OnkyoDriver", () => {
       mockConnectionManager.getPhysicalConnection.mockReturnValue(undefined);
 
       await expect(mockSetupHost.current.onConfigSaved()).resolves.not.toThrow();
+    });
+
+    it("removes stale zone entities from the available entity pool", async () => {
+      const configModule = await import("../src/configManager.js");
+      const oldZone = "TX-RZ50_1.2.3.4_zone2";
+      const staleIds = [oldZone, `${oldZone}_source_sensor`, `${oldZone}_input_selector`, `${oldZone}_remote`];
+      staleIds.forEach((id) => h.availableEntityIds.add(id));
+      mockDriver.getAvailableEntities.mockImplementation(() => ({
+        contains: (id: string) => h.availableEntityIds.has(id),
+        removeEntity: (id: string) => h.availableEntityIds.delete(id)
+      }));
+
+      (configModule.ConfigManager.load as any).mockReturnValueOnce({
+        avrs: [{ model: "TX-RZ50", ip: "1.2.3.4", zone: "zone2" }],
+        logLevel: "info"
+      });
+      const driver = await createDriver();
+      mockConnectCoordinator.reconcile.mockReset().mockReturnValue([oldZone]);
+      (configModule.ConfigManager.load as any).mockReturnValue({
+        avrs: [{ model: "TX-RZ50", ip: "1.2.3.4", zone: "main" }],
+        logLevel: "info"
+      });
+      await driver.handleDriverSetup({ command: "start" } as any);
+
+      await mockSetupHost.current.onConfigSaved();
+
+      expect(mockConnectCoordinator.reconcile).toHaveBeenCalled();
+      for (const id of staleIds) expect(h.availableEntityIds.has(id)).toBe(false);
     });
   });
 

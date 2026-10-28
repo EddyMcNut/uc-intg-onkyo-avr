@@ -145,10 +145,8 @@ export default class ConnectionManager {
   disconnectAll(): void {
     for (const [physicalAVR, connection] of this.physicalConnections) {
       try {
-        if (connection.eiscp.connected) {
-          log.info(`${logSource} [${physicalAVR}] Disconnecting AVR`);
-          connection.eiscp.disconnect();
-        }
+        log.info(`${logSource} [${physicalAVR}] Disconnecting AVR`);
+        connection.eiscp.disconnect();
       } catch (err) {
         log.warn(`${logSource} [${physicalAVR}] Error disconnecting AVR:`, err);
       }
@@ -158,5 +156,17 @@ export default class ConnectionManager {
   clearAllConnections(): void {
     this.disconnectAll();
     this.physicalConnections.clear();
+  }
+
+  reconcilePhysicalConnections(desiredPhysicalAvrs: readonly string[]): void {
+    const desired = new Set(desiredPhysicalAvrs);
+    for (const physicalAvr of this.physicalConnections.keys()) {
+      if (desired.has(physicalAvr)) continue;
+      this.reconnectionManager.cancelScheduledReconnection(physicalAvr);
+      const connection = this.physicalConnections.get(physicalAvr);
+      connection?.eiscp.disconnect();
+      this.physicalConnections.delete(physicalAvr);
+      log.info(`${logSource} [${physicalAvr}] Removed stale AVR connection`);
+    }
   }
 }

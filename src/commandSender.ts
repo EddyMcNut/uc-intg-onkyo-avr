@@ -11,6 +11,7 @@ import { toHex, ensureEiscpConnected } from "./utils.js";
 import { browseMedia, isMediaBrowsingAvailable } from "./mediaBrowser.js";
 import { PlayMediaCommandHandler } from "./playMediaCommandHandler.js";
 import { findAvrSourceId } from "./avrSourceCatalog.js";
+import { stripInputSourceMarker } from "./inputSourcePresentation.js";
 
 const logSource = "commandSender:";
 
@@ -172,7 +173,10 @@ export class CommandSender {
       uc.MediaPlayerCommands.SelectSource,
       async (_e, zone, sz, params) => {
         if (!params?.source || typeof params.source !== "string") return uc.StatusCodes.Ok;
-        const request = params.source.toLowerCase();
+        // Network-source markers are display decoration. The Web Configurator
+        // can send the displayed label back verbatim, so remove the marker
+        // before validating or resolving the command.
+        const request = stripInputSourceMarker(params.source).toLowerCase();
         if (request.startsWith("raw ")) {
           const rawCmd = request.substring(3).trim().toUpperCase();
           if (rawCmd.length > MAX_LENGTHS.RAW_COMMAND) {

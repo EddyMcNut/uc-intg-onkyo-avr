@@ -23,6 +23,13 @@ import { normalizeListeningModes } from "./listeningModePreferences.js";
 
 const logSource = "configManager:";
 
+function parseStrictInteger(value: unknown): number | undefined {
+  if (typeof value === "number") return Number.isSafeInteger(value) ? value : undefined;
+  if (typeof value !== "string" || !/^[+-]?\d+$/.test(value.trim())) return undefined;
+  const parsed = Number(value.trim());
+  return Number.isSafeInteger(parsed) ? parsed : undefined;
+}
+
 // Config directory is configurable at runtime to support integration manager backups/restores
 let CONFIG_DIR = process.env.UC_CONFIG_HOME || process.cwd();
 let CONFIG_PATH = path.resolve(CONFIG_DIR, "config.json");
@@ -272,8 +279,8 @@ export class ConfigManager {
     }
 
     // port
-    const portNum = typeof value.port === "number" ? value.port : parseInt(String(value.port ?? ""), 10);
-    if (isNaN(portNum) || portNum < 1 || portNum > 65535) {
+    const portNum = parseStrictInteger(value.port);
+    if (portNum === undefined || portNum < 1 || portNum > 65535) {
       errors.push("port must be a valid number between 1 and 65535");
     }
 
@@ -293,9 +300,9 @@ export class ConfigManager {
     }
 
     // queueThreshold
+    const queueThreshold = parseStrictInteger(value.queueThreshold);
     if (value.queueThreshold !== undefined) {
-      const qt = typeof value.queueThreshold === "number" ? value.queueThreshold : parseInt(String(value.queueThreshold), 10);
-      if (isNaN(qt) || qt < 0) {
+      if (queueThreshold === undefined || queueThreshold < 0) {
         errors.push("queueThreshold must be a non-negative integer");
       }
     }
@@ -303,7 +310,7 @@ export class ConfigManager {
     // volumeScale
     if (value.volumeScale !== undefined) {
       const raw = String(value.volumeScale).trim().toLowerCase();
-      if (raw !== VOLUME_SCALE_AUTO && ![80, 100].includes(parseInt(raw, 10))) {
+      if (raw !== VOLUME_SCALE_AUTO && raw !== "80" && raw !== "100") {
         errors.push('volumeScale must be 80, 100 or "auto"');
       }
     }
@@ -355,17 +362,17 @@ export class ConfigManager {
     }
 
     // netMenuDelay
+    const netMenuDelay = parseStrictInteger(value.netMenuDelay);
     if (value.netMenuDelay !== undefined) {
-      const nm = typeof value.netMenuDelay === "number" ? value.netMenuDelay : parseInt(String(value.netMenuDelay), 10);
-      if (isNaN(nm) || nm < 0) {
+      if (netMenuDelay === undefined || netMenuDelay < 0) {
         errors.push("netMenuDelay must be a non-negative integer");
       }
     }
 
     // tuneinPresetPosition
+    const tuneinPresetPosition = parseStrictInteger(value.tuneinPresetPosition);
     if (value.tuneinPresetPosition !== undefined) {
-      const tp = typeof value.tuneinPresetPosition === "number" ? value.tuneinPresetPosition : parseInt(String(value.tuneinPresetPosition), 10);
-      if (isNaN(tp) || tp < 1 || tp > 10) {
+      if (tuneinPresetPosition === undefined || tuneinPresetPosition < 1 || tuneinPresetPosition > 10) {
         errors.push("tuneinPresetPosition must be an integer between 1 and 10");
       }
     }
@@ -378,8 +385,8 @@ export class ConfigManager {
       }
     }
 
-    if (value.inputSourceLayout !== undefined && !["combined", "separate"].includes(String(value.inputSourceLayout).toLowerCase())) {
-      errors.push('inputSourceLayout must be "combined" or "separate"');
+    if (value.inputSourceLayout !== undefined && !["combined", "network-first", "network-last", "separate"].includes(String(value.inputSourceLayout).toLowerCase())) {
+      errors.push('inputSourceLayout must be "combined", "network-first" or "network-last"');
     }
     if (value.networkInputMarker !== undefined && !(NETWORK_INPUT_MARKERS as readonly string[]).includes(String(value.networkInputMarker))) {
       errors.push("networkInputMarker is not supported");
@@ -394,9 +401,9 @@ export class ConfigManager {
     const normalized: AvrConfig = this.applyDefaults({
       model: String(value.model).trim(),
       ip: String(value.ip).trim(),
-      port: portNum,
+      port: portNum!,
       zone: this.validateZone(zone),
-      queueThreshold: typeof value.queueThreshold === "number" ? value.queueThreshold : undefined,
+      queueThreshold,
       albumArtURL: typeof value.albumArtURL === "string" ? value.albumArtURL : undefined,
       volumeScale: parseVolumeScale(value.volumeScale),
       useAvrReportedInputs,
@@ -407,11 +414,13 @@ export class ConfigManager {
       createTunerPresets: parseBoolean(value.createTunerPresets, AVR_DEFAULTS.createTunerPresets),
       createRemoteEntity: parseBoolean(value.createRemoteEntity, AVR_DEFAULTS.createRemoteEntity),
       createDiracSelectEntity: parseBoolean(value.createDiracSelectEntity, AVR_DEFAULTS.createDiracSelectEntity),
-      netMenuDelay: typeof value.netMenuDelay === "number" ? value.netMenuDelay : typeof value.netMenuDelay === "string" ? parseInt(value.netMenuDelay, 10) : undefined,
-      tuneinPresetPosition:
-        typeof value.tuneinPresetPosition === "number" ? value.tuneinPresetPosition : typeof value.tuneinPresetPosition === "string" ? parseInt(value.tuneinPresetPosition, 10) : undefined,
+      netMenuDelay,
+      tuneinPresetPosition,
       tuneinMenuStyle: String(value.tuneinMenuStyle ?? AVR_DEFAULTS.tuneinMenuStyle).toLowerCase() === "full" ? "full" : "mypresets",
-      inputSourceLayout: String(value.inputSourceLayout ?? AVR_DEFAULTS.inputSourceLayout).toLowerCase() === "separate" ? "separate" : "combined",
+      inputSourceLayout: (() => {
+        const layout = String(value.inputSourceLayout ?? AVR_DEFAULTS.inputSourceLayout).toLowerCase();
+        return layout === "network-first" ? "network-first" : layout === "network-last" || layout === "separate" ? "network-last" : "combined";
+      })(),
       networkInputMarker: (value.networkInputMarker ?? AVR_DEFAULTS.networkInputMarker) as AvrConfig["networkInputMarker"],
       listeningModes: normalizeListeningModes(value.listeningModes),
       idInputSources: normalizeInputSourceSettings(value.idInputSources)

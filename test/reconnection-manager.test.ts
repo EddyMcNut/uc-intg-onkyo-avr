@@ -165,3 +165,20 @@ it("scheduleReconnection reschedules on failure", async () => {
   expect(rm.hasScheduledReconnection("M 1.2.3.4")).toBe(true);
   vi.useRealTimers();
 });
+
+it("does not leak callback failures as unhandled rejections", async () => {
+  vi.useFakeTimers();
+  const rm = new ReconnectionManager({ timeouts: [100], scheduleDelay: 5000 });
+  const eiscp = mockEiscp();
+  eiscp.connect.mockResolvedValue({ model: "M", host: "1.2.3.4", port: 60128 });
+  eiscp.waitForConnect.mockResolvedValue(undefined);
+  const onReconnected = vi.fn().mockRejectedValue(new Error("state refresh failed"));
+
+  rm.scheduleReconnection("M 1.2.3.4", eiscp, { model: "M", host: "1.2.3.4", port: 60128 }, () => false, onReconnected);
+
+  await vi.advanceTimersByTimeAsync(6000);
+  expect(onReconnected).toHaveBeenCalledOnce();
+  expect(rm.hasScheduledReconnection("M 1.2.3.4")).toBe(true);
+  rm.cancelAllScheduledReconnections();
+  vi.useRealTimers();
+});

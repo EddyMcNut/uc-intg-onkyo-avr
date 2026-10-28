@@ -98,6 +98,11 @@ describe("ConfigManager static methods", () => {
       expect(result.errors).toContain("queueThreshold must be a non-negative integer");
     });
 
+    it("rejects unsafe numeric integers", () => {
+      const result = ConfigManager.validateAvrPayload({ model: "TX-RZ50", ip: "1.2.3.4", port: 60128, queueThreshold: Number.MAX_SAFE_INTEGER + 1 });
+      expect(result.errors).toContain("queueThreshold must be a non-negative integer");
+    });
+
     it("rejects invalid volumeScale", () => {
       const result = ConfigManager.validateAvrPayload({ model: "TX-RZ50", ip: "1.2.3.4", port: 60128, volumeScale: 50 });
       expect(result.errors).toContain('volumeScale must be 80, 100 or "auto"');

@@ -188,7 +188,8 @@ export const AVR_DEFAULTS = {
 export type EntityNameStyle = "long" | "short";
 export type VolumeDisplay = "absolute" | "relative";
 export type TuneInMenuStyle = "mypresets" | "full";
-export type InputSourceLayout = "combined" | "separate";
+// `separate` is retained as a legacy persisted value and normalized to `network-last`.
+export type InputSourceLayout = "combined" | "network-first" | "network-last" | "separate";
 export type NetworkInputMarker = "none" | "🌐" | "📡" | "🔗" | "☁️" | "🛜" | "🎵" | "▶️";
 export const NETWORK_INPUT_MARKERS: readonly NetworkInputMarker[] = ["none", "🌐", "📡", "🔗", "☁️", "🛜", "🎵", "▶️"];
 export type LogLevel = "debug" | "info" | "warn" | "error";
@@ -306,7 +307,9 @@ export function normalizeAvrConfig(raw: AvrConfig): NormalizedAvrConfig {
 
   const tuneinMenuStyle: TuneInMenuStyle = String(raw.tuneinMenuStyle ?? AVR_DEFAULTS.tuneinMenuStyle).toLowerCase() === "full" ? "full" : "mypresets";
 
-  const inputSourceLayout: InputSourceLayout = String(raw.inputSourceLayout ?? "combined").toLowerCase() === "separate" ? "separate" : "combined";
+  const rawInputSourceLayout = String(raw.inputSourceLayout ?? "combined").toLowerCase();
+  const inputSourceLayout: InputSourceLayout =
+    rawInputSourceLayout === "network-first" ? "network-first" : rawInputSourceLayout === "network-last" || rawInputSourceLayout === "separate" ? "network-last" : "combined";
   const networkInputMarker: NetworkInputMarker = NETWORK_INPUT_MARKERS.includes(raw.networkInputMarker as NetworkInputMarker) ? (raw.networkInputMarker as NetworkInputMarker) : "none";
 
   const port = (() => {

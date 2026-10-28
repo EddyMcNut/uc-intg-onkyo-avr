@@ -88,11 +88,18 @@ export class ManualConfigParser {
       netMenuDelayValue: this.parseNetMenuDelay(input.netMenuDelay),
       tuneinPresetPositionValue: this.parseTuneInPresetPosition(input.tuneinPresetPosition),
       tuneinMenuStyleValue: this.parseTuneInMenuStyle(input.tuneinMenuStyle),
-      inputSourceLayoutValue: String(input.inputSourceLayout ?? "combined").toLowerCase() === "separate" ? "separate" : "combined",
+      inputSourceLayoutValue: this.parseInputSourceLayout(input.inputSourceLayout),
       networkInputMarkerValue: this.parseNetworkInputMarker(input.networkInputMarker),
       logLevelValue: this.parseLogLevel(input.logLevel, fallbackLogLevel),
       zoneCountValue: this.parseZoneCount(input.zoneCount)
     };
+  }
+
+  private parseInputSourceLayout(raw: unknown): InputSourceLayout {
+    const value = String(raw ?? "combined").toLowerCase();
+    if (value === "network-first") return "network-first";
+    if (value === "network-last" || value === "separate") return "network-last";
+    return "combined";
   }
 
   private parseListeningModePreferences(input: ManualConfigInput): Record<string, string> {

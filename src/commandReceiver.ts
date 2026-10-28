@@ -318,9 +318,9 @@ export class CommandReceiver {
     const physicalAVR = physicalAvrIdFromEntityId(entityId);
     const sourceInputId = physicalAVR ? (resolveInputSourceId(physicalAVR, source) ?? aliases[0]) : aliases[0];
     if (sourceInputId === "dab" || sourceInputId === "33") {
-      this.eiscpInstance.raw("DSNQSTN");
+      await this.eiscpInstance.raw("DSNQSTN");
     } else if (sourceInputId === "fm" || sourceInputId === "24") {
-      this.eiscpInstance.raw("FLDQSTN");
+      await this.eiscpInstance.raw("FLDQSTN");
     }
     this.driver.updateEntityAttributes(`${entityId}_source_sensor`, {
       [uc.SensorAttributes.State]: uc.SensorStates.On,
@@ -464,21 +464,24 @@ export class CommandReceiver {
     this.eiscpInstance.on("data", async (avrUpdates: AvrUpdateEvent) => {
       const eventZone = avrUpdates.zone || "main";
       const entityId = buildEntityId(avrUpdates.model, avrUpdates.host, eventZone);
+      try {
+        const handler = this.eventHandlers[avrUpdates.command];
+        if (handler) {
+          await handler(avrUpdates, entityId, eventZone);
+          await this.zoneAgnosticProcessor.renderEntity(entityId);
+          return;
+        }
 
-      const handler = this.eventHandlers[avrUpdates.command];
-      if (handler) {
-        await handler(avrUpdates, entityId, eventZone);
+        if (await this.dispatchZoneAgnosticCommand(avrUpdates, entityId, eventZone)) {
+          await this.zoneAgnosticProcessor.renderEntity(entityId);
+          return;
+        }
+
+        log.debug("%s [%s] Received unknown command type: '%s' with argument: %s", logSource, entityId, avrUpdates.command, avrUpdates.argument);
         await this.zoneAgnosticProcessor.renderEntity(entityId);
-        return;
+      } catch (err) {
+        log.warn("%s [%s] Failed to process AVR update '%s': %s", logSource, entityId, avrUpdates.command, err);
       }
-
-      if (await this.dispatchZoneAgnosticCommand(avrUpdates, entityId, eventZone)) {
-        await this.zoneAgnosticProcessor.renderEntity(entityId);
-        return;
-      }
-
-      log.debug("%s [%s] Received unknown command type: '%s' with argument: %s", logSource, entityId, avrUpdates.command, avrUpdates.argument);
-      await this.zoneAgnosticProcessor.renderEntity(entityId);
     });
   }
 

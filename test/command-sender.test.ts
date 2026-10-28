@@ -166,6 +166,20 @@ it("CommandSender executes core command branches and zone-specific routing", asy
   expect(refreshCalls).toBe(1);
 });
 
+it("strips network markers from Web Configurator source selections", async () => {
+  const commandSenderModule = await import("../src/commandSender.js");
+  const { CommandSender } = commandSenderModule as { CommandSender: new (...deps: any[]) => any };
+  const mockEiscp = makeMockEiscp(true);
+  const sender = new CommandSender({}, makeConfig(), mockEiscp as any, { getSubSource: () => "spotify" } as any, undefined);
+
+  const result = await sender.sharedCmdHandler({ id: "TX-RZ50 192.168.2.103 main", attributes: { state: uc.MediaPlayerStates.On } } as any, uc.MediaPlayerCommands.SelectSource, {
+    source: "📡 TuneIn Radio"
+  });
+
+  expect(result).toBe(uc.StatusCodes.Ok);
+  expect(mockEiscp.commands).toEqual(["tunein radio"]);
+});
+
 it("CommandSender handles relative volume ignore and throttle", async () => {
   const commandSenderModule = await import("../src/commandSender.js");
   const { CommandSender } = commandSenderModule as { CommandSender: new (...deps: any[]) => any };
