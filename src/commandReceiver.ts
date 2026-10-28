@@ -15,6 +15,7 @@ import type { AvrStateApi } from "./types.js";
 import { findLearnedListeningModeName, getLearnedListeningModes, learnListeningMode } from "./learnedListeningModeStore.js";
 import { EXCLUDE_LISTENING_MODE, resolveListeningModes } from "./listeningModePreferences.js";
 import { getKnownListeningModes } from "./listeningModePreferences.js";
+import { displayInputSourceOption } from "./inputSourcePresentation.js";
 
 const logSource = "commandReceiver:";
 
@@ -306,8 +307,9 @@ export class CommandReceiver {
       [uc.MediaPlayerAttributes.Source]: displaySource
     });
     log.info("%s [%s] input-selector (source) set to: %s (canonical: %s)", logSource, entityId, displaySource, source);
+    const avrConfig = this.config.avrs?.find((avr) => buildPhysicalAvrId(avr.model, avr.ip) === physicalAvr);
     this.driver.updateEntityAttributes(`${entityId}_input_selector`, {
-      [SelectAttributes.CurrentOption]: displaySource
+      [SelectAttributes.CurrentOption]: avrConfig && physicalAvr ? displayInputSourceOption(avrConfig, physicalAvr, displaySource) : displaySource
     });
     this.zoneAgnosticProcessor.resetZone(entityId);
     await this.zoneAgnosticProcessor.renderEntity(entityId);

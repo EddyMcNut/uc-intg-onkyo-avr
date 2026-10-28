@@ -2,10 +2,12 @@
 import EiscpDriver from "./eiscp.js";
 import { ConfigManager, type AvrConfig, type AvrZone, AVR_DEFAULTS, type IntegrationConfig } from "./configManager.js";
 import { getKnownListeningModes } from "./listeningModePreferences.js";
-import { setLogLevel } from "./loggers.js";
+import log, { setLogLevel } from "./loggers.js";
 import { type ParsedManualConfig } from "./manualConfigParser.js";
 import { getInputSourceAliases, EXCLUDE_INPUT_SOURCE, LEARNED_INPUT_SOURCE, getKnownInputSources } from "./inputSourcePreferences.js";
 import type { InputSourceSettings } from "./configConstants.js";
+
+const logSource = "configPersistenceManager:";
 
 export interface OnConfigSavedCallback {
   (): Promise<void>;
@@ -28,7 +30,8 @@ export class ConfigPersistenceManager {
         host: found.host,
         port: Number(found.port) || AVR_DEFAULTS.port
       };
-    } catch (_err) {
+    } catch (err) {
+      log.debug("%s Auto-discovery failed, setup will continue without discovered AVR details: %s", logSource, err);
       return { success: false };
     }
   }

@@ -12,6 +12,8 @@ import { EXCLUDE_INPUT_SOURCE, LEARNED_INPUT_SOURCE, LEARN_INPUT_SOURCE } from "
 import { EXCLUDE_LISTENING_MODE, LEARN_LISTENING_MODE } from "./listeningModePreferences.js";
 import { IDLE_SETUP_PAGE, type SetupFlowPage } from "./setupFlowState.js";
 
+const logSource = "setupHandler:";
+
 type SetupHost = {
   driver: uc.IntegrationAPI;
   getConfigDirPath: () => string | undefined;
@@ -129,15 +131,7 @@ export default class SetupHandler {
 
       if (this.setupPage.kind === "manual" && this.setupPage.page === 3) {
         if (this.integrationOnlyConfiguration) {
-          this.setupPage = IDLE_SETUP_PAGE;
-          this.integrationOnlyConfiguration = false;
-          const completeConfig = this.pendingManualConfig;
-          this.pendingManualConfig = {};
-          try {
-            return await this.handleManualConfiguration(completeConfig);
-          } catch (_err) {
-            return new uc.SetupError("OTHER");
-          }
+          return this.completePendingConfiguration("integration-only");
         }
         this.inputSourcePageCount = this.formBuilder.getInputSourcePageCount(parsed);
         this.listeningModePageCount = this.formBuilder.getListeningModePageCount();
@@ -151,15 +145,7 @@ export default class SetupHandler {
           return this.formBuilder.buildInputSourcePage(parsed, this.setupPage.page, this.setupPage.total);
         }
         if (this.inputSourcesOnlyConfiguration) {
-          this.setupPage = IDLE_SETUP_PAGE;
-          this.inputSourcesOnlyConfiguration = false;
-          const completeConfig = this.pendingManualConfig;
-          this.pendingManualConfig = {};
-          try {
-            return await this.handleManualConfiguration(completeConfig);
-          } catch (_err) {
-            return new uc.SetupError("OTHER");
-          }
+          return this.completePendingConfiguration("input-source");
         }
         this.setupPage = { kind: "listeningModes", page: 1, total: this.listeningModePageCount };
         return this.formBuilder.buildListeningModePage(parsed, 1);
@@ -172,14 +158,7 @@ export default class SetupHandler {
         }
       }
 
-      this.setupPage = IDLE_SETUP_PAGE;
-      const completeConfig = this.pendingManualConfig;
-      this.pendingManualConfig = {};
-      try {
-        return await this.handleManualConfiguration(completeConfig);
-      } catch (_err) {
-        return new uc.SetupError("OTHER");
-      }
+      return this.completePendingConfiguration("full");
     }
 
     const hasManualFields = this.hasManualConfigFields(input);
@@ -187,7 +166,8 @@ export default class SetupHandler {
     if (!action && hasManualFields) {
       try {
         return await this.handleManualConfiguration(input as ManualConfigInput);
-      } catch (_err) {
+      } catch (err) {
+        log.error("%s Failed to save configuration:", logSource, err);
         return new uc.SetupError("OTHER");
       }
     }
@@ -257,6 +237,20 @@ export default class SetupHandler {
       input.entityNameStyle ||
       input.logLevel
     );
+  }
+
+  private async completePendingConfiguration(context: string): Promise<uc.SetupAction> {
+    this.setupPage = IDLE_SETUP_PAGE;
+    this.integrationOnlyConfiguration = false;
+    this.inputSourcesOnlyConfiguration = false;
+    const completeConfig = this.pendingManualConfig;
+    this.pendingManualConfig = {};
+    try {
+      return await this.handleManualConfiguration(completeConfig);
+    } catch (err) {
+      log.error("%s Failed to save %s configuration:", logSource, context, err);
+      return new uc.SetupError("OTHER");
+    }
   }
 
   private requestManualConfiguration(): uc.RequestUserInput {
@@ -421,7 +415,8 @@ export default class SetupHandler {
 
       await this.persistenceManager.restoreConfiguration(validation.normalized!);
       return new uc.SetupComplete();
-    } catch (_err) {
+    } catch (err) {
+      log.error("%s Failed to restore configuration:", logSource, err);
       return new uc.SetupError("OTHER");
     }
   }
@@ -434,7 +429,8 @@ export default class SetupHandler {
     try {
       await this.host.onConfigCleared();
       return new uc.SetupComplete();
-    } catch (_err) {
+    } catch (err) {
+      log.error("%s Failed to clear configuration:", logSource, err);
       return new uc.SetupError("OTHER");
     }
   }

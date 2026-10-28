@@ -5,7 +5,8 @@ import { normalizeAvrInputs, type AvrInput } from "./inputSourceStore.js";
 import { getAvrInfo, listSelectors } from "./avrInfoStore.js";
 import { getAvrSourcesByPhysicalId } from "./avrSourceCatalog.js";
 import { getInputSourceAliases } from "./inputSourcePreferences.js";
-import { presentInputSourceOptions } from "./inputSourcePresentation.js";
+import { presentInputSourceOptions, stripInputSourceMarker } from "./inputSourcePresentation.js";
+export { stripInputSourceMarker } from "./inputSourcePresentation.js";
 
 export type InputSourceListResolution = {
   inputs?: AvrInput[];
@@ -17,6 +18,7 @@ export function collectAvrInputSources(selectors: AvrInput[], services: AvrInput
   const selectorIds = new Set(selectors.map((input) => input.id.toLowerCase()));
   const namespacedServices = services.map((service) => ({
     ...service,
+    network: true,
     id: selectorIds.has(service.id.toLowerCase()) ? `NSV${service.id.toUpperCase()}` : service.id
   }));
   return normalizeAvrInputs([...selectors, ...namespacedServices]);
@@ -39,16 +41,12 @@ export function resolveInputSourceId(physicalAvrId: string, option: string): str
 export function resolveCanonicalInputSource(physicalAvrId: string, option: string): string {
   const inputId = resolveInputSourceId(physicalAvrId, option);
   const aliases = inputId ? getInputSourceAliases(inputId) : [];
-  return aliases[0] ?? option.trim().toLowerCase().replace(/\s+/g, "-");
+  return aliases[0] ?? stripInputSourceMarker(option).trim().toLowerCase().replace(/\s+/g, "-");
 }
 
 // Build the options shown by the input selector for one configured AVR zone.
 export function getEffectiveInputSourceOptions(avrConfig: AvrConfig, physicalAvrId: string, builtInOptions: string[]): string[] {
   return presentInputSourceOptions(avrConfig, physicalAvrId, builtInOptions);
-}
-
-export function stripInputSourceMarker(option: string): string {
-  return option.replace(/^(?:🌐|📡|🔗|☁️|🛜|🎵|▶️)\s+/u, "");
 }
 
 // Resolve the AVR's input list when AVR-reported names are enabled.

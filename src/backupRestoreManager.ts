@@ -2,6 +2,9 @@
 import { readFileSync, existsSync } from "fs";
 import { resolve } from "path";
 import { ConfigManager, IntegrationConfig } from "./configManager.js";
+import log from "./loggers.js";
+
+const logSource = "backupRestoreManager:";
 
 interface BackupPayload {
   meta: {
@@ -9,7 +12,7 @@ interface BackupPayload {
     version: string;
     timestamp: string;
   };
-  config: any;
+  config: unknown;
 }
 
 export class BackupRestoreManager {
@@ -70,12 +73,13 @@ export class BackupRestoreManager {
         driverId: driverJson.driver_id || "unknown",
         driverVersion: driverJson.version || "unknown"
       };
-    } catch (_err) {
+    } catch (err) {
+      log.debug("%s Driver metadata unavailable, using fallback metadata: %s", logSource, err);
       return { driverId: "unknown", driverVersion: "unknown" };
     }
   }
 
-  private readConfigData(getConfigDirPath: () => string | undefined): any {
+  private readConfigData(getConfigDirPath: () => string | undefined): unknown {
     try {
       const cfgPath = resolve(getConfigDirPath() ?? process.cwd(), "config.json");
       if (existsSync(cfgPath)) {
@@ -83,14 +87,15 @@ export class BackupRestoreManager {
         return this.removeLegacyConfigVersion(JSON.parse(rawCfg));
       }
       return this.removeLegacyConfigVersion(ConfigManager.get());
-    } catch (_err) {
+    } catch (err) {
+      log.debug("%s Config file unavailable, using in-memory configuration: %s", logSource, err);
       return this.removeLegacyConfigVersion(ConfigManager.get());
     }
   }
 
-  private removeLegacyConfigVersion(config: any): any {
+  private removeLegacyConfigVersion(config: unknown): unknown {
     if (!config || typeof config !== "object" || Array.isArray(config)) return config;
-    const { configVersion: _configVersion, ...withoutVersion } = config;
+    const { configVersion: _configVersion, ...withoutVersion } = config as Record<string, unknown>;
     return withoutVersion;
   }
 }

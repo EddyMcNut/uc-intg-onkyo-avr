@@ -44,8 +44,8 @@ describe("input source preferences", () => {
         ]
       )
     ).toEqual([
-      { id: "nsv12", name: "Deezer" },
-      { id: "0a", name: "Spotify" },
+      { id: "nsv12", name: "Deezer", network: true },
+      { id: "0a", name: "Spotify", network: true },
       { id: "12", name: "TV" }
     ]);
   });

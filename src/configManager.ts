@@ -236,28 +236,29 @@ export class ConfigManager {
   }
 
   // Validate a single AVR object from a restored payload. Returns an object with errors (if any) and a normalized AvrConfig when valid.
-  static validateAvrPayload(avr: any): { errors: string[]; normalized?: AvrConfig } {
+  static validateAvrPayload(avr: unknown): { errors: string[]; normalized?: AvrConfig } {
     const errors: string[] = [];
 
     if (!avr || typeof avr !== "object") {
       errors.push("AVR entry must be an object");
       return { errors };
     }
+    const value = avr as Record<string, unknown>;
 
     // model
-    if (!avr.model || typeof avr.model !== "string" || avr.model.trim() === "") {
+    if (!value.model || typeof value.model !== "string" || value.model.trim() === "") {
       errors.push("model is required and must be a non-empty string");
-    } else if (avr.model.length > MAX_LENGTHS.MODEL_NAME) {
+    } else if (value.model.length > MAX_LENGTHS.MODEL_NAME) {
       errors.push(`model too long (max ${MAX_LENGTHS.MODEL_NAME})`);
-    } else if (!PATTERNS.MODEL_NAME.test(avr.model)) {
+    } else if (!PATTERNS.MODEL_NAME.test(value.model)) {
       errors.push("model contains invalid characters");
     }
 
     // ip
-    if (!avr.ip || typeof avr.ip !== "string" || avr.ip.trim() === "") {
+    if (!value.ip || typeof value.ip !== "string" || value.ip.trim() === "") {
       errors.push("ip is required and must be a non-empty string");
     } else {
-      const trimmed = avr.ip.trim();
+      const trimmed = value.ip.trim();
       if (trimmed.length > MAX_LENGTHS.IP_ADDRESS) {
         errors.push(`ip address too long (max ${MAX_LENGTHS.IP_ADDRESS})`);
       } else if (!PATTERNS.IP_ADDRESS.test(trimmed)) {
@@ -271,116 +272,116 @@ export class ConfigManager {
     }
 
     // port
-    const portNum = typeof avr.port === "number" ? avr.port : parseInt(String(avr.port ?? ""), 10);
+    const portNum = typeof value.port === "number" ? value.port : parseInt(String(value.port ?? ""), 10);
     if (isNaN(portNum) || portNum < 1 || portNum > 65535) {
       errors.push("port must be a valid number between 1 and 65535");
     }
 
     // zone
-    const zone = avr.zone ?? "main";
+    const zone = String(value.zone ?? "main");
     if (!["main", "zone2", "zone3", "zone4"].includes(zone)) {
       errors.push('zone must be one of "main", "zone2", "zone3", "zone4"');
     }
 
     // albumArtURL
-    if (avr.albumArtURL && typeof avr.albumArtURL === "string") {
-      if (avr.albumArtURL.length > MAX_LENGTHS.ALBUM_ART_URL) {
+    if (value.albumArtURL && typeof value.albumArtURL === "string") {
+      if (value.albumArtURL.length > MAX_LENGTHS.ALBUM_ART_URL) {
         errors.push(`albumArtURL too long (max ${MAX_LENGTHS.ALBUM_ART_URL})`);
-      } else if (!PATTERNS.ALBUM_ART_URL.test(avr.albumArtURL)) {
+      } else if (!PATTERNS.ALBUM_ART_URL.test(value.albumArtURL)) {
         errors.push("albumArtURL contains invalid characters");
       }
     }
 
     // queueThreshold
-    if (avr.queueThreshold !== undefined) {
-      const qt = typeof avr.queueThreshold === "number" ? avr.queueThreshold : parseInt(String(avr.queueThreshold), 10);
+    if (value.queueThreshold !== undefined) {
+      const qt = typeof value.queueThreshold === "number" ? value.queueThreshold : parseInt(String(value.queueThreshold), 10);
       if (isNaN(qt) || qt < 0) {
         errors.push("queueThreshold must be a non-negative integer");
       }
     }
 
     // volumeScale
-    if (avr.volumeScale !== undefined) {
-      const raw = String(avr.volumeScale).trim().toLowerCase();
+    if (value.volumeScale !== undefined) {
+      const raw = String(value.volumeScale).trim().toLowerCase();
       if (raw !== VOLUME_SCALE_AUTO && ![80, 100].includes(parseInt(raw, 10))) {
         errors.push('volumeScale must be 80, 100 or "auto"');
       }
     }
 
     // useAvrReportedInputs
-    if (avr.useAvrReportedInputs !== undefined && typeof avr.useAvrReportedInputs !== "boolean" && typeof avr.useAvrReportedInputs !== "string") {
+    if (value.useAvrReportedInputs !== undefined && typeof value.useAvrReportedInputs !== "boolean" && typeof value.useAvrReportedInputs !== "string") {
       errors.push("useAvrReportedInputs must be boolean");
     }
 
     // volumeDisplay
-    if (avr.volumeDisplay !== undefined) {
-      const vd = String(avr.volumeDisplay).toLowerCase();
+    if (value.volumeDisplay !== undefined) {
+      const vd = String(value.volumeDisplay).toLowerCase();
       if (vd !== "absolute" && vd !== "relative") {
         errors.push('volumeDisplay must be "absolute" or "relative"');
       }
     }
 
     // adjustVolumeDispl
-    if (avr.adjustVolumeDispl !== undefined && typeof avr.adjustVolumeDispl !== "boolean" && !(typeof avr.adjustVolumeDispl === "string")) {
+    if (value.adjustVolumeDispl !== undefined && typeof value.adjustVolumeDispl !== "boolean" && !(typeof value.adjustVolumeDispl === "string")) {
       errors.push("adjustVolumeDispl must be boolean");
     }
 
     // entityNameStyle
-    if (avr.entityNameStyle !== undefined) {
-      const style = String(avr.entityNameStyle).toLowerCase();
+    if (value.entityNameStyle !== undefined) {
+      const style = String(value.entityNameStyle).toLowerCase();
       if (style !== "long" && style !== "short") {
         errors.push('entityNameStyle must be "long" or "short"');
       }
     }
 
     // createSensors
-    if (avr.createSensors !== undefined && typeof avr.createSensors !== "boolean" && !(typeof avr.createSensors === "string")) {
+    if (value.createSensors !== undefined && typeof value.createSensors !== "boolean" && !(typeof value.createSensors === "string")) {
       errors.push("createSensors must be boolean");
     }
 
     // createTunerPresets
-    if (avr.createTunerPresets !== undefined && typeof avr.createTunerPresets !== "boolean" && !(typeof avr.createTunerPresets === "string")) {
+    if (value.createTunerPresets !== undefined && typeof value.createTunerPresets !== "boolean" && !(typeof value.createTunerPresets === "string")) {
       errors.push("createTunerPresets must be boolean");
     }
 
     // createRemoteEntity
-    if (avr.createRemoteEntity !== undefined && typeof avr.createRemoteEntity !== "boolean" && !(typeof avr.createRemoteEntity === "string")) {
+    if (value.createRemoteEntity !== undefined && typeof value.createRemoteEntity !== "boolean" && !(typeof value.createRemoteEntity === "string")) {
       errors.push("createRemoteEntity must be boolean");
     }
 
     // createDiracSelectEntity
-    if (avr.createDiracSelectEntity !== undefined && typeof avr.createDiracSelectEntity !== "boolean" && !(typeof avr.createDiracSelectEntity === "string")) {
+    if (value.createDiracSelectEntity !== undefined && typeof value.createDiracSelectEntity !== "boolean" && !(typeof value.createDiracSelectEntity === "string")) {
       errors.push("createDiracSelectEntity must be boolean");
     }
 
     // netMenuDelay
-    if (avr.netMenuDelay !== undefined) {
-      const nm = typeof avr.netMenuDelay === "number" ? avr.netMenuDelay : parseInt(String(avr.netMenuDelay), 10);
+    if (value.netMenuDelay !== undefined) {
+      const nm = typeof value.netMenuDelay === "number" ? value.netMenuDelay : parseInt(String(value.netMenuDelay), 10);
       if (isNaN(nm) || nm < 0) {
         errors.push("netMenuDelay must be a non-negative integer");
       }
     }
 
     // tuneinPresetPosition
-    if (avr.tuneinPresetPosition !== undefined) {
-      const tp = typeof avr.tuneinPresetPosition === "number" ? avr.tuneinPresetPosition : parseInt(String(avr.tuneinPresetPosition), 10);
-      if (isNaN(tp) || tp < 1 || tp > 9) {
+    if (value.tuneinPresetPosition !== undefined) {
+      const tp = typeof value.tuneinPresetPosition === "number" ? value.tuneinPresetPosition : parseInt(String(value.tuneinPresetPosition), 10);
+      if (isNaN(tp) || tp < 1 || tp > 10) {
         errors.push("tuneinPresetPosition must be an integer between 1 and 10");
       }
     }
 
     // tuneinMenuStyle
-    if (avr.tuneinMenuStyle !== undefined) {
-      const style = String(avr.tuneinMenuStyle).toLowerCase();
+    if (value.tuneinMenuStyle !== undefined) {
+      const style = String(value.tuneinMenuStyle).toLowerCase();
       if (style !== "mypresets" && style !== "full") {
         errors.push('tuneinMenuStyle must be "mypresets" or "full"');
       }
     }
 
-    if (avr.inputSourceLayout !== undefined && !["combined", "separate"].includes(String(avr.inputSourceLayout).toLowerCase())) {
+    if (value.inputSourceLayout !== undefined && !["combined", "separate"].includes(String(value.inputSourceLayout).toLowerCase())) {
       errors.push('inputSourceLayout must be "combined" or "separate"');
     }
-    if (avr.networkInputMarker !== undefined && !(NETWORK_INPUT_MARKERS as readonly string[]).includes(String(avr.networkInputMarker))) {
+    if (value.networkInputMarker !== undefined && !(NETWORK_INPUT_MARKERS as readonly string[]).includes(String(value.networkInputMarker))) {
       errors.push("networkInputMarker is not supported");
     }
 
@@ -389,37 +390,38 @@ export class ConfigManager {
     }
 
     // Build normalized AVR with defaults
-    const useAvrReportedInputs = parseBoolean(avr.useAvrReportedInputs, AVR_DEFAULTS.useAvrReportedInputs);
+    const useAvrReportedInputs = parseBoolean(value.useAvrReportedInputs, AVR_DEFAULTS.useAvrReportedInputs);
     const normalized: AvrConfig = this.applyDefaults({
-      model: String(avr.model).trim(),
-      ip: String(avr.ip).trim(),
+      model: String(value.model).trim(),
+      ip: String(value.ip).trim(),
       port: portNum,
       zone: this.validateZone(zone),
-      queueThreshold: avr.queueThreshold,
-      albumArtURL: avr.albumArtURL,
-      volumeScale: parseVolumeScale(avr.volumeScale),
+      queueThreshold: typeof value.queueThreshold === "number" ? value.queueThreshold : undefined,
+      albumArtURL: typeof value.albumArtURL === "string" ? value.albumArtURL : undefined,
+      volumeScale: parseVolumeScale(value.volumeScale),
       useAvrReportedInputs,
-      volumeDisplay: String(avr.volumeDisplay ?? AVR_DEFAULTS.volumeDisplay).toLowerCase() === "relative" ? "relative" : "absolute",
-      adjustVolumeDispl: parseBoolean(avr.adjustVolumeDispl, AVR_DEFAULTS.adjustVolumeDispl),
-      entityNameStyle: (String(avr.entityNameStyle ?? AVR_DEFAULTS.entityNameStyle).toLowerCase() === "short" ? "short" : "long") as EntityNameStyle,
-      createSensors: parseBoolean(avr.createSensors, AVR_DEFAULTS.createSensors),
-      createTunerPresets: parseBoolean(avr.createTunerPresets, AVR_DEFAULTS.createTunerPresets),
-      createRemoteEntity: parseBoolean(avr.createRemoteEntity, AVR_DEFAULTS.createRemoteEntity),
-      createDiracSelectEntity: parseBoolean(avr.createDiracSelectEntity, AVR_DEFAULTS.createDiracSelectEntity),
-      netMenuDelay: typeof avr.netMenuDelay === "string" ? parseInt(avr.netMenuDelay, 10) : avr.netMenuDelay,
-      tuneinPresetPosition: typeof avr.tuneinPresetPosition === "string" ? parseInt(avr.tuneinPresetPosition, 10) : avr.tuneinPresetPosition,
-      tuneinMenuStyle: String(avr.tuneinMenuStyle ?? AVR_DEFAULTS.tuneinMenuStyle).toLowerCase() === "full" ? "full" : "mypresets",
-      inputSourceLayout: String(avr.inputSourceLayout ?? AVR_DEFAULTS.inputSourceLayout).toLowerCase() === "separate" ? "separate" : "combined",
-      networkInputMarker: (avr.networkInputMarker ?? AVR_DEFAULTS.networkInputMarker) as AvrConfig["networkInputMarker"],
-      listeningModes: normalizeListeningModes(avr.listeningModes),
-      idInputSources: normalizeInputSourceSettings(avr.idInputSources)
+      volumeDisplay: String(value.volumeDisplay ?? AVR_DEFAULTS.volumeDisplay).toLowerCase() === "relative" ? "relative" : "absolute",
+      adjustVolumeDispl: parseBoolean(value.adjustVolumeDispl, AVR_DEFAULTS.adjustVolumeDispl),
+      entityNameStyle: (String(value.entityNameStyle ?? AVR_DEFAULTS.entityNameStyle).toLowerCase() === "short" ? "short" : "long") as EntityNameStyle,
+      createSensors: parseBoolean(value.createSensors, AVR_DEFAULTS.createSensors),
+      createTunerPresets: parseBoolean(value.createTunerPresets, AVR_DEFAULTS.createTunerPresets),
+      createRemoteEntity: parseBoolean(value.createRemoteEntity, AVR_DEFAULTS.createRemoteEntity),
+      createDiracSelectEntity: parseBoolean(value.createDiracSelectEntity, AVR_DEFAULTS.createDiracSelectEntity),
+      netMenuDelay: typeof value.netMenuDelay === "number" ? value.netMenuDelay : typeof value.netMenuDelay === "string" ? parseInt(value.netMenuDelay, 10) : undefined,
+      tuneinPresetPosition:
+        typeof value.tuneinPresetPosition === "number" ? value.tuneinPresetPosition : typeof value.tuneinPresetPosition === "string" ? parseInt(value.tuneinPresetPosition, 10) : undefined,
+      tuneinMenuStyle: String(value.tuneinMenuStyle ?? AVR_DEFAULTS.tuneinMenuStyle).toLowerCase() === "full" ? "full" : "mypresets",
+      inputSourceLayout: String(value.inputSourceLayout ?? AVR_DEFAULTS.inputSourceLayout).toLowerCase() === "separate" ? "separate" : "combined",
+      networkInputMarker: (value.networkInputMarker ?? AVR_DEFAULTS.networkInputMarker) as AvrConfig["networkInputMarker"],
+      listeningModes: normalizeListeningModes(value.listeningModes),
+      idInputSources: normalizeInputSourceSettings(value.idInputSources)
     });
 
     return { errors: [], normalized };
   }
 
   // Validate an entire restored config payload. Returns errors if any and a normalized IntegrationConfig when valid.
-  static validateConfigPayload(payload: any): { errors: string[]; normalized?: IntegrationConfig } {
+  static validateConfigPayload(payload: unknown): { errors: string[]; normalized?: IntegrationConfig } {
     const errors: string[] = [];
     if (!payload || typeof payload !== "object") {
       errors.push("Payload must be an object");
@@ -427,7 +429,7 @@ export class ConfigManager {
     }
 
     // Allow either full payload {config: {...}} or bare config
-    const cfg = payload.config ?? payload;
+    const cfg = (payload as Record<string, unknown>).config ?? payload;
 
     if (!cfg) {
       errors.push("No config object found in payload");
@@ -440,17 +442,18 @@ export class ConfigManager {
 
     // Preserve global logLevel if present
     const validLogLevels = ["debug", "info", "warn", "error"];
-    if (cfg.logLevel !== undefined) {
-      const level = String(cfg.logLevel).toLowerCase();
+    const config = cfg as Record<string, unknown>;
+    if (config.logLevel !== undefined) {
+      const level = String(config.logLevel).toLowerCase();
       if (validLogLevels.includes(level)) {
         normalizedConfig.logLevel = level as LogLevel;
       }
     }
 
-    if (Array.isArray(cfg.avrs)) {
+    if (Array.isArray(config.avrs)) {
       const normalizedAvrs: AvrConfig[] = [];
-      for (let i = 0; i < cfg.avrs.length; i++) {
-        const avr = { ...cfg.avrs[i] };
+      for (let i = 0; i < config.avrs.length; i++) {
+        const avr = { ...(config.avrs[i] as Record<string, unknown>) };
         const res = this.validateAvrPayload(avr);
         if (res.errors.length > 0) {
           errors.push(`avrs[${i}]: ${res.errors.join("; ")}`);
@@ -464,9 +467,9 @@ export class ConfigManager {
       }
 
       normalizedConfig.avrs = normalizedAvrs;
-    } else if (cfg.model && cfg.ip) {
+    } else if (config.model && config.ip) {
       // Legacy single-model payload
-      const res = this.validateAvrPayload({ model: cfg.model, ip: cfg.ip, port: cfg.port ?? AVR_DEFAULTS.port, zone: cfg.zone ?? "main" });
+      const res = this.validateAvrPayload({ model: config.model, ip: config.ip, port: config.port ?? AVR_DEFAULTS.port, zone: config.zone ?? "main" });
       if (res.errors.length > 0) {
         errors.push(...res.errors.map((e) => `legacy avrs: ${e}`));
         return { errors };

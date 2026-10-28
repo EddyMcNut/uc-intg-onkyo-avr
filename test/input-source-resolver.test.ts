@@ -126,9 +126,9 @@ describe("inputSourceResolver", () => {
 
     expect(resolveInputSourceList(AVR_CONFIG, ENTITY_ID)?.inputs).toEqual([
       { id: "10", name: "BD/DVD" },
-      { id: "40", name: "Chromecast built-in" },
-      { id: "0a", name: "Spotify" },
-      { id: "0e", name: "TuneIn Radio" }
+      { id: "40", name: "Chromecast built-in", network: true },
+      { id: "0a", name: "Spotify", network: true },
+      { id: "0e", name: "TuneIn Radio", network: true }
     ]);
   });
 

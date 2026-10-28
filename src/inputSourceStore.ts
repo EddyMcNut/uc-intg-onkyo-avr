@@ -14,6 +14,8 @@ export type AvrInput = {
   id: string;
   // Name as the AVR shows it, e.g. "DAB" or "BD/DVD".
   name: string;
+  // True when the entry came from the AVR's network-service list rather than its selector list.
+  network?: boolean;
 };
 
 // Collected inputs per physical AVR id ("MODEL HOST").
@@ -47,7 +49,7 @@ export function normalizeAvrInputs(raw: AvrInput[]): AvrInput[] {
     }
     seenIds.add(id);
     seenNames.add(key);
-    inputs.push({ id, name });
+    inputs.push({ id, name, ...(input.network ? { network: true } : {}) });
   }
 
   return inputs.sort(byName);
