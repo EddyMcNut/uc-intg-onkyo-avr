@@ -1,7 +1,7 @@
 // Focused responsibility: Parse and validate manual configuration input
 import { LogLevel, AVR_DEFAULTS, parseBoolean, parseVolumeScale, type VolumeScale } from "./configManager.js";
 import type { AvrInput } from "./inputSourceStore.js";
-import type { InputSourceSettings } from "./configConstants.js";
+import { NETWORK_INPUT_MARKERS, type InputSourceLayout, type InputSourceSettings, type NetworkInputMarker } from "./configConstants.js";
 
 export interface ManualConfigInput {
   model?: unknown;
@@ -26,6 +26,8 @@ export interface ManualConfigInput {
   netMenuDelay?: unknown;
   tuneinPresetPosition?: unknown;
   tuneinMenuStyle?: unknown;
+  inputSourceLayout?: unknown;
+  networkInputMarker?: unknown;
   entityNameStyle?: unknown;
   logLevel?: unknown;
 }
@@ -54,6 +56,8 @@ export interface ParsedManualConfig {
   netMenuDelayValue: number;
   tuneinPresetPositionValue: number;
   tuneinMenuStyleValue: "mypresets" | "full";
+  inputSourceLayoutValue: InputSourceLayout;
+  networkInputMarkerValue: NetworkInputMarker;
   logLevelValue: LogLevel;
   errorMessage?: string;
 }
@@ -84,6 +88,8 @@ export class ManualConfigParser {
       netMenuDelayValue: this.parseNetMenuDelay(input.netMenuDelay),
       tuneinPresetPositionValue: this.parseTuneInPresetPosition(input.tuneinPresetPosition),
       tuneinMenuStyleValue: this.parseTuneInMenuStyle(input.tuneinMenuStyle),
+      inputSourceLayoutValue: String(input.inputSourceLayout ?? "combined").toLowerCase() === "separate" ? "separate" : "combined",
+      networkInputMarkerValue: this.parseNetworkInputMarker(input.networkInputMarker),
       logLevelValue: this.parseLogLevel(input.logLevel, fallbackLogLevel),
       zoneCountValue: this.parseZoneCount(input.zoneCount)
     };
@@ -162,6 +168,10 @@ export class ManualConfigParser {
 
   private parseTuneInMenuStyle(style: unknown): "mypresets" | "full" {
     return String(style ?? AVR_DEFAULTS.tuneinMenuStyle).toLowerCase() === "full" ? "full" : "mypresets";
+  }
+
+  private parseNetworkInputMarker(marker: unknown): NetworkInputMarker {
+    return NETWORK_INPUT_MARKERS.includes(marker as NetworkInputMarker) ? (marker as NetworkInputMarker) : "none";
   }
 
   private parseLogLevel(level: unknown, fallback: LogLevel): LogLevel {

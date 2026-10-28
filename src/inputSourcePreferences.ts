@@ -20,6 +20,12 @@ const NRI_SERVICE_ALIASES: Record<string, string[]> = {
   musicserver: ["music-server"]
 };
 
+const NETWORK_SOURCE_ALIASES = new Set(
+  Object.values(NRI_SERVICE_ALIASES)
+    .flat()
+    .map((alias) => alias.toLowerCase())
+);
+
 function normalizeSourceName(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9]/g, "");
 }
@@ -48,6 +54,14 @@ export function getAliasesForReportedInput(id: string, name: string): string[] {
   const byId = getInputSourceAliases(id);
   if (byId.length > 0) return byId;
   return NRI_SERVICE_ALIASES[normalizeSourceName(name)] ?? [];
+}
+
+export function isNetworkInputSource(id: string, name: string, aliases: string[] = getAliasesForReportedInput(id, name)): boolean {
+  return (
+    id.toUpperCase().startsWith("NSV") ||
+    aliases.some((alias) => NETWORK_SOURCE_ALIASES.has(normalizeSourceName(alias)) || NETWORK_SOURCE_ALIASES.has(alias.toLowerCase())) ||
+    NETWORK_SOURCE_ALIASES.has(normalizeSourceName(name))
+  );
 }
 
 export function normalizeInputSources(raw: unknown): InputSourceSettings {

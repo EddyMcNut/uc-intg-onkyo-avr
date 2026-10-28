@@ -12,7 +12,7 @@ import { browseMedia, isMediaBrowsingAvailable } from "./mediaBrowser.js";
 import { PlayMediaCommandHandler } from "./playMediaCommandHandler.js";
 import { findAvrSourceId } from "./avrSourceCatalog.js";
 
-const integrationName = "commandSender:";
+const logSource = "commandSender:";
 
 export class CommandSender {
   private driver: uc.IntegrationAPI;
@@ -39,7 +39,7 @@ export class CommandSender {
   async sharedCmdHandler(entity: uc.Entity, cmdId: string, params?: { [key: string]: string | number | boolean }): Promise<uc.StatusCodes> {
     const entityParts = entity.id.split(" ");
     if (entityParts.length < 3) {
-      log.error("%s [%s] Cannot route command: entity id does not contain model, host, and zone", integrationName, entity.id);
+      log.error("%s [%s] Cannot route command: entity id does not contain model, host, and zone", logSource, entity.id);
       return uc.StatusCodes.BadRequest;
     }
 
@@ -49,15 +49,15 @@ export class CommandSender {
     const targetAvr = this.config.avrs?.find((avr) => buildEntityId(avr.model, avr.ip, avr.zone) === entity.id) ?? this.config.avrs?.find((avr) => avr.model === model && avr.ip === host) ?? null;
 
     if (!targetAvr) {
-      log.error("%s [%s] Cannot route command: no configured AVR matches model='%s' host='%s' zone='%s'", integrationName, entity.id, model, host, zone);
+      log.error("%s [%s] Cannot route command: no configured AVR matches model='%s' host='%s' zone='%s'", logSource, entity.id, model, host, zone);
       return uc.StatusCodes.BadRequest;
     }
 
-    if (!(await ensureEiscpConnected(this.eiscp, { model: targetAvr.model, host: targetAvr.ip, port: targetAvr.port }, entity.id, integrationName))) {
+    if (!(await ensureEiscpConnected(this.eiscp, { model: targetAvr.model, host: targetAvr.ip, port: targetAvr.port }, entity.id, logSource))) {
       return uc.StatusCodes.Timeout;
     }
 
-    log.info("%s [%s] media-player command request: %s", integrationName, entity.id, cmdId, params || "");
+    log.info("%s [%s] media-player command request: %s", logSource, entity.id, cmdId, params || "");
 
     const setZonePrefix = (cmd: string): string => (zone === "main" ? cmd : `${zone}.${cmd}`);
 
@@ -71,7 +71,7 @@ export class CommandSender {
     const handler = this.handlers.get(cmdId);
     if (!handler) {
       if (cmdId === uc.MediaPlayerCommands.Shuffle || cmdId === uc.MediaPlayerCommands.Repeat) {
-        log.debug("%s [%s] ignoring unsupported media-player command '%s'", integrationName, entity.id, cmdId);
+        log.debug("%s [%s] ignoring unsupported media-player command '%s'", logSource, entity.id, cmdId);
         return uc.StatusCodes.Ok;
       }
       return this.handleSimpleCommand(cmdId, zone);
@@ -142,7 +142,7 @@ export class CommandSender {
         if (params?.volume === undefined) return uc.StatusCodes.Ok;
         const volumeDisplay = String(this.config.volumeDisplay ?? "absolute").toLowerCase() === "relative" ? "relative" : "absolute";
         if (volumeDisplay !== "absolute") {
-          log.debug("%s volume set to relative so slider is ignored.", integrationName);
+          log.debug("%s volume set to relative so slider is ignored.", logSource);
           return uc.StatusCodes.Ok;
         }
         const sliderValue = Math.max(0, Math.min(100, Number(params.volume)));
@@ -176,11 +176,11 @@ export class CommandSender {
         if (request.startsWith("raw ")) {
           const rawCmd = request.substring(3).trim().toUpperCase();
           if (rawCmd.length > MAX_LENGTHS.RAW_COMMAND) {
-            log.error("%s Raw command too long (%d chars), rejecting", integrationName, rawCmd.length);
+            log.error("%s Raw command too long (%d chars), rejecting", logSource, rawCmd.length);
             return uc.StatusCodes.BadRequest;
           }
           if (!PATTERNS.RAW_COMMAND.test(rawCmd)) {
-            log.error("%s Raw command contains invalid characters, rejecting", integrationName);
+            log.error("%s Raw command contains invalid characters, rejecting", logSource);
             return uc.StatusCodes.BadRequest;
           }
           await this.eiscp.raw(rawCmd);
@@ -188,11 +188,11 @@ export class CommandSender {
         }
 
         if (request.length > MAX_LENGTHS.USER_COMMAND) {
-          log.error("%s Command too long (%d chars), rejecting", integrationName, request.length);
+          log.error("%s Command too long (%d chars), rejecting", logSource, request.length);
           return uc.StatusCodes.BadRequest;
         }
         if (!PATTERNS.USER_COMMAND.test(request)) {
-          log.error("%s Command contains invalid characters, rejecting", integrationName);
+          log.error("%s Command contains invalid characters, rejecting", logSource);
           return uc.StatusCodes.BadRequest;
         }
 
@@ -324,7 +324,7 @@ export class CommandSender {
     }
 
     const zonePrefixed = zone === "main" ? commandStr : `${zone}.${commandStr}`;
-    log.info("%s executing simple command '%s' → %s", integrationName, cmdId, zonePrefixed);
+    log.info("%s executing simple command '%s' → %s", logSource, cmdId, zonePrefixed);
     await this.eiscp.command(zonePrefixed);
     return uc.StatusCodes.Ok;
   }

@@ -38,6 +38,20 @@ describe("inputSourceResolver", () => {
     expect(resolution?.reason).toContain("2 input(s)");
   });
 
+  it("separates and marks configured network sources without changing command names", () => {
+    const config = {
+      ...AVR_CONFIG,
+      inputSourceLayout: "separate",
+      networkInputMarker: "🌐",
+      idInputSources: {
+        BD: { name: "BD/DVD", setting: "bd/dvd" },
+        SPOTIFY: { name: "Spotify", setting: "spotify" }
+      }
+    } as AvrConfig;
+
+    expect(getEffectiveInputSourceOptions(config, "TX-RZ50 192.168.2.103", ["BD/DVD", "Spotify"])).toEqual(["bd/dvd", "🌐 spotify"]);
+  });
+
   it("falls back to integration mappings when the AVR reports no inputs", () => {
     setAvrInfo(ENTITY_ID, parseAvrInfo(nriXml("")));
 

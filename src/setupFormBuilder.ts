@@ -3,6 +3,10 @@ import * as uc from "@unfoldedcircle/integration-api";
 import { ParsedManualConfig } from "./manualConfigParser.js";
 import { EXCLUDE_LISTENING_MODE, getKnownListeningModes, LEARNED_LISTENING_MODE, LEARN_LISTENING_MODE, normalizeListeningModeSetting } from "./listeningModePreferences.js";
 import { EXCLUDE_INPUT_SOURCE, getAliasesForReportedInput, getKnownInputSources, LEARNED_INPUT_SOURCE, LEARN_INPUT_SOURCE } from "./inputSourcePreferences.js";
+import { NETWORK_INPUT_MARKERS } from "./configConstants.js";
+import { SETUP_SELECTION_PAGE_SIZE } from "./inputSourcePresentation.js";
+
+type FormSetting = { id: string; [key: string]: object | string };
 
 export class SetupFormBuilder {
   buildManualConfigForm(values: ParsedManualConfig): uc.RequestUserInput {
@@ -24,7 +28,16 @@ export class SetupFormBuilder {
   }
 
   buildManualConfigPage2(values: ParsedManualConfig): uc.RequestUserInput {
-    return this.buildManualConfigFormPage(values, "Manual configuration (2/3)", ["entityNameStyle", "volumeScale", "volumeDisplay", "adjustVolumeDispl", "tuneinPresetPosition", "tuneinMenuStyle"]);
+    return this.buildManualConfigFormPage(values, "Manual configuration (2/3)", [
+      "entityNameStyle",
+      "volumeScale",
+      "volumeDisplay",
+      "adjustVolumeDispl",
+      "tuneinPresetPosition",
+      "tuneinMenuStyle",
+      "inputSourceLayout",
+      "networkInputMarker"
+    ]);
   }
 
   buildManualConfigPage3(values: ParsedManualConfig): uc.RequestUserInput {
@@ -34,73 +47,82 @@ export class SetupFormBuilder {
 
   buildInputSourcePage(values: ParsedManualConfig, page: number, total: number): uc.RequestUserInput {
     const sources = this.getInputSourceRows(values);
-    const pageSize = 12;
+    const pageSize = SETUP_SELECTION_PAGE_SIZE;
     const ids = sources.slice((page - 1) * pageSize, page * pageSize).map((source) => `ids_${source.id}`);
     return this.buildManualConfigFormPage(values, `Input Sources (${page}/${total})`, ids);
   }
 
   getInputSourcePageCount(values: ParsedManualConfig): number {
-    return Math.ceil(this.getInputSourceRows(values).length / 12);
+    return Math.ceil(this.getInputSourceRows(values).length / SETUP_SELECTION_PAGE_SIZE);
   }
 
   buildListeningModePage(values: ParsedManualConfig, page: number): uc.RequestUserInput {
     const modes = getKnownListeningModes();
-    const pageSize = Math.ceil(modes.length / 5);
+    const pageSize = SETUP_SELECTION_PAGE_SIZE;
     const ids = modes.slice((page - 1) * pageSize, page * pageSize).map((mode) => `lmd_${mode.code}`);
-    return this.buildManualConfigFormPage(values, `Listening Modes (${page}/5)`, ids);
+    return this.buildManualConfigFormPage(values, `Listening Modes (${page}/${this.getListeningModePageCount()})`, ids);
+  }
+
+  getListeningModePageCount(): number {
+    return Math.ceil(getKnownListeningModes().length / SETUP_SELECTION_PAGE_SIZE);
   }
 
   buildManualConfigPage4(values: ParsedManualConfig): uc.RequestUserInput {
-    const modes = getKnownListeningModes();
-    const pageSize = Math.ceil(modes.length / 5);
-    const ids = modes.slice(0, pageSize).map((mode) => `lmd_${mode.code}`);
-    return this.buildManualConfigFormPage(values, "Listening Modes (1/5)", ids);
+    return this.buildListeningModePage(values, 1);
   }
 
   buildManualConfigPage5(values: ParsedManualConfig): uc.RequestUserInput {
-    const modes = getKnownListeningModes();
-    const pageSize = Math.ceil(modes.length / 5);
-    const ids = modes.slice(pageSize, pageSize * 2).map((mode) => `lmd_${mode.code}`);
-    return this.buildManualConfigFormPage(values, "Listening Modes (2/5)", ids);
+    return this.buildListeningModePage(values, 2);
   }
 
   buildManualConfigPage6(values: ParsedManualConfig): uc.RequestUserInput {
-    const modes = getKnownListeningModes();
-    const pageSize = Math.ceil(modes.length / 5);
-    const ids = modes.slice(pageSize * 2, pageSize * 3).map((mode) => `lmd_${mode.code}`);
-    return this.buildManualConfigFormPage(values, "Listening Modes (3/5)", ids);
+    return this.buildListeningModePage(values, 3);
   }
 
   buildManualConfigPage7(values: ParsedManualConfig): uc.RequestUserInput {
-    const modes = getKnownListeningModes();
-    const pageSize = Math.ceil(modes.length / 5);
-    const ids = modes.slice(pageSize * 3, pageSize * 4).map((mode) => `lmd_${mode.code}`);
-    return this.buildManualConfigFormPage(values, "Listening Modes (4/5)", ids);
+    return this.buildListeningModePage(values, 4);
   }
 
   buildManualConfigPage8(values: ParsedManualConfig): uc.RequestUserInput {
-    const modes = getKnownListeningModes();
-    const pageSize = Math.ceil(modes.length / 5);
-    const ids = modes.slice(pageSize * 4).map((mode) => `lmd_${mode.code}`);
-    return this.buildManualConfigFormPage(values, "Listening Modes (5/5)", ids);
+    return this.buildListeningModePage(values, 5);
+  }
+
+  buildManualConfigPage9(values: ParsedManualConfig): uc.RequestUserInput {
+    return this.buildListeningModePage(values, 6);
   }
 
   private buildManualConfigFormPage(values: ParsedManualConfig, title: string, ids: string[]): uc.RequestUserInput {
     const form = this.buildManualConfigFormAll(values);
-    const settings = (form.settings as Array<{ id: string }>).filter((setting) => ids.includes(setting.id));
+    const settings = (form.settings as FormSetting[]).filter((setting) => ids.includes(setting.id));
     if (title.startsWith("Listening Modes")) {
       settings.unshift({
         id: `listeningModesPageInfo_${title.replace(/\W/g, "_")}`,
         label: { en: title },
         field: { label: { value: { en: "Choose Learn from AVR, Disable, or an alternate alias for each mode." } } }
-      } as never);
+      });
     }
     if (title.startsWith("Input Sources")) {
       settings.unshift({
         id: `inputSourcesPageInfo_${title.replace(/\W/g, "_")}`,
         label: { en: title },
         field: { label: { value: { en: "Choose the AVR name, an integration alias, or Exclude from integration." } } }
-      } as never);
+      });
+    }
+    if (title.startsWith("Listening Modes") || title.startsWith("Input Sources")) {
+      settings.unshift({
+        id: "set_all_page",
+        label: { en: "Set all entries on this page" },
+        field: {
+          dropdown: {
+            value: "none",
+            items: [
+              { id: "none", label: { en: "Keep individual selections" } },
+              { id: "learn", label: { en: "Learn all entries" } },
+              { id: "exclude", label: { en: "Exclude all entries" } }
+            ]
+          }
+        }
+      });
     }
     return new uc.RequestUserInput(title, settings);
   }
@@ -215,6 +237,31 @@ export class SetupFormBuilder {
           }
         },
         description: { en: "Choose how TuneIn navigation is handled when selecting presets." }
+      },
+      {
+        id: "inputSourceLayout",
+        label: { en: "Input source layout" },
+        field: {
+          dropdown: {
+            value: values.inputSourceLayoutValue,
+            items: [
+              { id: "combined", label: { en: "Combined list (default)" } },
+              { id: "separate", label: { en: "Separate network sources" } }
+            ]
+          }
+        },
+        description: { en: "Choose whether network sources appear mixed with regular input sources or after them." }
+      },
+      {
+        id: "networkInputMarker",
+        label: { en: "Mark network subsources" },
+        field: {
+          dropdown: {
+            value: values.networkInputMarkerValue,
+            items: NETWORK_INPUT_MARKERS.map((icon) => ({ id: icon, label: { en: icon === "none" ? "No (default)" : icon } }))
+          }
+        },
+        description: { en: "Add the selected visual marker to network sources in the input-source selector." }
       },
       {
         id: "zoneCount",

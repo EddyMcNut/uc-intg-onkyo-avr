@@ -1,7 +1,7 @@
 ## Collect logs
 
 - Reconfigure the integration: `Log level = Debug (all)`
-    ![](../screenshots/loglevel-debug.png)
+  ![](../screenshots/loglevel-debug.png)
 
 - Complete the setup flow of the integration so the configuration change takes effect
 - Turn off AVR
@@ -11,7 +11,7 @@
 - Services: `Custom: Onkyo/Pioneer/Integra AVR`
 - Download
 
-    ![](../screenshots/collect-logs.png)
+  ![](../screenshots/collect-logs.png)
 
 - Reconfigure the integration: `Log level = Warn + Error (default)`
-    ![](../screenshots/loglevel-default.png)
+  ![](../screenshots/loglevel-default.png)

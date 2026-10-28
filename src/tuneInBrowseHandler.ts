@@ -9,7 +9,7 @@ import type { AvrStateApi } from "./types.js";
 import log from "./loggers.js";
 import { MenuBrowseHandlerBase } from "./menuBrowseHandlerBase.js";
 
-const integrationName = "tuneInBrowseHandler:";
+const logSource = "tuneInBrowseHandler:";
 
 type CmdHandlerFn = (entity: uc.Entity, cmdId: string, params?: { [key: string]: string | number | boolean }) => Promise<uc.StatusCodes>;
 type RawSendFn = (cmd: string) => Promise<void>;
@@ -62,7 +62,7 @@ function resolveTuneInMenuSelection(entityId: string, mediaId?: string, mediaTyp
 }
 
 export class TuneInBrowseHandler extends MenuBrowseHandlerBase {
-  protected readonly integrationName = integrationName;
+  protected readonly logSource = logSource;
   protected getServiceLabel(): string {
     return "TuneIn";
   }
@@ -126,7 +126,7 @@ export class TuneInBrowseHandler extends MenuBrowseHandlerBase {
     if (isBackRequest && cmdHandler) {
       const beforeSignature = this.buildMenuSignature(entityId);
       const menuDelay = getMenuDelay(entityId);
-      log.info("%s [%s] sending TuneIn Back command to AVR", integrationName, entityId);
+      log.info("%s [%s] sending TuneIn Back command to AVR", logSource, entityId);
       await cmdHandler(mediaPlayerEntity, uc.MediaPlayerCommands.PlayMedia, {
         media_id: TUNEIN_MENU_BACK_ID,
         media_type: TUNEIN_MENU_ROOT_TYPE
@@ -152,7 +152,7 @@ export class TuneInBrowseHandler extends MenuBrowseHandlerBase {
       }
 
       if (state && (state.optionsByMenuIndex.size === 0 || isExplicitMainMenuSelection)) {
-        log.info("%s [%s] Loading TuneIn full menu root", integrationName, entityId);
+        log.info("%s [%s] Loading TuneIn full menu root", logSource, entityId);
         await cmdHandler(mediaPlayerEntity, uc.MediaPlayerCommands.PlayMedia, {
           media_id: TUNEIN_MENU_ROOT_ID,
           media_type: TUNEIN_MENU_ROOT_TYPE

@@ -7,7 +7,7 @@ import { addTuneInMenuOption, listTuneInMenuOptions, getTuneInMenuBrowseState, t
 import { createServiceThumbnails } from "./serviceThumbnails.js";
 import { parseIndexedMenuEntry, getXmlOffset } from "./menuEntryParser.js";
 
-const integrationName = "tuneInMediaBrowser:";
+const logSource = "tuneInMediaBrowser:";
 const NOW_PLAYING_LABEL = "▶ Now Playing";
 
 const { createBackdrop: createTuneInBackdrop, getOrCreateThumbnail: getOrCreateTuneInThumbnail } = createServiceThumbnails({
@@ -186,7 +186,7 @@ export class TuneInMediaBrowser {
   async browse(entityId: string, options: uc.BrowseOptions): Promise<uc.StatusCodes | uc.BrowseResult> {
     const tuneInPresets = listTuneInPresets(entityId);
     if (!options.media_id || options.media_id === TUNEIN_ROOT_ID) {
-      log.info("%s [%s] browsable TuneIn presets: %d", integrationName, entityId, tuneInPresets.length);
+      log.info("%s [%s] browsable TuneIn presets: %d", logSource, entityId, tuneInPresets.length);
       return uc.BrowseResult.fromPaging(this.createRootItem(entityId, options.paging), options.paging, tuneInPresets.length);
     }
 
@@ -202,7 +202,7 @@ export class TuneInMediaBrowser {
     const menuOptions = listTuneInMenuOptions(entityId);
     const showMainMenuShortcut = getTuneInMenuBrowseState(entityId)?.showMainMenuShortcut ?? false;
     const totalCount = menuOptions.length + (showMainMenuShortcut ? 2 : 0);
-    log.info("%s [%s] browsable TuneIn full menu options: %d", integrationName, entityId, menuOptions.length);
+    log.info("%s [%s] browsable TuneIn full menu options: %d", logSource, entityId, menuOptions.length);
     return uc.BrowseResult.fromPaging(this.createMenuRootItem(entityId, options.paging), options.paging, totalCount);
   }
 

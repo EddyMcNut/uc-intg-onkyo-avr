@@ -82,7 +82,7 @@ function createExcludedTitleChecker(excludedPrefixes: string[]): (title: string)
 }
 
 export function createMediaBrowser(cfg: MediaBrowserConfig, store: MenuBrowseStore): MediaBrowserApi {
-  const integrationName = `${cfg.providerLabel.toLowerCase().replace(/\s+/g, "")}MediaBrowser:`;
+  const logSource = `${cfg.providerLabel.toLowerCase().replace(/\s+/g, "")}MediaBrowser:`;
   const isExcludedTitle = createExcludedTitleChecker(cfg.excludedPrefixes);
 
   const { createBackdrop, getOrCreateThumbnail } = createServiceThumbnails(cfg.thumbnails.service);
@@ -174,7 +174,7 @@ export function createMediaBrowser(cfg: MediaBrowserConfig, store: MenuBrowseSto
     const browseState = store.getBrowseState(entityId);
     const totalCount = menuOptions.length + ((browseState?.showMainMenuShortcut ?? false) ? 2 : 0);
     if (!options.media_id || options.media_id === cfg.rootId || isMainMenuRequest(options.media_id, options.media_type) || isBackRequest(options.media_id, options.media_type)) {
-      log.info("%s [%s] browsable %s menu options: %d", integrationName, entityId, cfg.providerLabel, menuOptions.length);
+      log.info("%s [%s] browsable %s menu options: %d", logSource, entityId, cfg.providerLabel, menuOptions.length);
       return uc.BrowseResult.fromPaging(createRootItem(entityId, options.paging), options.paging, totalCount);
     }
 

@@ -64,7 +64,7 @@ export default class EntityRegistrar {
       new TuneInBrowseHandler(avrStateApi),
       createMenuBrowseHandler({
         providerLabel: "Tidal",
-        integrationName: "tidalBrowseHandler:",
+        logSource: "tidalBrowseHandler:",
         rootId: TIDAL_ROOT_ID,
         rootType: TIDAL_ROOT_TYPE,
         backId: TIDAL_BACK_ID,
@@ -78,7 +78,7 @@ export default class EntityRegistrar {
       }),
       createMenuBrowseHandler({
         providerLabel: "Deezer",
-        integrationName: "deezerBrowseHandler:",
+        logSource: "deezerBrowseHandler:",
         rootId: DEEZER_ROOT_ID,
         rootType: DEEZER_ROOT_TYPE,
         backId: DEEZER_BACK_ID,
@@ -92,7 +92,7 @@ export default class EntityRegistrar {
       }),
       createMenuBrowseHandler({
         providerLabel: "Music Server",
-        integrationName: "musicServerBrowseHandler:",
+        logSource: "musicServerBrowseHandler:",
         rootId: MUSIC_SERVER_ROOT_ID,
         rootType: MUSIC_SERVER_ROOT_TYPE,
         backId: MUSIC_SERVER_BACK_ID,

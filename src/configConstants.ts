@@ -180,12 +180,17 @@ export const AVR_DEFAULTS = {
   netMenuDelay: 500,
   tuneinPresetPosition: 1,
   tuneinMenuStyle: "mypresets",
+  inputSourceLayout: "combined",
+  networkInputMarker: "none",
   port: 60128
 } as const;
 
 export type EntityNameStyle = "long" | "short";
 export type VolumeDisplay = "absolute" | "relative";
 export type TuneInMenuStyle = "mypresets" | "full";
+export type InputSourceLayout = "combined" | "separate";
+export type NetworkInputMarker = "none" | "🌐" | "📡" | "🔗" | "☁️" | "🛜" | "🎵" | "▶️";
+export const NETWORK_INPUT_MARKERS: readonly NetworkInputMarker[] = ["none", "🌐", "📡", "🔗", "☁️", "🛜", "🎵", "▶️"];
 export type LogLevel = "debug" | "info" | "warn" | "error";
 
 export interface AvrConfig {
@@ -207,6 +212,8 @@ export interface AvrConfig {
   netMenuDelay?: number; // delay in ms for NET menu to load (default 2500)
   tuneinPresetPosition?: number; // position of "My Presets" in TuneIn menu (1-10, default 1)
   tuneinMenuStyle?: TuneInMenuStyle; // choose TuneIn navigation mode: mypresets or full
+  inputSourceLayout?: InputSourceLayout;
+  networkInputMarker?: NetworkInputMarker;
   // undefined = all options, non-empty = exact options, null = don't create entity. Empty input is normalized to "all".
   listeningModes?: Record<string, { name: string; setting: string }>;
   idInputSources?: InputSourceSettings;
@@ -252,6 +259,8 @@ export interface NormalizedAvrConfig {
   netMenuDelay: number;
   tuneinPresetPosition: number;
   tuneinMenuStyle: TuneInMenuStyle;
+  inputSourceLayout: InputSourceLayout;
+  networkInputMarker: NetworkInputMarker;
   listeningModes: Record<string, { name: string; setting: string }>;
   idInputSources: InputSourceSettings;
 }
@@ -297,6 +306,9 @@ export function normalizeAvrConfig(raw: AvrConfig): NormalizedAvrConfig {
 
   const tuneinMenuStyle: TuneInMenuStyle = String(raw.tuneinMenuStyle ?? AVR_DEFAULTS.tuneinMenuStyle).toLowerCase() === "full" ? "full" : "mypresets";
 
+  const inputSourceLayout: InputSourceLayout = String(raw.inputSourceLayout ?? "combined").toLowerCase() === "separate" ? "separate" : "combined";
+  const networkInputMarker: NetworkInputMarker = NETWORK_INPUT_MARKERS.includes(raw.networkInputMarker as NetworkInputMarker) ? (raw.networkInputMarker as NetworkInputMarker) : "none";
+
   const port = (() => {
     const p = typeof raw.port === "number" ? raw.port : parseInt(String(raw.port ?? ""), 10);
     return isNaN(p) || p < 1 || p > 65535 ? AVR_DEFAULTS.port : p;
@@ -321,6 +333,8 @@ export function normalizeAvrConfig(raw: AvrConfig): NormalizedAvrConfig {
     netMenuDelay,
     tuneinPresetPosition,
     tuneinMenuStyle,
+    inputSourceLayout,
+    networkInputMarker,
     listeningModes:
       raw.listeningModes && typeof raw.listeningModes === "object" && !Array.isArray(raw.listeningModes) ? { ...(raw.listeningModes as Record<string, { name: string; setting: string }>) } : {},
     idInputSources: normalizeInputSourceSettings(raw.idInputSources)

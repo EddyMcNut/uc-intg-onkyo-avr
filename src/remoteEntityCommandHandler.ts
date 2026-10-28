@@ -15,7 +15,7 @@ import log from "./loggers.js";
 import { EiscpDriver } from "./eiscp.js";
 import { AvrConfig } from "./configManager.js";
 
-const integrationName = "remoteHandler:";
+const logSource = "remoteEntityCommandHandler:";
 const INPUT_NAMES_SET = new Set(ALL_INPUT_SELECTOR_NAMES);
 
 // Vocal (Dialog Enhancement) absolute level range: 0 (off) .. 5.
@@ -39,7 +39,7 @@ export class remoteEntityCommandHandler {
     const instance = this.avrInstanceManager.get(avrEntry);
 
     if (!instance) {
-      log.error("%s [%s] No AVR instance found", integrationName, entity.id);
+      log.error("%s [%s] No AVR instance found", logSource, entity.id);
       return uc.StatusCodes.NotFound;
     }
 
@@ -47,15 +47,15 @@ export class remoteEntityCommandHandler {
     const physicalConnection = this.connectionManager.getPhysicalConnection(physicalAVR);
 
     if (!physicalConnection) {
-      log.error("%s [%s] No physical connection found", integrationName, entity.id);
+      log.error("%s [%s] No physical connection found", logSource, entity.id);
       return uc.StatusCodes.ServiceUnavailable;
     }
 
-    if (!(await ensureEiscpConnected(physicalConnection.eiscp, { model: instance.config.model, host: instance.config.ip, port: instance.config.port }, entity.id, integrationName))) {
+    if (!(await ensureEiscpConnected(physicalConnection.eiscp, { model: instance.config.model, host: instance.config.ip, port: instance.config.port }, entity.id, logSource))) {
       return uc.StatusCodes.Timeout;
     }
 
-    log.info("%s [%s] remote command request: %s", integrationName, entity.id, cmdId, params ?? "");
+    log.info("%s [%s] remote command request: %s", logSource, entity.id, cmdId, params ?? "");
 
     try {
       switch (cmdId) {
@@ -76,7 +76,7 @@ export class remoteEntityCommandHandler {
           return this.handleCommand(entity, physicalConnection.eiscp, physicalConnection.commandReceiver, instance.config, avrEntry, cmdId, params);
       }
     } catch (err) {
-      log.error("%s [%s] Failed to execute remote command %s:", integrationName, entity.id, cmdId, err);
+      log.error("%s [%s] Failed to execute remote command %s:", logSource, entity.id, cmdId, err);
       return uc.StatusCodes.ServerError;
     }
   }
@@ -84,7 +84,7 @@ export class remoteEntityCommandHandler {
   private async handleSendCmd(entity: uc.Entity, eiscp: EiscpDriver, commandReceiver: ICommandReceiver | undefined, cfg: AvrConfig, avrEntry: string, params: RemoteParams): Promise<uc.StatusCodes> {
     const command = typeof params?.command === "string" ? params.command : "";
     if (!command) {
-      log.warn("%s [%s] send_cmd without a command", integrationName, entity.id);
+      log.warn("%s [%s] send_cmd without a command", logSource, entity.id);
       return uc.StatusCodes.BadRequest;
     }
 
@@ -109,7 +109,7 @@ export class remoteEntityCommandHandler {
   ): Promise<uc.StatusCodes> {
     const sequence = Array.isArray(params?.sequence) ? params.sequence.map(String) : [];
     if (sequence.length === 0) {
-      log.warn("%s [%s] send_cmd_sequence without a sequence", integrationName, entity.id);
+      log.warn("%s [%s] send_cmd_sequence without a sequence", logSource, entity.id);
       return uc.StatusCodes.BadRequest;
     }
 
@@ -239,7 +239,7 @@ export class remoteEntityCommandHandler {
     if (params?.volume === undefined) return uc.StatusCodes.Ok;
     const volumeDisplay = String(cfg.volumeDisplay ?? "absolute").toLowerCase() === "relative" ? "relative" : "absolute";
     if (volumeDisplay !== "absolute") {
-      log.debug("%s volume set to relative so slider is ignored.", integrationName);
+      log.debug("%s volume set to relative so slider is ignored.", logSource);
       return uc.StatusCodes.Ok;
     }
     const sliderValue = Math.max(0, Math.min(100, Number(params.volume)));
@@ -258,11 +258,11 @@ export class remoteEntityCommandHandler {
     if (request.startsWith("raw ")) {
       const rawCmd = request.substring(3).trim().toUpperCase();
       if (rawCmd.length > MAX_LENGTHS.RAW_COMMAND) {
-        log.error("%s Raw command too long (%d chars), rejecting", integrationName, rawCmd.length);
+        log.error("%s Raw command too long (%d chars), rejecting", logSource, rawCmd.length);
         return uc.StatusCodes.BadRequest;
       }
       if (!PATTERNS.RAW_COMMAND.test(rawCmd)) {
-        log.error("%s Raw command contains invalid characters, rejecting", integrationName);
+        log.error("%s Raw command contains invalid characters, rejecting", logSource);
         return uc.StatusCodes.BadRequest;
       }
       await eiscp.raw(rawCmd);
@@ -270,11 +270,11 @@ export class remoteEntityCommandHandler {
     }
 
     if (request.length > MAX_LENGTHS.USER_COMMAND) {
-      log.error("%s Command too long (%d chars), rejecting", integrationName, request.length);
+      log.error("%s Command too long (%d chars), rejecting", logSource, request.length);
       return uc.StatusCodes.BadRequest;
     }
     if (!PATTERNS.USER_COMMAND.test(request)) {
-      log.error("%s Command contains invalid characters, rejecting", integrationName);
+      log.error("%s Command contains invalid characters, rejecting", logSource);
       return uc.StatusCodes.BadRequest;
     }
 
@@ -294,12 +294,12 @@ export class remoteEntityCommandHandler {
   private async handleSimpleCommand(entity: uc.Entity, eiscp: EiscpDriver, zone: string, cmdId: string): Promise<uc.StatusCodes> {
     const commandStr = SIMPLE_COMMANDS_MAP[cmdId];
     if (!commandStr) {
-      log.warn("%s [%s] Unknown command: %s", integrationName, entity.id, cmdId);
+      log.warn("%s [%s] Unknown command: %s", logSource, entity.id, cmdId);
       return uc.StatusCodes.NotImplemented;
     }
 
     const zonePrefixed = zone === "main" ? commandStr : `${zone}.${commandStr}`;
-    log.info("%s [%s] executing simple command '%s' → %s", integrationName, entity.id, cmdId, zonePrefixed);
+    log.info("%s [%s] executing simple command '%s' → %s", logSource, entity.id, cmdId, zonePrefixed);
     await eiscp.command(zonePrefixed);
     return uc.StatusCodes.Ok;
   }
@@ -307,11 +307,11 @@ export class remoteEntityCommandHandler {
   private async adjustVocal(eiscp: EiscpDriver, entity: uc.Entity, avrEntry: string, delta: number): Promise<uc.StatusCodes> {
     const current = await this.queryVocalLevel(eiscp, entity, avrEntry);
     if (current === undefined) {
-      log.warn("%s [%s] Could not determine current vocal level, ignoring %s", integrationName, entity.id, delta > 0 ? "up" : "down");
+      log.warn("%s [%s] Could not determine current vocal level, ignoring %s", logSource, entity.id, delta > 0 ? "up" : "down");
       return uc.StatusCodes.Ok;
     }
     const next = Math.max(0, Math.min(VOCAL_LEVEL_MAX, current + delta));
-    log.info("%s [%s] vocal level %d -> %d", integrationName, entity.id, current, next);
+    log.info("%s [%s] vocal level %d -> %d", logSource, entity.id, current, next);
     await eiscp.raw(`VOC${toHex(next, 2)}`);
     return uc.StatusCodes.Ok;
   }
@@ -319,7 +319,7 @@ export class remoteEntityCommandHandler {
   private async queryVocalLevel(eiscp: EiscpDriver, entity: uc.Entity, _avrEntry: string): Promise<number | undefined> {
     return new Promise<number | undefined>((resolve) => {
       const timer = setTimeout(() => {
-        log.warn("%s [%s] Timed out waiting for vocal level response", integrationName, entity.id);
+        log.warn("%s [%s] Timed out waiting for vocal level response", logSource, entity.id);
         eiscp.off("data", onData);
         resolve(undefined);
       }, VOCAL_QUERY_TIMEOUT_MS);

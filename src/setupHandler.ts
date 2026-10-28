@@ -8,9 +8,9 @@ import { SetupFormBuilder } from "./setupFormBuilder.js";
 import { BackupRestoreManager } from "./backupRestoreManager.js";
 import { ConfigPersistenceManager } from "./configPersistenceManager.js";
 import type { AvrInput } from "./inputSourceStore.js";
-import { LEARNED_INPUT_SOURCE, LEARN_INPUT_SOURCE } from "./inputSourcePreferences.js";
-
-const _integrationName = "setupHandler:";
+import { EXCLUDE_INPUT_SOURCE, LEARNED_INPUT_SOURCE, LEARN_INPUT_SOURCE } from "./inputSourcePreferences.js";
+import { EXCLUDE_LISTENING_MODE, LEARN_LISTENING_MODE } from "./listeningModePreferences.js";
+import { IDLE_SETUP_PAGE, type SetupFlowPage } from "./setupFlowState.js";
 
 type SetupHost = {
   driver: uc.IntegrationAPI;
@@ -27,9 +27,10 @@ export default class SetupHandler {
   private formBuilder: SetupFormBuilder;
   private backupRestoreManager: BackupRestoreManager;
   private persistenceManager: ConfigPersistenceManager;
-  private manualConfigPage = 0;
+  private setupPage: SetupFlowPage = IDLE_SETUP_PAGE;
   private pendingManualConfig: ManualConfigInput = {};
   private inputSourcePageCount = 0;
+  private listeningModePageCount = 0;
   private inputSourcesOnlyConfiguration = false;
   private integrationOnlyConfiguration = false;
 
@@ -102,10 +103,10 @@ export default class SetupHandler {
       return this.handleRestorePayload(restoreData);
     }
 
-    if (this.manualConfigPage > 0 && this.hasManualConfigFields(input)) {
-      this.pendingManualConfig = { ...this.pendingManualConfig, ...input };
+    if (this.setupPage.kind !== "idle" && this.hasManualConfigFields(input)) {
+      this.pendingManualConfig = { ...this.pendingManualConfig, ...this.applyPageWideSelection(input) };
       const parsed = this.configParser.parse(this.pendingManualConfig, ConfigManager.get().logLevel ?? "warn");
-      if (this.manualConfigPage === 1) {
+      if (this.setupPage.kind === "manual" && this.setupPage.page === 1) {
         const discovery = this.host.queryInputSources
           ? await this.host.queryInputSources({
               model: String(this.pendingManualConfig.model ?? ""),
@@ -118,17 +119,17 @@ export default class SetupHandler {
         }
         this.pendingManualConfig = this.applyInputSourceDiscovery(this.pendingManualConfig, discovery.inputs, discovery.available);
         const refreshed = this.configParser.parse(this.pendingManualConfig, ConfigManager.get().logLevel ?? "warn");
-        this.manualConfigPage = 2;
+        this.setupPage = { kind: "manual", page: 2 };
         return this.formBuilder.buildManualConfigPage2(refreshed);
       }
-      if (this.manualConfigPage === 2) {
-        this.manualConfigPage = 3;
+      if (this.setupPage.kind === "manual" && this.setupPage.page === 2) {
+        this.setupPage = { kind: "manual", page: 3 };
         return this.formBuilder.buildManualConfigPage3(parsed);
       }
 
-      if (this.manualConfigPage === 3) {
+      if (this.setupPage.kind === "manual" && this.setupPage.page === 3) {
         if (this.integrationOnlyConfiguration) {
-          this.manualConfigPage = 0;
+          this.setupPage = IDLE_SETUP_PAGE;
           this.integrationOnlyConfiguration = false;
           const completeConfig = this.pendingManualConfig;
           this.pendingManualConfig = {};
@@ -139,18 +140,18 @@ export default class SetupHandler {
           }
         }
         this.inputSourcePageCount = this.formBuilder.getInputSourcePageCount(parsed);
-        this.manualConfigPage = 4;
-        return this.inputSourcePageCount > 0 ? this.formBuilder.buildInputSourcePage(parsed, 1, this.inputSourcePageCount) : this.formBuilder.buildManualConfigPage4(parsed);
+        this.listeningModePageCount = this.formBuilder.getListeningModePageCount();
+        this.setupPage = this.inputSourcePageCount > 0 ? { kind: "inputSources", page: 1, total: this.inputSourcePageCount } : { kind: "listeningModes", page: 1, total: this.listeningModePageCount };
+        return this.inputSourcePageCount > 0 ? this.formBuilder.buildInputSourcePage(parsed, 1, this.inputSourcePageCount) : this.formBuilder.buildListeningModePage(parsed, 1);
       }
 
-      if (this.manualConfigPage >= 4 && this.manualConfigPage < 4 + this.inputSourcePageCount) {
-        const inputPage = this.manualConfigPage - 3;
-        this.manualConfigPage++;
-        if (inputPage < this.inputSourcePageCount) {
-          return this.formBuilder.buildInputSourcePage(parsed, inputPage + 1, this.inputSourcePageCount);
+      if (this.setupPage.kind === "inputSources") {
+        if (this.setupPage.page < this.setupPage.total) {
+          this.setupPage = { ...this.setupPage, page: this.setupPage.page + 1 };
+          return this.formBuilder.buildInputSourcePage(parsed, this.setupPage.page, this.setupPage.total);
         }
         if (this.inputSourcesOnlyConfiguration) {
-          this.manualConfigPage = 0;
+          this.setupPage = IDLE_SETUP_PAGE;
           this.inputSourcesOnlyConfiguration = false;
           const completeConfig = this.pendingManualConfig;
           this.pendingManualConfig = {};
@@ -160,16 +161,18 @@ export default class SetupHandler {
             return new uc.SetupError("OTHER");
           }
         }
-        return this.formBuilder.buildManualConfigPage4(parsed);
+        this.setupPage = { kind: "listeningModes", page: 1, total: this.listeningModePageCount };
+        return this.formBuilder.buildListeningModePage(parsed, 1);
       }
 
-      if (this.manualConfigPage >= 4 + this.inputSourcePageCount && this.manualConfigPage < 8 + this.inputSourcePageCount) {
-        const listeningPage = this.manualConfigPage - 3 - this.inputSourcePageCount;
-        this.manualConfigPage++;
-        return this.formBuilder.buildListeningModePage(parsed, listeningPage + 1);
+      if (this.setupPage.kind === "listeningModes") {
+        if (this.setupPage.page < this.setupPage.total) {
+          this.setupPage = { ...this.setupPage, page: this.setupPage.page + 1 };
+          return this.formBuilder.buildListeningModePage(parsed, this.setupPage.page);
+        }
       }
 
-      this.manualConfigPage = 0;
+      this.setupPage = IDLE_SETUP_PAGE;
       const completeConfig = this.pendingManualConfig;
       this.pendingManualConfig = {};
       try {
@@ -224,19 +227,6 @@ export default class SetupHandler {
       return this.requestListeningModeConfiguration();
     }
 
-    if (action === "configure") {
-      const hasFields = this.hasManualConfigFields(input);
-      if (!hasFields) {
-        return this.requestManualConfiguration();
-      }
-
-      try {
-        return await this.handleManualConfiguration(input as ManualConfigInput);
-      } catch (_err) {
-        return new uc.SetupError("OTHER");
-      }
-    }
-
     return undefined;
   }
 
@@ -262,13 +252,15 @@ export default class SetupHandler {
       input.netMenuDelay ||
       input.tuneinPresetPosition ||
       input.tuneinMenuStyle ||
+      input.inputSourceLayout ||
+      input.networkInputMarker ||
       input.entityNameStyle ||
       input.logLevel
     );
   }
 
   private requestManualConfiguration(): uc.RequestUserInput {
-    this.manualConfigPage = 1;
+    this.setupPage = { kind: "manual", page: 1 };
     this.inputSourcesOnlyConfiguration = false;
     this.integrationOnlyConfiguration = false;
     this.pendingManualConfig = {};
@@ -297,6 +289,8 @@ export default class SetupHandler {
         netMenuDelay: currentAvr?.netMenuDelay,
         tuneinPresetPosition: currentAvr?.tuneinPresetPosition,
         tuneinMenuStyle: currentAvr?.tuneinMenuStyle,
+        inputSourceLayout: currentAvr?.inputSourceLayout,
+        networkInputMarker: currentAvr?.networkInputMarker,
         logLevel: cfg.logLevel ?? "warn"
       },
       (cfg.logLevel ?? "warn") as LogLevel
@@ -327,6 +321,8 @@ export default class SetupHandler {
       netMenuDelay: parsedConfig.netMenuDelayValue,
       tuneinPresetPosition: parsedConfig.tuneinPresetPositionValue,
       tuneinMenuStyle: parsedConfig.tuneinMenuStyleValue,
+      inputSourceLayout: parsedConfig.inputSourceLayoutValue,
+      networkInputMarker: parsedConfig.networkInputMarkerValue,
       logLevel: parsedConfig.logLevelValue
     };
 
@@ -341,9 +337,10 @@ export default class SetupHandler {
     // Page 4 is the first listening-mode page; mark it as already displayed so the next
     // response advances to page 5 instead of showing page 4 again.
     this.inputSourcePageCount = 0;
+    this.listeningModePageCount = this.formBuilder.getListeningModePageCount();
     this.inputSourcesOnlyConfiguration = false;
     this.integrationOnlyConfiguration = false;
-    this.manualConfigPage = 4;
+    this.setupPage = { kind: "listeningModes", page: 1, total: this.listeningModePageCount };
     return this.formBuilder.buildManualConfigPage4(parsed);
   }
 
@@ -359,9 +356,10 @@ export default class SetupHandler {
     this.pendingManualConfig = this.applyInputSourceDiscovery(this.pendingManualConfig, discovery.inputs, discovery.available);
     const parsed = this.configParser.parse(this.pendingManualConfig, ConfigManager.get().logLevel ?? "warn");
     this.inputSourcePageCount = this.formBuilder.getInputSourcePageCount(parsed);
+    this.listeningModePageCount = this.formBuilder.getListeningModePageCount();
     this.inputSourcesOnlyConfiguration = true;
     this.integrationOnlyConfiguration = false;
-    this.manualConfigPage = 4;
+    this.setupPage = { kind: "inputSources", page: 1, total: this.inputSourcePageCount };
     return this.formBuilder.buildInputSourcePage(parsed, 1, this.inputSourcePageCount);
   }
 
@@ -376,6 +374,23 @@ export default class SetupHandler {
       }
     }
     return { ...config, idInputSources, inputSources: inputs, inputSourceDiscoveryAvailable: available };
+  }
+
+  private applyPageWideSelection(input: Record<string, string>): Record<string, string> {
+    const selection = input.set_all_page;
+    if (selection !== LEARN_LISTENING_MODE && selection !== EXCLUDE_LISTENING_MODE) {
+      return input;
+    }
+
+    const isInputSourcePage = this.setupPage.kind === "inputSources";
+    const prefix = isInputSourcePage ? "ids_" : "lmd_";
+    const value = isInputSourcePage ? (selection === LEARN_LISTENING_MODE ? LEARN_INPUT_SOURCE : EXCLUDE_INPUT_SOURCE) : selection;
+    const updated = { ...input };
+    for (const id of Object.keys(updated)) {
+      if (id.startsWith(prefix)) updated[id] = value;
+    }
+    delete updated.set_all_page;
+    return updated;
   }
 
   private requestIntegrationConfiguration(): uc.RequestUserInput {

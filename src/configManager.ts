@@ -16,11 +16,12 @@ import {
   EntityNameStyle,
   LogLevel,
   VOLUME_SCALE_AUTO,
-  normalizeInputSourceSettings
+  normalizeInputSourceSettings,
+  NETWORK_INPUT_MARKERS
 } from "./configConstants.js";
 import { normalizeListeningModes } from "./listeningModePreferences.js";
 
-const integrationName = "configManager:";
+const logSource = "configManager:";
 
 // Config directory is configurable at runtime to support integration manager backups/restores
 let CONFIG_DIR = process.env.UC_CONFIG_HOME || process.cwd();
@@ -61,6 +62,8 @@ export class ConfigManager {
       netMenuDelay: avr.netMenuDelay ?? AVR_DEFAULTS.netMenuDelay,
       tuneinPresetPosition: avr.tuneinPresetPosition ?? AVR_DEFAULTS.tuneinPresetPosition,
       tuneinMenuStyle: avr.tuneinMenuStyle ?? AVR_DEFAULTS.tuneinMenuStyle,
+      inputSourceLayout: avr.inputSourceLayout ?? AVR_DEFAULTS.inputSourceLayout,
+      networkInputMarker: avr.networkInputMarker ?? AVR_DEFAULTS.networkInputMarker,
       listeningModes: normalizeListeningModes(avr.listeningModes),
       idInputSources: normalizeInputSourceSettings(avr.idInputSources)
     };
@@ -95,7 +98,7 @@ export class ConfigManager {
           delete rawConfig.learning;
           delete rawConfig.learningEnabled;
           shouldPersistMigration = true;
-          log.info("%s Removed legacy learning/learningEnabled keys from config", integrationName);
+          log.info("%s Removed legacy learning/learningEnabled keys from config", logSource);
         }
 
         // Migrate legacy config to new format
@@ -154,11 +157,11 @@ export class ConfigManager {
         // receive the same per-AVR configuration as installations that saved an older form.
         if (shouldPersistMigration) {
           this.save(this.config);
-          log.info("%s Persisted normalized configuration", integrationName);
+          log.info("%s Persisted normalized configuration", logSource);
         }
       }
     } catch (err) {
-      log.error(`${integrationName} Failed to load config:`, err);
+      log.error(`${logSource} Failed to load config:`, err);
       this.config = {};
     }
     if (this.config.logLevel) {
@@ -174,7 +177,7 @@ export class ConfigManager {
     try {
       fs.writeFileSync(CONFIG_PATH, JSON.stringify(this.config, null, 2), "utf-8");
     } catch (err) {
-      log.error(`${integrationName} Failed to save config:`, err);
+      log.error(`${logSource} Failed to save config:`, err);
     }
   }
 
@@ -192,7 +195,7 @@ export class ConfigManager {
     const existingIndex = this.config.avrs.findIndex((a) => a.ip === normalizedAvr.ip && a.zone === normalizedAvr.zone);
     if (existingIndex >= 0) {
       // AVR already exists, update it with new settings from setup
-      log.info(`${integrationName} Updating existing AVR at ${normalizedAvr.ip} zone ${normalizedAvr.zone}`);
+      log.info(`${logSource} Updating existing AVR at ${normalizedAvr.ip} zone ${normalizedAvr.zone}`);
       this.config.avrs[existingIndex] = normalizedAvr;
       this.save(this.config);
       return;
@@ -222,9 +225,9 @@ export class ConfigManager {
     this.config = {} as IntegrationConfig;
     try {
       fs.writeFileSync(CONFIG_PATH, JSON.stringify(this.config, null, 2), "utf-8");
-      log.info(`${integrationName} Cleared configuration and persisted empty config file`);
+      log.info(`${logSource} Cleared configuration and persisted empty config file`);
     } catch (err) {
-      log.error(`${integrationName} Failed to clear config:`, err);
+      log.error(`${logSource} Failed to clear config:`, err);
     }
   }
 
@@ -374,6 +377,13 @@ export class ConfigManager {
       }
     }
 
+    if (avr.inputSourceLayout !== undefined && !["combined", "separate"].includes(String(avr.inputSourceLayout).toLowerCase())) {
+      errors.push('inputSourceLayout must be "combined" or "separate"');
+    }
+    if (avr.networkInputMarker !== undefined && !(NETWORK_INPUT_MARKERS as readonly string[]).includes(String(avr.networkInputMarker))) {
+      errors.push("networkInputMarker is not supported");
+    }
+
     if (errors.length > 0) {
       return { errors };
     }
@@ -399,6 +409,8 @@ export class ConfigManager {
       netMenuDelay: typeof avr.netMenuDelay === "string" ? parseInt(avr.netMenuDelay, 10) : avr.netMenuDelay,
       tuneinPresetPosition: typeof avr.tuneinPresetPosition === "string" ? parseInt(avr.tuneinPresetPosition, 10) : avr.tuneinPresetPosition,
       tuneinMenuStyle: String(avr.tuneinMenuStyle ?? AVR_DEFAULTS.tuneinMenuStyle).toLowerCase() === "full" ? "full" : "mypresets",
+      inputSourceLayout: String(avr.inputSourceLayout ?? AVR_DEFAULTS.inputSourceLayout).toLowerCase() === "separate" ? "separate" : "combined",
+      networkInputMarker: (avr.networkInputMarker ?? AVR_DEFAULTS.networkInputMarker) as AvrConfig["networkInputMarker"],
       listeningModes: normalizeListeningModes(avr.listeningModes),
       idInputSources: normalizeInputSourceSettings(avr.idInputSources)
     });

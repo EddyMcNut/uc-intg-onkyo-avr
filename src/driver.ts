@@ -44,7 +44,7 @@ import { delay } from "./utils.js";
 import type { AvrInput } from "./inputSourceStore.js";
 import { getAvrInfo } from "./avrInfoStore.js";
 
-const integrationName = "driver:";
+const logSource = "driver:";
 
 // Descriptor for registering one group of entities for an AVR zone. OCP: add a type by appending to buildEntityRegistrations() — the loop never changes.
 interface EntityRegistration {
@@ -92,7 +92,7 @@ export default class OnkyoDriver {
       const driverJson = JSON.parse(driverJsonRaw);
       this.driverVersion = driverJson.version || "unknown";
     } catch (err) {
-      log.warn("%s Could not read driver version in constructor:", integrationName, err);
+      log.warn("%s Could not read driver version in constructor:", logSource, err);
     }
 
     // Ensure ConfigManager uses the Integration API config dir so the Integration Manager can back up and restore the same files
@@ -100,7 +100,7 @@ export default class OnkyoDriver {
       const configDir = this.driver.getConfigDirPath();
       setConfigDir(configDir);
     } catch (err) {
-      log.warn("%s Could not determine driver config directory, falling back to environment or CWD", integrationName, err);
+      log.warn("%s Could not determine driver config directory, falling back to environment or CWD", logSource, err);
     }
 
     // Now load config from the correct path and continue setup
@@ -151,7 +151,7 @@ export default class OnkyoDriver {
     );
     this.setupDriverEvents();
     this.setupEventHandlers();
-    log.info("%s Loaded config at startup: %o", integrationName, this.config);
+    log.info("%s Loaded config at startup: %o", logSource, this.config);
 
     // Register entities from config at startup (like Python integrations do) This ensures entities survive reboots - they're registered before Connect event
     if (this.config.avrs && this.config.avrs.length > 0) {
@@ -218,10 +218,10 @@ export default class OnkyoDriver {
               info?.selectors ?? [],
               (info?.netServices ?? []).filter((service) => service.enabled).map((service) => ({ id: service.id, name: service.name }))
             );
-            log.info("%s Setup NRI discovered %d input source(s) for %s %s", integrationName, inputs.length, resolvedModel, resolvedIp);
+            log.info("%s Setup NRI discovered %d input source(s) for %s %s", logSource, inputs.length, resolvedModel, resolvedIp);
             return { inputs, available: inputs.length > 0, model: resolvedModel, ip: resolvedIp, port: resolvedPort };
           } catch (err) {
-            log.debug("%s Setup NRI query failed: %o", integrationName, err);
+            log.debug("%s Setup NRI query failed: %o", logSource, err);
             return { inputs: [], available: false, model: resolvedModel, ip: resolvedIp, port: resolvedPort };
           } finally {
             probe.disconnect();
@@ -244,7 +244,7 @@ export default class OnkyoDriver {
       {
         enabled: (cfg) => cfg.createSensors !== false,
         create: () => this.entityRegistrar.createSensorEntities(avrEntry),
-        disabledMessage: `${integrationName} [${avrEntry}] Sensor entities disabled by user preference`
+        disabledMessage: `${logSource} [${avrEntry}] Sensor entities disabled by user preference`
       },
 
       // ── Remote entity — conditional on createRemoteEntity flag ─────────────
@@ -254,7 +254,7 @@ export default class OnkyoDriver {
           const handler = this.remoteEntityCommandHandler?.handle.bind(this.remoteEntityCommandHandler) ?? (async () => uc.StatusCodes.Ok);
           return this.entityRegistrar.createRemoteEntity(avrEntry, handler);
         },
-        disabledMessage: `${integrationName} [${avrEntry}] Remote entity disabled by user preference`
+        disabledMessage: `${logSource} [${avrEntry}] Remote entity disabled by user preference`
       },
 
       // ── Listening Mode select ──────────────────────────────────────────────
@@ -270,10 +270,10 @@ export default class OnkyoDriver {
             this.driver.updateEntityAttributes(`${avrEntry}_listening_mode`, { [SelectAttributes.Options]: options });
           }
           if (avrConfig.listeningModes) {
-            log.info("%s [%s] Loaded %d listeningModes", integrationName, avrEntry, Object.keys(avrConfig.listeningModes).length);
+            log.info("%s [%s] Loaded %d listeningModes", logSource, avrEntry, Object.keys(avrConfig.listeningModes).length);
           }
         },
-        disabledMessage: `${integrationName} [${avrEntry}] Listening Mode select entity unavailable`
+        disabledMessage: `${logSource} [${avrEntry}] Listening Mode select entity unavailable`
       },
 
       // ── Input Selector select ───────────────────────────────────────────────
@@ -289,7 +289,7 @@ export default class OnkyoDriver {
             this.driver.updateEntityAttributes(`${avrEntry}_input_selector`, { [SelectAttributes.Options]: isOptions });
           }
         },
-        disabledMessage: `${integrationName} [${avrEntry}] Input Selector select entity unavailable`
+        disabledMessage: `${logSource} [${avrEntry}] Input Selector select entity unavailable`
       },
 
       // ── Tuner Presets select — conditional on createTunerPresets flag ──────
@@ -305,7 +305,7 @@ export default class OnkyoDriver {
             this.driver.updateEntityAttributes(`${avrEntry}_tuner_presets`, { [SelectAttributes.Options]: this.entityRegistrar.getTunerPresetOptions(avrEntry) });
           }
         },
-        disabledMessage: `${integrationName} [${avrEntry}] Tuner Presets select entity disabled by user preference`
+        disabledMessage: `${logSource} [${avrEntry}] Tuner Presets select entity disabled by user preference`
       },
 
       // ── Dirac select — conditional on createDiracSelectEntity flag ─────────
@@ -315,7 +315,7 @@ export default class OnkyoDriver {
           const handler = this.diracHandler?.handle.bind(this.diracHandler) ?? (async () => uc.StatusCodes.Ok);
           return this.entityRegistrar.createDiracSelectEntity(avrEntry, handler);
         },
-        disabledMessage: `${integrationName} [${avrEntry}] Dirac select entity disabled by user preference`
+        disabledMessage: `${logSource} [${avrEntry}] Dirac select entity disabled by user preference`
       }
     ];
   }
@@ -335,7 +335,7 @@ export default class OnkyoDriver {
   }
 
   private registerAvailableEntities(): void {
-    log.info("%s Registering available entities from config", integrationName);
+    log.info("%s Registering available entities from config", logSource);
     if (!this.entityRegistrar) this.entityRegistrar = new EntityRegistrar(this.avrStateApi);
     for (const avrConfig of this.config.avrs!) {
       const avrEntry = buildEntityId(avrConfig.model, avrConfig.ip, avrConfig.zone);
@@ -387,12 +387,12 @@ export default class OnkyoDriver {
     const physicalAVR = physicalAvrIdFromEntityId(avrEntry);
     const preset = physicalAVR ? findTunerPresetByName(physicalAVR, option) : undefined;
     if (!preset) {
-      log.warn("%s Tuner preset '%s' is not one of the stations the AVR reported, nothing sent", integrationName, option);
+      log.warn("%s Tuner preset '%s' is not one of the stations the AVR reported, nothing sent", logSource, option);
       throw new Error(`Unknown tuner preset: ${option}`);
     }
 
     const value = tunerPresetCommandValue(preset.slot);
-    log.debug("%s [%s] Selecting tuner preset '%s': slot %d (band %s) -> PRS%s", integrationName, physicalAVR, preset.name, preset.slot, preset.band, value);
+    log.debug("%s [%s] Selecting tuner preset '%s': slot %d (band %s) -> PRS%s", logSource, physicalAVR, preset.name, preset.slot, preset.band, value);
     await eiscp.raw(`PRS${value}`);
   }
 
@@ -401,11 +401,11 @@ export default class OnkyoDriver {
     // definitions take effect — addAvailableEntity silently keeps the old entity otherwise.
     const availablePool = this.driver.getAvailableEntities?.();
     if (availablePool && availablePool.contains(entity.id)) {
-      log.info("%s [%s] Re-registering existing entity with updated definition: %s", integrationName, avrEntry, entity.id);
+      log.info("%s [%s] Re-registering existing entity with updated definition: %s", logSource, avrEntry, entity.id);
       availablePool.removeEntity(entity.id);
     }
     this.driver.addAvailableEntity(entity);
-    log.info("%s [%s] Entity registered: %s", integrationName, avrEntry, entity.id);
+    log.info("%s [%s] Entity registered: %s", logSource, avrEntry, entity.id);
   }
 
   private createRawSend(avrConfig: AvrConfig): (cmd: string) => Promise<void> {
@@ -428,15 +428,15 @@ export default class OnkyoDriver {
 
       const eiscp = this.connectionManager?.getPhysicalConnection(physicalAVR)?.eiscp;
       if (!eiscp || !eiscp.connected) {
-        log.debug("%s [%s] Not connected, cannot collect the AVR info", integrationName, buildEntityId(avrConfig.model, avrConfig.ip, avrConfig.zone));
+        log.debug("%s [%s] Not connected, cannot collect the AVR info", logSource, buildEntityId(avrConfig.model, avrConfig.ip, avrConfig.zone));
         continue;
       }
 
-      log.info("%s [%s] Collecting the AVR info after the config was saved...", integrationName, physicalAVR);
+      log.info("%s [%s] Collecting the AVR info after the config was saved...", logSource, physicalAVR);
       try {
         await eiscp.command({ zone: avrConfig.zone, command: "avr-info", args: "query" });
       } catch (err) {
-        log.warn("%s [%s] Failed to collect the AVR info after the config was saved:", integrationName, physicalAVR, err);
+        log.warn("%s [%s] Failed to collect the AVR info after the config was saved:", logSource, physicalAVR, err);
       }
     }
   }
@@ -491,11 +491,11 @@ export default class OnkyoDriver {
       const volumeResolution = resolveAutoVolumeScale(avrConfig, entityId);
       if (volumeResolution) {
         if (ConfigManager.patchAvr(avrConfig.ip, avrConfig.zone, { volumeScale: volumeResolution.scale })) {
-          log.debug("%s [%s] Volume scale 'auto' resolved to 0-%d: %s", integrationName, zoneEntry, volumeResolution.scale, volumeResolution.reason);
+          log.debug("%s [%s] Volume scale 'auto' resolved to 0-%d: %s", logSource, zoneEntry, volumeResolution.scale, volumeResolution.reason);
           configChanged = true;
           changed = true;
         } else {
-          log.warn("%s [%s] Could not store the resolved volume scale 0-%d in the config", integrationName, zoneEntry, volumeResolution.scale);
+          log.warn("%s [%s] Could not store the resolved volume scale 0-%d in the config", logSource, zoneEntry, volumeResolution.scale);
         }
       }
 
@@ -505,11 +505,11 @@ export default class OnkyoDriver {
           // Nothing to collect: fall back to integration mappings and remember that, so unsupported
           // older AVRs are not queried for names on every NRI reply.
           if (ConfigManager.patchAvr(avrConfig.ip, avrConfig.zone, { useAvrReportedInputs: false })) {
-            log.debug("%s [%s] AVR-reported input names disabled: %s", integrationName, zoneEntry, inputResolution.reason);
+            log.debug("%s [%s] AVR-reported input names disabled: %s", logSource, zoneEntry, inputResolution.reason);
             configChanged = true;
             changed = true;
           } else {
-            log.error("%s [%s] Could not disable AVR-reported input names in the config", integrationName, zoneEntry);
+            log.error("%s [%s] Could not disable AVR-reported input names in the config", logSource, zoneEntry);
           }
           if (!inputsDecided) {
             inputsDecided = true;
@@ -521,7 +521,7 @@ export default class OnkyoDriver {
           inputsChanged = setAvrInputs(physicalAVR, inputResolution.inputs);
           if (inputsChanged) {
             // The inputs changed, so the entities listing them have to be rebuilt.
-            log.debug("%s [%s] Input source list 'auto' resolved: %s", integrationName, zoneEntry, inputResolution.reason);
+            log.debug("%s [%s] Input source list 'auto' resolved: %s", logSource, zoneEntry, inputResolution.reason);
           }
         }
 
@@ -536,7 +536,7 @@ export default class OnkyoDriver {
         presetsChanged = setTunerPresets(physicalAVR, listNamedPresets(entityId));
         if (presetsChanged) {
           const names = getTunerPresetNames(physicalAVR);
-          log.debug("%s [%s] Tuner presets collected from the AVR: %d station(s): %s", integrationName, zoneEntry, names.length, names.join(", "));
+          log.debug("%s [%s] Tuner presets collected from the AVR: %d station(s): %s", logSource, zoneEntry, names.length, names.join(", "));
         }
       }
 
@@ -572,7 +572,7 @@ export default class OnkyoDriver {
     const avrEntry = buildEntityId(avrConfig.model, avrConfig.ip, avrConfig.zone);
     const options = this.entityRegistrar.getTunerPresetOptions(avrEntry);
     if (logUpdate) {
-      log.debug("%s [%s] Updating Tuner Presets select with %d station(s)", integrationName, avrEntry, options.length);
+      log.debug("%s [%s] Updating Tuner Presets select with %d station(s)", logSource, avrEntry, options.length);
     }
     this.driver.updateEntityAttributes(`${avrEntry}_tuner_presets`, { [SelectAttributes.Options]: options });
   }
@@ -624,13 +624,13 @@ export default class OnkyoDriver {
 
   private setupDriverEvents() {
     this.driver.on(uc.Events.Connect, async () => {
-      log.info(`${integrationName} ===== CONNECT EVENT RECEIVED =====`);
-      log.info(`${integrationName} Driver version: ${this.driverVersion}`);
+      log.info(`${logSource} ===== CONNECT EVENT RECEIVED =====`);
+      log.info(`${logSource} Driver version: ${this.driverVersion}`);
       await this.handleConnect();
     });
     this.driver.on(uc.Events.EnterStandby, async () => {
-      log.info(`${integrationName} ===== ENTER STANDBY EVENT RECEIVED =====`);
-      log.info(`${integrationName} Remote entering standby, disconnecting AVR(s) to save battery...`);
+      log.info(`${logSource} ===== ENTER STANDBY EVENT RECEIVED =====`);
+      log.info(`${logSource} Remote entering standby, disconnecting AVR(s) to save battery...`);
 
       // Clear all reconnect timers
       this.connectionManager.cancelAllScheduledReconnections();
@@ -641,14 +641,14 @@ export default class OnkyoDriver {
       await this.driver.setDeviceState(uc.DeviceStates.Disconnected);
     });
     this.driver.on(uc.Events.ExitStandby, async () => {
-      log.info(`${integrationName} ===== EXIT STANDBY EVENT RECEIVED =====`);
+      log.info(`${logSource} ===== EXIT STANDBY EVENT RECEIVED =====`);
       await this.handleConnect();
     });
   }
 
   private async queryAvrState(avrEntry: string, eiscp: EiscpDriver, context: string): Promise<void> {
     if (!eiscp.connected) {
-      log.warn(`${integrationName} [${avrEntry}] Cannot query AVR state (${context}), not connected`);
+      log.warn(`${logSource} [${avrEntry}] Cannot query AVR state (${context}), not connected`);
       return;
     }
 
@@ -670,7 +670,7 @@ export default class OnkyoDriver {
         // For non-initial queries, only query zones that are powered on Initial queries (after connection) will query all zones to get power state
         const isInitialQuery = context.includes("after reconnection") || context.includes("after connection");
         if (!isInitialQuery && !this.avrStateApi.isEntityOn(avrEntry)) {
-          log.debug("%s [%s] Skipping query for zone in standby (%s)", integrationName, avrEntry, context);
+          log.debug("%s [%s] Skipping query for zone in standby (%s)", logSource, avrEntry, context);
           continue;
         }
 
@@ -745,7 +745,7 @@ export default class OnkyoDriver {
     });
 
     this.driver.on(uc.Events.SubscribeEntities, async (entityIds: string[]) => {
-      log.info("%s Entities subscribed: %s", integrationName, entityIds.join(", "));
+      log.info("%s Entities subscribed: %s", logSource, entityIds.join(", "));
 
       // Push source list for MediaPlayer entities
       for (const entityId of entityIds) {
@@ -760,7 +760,7 @@ export default class OnkyoDriver {
 
     this.driver.on(uc.Events.UnsubscribeEntities, async (entityIds: string[]) => {
       for (const entityId of entityIds) {
-        log.info("%s [%s] Unsubscribed entity", integrationName, entityId);
+        log.info("%s [%s] Unsubscribed entity", logSource, entityId);
       }
     });
   }
@@ -770,14 +770,14 @@ export default class OnkyoDriver {
     // Get the AVR instance for this entity
     const instance = this.avrInstances.get(entity.id);
     if (!instance) {
-      log.error("%s [%s] No AVR instance found for entity", integrationName, entity.id);
+      log.error("%s [%s] No AVR instance found for entity", logSource, entity.id);
       return uc.StatusCodes.NotFound;
     }
     return instance.commandSender.sharedCmdHandler(entity, cmdId, params);
   }
 
   async init() {
-    log.info("%s Initializing...", integrationName);
+    log.info("%s Initializing...", logSource);
 
     // The integration can be upgraded while the remote is already connected. In that case the
     // Integration API may not emit a new Connect event, leaving NRI-only data (reported input

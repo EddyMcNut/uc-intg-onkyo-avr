@@ -13,7 +13,7 @@ export type MenuSignatureItem = {
 };
 
 export abstract class MenuBrowseHandlerBase {
-  protected abstract readonly integrationName: string;
+  protected abstract readonly logSource: string;
   protected abstract getServiceLabel(): string;
   protected abstract nextListSequence(): string;
   protected abstract getMenuState(entityId: string): MenuHarvestState | null;
@@ -64,15 +64,7 @@ export abstract class MenuBrowseHandlerBase {
     const knownLayer = state.nlsLayerNumber;
     const layersToTry = knownLayer > 0 ? [knownLayer, knownLayer - 1, knownLayer + 1].filter((layer) => layer > 0).map((layer) => toHex(layer, 2)) : ["02", "01", "03"];
 
-    log.info(
-      "%s [%s] %s NLAL harvest: need %d items, have %d, trying layers %s",
-      this.integrationName,
-      entityId,
-      this.getServiceLabel(),
-      state.totalListItemCount,
-      currentCount,
-      layersToTry.join(",")
-    );
+    log.info("%s [%s] %s NLAL harvest: need %d items, have %d, trying layers %s", this.logSource, entityId, this.getServiceLabel(), state.totalListItemCount, currentCount, layersToTry.join(","));
 
     state.harvestMode = true;
     try {
@@ -84,7 +76,7 @@ export abstract class MenuBrowseHandlerBase {
 
     if (!this.phase2HarvestEnabled) {
       state.harvestMode = false;
-      log.info("%s [%s] %s NLAL harvest complete: %d/%d items", this.integrationName, entityId, this.getServiceLabel(), this.listMenuItems(entityId).length, state.totalListItemCount);
+      log.info("%s [%s] %s NLAL harvest complete: %d/%d items", this.logSource, entityId, this.getServiceLabel(), this.listMenuItems(entityId).length, state.totalListItemCount);
       return;
     }
 
@@ -93,12 +85,12 @@ export abstract class MenuBrowseHandlerBase {
         await delay(scanDelay * 2);
         const collectedAfterPhase1 = this.listMenuItems(entityId).length;
         if (state.totalListItemCount > collectedAfterPhase1) {
-          log.info("%s [%s] %s NLAL harvest phase 2: total updated to %d, have %d", this.integrationName, entityId, this.getServiceLabel(), state.totalListItemCount, collectedAfterPhase1);
+          log.info("%s [%s] %s NLAL harvest phase 2: total updated to %d, have %d", this.logSource, entityId, this.getServiceLabel(), state.totalListItemCount, collectedAfterPhase1);
           await this.harvestNlalChunks(entityId, layersToTry, scanDelay, rawSend);
         }
       } finally {
         state.harvestMode = false;
-        log.info("%s [%s] %s NLAL harvest complete: %d/%d items", this.integrationName, entityId, this.getServiceLabel(), this.listMenuItems(entityId).length, state.totalListItemCount);
+        log.info("%s [%s] %s NLAL harvest complete: %d/%d items", this.logSource, entityId, this.getServiceLabel(), this.listMenuItems(entityId).length, state.totalListItemCount);
       }
     })();
   }

@@ -21,6 +21,7 @@ import { findNetServiceByName } from "./avrInfoStore.js";
 import { findLearnedListeningModeCode } from "./learnedListeningModeStore.js";
 import { findConfiguredInputId } from "./inputSourcePreferences.js";
 import type { InputSourceSettings } from "./configConstants.js";
+import { stripInputSourceMarker } from "./inputSourceResolver.js";
 
 export interface EiscpConfig {
   host?: string;
@@ -43,7 +44,7 @@ const NOOP_STATE_READER: AvrStateReader = {
 
 const COMMAND_MAPPINGS = eiscpMappings.command_mappings;
 const VALUE_MAPPINGS = eiscpMappings.value_mappings;
-const integrationName = "eISCP:";
+const logSource = "eISCP:";
 const IGNORED_COMMANDS = new Set(["NMS", "NPB", "NJA", "EDV", "NFI", "NDN", "NTR", "NDS"]); // Commands to ignore from AVR (NMS=menu, NPB=playback info)
 const THROTTLED_COMMANDS = new Set(["IFA", "IFV", "FLD"]); // Commands to send to incoming queue for throttling
 const FLD_VOLUME_HEX_PREFIX = "566F6C756D65"; // "Volume" in hex - skip these FLD messages
@@ -154,7 +155,7 @@ export class EiscpDriver extends EventEmitter {
     );
     if (this.listenerCount("error") === 0) {
       this.on("error", (err: Error) => {
-        log.error("%s eiscp error (unhandled):", integrationName, err);
+        log.error("%s eiscp error (unhandled):", logSource, err);
       });
     }
   }
@@ -179,7 +180,7 @@ export class EiscpDriver extends EventEmitter {
       }
       client
         .on("error", (err: Error) => {
-          log.error("%s UDP error:", integrationName, err);
+          log.error("%s UDP error:", logSource, err);
           try {
             client.close();
           } catch {}
@@ -212,7 +213,7 @@ export class EiscpDriver extends EventEmitter {
           client.send(buffer, 0, buffer.length, opts.port, opts.address, (err) => {
             if (err) {
               // Log but don't fail - network might not be ready yet (ENETUNREACH)
-              log.error("%s UDP send error (network may not be ready):", integrationName, err);
+              log.error("%s UDP send error (network may not be ready):", logSource, err);
               // Close client and resolve with empty result - configured AVRs will still be tried
               clearTimeout(timeoutTimer);
               close();
@@ -221,10 +222,10 @@ export class EiscpDriver extends EventEmitter {
           timeoutTimer = setTimeout(close, opts.timeout * 1000);
         })
         .on("close", () => {
-          log.info("%s UDP socket closed", integrationName);
+          log.info("%s UDP socket closed", logSource);
         })
         .bind(0, undefined, (err?: Error) => {
-          if (err) log.error("%s UDP bind error:", integrationName, err);
+          if (err) log.error("%s UDP bind error:", logSource, err);
         });
     });
   }
@@ -241,7 +242,7 @@ export class EiscpDriver extends EventEmitter {
         this.config.port = Number(h.port);
         this.config.model = h.model;
       } else {
-        log.error("%s No AVR found during discovery.", integrationName);
+        log.error("%s No AVR found during discovery.", logSource);
         return null;
       }
     }
@@ -278,15 +279,15 @@ export class EiscpDriver extends EventEmitter {
         const wasConnected = this.isConnected;
         this.isConnected = false;
         if (wasConnected) {
-          log.warn("%s Connection closed for %s at %s:%d", integrationName, this.config.model, this.config.host, this.config.port || 60128);
+          log.warn("%s Connection closed for %s at %s:%d", logSource, this.config.model, this.config.host, this.config.port || 60128);
         }
         if (this.config.reconnect) {
-          log.info("%s Scheduling reconnection in %ds", integrationName, this.config.reconnectSleep);
+          log.info("%s Scheduling reconnection in %ds", logSource, this.config.reconnectSleep);
           setTimeout(() => this.connect(), this.config.reconnectSleep! * 1000);
         }
       })
       .on("error", (err) => {
-        log.error("%s Socket error for %s at %s:%d - %s", integrationName, this.config.model, this.config.host, this.config.port || 60128, err.message);
+        log.error("%s Socket error for %s at %s:%d - %s", logSource, this.config.model, this.config.host, this.config.port || 60128, err.message);
         this.isConnected = false;
         this.eiscp?.destroy();
       })
@@ -323,7 +324,7 @@ export class EiscpDriver extends EventEmitter {
           let command = iscpMessage.slice(0, 3);
           let value = iscpMessage.slice(3);
 
-          // log.info("%s RAW (0) RECEIVE: [%s] %s %s", integrationName, command, value);
+          // log.info("%s RAW (0) RECEIVE: [%s] %s %s", logSource, command, value);
 
           if (IGNORED_COMMANDS.has(command)) {
             continue;
@@ -416,7 +417,7 @@ export class EiscpDriver extends EventEmitter {
         }
       } catch (err) {
         this.incomingDrainScheduled = false;
-        log.error("%s Error processing queued incoming message:", integrationName, err);
+        log.error("%s Error processing queued incoming message:", logSource, err);
       }
     })();
   }
@@ -437,7 +438,7 @@ export class EiscpDriver extends EventEmitter {
     const menuDelay = this.config.netMenuDelay ?? 2500;
     const myPresetsPosition = String(this.config.tuneinPresetPosition ?? 1).padStart(5, "0");
 
-    log.info("%s TuneIn preset %d: navigating to My Presets (position %s), selecting index %s", integrationName, preset, myPresetsPosition, presetIndex);
+    log.info("%s TuneIn preset %d: navigating to My Presets (position %s), selecting index %s", logSource, preset, myPresetsPosition, presetIndex);
 
     this.commandParser.patchMetadata({ artist: `Selecting preset ${preset}...`, album: "please wait" });
     this.emit("data", {
@@ -495,13 +496,13 @@ export class EiscpDriver extends EventEmitter {
     const physicalAvrId = this.config.model && this.config.host ? buildPhysicalAvrId(this.config.model, this.config.host) : "";
     const directService = physicalAvrId ? findNetServiceByName(physicalAvrId, NSS_SERVICE_NAMES[nssCode] ?? []) : undefined;
 
-    log.debug("%s Sending %s (NET input for zone %s) before %s", integrationName, netCommand, zone, nssCode);
+    log.debug("%s Sending %s (NET input for zone %s) before %s", logSource, netCommand, zone, nssCode);
     await this.raw(netCommand); // Select NET input first
     await delay(menuDelay); // Wait for AVR to switch/acknowledge NET input
 
     if (directService) {
       const serviceCommand = `NSV${directService.id.toUpperCase()}0`;
-      log.debug("%s Selecting reported network service %s (%s) directly: %s", integrationName, directService.name, directService.id, serviceCommand);
+      log.debug("%s Selecting reported network service %s (%s) directly: %s", logSource, directService.name, directService.id, serviceCommand);
       await this.raw(serviceCommand);
       await delay(menuDelay);
       await this.raw(queryCommand);
@@ -512,7 +513,7 @@ export class EiscpDriver extends EventEmitter {
     await this.raw("NTCTOP");
     await delay(menuDelay); // Wait for AVR to fully load NET menu
 
-    log.debug("%s Sending network service command: %s", integrationName, nssCode);
+    log.debug("%s Sending network service command: %s", logSource, nssCode);
     await this.raw(`NLSI${newSubsource}`);
     await delay(menuDelay);
     await this.raw(queryCommand); // Query input-selector to ensure source state updates
@@ -524,7 +525,7 @@ export class EiscpDriver extends EventEmitter {
     const netCommand = `${sliPrefix}2B`;
     const queryCommand = `${sliPrefix}QSTN`;
 
-    log.debug("%s Sending %s (NET input for zone %s) before NSV%s", integrationName, netCommand, zone, serviceId);
+    log.debug("%s Sending %s (NET input for zone %s) before NSV%s", logSource, netCommand, zone, serviceId);
     await this.raw(netCommand);
     await delay(menuDelay);
     await this.raw(`NSV${serviceId.toUpperCase()}0`);
@@ -606,7 +607,7 @@ export class EiscpDriver extends EventEmitter {
       .filter((item) => item !== "");
 
     if (parts.length !== 2) {
-      log.warn("%s Invalid multi-zone-%s command format: %s", integrationName, commandType, data);
+      log.warn("%s Invalid multi-zone-%s command format: %s", logSource, commandType, data);
       return;
     }
 
@@ -615,11 +616,11 @@ export class EiscpDriver extends EventEmitter {
     const commands = commandType === "volume" ? buildMultiZoneVolumeCommands(action, configuredZones) : buildMultiZoneMuteCommands(action, configuredZones);
 
     if (commands.length === 0) {
-      log.warn("%s No zones configured for multi-zone-%s action: %s (configured zones: %s)", integrationName, commandType, action, configuredZones.join(", "));
+      log.warn("%s No zones configured for multi-zone-%s action: %s (configured zones: %s)", logSource, commandType, action, configuredZones.join(", "));
       return;
     }
 
-    log.info("%s Multi-zone %s command: %s -> sending %d zone commands (configured zones: %s)", integrationName, commandType, data, commands.length, configuredZones.join(", "));
+    log.info("%s Multi-zone %s command: %s -> sending %d zone commands (configured zones: %s)", logSource, commandType, data, commands.length, configuredZones.join(", "));
     this.enqueueSend(commands);
   }
 
@@ -630,15 +631,16 @@ export class EiscpDriver extends EventEmitter {
     if (args !== undefined && valueMap && Object.prototype.hasOwnProperty.call(valueMap, args)) {
       value = valueMap[String(args)].value;
     } else if (prefix === "SLI" && typeof args === "string") {
+      args = stripInputSourceMarker(args);
       const physicalAvrId = buildPhysicalAvrId(this.config.model ?? "", this.config.host ?? "");
       const reportedService = findNetServiceByName(physicalAvrId, [args]);
       if (reportedService) {
         const logicalService = Object.entries(NSS_SERVICE_NAMES).find(([, names]) => names.includes(reportedService.name.toLowerCase().replace(/[^a-z0-9]/g, "")));
         if (logicalService) {
-          log.debug("%s Sending reported network service %s through %s", integrationName, args, logicalService[0]);
+          log.debug("%s Sending reported network service %s through %s", logSource, args, logicalService[0]);
           return logicalService[0];
         }
-        log.debug("%s Sending reported network service %s directly through NSV%s", integrationName, args, reportedService.id);
+        log.debug("%s Sending reported network service %s directly through NSV%s", logSource, args, reportedService.id);
         return `NSV${reportedService.id.toUpperCase()}0`;
       }
 
@@ -646,25 +648,25 @@ export class EiscpDriver extends EventEmitter {
       // table: send the input id the AVR gave for it instead.
       const inputId = findAvrInputId(physicalAvrId, args) ?? findConfiguredInputId(this.config.idInputSources, args);
       if (inputId) {
-        log.debug("%s Sending input-selector %s as %s%s (id reported by the AVR)", integrationName, args, getZonePrefix(prefix, zone), inputId);
+        log.debug("%s Sending input-selector %s as %s%s (id reported by the AVR)", logSource, args, getZonePrefix(prefix, zone), inputId);
         return getZonePrefix(prefix, zone) + inputId;
       }
-      log.error("%s Input source alias is not mapped: %s %s", integrationName, command, args);
+      log.error("%s Input source alias is not mapped: %s %s", logSource, command, args);
       value = String(args ?? "");
     } else if (prefix === "LMD" && typeof args === "string") {
       const physicalAvrId = buildPhysicalAvrId(this.config.model ?? "", this.config.host ?? "");
       const learnedCode = findLearnedListeningModeCode(physicalAvrId, args);
       if (learnedCode) {
-        log.debug("%s Sending learned listening mode %s as LMD%s", integrationName, args, learnedCode);
+        log.debug("%s Sending learned listening mode %s as LMD%s", logSource, args, learnedCode);
         value = learnedCode;
       } else {
-        log.warn("%s Listening mode is not mapped: %s", integrationName, args);
+        log.warn("%s Listening mode is not mapped: %s", logSource, args);
         value = String(args);
       }
     } else if (valueMap && Object.prototype.hasOwnProperty.call(valueMap, "intgrRange")) {
       value = (+args!).toString(16).toUpperCase().padStart(2, "0");
     } else {
-      log.warn("%s not found in JSON: %s %s", integrationName, command, args);
+      log.warn("%s not found in JSON: %s %s", logSource, command, args);
       value = String(args ?? "");
     }
 

@@ -16,7 +16,7 @@ export type MenuItemLister = (entityId: string) => MenuSignatureItem[];
 
 export type MenuBrowseHandlerConfig = {
   providerLabel: string;
-  integrationName: string;
+  logSource: string;
   rootId: string;
   rootType: string;
   backId: string;
@@ -41,10 +41,10 @@ export type MenuBrowseHandlerApi = MenuBrowseHandlerBase & {
 };
 
 export function createMenuBrowseHandler(cfg: MenuBrowseHandlerConfig): MenuBrowseHandlerApi {
-  const integrationName = cfg.integrationName;
+  const logSource = cfg.logSource;
 
   class Handler extends MenuBrowseHandlerBase {
-    protected readonly integrationName = integrationName;
+    protected readonly logSource = logSource;
     protected phase2HarvestEnabled = true;
 
     protected getServiceLabel(): string {
@@ -101,7 +101,7 @@ export function createMenuBrowseHandler(cfg: MenuBrowseHandlerConfig): MenuBrows
         cfg.resetState(entityId);
         const beforeSignature = this.buildMenuSignature(entityId);
         const menuDelay = this.getMenuDelay(entityId);
-        log.info("%s [%s] sending %s Back command to AVR", integrationName, entityId, cfg.providerLabel);
+        log.info("%s [%s] sending %s Back command to AVR", logSource, entityId, cfg.providerLabel);
         await cmdHandler(mediaPlayerEntity, uc.MediaPlayerCommands.PlayMedia, {
           media_id: cfg.backId,
           media_type: cfg.rootType
@@ -129,7 +129,7 @@ export function createMenuBrowseHandler(cfg: MenuBrowseHandlerConfig): MenuBrows
         cfg.resetState(entityId);
         const browseState = cfg.getBrowseState(entityId);
         if (browseState) browseState.traceNextSelectionAfterMainMenu = true;
-        log.info("%s [%s] %s Main Menu selected; next %s selection will be traced", integrationName, entityId, cfg.providerLabel, cfg.providerLabel);
+        log.info("%s [%s] %s Main Menu selected; next %s selection will be traced", logSource, entityId, cfg.providerLabel, cfg.providerLabel);
         await cmdHandler(mediaPlayerEntity, uc.MediaPlayerCommands.PlayMedia, {
           media_id: String(options.media_id),
           media_type: cfg.rootType

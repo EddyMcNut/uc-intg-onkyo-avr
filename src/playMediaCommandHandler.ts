@@ -37,7 +37,7 @@ import {
   type BrowseServiceId
 } from "./browseServiceContract.js";
 
-const integrationName = "playMediaCommandHandler:";
+const logSource = "playMediaCommandHandler:";
 
 type ZonePrefixFn = (cmd: string) => string;
 
@@ -231,7 +231,7 @@ export class PlayMediaCommandHandler {
         .slice(0, 12)
         .map((item) => `${item.menuIndex}:${item.title}`)
         .join(", ");
-      log.info("%s [%s] TRACE cached %s menu before command: [%s] requestedTitle='%s'", integrationName, entityId, activeLabel, cached, requestedTitle ?? "");
+      log.info("%s [%s] TRACE cached %s menu before command: [%s] requestedTitle='%s'", logSource, entityId, activeLabel, cached, requestedTitle ?? "");
     }
 
     const cachedOption = activeOptions.find((item) => item.menuIndex === activeOption.menuIndex) ?? (requestedTitle ? activeOptions.find((item) => item.title === requestedTitle) : undefined);
@@ -262,13 +262,13 @@ export class PlayMediaCommandHandler {
     if (requestedTitle) {
       const remapped = activeOptions.find((item) => item.title === requestedTitle);
       if (remapped && remapped.menuIndex !== activeOption.menuIndex) {
-        log.debug("%s [%s] remapped %s selection '%s' from index %d to %d", integrationName, entityId, activeLabel, requestedTitle, activeOption.menuIndex, remapped.menuIndex);
+        log.debug("%s [%s] remapped %s selection '%s' from index %d to %d", logSource, entityId, activeLabel, requestedTitle, activeOption.menuIndex, remapped.menuIndex);
         menuIndexToSelect = remapped.menuIndex;
       }
     }
 
     if (shouldTraceSelection) {
-      log.info("%s [%s] TRACE final %s selection index=%d source=%s subsource=%s", integrationName, entityId, activeLabel, menuIndexToSelect, currentSource, currentSubSource);
+      log.info("%s [%s] TRACE final %s selection index=%d source=%s subsource=%s", logSource, entityId, activeLabel, menuIndexToSelect, currentSource, currentSubSource);
     }
 
     if (activeServiceId === TIDAL_SERVICE_ID) {

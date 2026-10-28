@@ -13,7 +13,7 @@ import { TUNEIN_SERVICE_ID } from "./browseServiceContract.js";
 import type { AvrStateApi } from "./types.js";
 import { findTunerPresetByName } from "./tunerPresetStore.js";
 
-const integrationName = "zoneAgnosticUpdateProcessor:";
+const logSource = "zoneAgnosticUpdateProcessor:";
 
 export class ZoneAgnosticUpdateProcessor {
   public static readonly ZONE_AGNOSTIC_COMMANDS = new Set<string>(["IFA", "DSN", "NST", "NLT", "NLT_CONTEXT", "NLS", "NLA", "FLD", "NTM", "metadata", "avr-info"]);
@@ -195,7 +195,7 @@ export class ZoneAgnosticUpdateProcessor {
         });
       }
 
-      log.debug("%s IFA sync for [%s] (event zone %s)", integrationName, zoneEntityId, _eventZone);
+      log.debug("%s IFA sync for [%s] (event zone %s)", logSource, zoneEntityId, _eventZone);
     }
   }
 
@@ -216,7 +216,7 @@ export class ZoneAgnosticUpdateProcessor {
       await this.renderZoneMedia(zoneEntityId, true);
     }
 
-    log.info("%s DAB station set to %s (updated %d zone(s))", integrationName, stationName, affectedZones.length);
+    log.info("%s DAB station set to %s (updated %d zone(s))", logSource, stationName, affectedZones.length);
   }
 
   async handleNlt(sourceEntityId: string, serviceName: string, eventZone: string): Promise<void> {
@@ -284,7 +284,7 @@ export class ZoneAgnosticUpdateProcessor {
     const artist = argument?.artist || "unknown";
     const affectedZones = argument ? this.getNetZones(sourceEntityId) : [];
     if (affectedZones.length > 0) {
-      log.info("%s metadata updated: %s - %s (updated %d zone(s))", integrationName, artist, title, affectedZones.length);
+      log.info("%s metadata updated: %s - %s (updated %d zone(s))", logSource, artist, title, affectedZones.length);
     }
   }
 

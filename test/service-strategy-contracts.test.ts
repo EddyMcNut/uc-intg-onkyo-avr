@@ -5,7 +5,7 @@ it("MenuBrowseHandlerBase harvest contract populates contiguous items and clears
   const { MenuBrowseHandlerBase } = baseModule as { MenuBrowseHandlerBase: new () => any };
 
   class TestHandler extends MenuBrowseHandlerBase {
-    protected readonly integrationName = "test:handler";
+    protected readonly logSource = "test:handler";
     protected phase2HarvestEnabled = false;
     private sequence = 0;
     private readonly entityId = "TX-CONTRACT 10.0.0.81 main";

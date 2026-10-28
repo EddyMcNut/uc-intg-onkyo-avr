@@ -4,7 +4,8 @@ import { type AvrConfig } from "./configManager.js";
 import { normalizeAvrInputs, type AvrInput } from "./inputSourceStore.js";
 import { getAvrInfo, listSelectors } from "./avrInfoStore.js";
 import { getAvrSourcesByPhysicalId } from "./avrSourceCatalog.js";
-import { getInputSourceAliases, resolveConfiguredInputSources } from "./inputSourcePreferences.js";
+import { getInputSourceAliases } from "./inputSourcePreferences.js";
+import { presentInputSourceOptions } from "./inputSourcePresentation.js";
 
 export type InputSourceListResolution = {
   inputs?: AvrInput[];
@@ -23,13 +24,15 @@ export function collectAvrInputSources(selectors: AvrInput[], services: AvrInput
 
 // Return the stable SLI ID for a built-in integration alias.
 export function getInputSourceId(option: string): string | undefined {
+  option = stripInputSourceMarker(option);
   const mappings = eiscpMappings.value_mappings.SLI as Record<string, { value: string }>;
   return mappings[option.trim().toLowerCase()]?.value.toLowerCase();
 }
 
 // Resolve a displayed option to an AVR-reported ID, then fall back to the built-in alias mapping.
 export function resolveInputSourceId(physicalAvrId: string, option: string): string | undefined {
-  return getAvrSourcesByPhysicalId(physicalAvrId).find((input) => input.name.toLowerCase() === option.trim().toLowerCase())?.id ?? getInputSourceId(option);
+  const cleanOption = stripInputSourceMarker(option);
+  return getAvrSourcesByPhysicalId(physicalAvrId).find((input) => input.name.toLowerCase() === cleanOption.trim().toLowerCase())?.id ?? getInputSourceId(cleanOption);
 }
 
 // Convert a displayed/configured source name to the stable integration name used by internal state comparisons. AVR-learned names remain suitable for display, but must not replace values such as `net`, `fm`, or `dab` in the state model.
@@ -41,15 +44,11 @@ export function resolveCanonicalInputSource(physicalAvrId: string, option: strin
 
 // Build the options shown by the input selector for one configured AVR zone.
 export function getEffectiveInputSourceOptions(avrConfig: AvrConfig, physicalAvrId: string, builtInOptions: string[]): string[] {
-  if (avrConfig.idInputSources && Object.keys(avrConfig.idInputSources).length > 0) {
-    return resolveConfiguredInputSources(avrConfig.idInputSources);
-  }
-  if (!avrConfig.useAvrReportedInputs) {
-    return builtInOptions;
-  }
+  return presentInputSourceOptions(avrConfig, physicalAvrId, builtInOptions);
+}
 
-  const reported = getAvrSourcesByPhysicalId(physicalAvrId);
-  return reported.length > 0 ? reported.map((input) => input.name) : builtInOptions;
+export function stripInputSourceMarker(option: string): string {
+  return option.replace(/^(?:🌐|📡|🔗|☁️|🛜|🎵|▶️)\s+/u, "");
 }
 
 // Resolve the AVR's input list when AVR-reported names are enabled.

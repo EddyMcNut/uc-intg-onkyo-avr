@@ -4,7 +4,7 @@ import log from "./loggers.js";
 import { delay } from "./utils.js";
 import { QUERY_DEFAULT_DELAY, WAIT_FOR_CONNECT_TIMEOUT } from "./constants.js";
 
-const integrationName = "avrStateQuery:";
+const logSource = "avrStateQuery:";
 
 // ms — minimum time between queries for the same entity
 const QUERY_TTL = WAIT_FOR_CONNECT_TIMEOUT;
@@ -42,14 +42,14 @@ class AvrStateQueryService {
     if (!eiscpInstance || !zone || !entityId) return;
 
     if (!this.shouldQuery(entityId)) {
-      log.debug(`${integrationName} [%s] skipping redundant query (%s)`, entityId, context);
+      log.debug(`${logSource} [%s] skipping redundant query (%s)`, entityId, context);
       return;
     }
     this.recordQuery(entityId);
 
     const threshold = queueThreshold ?? (typeof eiscpInstance.eiscpConfig?.sendDelay === "number" ? eiscpInstance.eiscpConfig.sendDelay : QUERY_DEFAULT_DELAY);
 
-    log.info(`${integrationName} [%s] Querying AVR state for zone %s (%s)...`, entityId, zone, context);
+    log.info(`${logSource} [%s] Querying AVR state for zone %s (%s)...`, entityId, zone, context);
     try {
       await eiscpInstance.command({ zone, command: "system-power", args: "query" });
       await delay(threshold);
@@ -73,7 +73,7 @@ class AvrStateQueryService {
       await delay(threshold);
       await eiscpInstance.command({ zone, command: "dirac", args: "query" });
     } catch (err) {
-      log.warn(`${integrationName} [%s] Failed to query AVR state (%s):`, entityId, context, err);
+      log.warn(`${logSource} [%s] Failed to query AVR state (%s):`, entityId, context, err);
     }
   }
 }

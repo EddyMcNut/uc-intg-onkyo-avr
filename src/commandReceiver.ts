@@ -16,7 +16,7 @@ import { findLearnedListeningModeName, getLearnedListeningModes, learnListeningM
 import { EXCLUDE_LISTENING_MODE, resolveListeningModes } from "./listeningModePreferences.js";
 import { getKnownListeningModes } from "./listeningModePreferences.js";
 
-const integrationName = "commandReceiver:";
+const logSource = "commandReceiver:";
 
 type AvrUpdateEvent = {
   command: string;
@@ -125,7 +125,7 @@ export class CommandReceiver {
     const source = this.avrStateApi.getSource(entityId) || argument.inputSource;
     const changed = learnListeningMode(entityId, { code, name: argument.listeningMode });
     if (changed) {
-      log.info("%s [%s] learned listening mode %s = %s for source %s / format %s", integrationName, entityId, code, argument.listeningMode, source, audioFormat);
+      log.info("%s [%s] learned listening mode %s = %s for source %s / format %s", logSource, entityId, code, argument.listeningMode, source, audioFormat);
     }
   }
 
@@ -144,21 +144,13 @@ export class CommandReceiver {
     const cfgAvr = this.config.avrs ? this.config.avrs.find((a) => buildEntityId(a.model, a.ip, a.zone) === zoneEntityId) : undefined;
     if (cfgAvr?.listeningModes) {
       const options = resolveListeningModes(cfgAvr.listeningModes, learned);
-      log.info("%s [%s] using listeningModes (%d entries)", integrationName, zoneEntityId, options.length);
+      log.info("%s [%s] using listeningModes (%d entries)", logSource, zoneEntityId, options.length);
       this.driver.updateEntityAttributes(selectEntityId, { [SelectAttributes.Options]: options });
       return;
     }
 
     if (learned.length > 0) {
-      log.info(
-        "%s [%s] using %d learned listening mode(s) for source %s / format %s%s",
-        integrationName,
-        zoneEntityId,
-        learned.length,
-        source,
-        audioFormatType,
-        inputChannels ? ` / ${inputChannels}` : ""
-      );
+      log.info("%s [%s] using %d learned listening mode(s) for source %s / format %s%s", logSource, zoneEntityId, learned.length, source, audioFormatType, inputChannels ? ` / ${inputChannels}` : "");
       this.driver.updateEntityAttributes(selectEntityId, {
         [SelectAttributes.Options]: learned.map((mode) => mode.name).sort((a, b) => a.localeCompare(b))
       });
@@ -170,7 +162,7 @@ export class CommandReceiver {
     const allModes = getKnownListeningModes().map((mode) => mode.aliases[0]);
     const filteredOptions = allModes.filter((mode) => compatibleModes.includes(mode)).sort();
 
-    log.info("%s [%s] updating listening mode options for format: %s (%d modes)", integrationName, zoneEntityId, audioFormatType, filteredOptions.length);
+    log.info("%s [%s] updating listening mode options for format: %s (%d modes)", logSource, zoneEntityId, audioFormatType, filteredOptions.length);
     this.driver.updateEntityAttributes(selectEntityId, {
       [SelectAttributes.Options]: filteredOptions
     });
@@ -196,11 +188,11 @@ export class CommandReceiver {
     this.avInfoRequeryTimer = setTimeout(async () => {
       this.avInfoRequeryTimer = null;
       try {
-        log.info("%s [%s] re-querying AV info after transient format '%s'", integrationName, zone, audioInputValue);
+        log.info("%s [%s] re-querying AV info after transient format '%s'", logSource, zone, audioInputValue);
         await this.eiscpInstance.command({ zone, command: "audio-information", args: "query" });
         await this.eiscpInstance.command({ zone, command: "video-information", args: "query" });
       } catch (err) {
-        log.warn("%s Failed to re-query AV info after transient format: %s", integrationName, err);
+        log.warn("%s Failed to re-query AV info after transient format: %s", logSource, err);
       }
     }, AV_INFO_REQUERY_DELAY);
   }
@@ -213,7 +205,7 @@ export class CommandReceiver {
     }
 
     if (ZoneAgnosticUpdateProcessor.isZoneAgnosticCommand(avrUpdates.command)) {
-      log.warn("%s [%s] command '%s' is declared zone-agnostic but has no dispatch handler", integrationName, entityId, avrUpdates.command);
+      log.warn("%s [%s] command '%s' is declared zone-agnostic but has no dispatch handler", logSource, entityId, avrUpdates.command);
       return true;
     }
 
@@ -226,8 +218,8 @@ export class CommandReceiver {
 
   private async handleSystemPower(avrUpdates: AvrUpdateEvent, entityId: string): Promise<void> {
     const powerState = avrUpdates.argument === "on" ? uc.MediaPlayerStates.On : uc.MediaPlayerStates.Standby;
-    log.info("** Onkyo AVR custom integration version %s **", this.driverVersion);
-    log.info("%s [%s] power set to: %s (log level: %s)", integrationName, entityId, powerState, getLogLevel());
+    log.info("%s ** Onkyo AVR custom integration version %s **", logSource, this.driverVersion);
+    log.info("%s [%s] power set to: %s (log level: %s)", logSource, entityId, powerState, getLogLevel());
     this.avrStateApi.setPowerState(entityId, avrUpdates.argument as string, this.driver);
     if (avrUpdates.argument !== "on") {
       for (const suffix of SENSOR_SUFFIXES) {
@@ -250,7 +242,7 @@ export class CommandReceiver {
       [uc.SensorAttributes.State]: uc.SensorStates.On,
       [uc.SensorAttributes.Value]: muteState
     });
-    log.info("%s [%s] audio-muting set to: %s", integrationName, entityId, muteState);
+    log.info("%s [%s] audio-muting set to: %s", logSource, entityId, muteState);
   }
 
   private async handleVolume(avrUpdates: AvrUpdateEvent, entityId: string): Promise<void> {
@@ -274,7 +266,7 @@ export class CommandReceiver {
 
   private async handlePreset(avrUpdates: AvrUpdateEvent, entityId: string): Promise<void> {
     this.avrPreset = avrUpdates.argument.toString();
-    log.info("%s [%s] preset set to: %s", integrationName, entityId, this.avrPreset);
+    log.info("%s [%s] preset set to: %s", logSource, entityId, this.avrPreset);
 
     // A numeric argument is a preset slot ("PRS0C" -> 12), which is what the tuner presets select
     // entity lists stations for. "up"/"down" and the wrapped TuneIn/streaming presets are not.
@@ -289,7 +281,7 @@ export class CommandReceiver {
       });
       return;
     }
-    log.debug("%s [%s] Tuner preset slot %d is '%s'", integrationName, entityId, avrUpdates.argument, station);
+    log.debug("%s [%s] Tuner preset slot %d is '%s'", logSource, entityId, avrUpdates.argument, station);
     this.updateTunerPresetSelection(entityId, station);
   }
 
@@ -313,7 +305,7 @@ export class CommandReceiver {
     this.driver.updateEntityAttributes(entityId, {
       [uc.MediaPlayerAttributes.Source]: displaySource
     });
-    log.info("%s [%s] input-selector (source) set to: %s (canonical: %s)", integrationName, entityId, displaySource, source);
+    log.info("%s [%s] input-selector (source) set to: %s (canonical: %s)", logSource, entityId, displaySource, source);
     this.driver.updateEntityAttributes(`${entityId}_input_selector`, {
       [SelectAttributes.CurrentOption]: displaySource
     });
@@ -339,7 +331,7 @@ export class CommandReceiver {
     if (modeCode) this.pendingListeningModeCodes.set(entityId, modeCode);
     const aliases = Array.isArray(avrUpdates.argument) ? avrUpdates.argument : [avrUpdates.argument as string];
     if (aliases[0] === "undefined" || aliases[0] === "unknown") {
-      log.info("%s [%s] listening-mode '%s', keeping current value (no re-query)", integrationName, entityId, aliases[0]);
+      log.info("%s [%s] listening-mode '%s', keeping current value (no re-query)", logSource, entityId, aliases[0]);
       return;
     }
     let listeningMode = aliases[0];
@@ -352,26 +344,26 @@ export class CommandReceiver {
       const configured = cfgAvr.listeningModes[configuredCode]?.setting;
       if (configured && configured !== "learn" && configured !== EXCLUDE_LISTENING_MODE && configured !== "disable") listeningMode = configured;
     }
-    log.info("%s [%s] listening-mode set to: %s", integrationName, entityId, listeningMode);
+    log.info("%s [%s] listening-mode set to: %s", logSource, entityId, listeningMode);
     this.driver.updateEntityAttributes(`${entityId}_listening_mode`, {
       [SelectAttributes.CurrentOption]: listeningMode
     });
-    log.info("%s [%s] querying AV info after listening-mode update", integrationName, entityId);
+    log.info("%s [%s] querying AV info after listening-mode update", logSource, entityId);
     this.eiscpInstance.command({ zone: eventZone, command: "audio-information", args: "query" }).catch((err) => {
-      log.debug("%s [%s] audio-information query failed: %s", integrationName, entityId, err instanceof Error ? err.message : String(err));
+      log.debug("%s [%s] audio-information query failed: %s", logSource, entityId, err instanceof Error ? err.message : String(err));
     });
     this.eiscpInstance.command({ zone: eventZone, command: "video-information", args: "query" }).catch((err) => {
-      log.debug("%s [%s] video-information query failed: %s", integrationName, entityId, err instanceof Error ? err.message : String(err));
+      log.debug("%s [%s] video-information query failed: %s", logSource, entityId, err instanceof Error ? err.message : String(err));
     });
   }
 
   private async handleDirac(avrUpdates: AvrUpdateEvent, entityId: string): Promise<void> {
     const diracSlot = diracServiceKeyToOption(avrUpdates.argument.toString());
     if (diracSlot === "undefined" || diracSlot === "unknown" || diracSlot === "query") {
-      log.info("%s [%s] dirac '%s', keeping current value (no update)", integrationName, entityId, diracSlot);
+      log.info("%s [%s] dirac '%s', keeping current value (no update)", logSource, entityId, diracSlot);
       return;
     }
-    log.info("%s [%s] dirac set to: %s", integrationName, entityId, diracSlot);
+    log.info("%s [%s] dirac set to: %s", logSource, entityId, diracSlot);
     this.driver.updateEntityAttributes(`${entityId}_dirac`, {
       [SelectAttributes.CurrentOption]: diracSlot
     });
@@ -418,12 +410,12 @@ export class CommandReceiver {
         [uc.SensorAttributes.Value]: String(treble)
       });
     }
-    log.info("%s [%s] tone-front bass=%s treble=%s", integrationName, entityId, bass, treble);
+    log.info("%s [%s] tone-front bass=%s treble=%s", logSource, entityId, bass, treble);
   }
 
   private async handleVocal(avrUpdates: AvrUpdateEvent, entityId: string): Promise<void> {
     const level = Number(avrUpdates.argument);
-    log.info("%s [%s] vocal set to: %s", integrationName, entityId, level);
+    log.info("%s [%s] vocal set to: %s", logSource, entityId, level);
     this.driver.updateEntityAttributes(`${entityId}_vocal_sensor`, {
       [uc.SensorAttributes.State]: uc.SensorStates.On,
       [uc.SensorAttributes.Value]: Number.isNaN(level) ? String(avrUpdates.argument) : String(level)
@@ -432,7 +424,7 @@ export class CommandReceiver {
 
   private async handleCenterLevel(avrUpdates: AvrUpdateEvent, entityId: string): Promise<void> {
     const level = Number(avrUpdates.argument);
-    log.info("%s [%s] center-temporary-level set to: %s", integrationName, entityId, level);
+    log.info("%s [%s] center-temporary-level set to: %s", logSource, entityId, level);
     this.driver.updateEntityAttributes(`${entityId}_temp_center_sensor`, {
       [uc.SensorAttributes.State]: uc.SensorStates.On,
       [uc.SensorAttributes.Value]: Number.isNaN(level) ? String(avrUpdates.argument) : `${level.toFixed(1)} dB`
@@ -441,7 +433,7 @@ export class CommandReceiver {
 
   private async handleSubwooferLevel(avrUpdates: AvrUpdateEvent, entityId: string): Promise<void> {
     const level = Number(avrUpdates.argument);
-    log.info("%s [%s] subwoofer-temporary-level set to: %s", integrationName, entityId, level);
+    log.info("%s [%s] subwoofer-temporary-level set to: %s", logSource, entityId, level);
     this.driver.updateEntityAttributes(`${entityId}_temp_subwoofer_sensor`, {
       [uc.SensorAttributes.State]: uc.SensorStates.On,
       [uc.SensorAttributes.Value]: Number.isNaN(level) ? String(avrUpdates.argument) : `${level.toFixed(1)} dB`
@@ -465,7 +457,7 @@ export class CommandReceiver {
 
   setupEiscpListener() {
     this.eiscpInstance.on("error", (err: Error) => {
-      log.error("%s eiscp error: %s", integrationName, err);
+      log.error("%s eiscp error: %s", logSource, err);
     });
     this.eiscpInstance.on("data", async (avrUpdates: AvrUpdateEvent) => {
       const eventZone = avrUpdates.zone || "main";
@@ -483,7 +475,7 @@ export class CommandReceiver {
         return;
       }
 
-      log.debug("%s [%s] Received unknown command type: '%s' with argument: %s", integrationName, entityId, avrUpdates.command, avrUpdates.argument);
+      log.debug("%s [%s] Received unknown command type: '%s' with argument: %s", logSource, entityId, avrUpdates.command, avrUpdates.argument);
       await this.zoneAgnosticProcessor.renderEntity(entityId);
     });
   }

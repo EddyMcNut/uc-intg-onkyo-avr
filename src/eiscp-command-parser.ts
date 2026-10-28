@@ -14,7 +14,7 @@ import type { TuneInMenuBrowseState } from "./tuneInMenuStore.js";
 
 const COMMANDS = eiscpCommands.commands;
 const VALUE_MAPPINGS = eiscpMappings.value_mappings;
-const integrationName = "eiscpCommandParser:";
+const logSource = "eiscpCommandParser:";
 
 // Zone-specific command codes → main-zone equivalent (for incoming command parsing)
 const ZONE2_REVERSE_MAP: Record<string, string> = { ZVL: "MVL", ZPW: "PWR", ZMT: "AMT", SLZ: "SLI", TUZ: "TUN" };
@@ -514,27 +514,27 @@ export class IscpCommandParser {
     // frame with SUB (0x1A), which is not XML and is stripped.
     if (getLogLevel() === "debug") {
       const dumpable = xml.replace(/\x1a+$/, "");
-      log.debug("%s [%s] Complete NRI payload (%d chars):\n%s", integrationName, entityId, dumpable.length, dumpable.replace(/></g, ">\n<").replace(/>\n<\//g, "></"));
+      log.debug("%s [%s] Complete NRI payload (%d chars):\n%s", logSource, entityId, dumpable.length, dumpable.replace(/></g, ">\n<").replace(/>\n<\//g, "></"));
     }
 
     setAvrInfo(entityId, info);
     const dabPresets = listDabPresets(entityId);
     const fmPresets = listFmPresets(entityId);
     const emptyPresets = info.presets.filter((preset) => preset.band === PRESET_BAND_EMPTY);
-    log.debug("%s [%s] Collected AVR info: %d DAB preset(s), %d FM preset(s) of %d slot(s)", integrationName, entityId, dabPresets.length, fmPresets.length, info.presetCount);
+    log.debug("%s [%s] Collected AVR info: %d DAB preset(s), %d FM preset(s) of %d slot(s)", logSource, entityId, dabPresets.length, fmPresets.length, info.presetCount);
     if (dabPresets.length > 0) {
-      log.debug("%s [%s] DAB presets (band=2, no frequency):\n%s", integrationName, entityId, dabPresets.map((preset) => `  slot ${String(preset.slot).padStart(2, " ")}: ${preset.name}`).join("\n"));
+      log.debug("%s [%s] DAB presets (band=2, no frequency):\n%s", logSource, entityId, dabPresets.map((preset) => `  slot ${String(preset.slot).padStart(2, " ")}: ${preset.name}`).join("\n"));
     }
     if (fmPresets.length > 0) {
       log.debug(
         "%s [%s] FM presets (band=1, carries a frequency):\n%s",
-        integrationName,
+        logSource,
         entityId,
         fmPresets.map((preset) => `  slot ${String(preset.slot).padStart(2, " ")}: ${preset.name} @ ${preset.freq} MHz`).join("\n")
       );
     }
     if (emptyPresets.length > 0) {
-      log.debug("%s [%s] Empty slots (band=0): %d (slots %s)", integrationName, entityId, emptyPresets.length, emptyPresets.map((preset) => preset.slot).join(", "));
+      log.debug("%s [%s] Empty slots (band=0): %d (slots %s)", logSource, entityId, emptyPresets.length, emptyPresets.map((preset) => preset.slot).join(", "));
     }
 
     // Use the command name, not the raw NRI opcode, so the command receiver can dispatch it.
@@ -556,10 +556,10 @@ export class IscpCommandParser {
     if (imageType === "2") {
       // The URL form. AVRs commonly report a link-local address, which is not reachable from the
       // UC host, so the link is logged rather than followed.
-      log.debug("%s [%s] AVR offered jacket art by URL: %s", integrationName, entityId, value.substring(1).trim());
+      log.debug("%s [%s] AVR offered jacket art by URL: %s", logSource, entityId, value.substring(1).trim());
     } else {
       const inlineBytes = Math.floor(value.length / 2);
-      log.debug("%s [%s] AVR sent inline jacket art data (image type %s, %d bytes) which is not used", integrationName, entityId, imageType || "n", inlineBytes);
+      log.debug("%s [%s] AVR sent inline jacket art data (image type %s, %d bytes) which is not used", logSource, entityId, imageType || "n", inlineBytes);
     }
 
     return result;

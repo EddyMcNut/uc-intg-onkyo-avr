@@ -45,7 +45,7 @@ describe("TidalBrowseHandler", () => {
     const { createMenuBrowseHandler } = await import("../src/menuBrowseHandler.js");
     handler = createMenuBrowseHandler({
       providerLabel: "Tidal",
-      integrationName: "tidalBrowseHandler:",
+      logSource: "tidalBrowseHandler:",
       rootId: "tidal:root",
       rootType: "tidal://menu",
       backId: "tidal:menu-back",

@@ -54,7 +54,7 @@ import {
   setTuneInBrowseContext
 } from "./mediaBrowserServices.js";
 
-const integrationName = "mediaBrowser:";
+const logSource = "mediaBrowser:";
 const DEFAULT_BROWSE_PAGE_SIZE = 25;
 
 export {
@@ -124,7 +124,7 @@ export function createMediaBrowser(avrStateApi: AvrStateApi) {
     async browseMedia(entityId: string, options: uc.BrowseOptions): Promise<uc.StatusCodes | uc.BrowseResult> {
       const subSource = avrStateApi.getSubSource(entityId);
       if (!this.isMediaBrowsingAvailable(entityId, subSource)) {
-        log.debug("%s [%s] ignoring browse request outside browsable context", integrationName, entityId);
+        log.debug("%s [%s] ignoring browse request outside browsable context", logSource, entityId);
         return uc.StatusCodes.NotFound;
       }
 
@@ -141,7 +141,7 @@ export function createMediaBrowser(avrStateApi: AvrStateApi) {
         case "music-server":
           return browseMusicServerMedia(entityId, withPaging(options));
         default:
-          log.debug("%s [%s] unsupported media browsing for subSource [%s]", integrationName, entityId, subSource);
+          log.debug("%s [%s] unsupported media browsing for subSource [%s]", logSource, entityId, subSource);
           return uc.StatusCodes.NotFound;
       }
     }

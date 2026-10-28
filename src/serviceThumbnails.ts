@@ -132,7 +132,7 @@ export function createTunerArtwork(options: TunerArtworkOptions = {}): string {
 
 export function createServiceThumbnails(config: ServiceThumbnailConfig) {
   const maxLength = config.maxThumbnailLength ?? 4000;
-  const integrationName = `${config.logName.toLowerCase()}Thumbnails:`;
+  const logSource = `${config.logName.toLowerCase()}Thumbnails:`;
 
   let cachedAsset: BackgroundAsset | null = null;
 
@@ -184,12 +184,12 @@ export function createServiceThumbnails(config: ServiceThumbnailConfig) {
           return cachedAsset;
         }
       } catch (err) {
-        log.warn("%s failed to load background asset %s: %s", integrationName, candidate, err);
+        log.warn("%s failed to load background asset %s: %s", logSource, candidate, err);
       }
     }
 
     if (cachedAsset?.signature !== "missing") {
-      log.warn("%s background asset not found; falling back to default icon", integrationName);
+      log.warn("%s background asset not found; falling back to default icon", logSource);
     }
 
     cachedAsset = { dataUri: null, signature: "missing", inlineSafe: false, logoMarkup: null };

@@ -6,7 +6,7 @@ describe("buildMenuSignature", () => {
     const { MenuBrowseHandlerBase } = baseModule as any;
 
     class TestHandler extends MenuBrowseHandlerBase {
-      protected readonly integrationName = "test:handler";
+      protected readonly logSource = "test:handler";
       protected phase2HarvestEnabled = false;
       protected getServiceLabel() {
         return "Test";
@@ -43,7 +43,7 @@ describe("buildMenuSignature", () => {
     const { MenuBrowseHandlerBase } = baseModule as any;
 
     class TestHandler extends MenuBrowseHandlerBase {
-      protected readonly integrationName = "test:handler";
+      protected readonly logSource = "test:handler";
       protected phase2HarvestEnabled = false;
       protected getServiceLabel() {
         return "Test";
@@ -76,7 +76,7 @@ describe("buildMenuSignature", () => {
     const { MenuBrowseHandlerBase } = baseModule as any;
 
     class TestHandler extends MenuBrowseHandlerBase {
-      protected readonly integrationName = "test:handler";
+      protected readonly logSource = "test:handler";
       protected phase2HarvestEnabled = false;
       protected getServiceLabel() {
         return "Test";
@@ -114,7 +114,7 @@ describe("waitForMenuStable", () => {
 
     let callCount = 0;
     class TestHandler extends MenuBrowseHandlerBase {
-      protected readonly integrationName = "test:handler";
+      protected readonly logSource = "test:handler";
       protected phase2HarvestEnabled = false;
       protected getServiceLabel() {
         return "Test";
@@ -156,7 +156,7 @@ describe("waitForMenuStable", () => {
     const { MenuBrowseHandlerBase } = baseModule as any;
 
     class TestHandler extends MenuBrowseHandlerBase {
-      protected readonly integrationName = "test:handler";
+      protected readonly logSource = "test:handler";
       protected phase2HarvestEnabled = false;
       protected getServiceLabel() {
         return "Test";
@@ -195,7 +195,7 @@ describe("waitForMenuStable", () => {
     const { MenuBrowseHandlerBase } = baseModule as any;
 
     class TestHandler extends MenuBrowseHandlerBase {
-      protected readonly integrationName = "test:handler";
+      protected readonly logSource = "test:handler";
       protected phase2HarvestEnabled = false;
       protected getServiceLabel() {
         return "Test";

@@ -4,7 +4,7 @@ import { ConfigManager, type AvrConfig, type AvrZone, AVR_DEFAULTS, type Integra
 import { getKnownListeningModes } from "./listeningModePreferences.js";
 import { setLogLevel } from "./loggers.js";
 import { type ParsedManualConfig } from "./manualConfigParser.js";
-import { getInputSourceAliases, EXCLUDE_INPUT_SOURCE, LEARN_INPUT_SOURCE, LEARNED_INPUT_SOURCE, getKnownInputSources } from "./inputSourcePreferences.js";
+import { getInputSourceAliases, EXCLUDE_INPUT_SOURCE, LEARNED_INPUT_SOURCE, getKnownInputSources } from "./inputSourcePreferences.js";
 import type { InputSourceSettings } from "./configConstants.js";
 
 export interface OnConfigSavedCallback {
@@ -47,6 +47,8 @@ export class ConfigPersistenceManager {
       createDiracSelectEntity: parsedConfig.createDiracSelectEntityValue,
       tuneinMenuStyle: parsedConfig.tuneinMenuStyleValue,
       useAvrReportedInputs: parsedConfig.useAvrReportedInputsValue,
+      inputSourceLayout: parsedConfig.inputSourceLayoutValue,
+      networkInputMarker: parsedConfig.networkInputMarkerValue,
       idInputSources: this.buildInputSources(parsedConfig, undefined, discovered.host)
     };
 
@@ -70,6 +72,8 @@ export class ConfigPersistenceManager {
       listeningModes: this.buildListeningModes(listeningModePreferences, parsedConfig.listeningModeNames, parsedConfig.modelName, parsedConfig.ipVal),
       volumeScale: parsedConfig.volumeScaleValue,
       useAvrReportedInputs: parsedConfig.useAvrReportedInputsValue,
+      inputSourceLayout: parsedConfig.inputSourceLayoutValue,
+      networkInputMarker: parsedConfig.networkInputMarkerValue,
       idInputSources: this.buildInputSources(parsedConfig, parsedConfig.modelName, parsedConfig.ipVal),
       volumeDisplay: parsedConfig.volumeDisplayValue,
       adjustVolumeDispl: parsedConfig.adjustVolumeDisplValue,

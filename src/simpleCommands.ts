@@ -2,7 +2,7 @@ import { eiscpCommands } from "./eiscp-commands.js";
 import log from "./loggers.js";
 import { EXCLUDE_LISTENING_MODE, getKnownListeningModes } from "./listeningModePreferences.js";
 
-const integrationName = "simpleCommands:";
+const logSource = "simpleCommands:";
 
 interface SimpleCommandDef {
   command: string;
@@ -161,5 +161,5 @@ export function addListeningModeSimpleCommands(modes: Record<string, { name: str
 }
 
 export function logGeneratedCount(): void {
-  log.info("%s generated %d simple commands", integrationName, ALL_SIMPLE_COMMANDS.length);
+  log.info("%s generated %d simple commands", logSource, ALL_SIMPLE_COMMANDS.length);
 }

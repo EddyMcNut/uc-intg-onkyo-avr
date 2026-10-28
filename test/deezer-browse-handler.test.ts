@@ -45,7 +45,7 @@ describe("DeezerBrowseHandler", () => {
     const { createMenuBrowseHandler } = await import("../src/menuBrowseHandler.js");
     handler = createMenuBrowseHandler({
       providerLabel: "Deezer",
-      integrationName: "deezerBrowseHandler:",
+      logSource: "deezerBrowseHandler:",
       rootId: "deezer:root",
       rootType: "deezer://menu",
       backId: "deezer:menu-back",

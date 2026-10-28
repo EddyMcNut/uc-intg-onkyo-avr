@@ -7,7 +7,7 @@ import { delay } from "./utils.js";
 import { createTunerArtwork } from "./serviceThumbnails.js";
 import { ZoneAgnosticMediaStateStore } from "./zoneAgnosticMediaState.js";
 
-const integrationName = "zoneMediaRenderer:";
+const logSource = "zoneMediaRenderer:";
 
 export class ZoneMediaRenderer {
   private readonly imageHashInFlight = new Map<string, Promise<string>>();
@@ -34,7 +34,7 @@ export class ZoneMediaRenderer {
     const imageUrl = `http://${this.config.ip}/${this.config.albumArtURL}`;
     const previousHash = sharedState.lastImageHash;
 
-    log.debug("%s [%s] collecting album art from %s", integrationName, entityId, imageUrl);
+    log.debug("%s [%s] collecting album art from %s", logSource, entityId, imageUrl);
     let newHash = await this.getImageHash(imageUrl, entityId);
     let attempts = 0;
     while (newHash === previousHash && attempts < 3) {
@@ -46,9 +46,9 @@ export class ZoneMediaRenderer {
     if (newHash !== previousHash) {
       sharedState.lastImageHash = newHash;
       sharedState.currentImageUrl = `${imageUrl}?hash=${newHash}`;
-      log.debug("%s [%s] album art URL updated to %s", integrationName, entityId, sharedState.currentImageUrl);
+      log.debug("%s [%s] album art URL updated to %s", logSource, entityId, sharedState.currentImageUrl);
     } else {
-      log.debug("%s [%s] album art unchanged (hash %s)", integrationName, entityId, newHash || "empty");
+      log.debug("%s [%s] album art unchanged (hash %s)", logSource, entityId, newHash || "empty");
     }
 
     if (sharedState.currentImageUrl) {
@@ -141,7 +141,7 @@ export class ZoneMediaRenderer {
     // fully re-downloaded. Most AVR web servers expose an ETag or Last-Modified header.
     try {
       const headResponse = await fetch(url, { method: "HEAD" });
-      log.debug("%s [%s] album art HEAD %s -> HTTP %s", integrationName, entityId, url, headResponse.status);
+      log.debug("%s [%s] album art HEAD %s -> HTTP %s", logSource, entityId, url, headResponse.status);
       const etag = headResponse.headers.get("etag");
       const lastModified = headResponse.headers.get("last-modified");
       const token = etag ?? lastModified;
@@ -154,7 +154,7 @@ export class ZoneMediaRenderer {
 
     try {
       const response = await fetch(url);
-      log.debug("%s [%s] album art GET %s -> HTTP %s", integrationName, entityId, url, response.status);
+      log.debug("%s [%s] album art GET %s -> HTTP %s", logSource, entityId, url, response.status);
       if (!response.ok) {
         return "";
       }
@@ -176,7 +176,7 @@ export class ZoneMediaRenderer {
       }
       return hash.digest("hex");
     } catch (err) {
-      log.warn("%s failed to fetch/hash image: %s", integrationName, err);
+      log.warn("%s failed to fetch/hash image: %s", logSource, err);
       return "";
     }
   }

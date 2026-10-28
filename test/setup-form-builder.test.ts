@@ -32,18 +32,18 @@ function values(overrides: Record<string, unknown> = {}): any {
 }
 
 describe("SetupFormBuilder", () => {
-  it("builds all setup forms and paginates input sources at twelve rows", () => {
+  it("builds all setup forms and paginates selectable entries at ten rows", () => {
     const builder = new SetupFormBuilder();
     const base = values();
     expect(builder.buildManualConfigForm(base).settings.length).toBeGreaterThan(0);
     expect(builder.buildManualConfigPage1(base).title).toContain("1/3");
     expect(builder.buildManualConfigPage2(base).title).toContain("2/3");
     expect(builder.buildManualConfigPage3(base).title).toContain("3/4");
-    expect(builder.buildManualConfigPage4(base).title).toContain("1/5");
-    expect(builder.buildManualConfigPage5(base).title).toContain("2/5");
-    expect(builder.buildManualConfigPage6(base).title).toContain("3/5");
-    expect(builder.buildManualConfigPage7(base).title).toContain("4/5");
-    expect(builder.buildManualConfigPage8(base).title).toContain("5/5");
+    expect(builder.buildManualConfigPage4(base).title).toContain("1/6");
+    expect(builder.buildManualConfigPage5(base).title).toContain("2/6");
+    expect(builder.buildManualConfigPage6(base).title).toContain("3/6");
+    expect(builder.buildManualConfigPage7(base).title).toContain("4/6");
+    expect(builder.buildManualConfigPage8(base).title).toContain("5/6");
     expect(builder.buildInitialSetupForm().settings.length).toBeGreaterThan(0);
     expect(builder.buildReconfigureForm().settings.length).toBeGreaterThan(0);
     expect(builder.getInputSourcePageCount(base)).toBeGreaterThan(0);
@@ -52,8 +52,10 @@ describe("SetupFormBuilder", () => {
     const reportedValues = values({ inputSources: reported, inputSourceDiscoveryAvailable: true });
     expect(builder.getInputSourcePageCount(reportedValues)).toBe(3);
     const firstInputPage = builder.buildInputSourcePage(reportedValues, 1, 3);
-    expect((firstInputPage.settings as unknown[]).length).toBe(13);
-    expect((firstInputPage.settings[1] as any).field.dropdown.value).toBe("learned");
-    expect((builder.buildInputSourcePage(reportedValues, 3, 3).settings as unknown[]).length).toBe(2);
+    expect((firstInputPage.settings as unknown[]).length).toBe(12);
+    expect((firstInputPage.settings as any[]).filter((setting) => setting.id.startsWith("ids_")).length).toBe(10);
+    expect((firstInputPage.settings as any[]).find((setting) => setting.id === "set_all_page")).toBeDefined();
+    expect((firstInputPage.settings as any[]).find((setting) => setting.id.startsWith("ids_"))?.field.dropdown.value).toBe("learned");
+    expect((builder.buildInputSourcePage(reportedValues, 3, 3).settings as unknown[]).length).toBe(7);
   });
 });

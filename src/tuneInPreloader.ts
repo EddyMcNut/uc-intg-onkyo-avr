@@ -3,7 +3,7 @@ import log from "./loggers.js";
 import { delay, toHex } from "./utils.js";
 import { getTuneInPresetCount, hasTuneInPresets, setTuneInBrowseContext } from "./mediaBrowser.js";
 
-const integrationName = "tuneInPreloader:";
+const logSource = "tuneInPreloader:";
 
 type PhysicalAvrIdResolver = (entityId: string) => string;
 
@@ -41,7 +41,7 @@ export class TuneInPreloader {
     const scanDelay = Math.max(200, Math.min(menuDelay || 0, 1000));
 
     try {
-      log.info("%s [%s] preloading TuneIn My Presets for media browsing (position %s)", integrationName, entityId, myPresetsPosition);
+      log.info("%s [%s] preloading TuneIn My Presets for media browsing (position %s)", logSource, entityId, myPresetsPosition);
       setTuneInBrowseContext(entityId, "My Presets");
       await this.eiscpInstance.raw("NTCTOP");
       await delay(menuDelay);
@@ -54,10 +54,10 @@ export class TuneInPreloader {
 
       const lastCount = getTuneInPresetCount(entityId);
       if (lastCount > 0) {
-        log.info("%s [%s] harvested %d TuneIn preset(s) from NLAL", integrationName, entityId, lastCount);
+        log.info("%s [%s] harvested %d TuneIn preset(s) from NLAL", logSource, entityId, lastCount);
       }
     } catch (err) {
-      log.warn("%s [%s] failed to preload TuneIn My Presets: %s", integrationName, entityId, err);
+      log.warn("%s [%s] failed to preload TuneIn My Presets: %s", logSource, entityId, err);
     } finally {
       this.tuneInPreloadInFlight.delete(physicalAvrId);
     }
