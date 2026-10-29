@@ -28,6 +28,11 @@ export type MenuBrowseHandlerConfig = {
   getBrowseState: BrowseStateGetter;
   listMenuItems: MenuItemLister;
   afterHarvest?: (entityId: string, rawSend: RawSendFn) => Promise<void>;
+  // XML-only services (such as Music Server) must request NLAL before waiting
+  // for a list signature; the list does not exist until that request is made.
+  waitForMenuStableBeforeHarvest?: boolean;
+  // Some XML-only services leave the browse context entirely on Back.
+  harvestAfterBack?: boolean;
 };
 
 export type MenuBrowseHandlerApi = MenuBrowseHandlerBase & {
@@ -42,6 +47,8 @@ export type MenuBrowseHandlerApi = MenuBrowseHandlerBase & {
 
 export function createMenuBrowseHandler(cfg: MenuBrowseHandlerConfig): MenuBrowseHandlerApi {
   const logSource = cfg.logSource;
+  const waitForMenuStableBeforeHarvest = cfg.waitForMenuStableBeforeHarvest ?? true;
+  const harvestAfterBack = cfg.harvestAfterBack ?? true;
 
   class Handler extends MenuBrowseHandlerBase {
     protected readonly logSource = logSource;
@@ -97,6 +104,37 @@ export function createMenuBrowseHandler(cfg: MenuBrowseHandlerConfig): MenuBrows
       const backRequest = cfg.isBackRequest(options.media_id, options.media_type);
       const selection = cfg.resolveMenuOption(options.media_id, options.media_type);
 
+      // For XML-only services the remote normally asks for the root directly
+      // after source selection. The Onkyo app responds to NSV000/NLT by
+      // issuing NLAL; do the same instead of waiting for a synthetic main
+      // menu selection that the remote may never send.
+      const rootRequest = !options.media_id || options.media_id === cfg.rootId;
+      if (rootRequest && !waitForMenuStableBeforeHarvest && rawSend) {
+        const browseState = cfg.getBrowseState(entityId);
+        if (cfg.listMenuItems(entityId).length === 0) {
+          if (browseState) browseState.listModeActive = true;
+          await this.waitForListMetadata(entityId, this.getMenuDelay(entityId));
+          if ((browseState?.totalListItemCount ?? 0) === 0 && cfg.listMenuItems(entityId).length === 0) {
+            // The AVR can reset the NLT metadata while changing source. The
+            // Onkyo app still starts the XML browser with this exact request.
+            await rawSend(`NLAL00000100000001`);
+            await this.waitForListMetadata(entityId, this.getMenuDelay(entityId));
+          }
+          await this.harvestListItems(entityId, rawSend);
+          if (cfg.afterHarvest) {
+            await cfg.afterHarvest(entityId, rawSend);
+          }
+        }
+        const paging = options.paging;
+        const requiredCount = (paging?.offset ?? 0) + (paging?.limit ?? 0);
+        await this.waitForMenuItems(entityId, requiredCount, this.getMenuDelay(entityId) * 4);
+        return cfg.browseMedia(entityId, {
+          ...options,
+          media_id: cfg.rootId,
+          media_type: cfg.rootType
+        });
+      }
+
       if (backRequest && cmdHandler) {
         cfg.resetState(entityId);
         const beforeSignature = this.buildMenuSignature(entityId);
@@ -106,7 +144,17 @@ export function createMenuBrowseHandler(cfg: MenuBrowseHandlerConfig): MenuBrows
           media_id: cfg.backId,
           media_type: cfg.rootType
         });
-        await this.waitForMenuStable(entityId, beforeSignature, menuDelay);
+        const backBrowseState = cfg.getBrowseState(entityId);
+        if (backBrowseState) backBrowseState.showMainMenuShortcut = true;
+        if (!harvestAfterBack) {
+          return cfg.browseMedia(entityId, {
+            ...options,
+            media_id: cfg.rootId,
+            media_type: cfg.rootType
+          });
+        }
+        if (waitForMenuStableBeforeHarvest) await this.waitForMenuStable(entityId, beforeSignature, menuDelay);
+        else await this.waitForListMetadata(entityId, menuDelay);
         if (rawSend) {
           const browseState = cfg.getBrowseState(entityId);
           if (browseState) {
@@ -138,7 +186,8 @@ export function createMenuBrowseHandler(cfg: MenuBrowseHandlerConfig): MenuBrows
         const beforeSignature = this.buildMenuSignature(entityId);
         const menuDelay = this.getMenuDelay(entityId);
 
-        await this.waitForMenuStable(entityId, beforeSignature, menuDelay);
+        if (waitForMenuStableBeforeHarvest) await this.waitForMenuStable(entityId, beforeSignature, menuDelay);
+        else await this.waitForListMetadata(entityId, menuDelay);
         if (browseState) browseState.listModeActive = true;
         if (rawSend) {
           await this.harvestListItems(entityId, rawSend);
@@ -155,6 +204,12 @@ export function createMenuBrowseHandler(cfg: MenuBrowseHandlerConfig): MenuBrows
       }
 
       if (selection && cmdHandler) {
+        // A browsable selection creates a new AVR menu context. Invalidate
+        // any background NLAL harvest belonging to the previous folder before
+        // asking the AVR for the next one.
+        if (selection.isBrowsable && (options.paging?.offset ?? 0) === 0) {
+          cfg.resetState(entityId);
+        }
         const browseState = cfg.getBrowseState(entityId);
         if (browseState) browseState.showMainMenuShortcut = true;
 
@@ -168,7 +223,8 @@ export function createMenuBrowseHandler(cfg: MenuBrowseHandlerConfig): MenuBrows
             const beforeSignature = this.buildMenuSignature(entityId);
             const menuDelay = this.getMenuDelay(entityId);
 
-            await this.waitForMenuStable(entityId, beforeSignature, menuDelay);
+            if (waitForMenuStableBeforeHarvest) await this.waitForMenuStable(entityId, beforeSignature, menuDelay);
+            else await this.waitForListMetadata(entityId, menuDelay);
             if (browseState) browseState.listModeActive = true;
             if (rawSend) {
               await this.harvestListItems(entityId, rawSend);

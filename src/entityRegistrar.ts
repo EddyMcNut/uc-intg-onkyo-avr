@@ -36,7 +36,7 @@ import {
 import { createMenuBrowseHandler } from "./menuBrowseHandler.js";
 import { listTidalMenuOptions, resetTidalBrowseState, getTidalBrowseState } from "./tidalBrowserStore.js";
 import { listDeezerMenuOptions, resetDeezerBrowseState, getDeezerBrowseState } from "./deezerBrowserStore.js";
-import { listMusicServerMenuOptions, resetMusicServerBrowseState, getMusicServerBrowseState, waitForNlaIngestion } from "./musicServerBrowserStore.js";
+import { listMusicServerMenuOptions, resetMusicServerBrowseState, getMusicServerBrowseState } from "./musicServerBrowserStore.js";
 import { TuneInBrowseHandler } from "./tuneInBrowseHandler.js";
 import { SELECT_SUFFIXES } from "./sensorSuffixes.js";
 import { DIRAC_OPTION_LABELS } from "./diracSelect.js";
@@ -102,12 +102,9 @@ export default class EntityRegistrar {
         resolveMenuOption: (mediaId, mediaType) => resolveMusicServerMenuOption(mediaId, mediaType),
         resetState: resetMusicServerBrowseState,
         getBrowseState: getMusicServerBrowseState,
-        listMenuItems: listMusicServerMenuOptions,
-        afterHarvest: async (entityId, rawSend) => {
-          void rawSend;
-          await waitForNlaIngestion(entityId);
-        }
-      })
+         listMenuItems: listMusicServerMenuOptions,
+         waitForMenuStableBeforeHarvest: false,
+       })
     ];
   }
 

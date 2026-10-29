@@ -19,6 +19,7 @@ function makeMockEiscp(connected = true) {
   eiscp.waitForConnect = vi.fn().mockResolvedValue(undefined);
   eiscp.command = vi.fn().mockResolvedValue(undefined);
   eiscp.raw = vi.fn().mockResolvedValue(undefined);
+  eiscp.rawIfAvailable = vi.fn().mockResolvedValue(true);
   return eiscp;
 }
 
@@ -135,7 +136,7 @@ describe("remoteEntityCommandHandler", () => {
     const result = await handler.handle(entity, uc.MediaPlayerCommands.VolumeUp, {});
 
     expect(result).toBe(uc.StatusCodes.Ok);
-    expect(mock.mockEiscp.raw).toHaveBeenCalledWith("MVLUP1");
+    expect(mock.mockEiscp.rawIfAvailable).toHaveBeenCalledWith("MVLUP1");
   });
 
   it("sends preset command for ChannelDown", async () => {
@@ -157,7 +158,7 @@ describe("remoteEntityCommandHandler", () => {
     const result = await handler.handle(entity, uc.MediaPlayerCommands.Volume, { volume: 50 });
 
     expect(result).toBe(uc.StatusCodes.Ok);
-    expect(mock.mockEiscp.raw).toHaveBeenCalledWith("MVL64");
+    expect(mock.mockEiscp.rawIfAvailable).toHaveBeenCalledWith("MVL64");
   });
 
   it("ignores volume slider when volumeDisplay is relative", async () => {
@@ -403,7 +404,7 @@ describe("remoteEntityCommandHandler", () => {
     const result = await handler.handle(entity, uc.MediaPlayerCommands.VolumeDown, {});
 
     expect(result).toBe(uc.StatusCodes.Ok);
-    expect(mock.mockEiscp.raw).toHaveBeenCalledWith("MVLDOWN1");
+    expect(mock.mockEiscp.rawIfAvailable).toHaveBeenCalledWith("MVLDOWN1");
   });
 
   it("sends audio-muting on for Mute", async () => {
@@ -537,7 +538,7 @@ describe("remoteEntityCommandHandler", () => {
     const result = await handler.handle(entity, uc.MediaPlayerCommands.Volume, { volume: 50 });
 
     expect(result).toBe(uc.StatusCodes.Ok);
-    expect(mock.mockEiscp.raw).toHaveBeenCalledWith("MVL64");
+    expect(mock.mockEiscp.rawIfAvailable).toHaveBeenCalledWith("MVL64");
   });
 
   it("sets volume without doubling when adjustVolumeDispl is false", async () => {
@@ -549,7 +550,7 @@ describe("remoteEntityCommandHandler", () => {
     const result = await handler.handle(entity, uc.MediaPlayerCommands.Volume, { volume: 50 });
 
     expect(result).toBe(uc.StatusCodes.Ok);
-    expect(mock.mockEiscp.raw).toHaveBeenCalledWith("MVL32");
+    expect(mock.mockEiscp.rawIfAvailable).toHaveBeenCalledWith("MVL32");
   });
 
   it("defaults adjustVolumeDispl to true when not configured", async () => {
@@ -561,7 +562,7 @@ describe("remoteEntityCommandHandler", () => {
     const result = await handler.handle(entity, uc.MediaPlayerCommands.Volume, { volume: 50 });
 
     expect(result).toBe(uc.StatusCodes.Ok);
-    expect(mock.mockEiscp.raw).toHaveBeenCalledWith("MVL64");
+    expect(mock.mockEiscp.rawIfAvailable).toHaveBeenCalledWith("MVL64");
   });
 
   it("defaults volumeDisplay to absolute when not configured", async () => {
@@ -573,7 +574,7 @@ describe("remoteEntityCommandHandler", () => {
     const result = await handler.handle(entity, uc.MediaPlayerCommands.Volume, { volume: 50 });
 
     expect(result).toBe(uc.StatusCodes.Ok);
-    expect(mock.mockEiscp.raw).toHaveBeenCalledWith("MVL64");
+    expect(mock.mockEiscp.rawIfAvailable).toHaveBeenCalledWith("MVL64");
   });
 
   it("does nothing for SelectSource without a source", async () => {

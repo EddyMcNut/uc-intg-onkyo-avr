@@ -377,18 +377,20 @@ export class AvrStateManager {
       await eiscpInstance.raw("NSTQSTN"); // Query play/pause status
     }
 
-    // For Tidal/Deezer/Music Server, reset browse state and re-request the NLS list so the media browser stays fresh
-    if (currentSubSource === "tidal" || currentSubSource === "deezer" || currentSubSource === "music-server") {
+    // For Tidal and Deezer, reset browse state and re-request the NLS list so
+    // the media browser stays fresh. Music Server follows the app's direct
+    // NSV000 + NLA/NLAL flow and must not use the legacy NET menu commands.
+    if (currentSubSource === "tidal" || currentSubSource === "deezer") {
       log.info("%s [%s] refreshing %s browse state via NTCTOP + NTCSELECT", logSource, entityId, currentSubSource);
       if (currentSubSource === "tidal") {
         resetTidalBrowseState(entityId);
       } else if (currentSubSource === "deezer") {
         resetDeezerBrowseState(entityId);
-      } else {
-        resetMusicServerBrowseState(entityId);
       }
       await eiscpInstance.raw("NTCTOP");
       await eiscpInstance.raw("NTCSELECT");
+    } else if (currentSubSource === "music-server") {
+      resetMusicServerBrowseState(entityId);
     }
   }
 }

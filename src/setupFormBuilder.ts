@@ -154,8 +154,8 @@ export class SetupFormBuilder {
             value: String(values.volumeScaleValue),
             items: [
               { id: "auto", label: { en: "✨ Auto (default)" } },
-              { id: "80", label: { en: values.volumeScaleDiscoveredValue && values.volumeScaleValue === 80 ? "✅ 0-80 (discovered from AVR)" : "0-80" } },
-              { id: "100", label: { en: values.volumeScaleDiscoveredValue && values.volumeScaleValue === 100 ? "✅ 0-100 (discovered from AVR)" : "0-100" } }
+              { id: "80", label: { en: values.volumeScaleDiscoveredValue && values.volumeScaleValue === 80 ? "✅ 0-80 (AVR discovered)" : "0-80" } },
+              { id: "100", label: { en: values.volumeScaleDiscoveredValue && values.volumeScaleValue === 100 ? "✅ 0-100 (AVR discovered)" : "0-100" } }
             ]
           }
         },
@@ -351,7 +351,7 @@ export class SetupFormBuilder {
             items: [
               ...(values.listeningModePreferences[mode.code] === DISCOVERED_LISTENING_MODE ||
               (values.listeningModePreferences[mode.code] === DISCOVER_LISTENING_MODE && values.listeningModeNames[mode.code] && values.listeningModeNames[mode.code] !== mode.aliases[0])
-                ? [{ id: DISCOVERED_LISTENING_MODE, label: { en: "✅ Using AVR-discovered name" } }]
+                ? [{ id: DISCOVERED_LISTENING_MODE, label: { en: "✅ AVR-discovered" } }]
                 : []),
               {
                 id: DISCOVER_LISTENING_MODE,
@@ -388,7 +388,7 @@ export class SetupFormBuilder {
       const aliases = avrSource ? getAliasesForReportedInput(id, avrSource.name) : (knownSource?.aliases ?? []);
       const learned = avrSource?.name ?? (configured?.setting === DISCOVERED_INPUT_SOURCE ? configured.name : undefined);
       const items = [
-        ...(learned ? [{ id: DISCOVERED_INPUT_SOURCE, label: { en: "✅ Using AVR-discovered name" } }] : []),
+        ...(learned ? [{ id: DISCOVERED_INPUT_SOURCE, label: { en: "✅ AVR-discovered" } }] : []),
         ...(learned ? [{ id: DISCOVER_INPUT_SOURCE, label: { en: "✨ Discover from AVR (default)" } }] : []),
         { id: DONT_INCLUDE_INPUT_SOURCE, label: { en: "🚫 Don't include" } },
         ...aliases.map((alias) => ({ id: alias, label: { en: alias } }))

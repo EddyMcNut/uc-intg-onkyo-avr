@@ -39,6 +39,17 @@ import {
 
 const logSource = "playMediaCommandHandler:";
 
+// The AVR's XML music-server browser uses NLAI to select an item.  The
+// older NLSI command selects an item in the ten-line display list and is not
+// equivalent: it can appear to work for the first page, but does not follow
+// the object/layer selected by the NLA/NLAL browser.  NLAI uses a zero-based
+// item index, while our media IDs and store use one-based menu indices.
+function musicServerSelectCommand(menuIndex: number, layerNumber: number | undefined): string {
+  const layer = Math.max(1, layerNumber ?? 1).toString(16).padStart(2, "0").toUpperCase();
+  const index = Math.max(0, menuIndex - 1).toString(16).padStart(4, "0").toUpperCase();
+  return `NLAI${layer}${index}----`;
+}
+
 type ZonePrefixFn = (cmd: string) => string;
 
 export type PlayMediaCommandContext = {
@@ -107,7 +118,13 @@ export class PlayMediaCommandHandler {
       return;
     }
 
-    await this.eiscp.command(setZonePrefix(getBrowseServiceSelectSourceCommand(serviceId)));
+    // The Onkyo app enters Music Server directly with NSV000. This avoids the
+    // legacy NET menu/NLS path and matches the captured NLA/NLAL browse flow.
+    if (serviceId === MUSIC_SERVER_SERVICE_ID) {
+      await this.eiscp.raw("NSV000");
+    } else {
+      await this.eiscp.command(setZonePrefix(getBrowseServiceSelectSourceCommand(serviceId)));
+    }
     if (options?.delayAfterSelect) {
       await delay(netMenuDelay);
     }
@@ -296,7 +313,12 @@ export class PlayMediaCommandHandler {
         }
       }
     }
-    await this.eiscp.raw(`NLSI${String(menuIndexToSelect).padStart(5, "0")}`);
+    if (activeServiceId === MUSIC_SERVER_SERVICE_ID) {
+      const musicServerState = getMusicServerBrowseState(entityId);
+      await this.eiscp.raw(musicServerSelectCommand(menuIndexToSelect, musicServerState?.nlsLayerNumber));
+    } else {
+      await this.eiscp.raw(`NLSI${String(menuIndexToSelect).padStart(5, "0")}`);
+    }
     return uc.StatusCodes.Ok;
   }
 }

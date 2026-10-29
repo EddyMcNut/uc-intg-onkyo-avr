@@ -20,7 +20,6 @@ export class CommandSender {
   private config: IntegrationConfig;
   private eiscp: EiscpDriver;
   private avrStateApi: AvrStateApi;
-  private lastCommandTime: number = 0;
   private commandReceiver: ICommandReceiver | undefined;
   private playMediaCommandHandler: PlayMediaCommandHandler;
 
@@ -62,12 +61,7 @@ export class CommandSender {
 
     const setZonePrefix = (cmd: string): string => (zone === "main" ? cmd : `${zone}.${cmd}`);
 
-    const now = Date.now();
     const queueThreshold = this.config.queueThreshold ?? (typeof this.eiscp.eiscpConfig?.sendDelay === "number" ? this.eiscp.eiscpConfig.sendDelay : DEFAULT_QUEUE_THRESHOLD);
-
-    if (now - this.lastCommandTime <= queueThreshold) {
-      return uc.StatusCodes.Ok;
-    }
 
     const handler = this.handlers.get(cmdId);
     if (!handler) {
@@ -78,7 +72,7 @@ export class CommandSender {
       return this.handleSimpleCommand(cmdId, zone);
     }
 
-    return handler(entity, zone, setZonePrefix, params, targetAvr, queueThreshold, now);
+    return handler(entity, zone, setZonePrefix, params, targetAvr, queueThreshold);
   }
 
   private readonly handlers = new Map<
@@ -89,8 +83,7 @@ export class CommandSender {
       setZonePrefix: (cmd: string) => string,
       params: { [key: string]: string | number | boolean } | undefined,
       targetAvr: import("./configManager.js").AvrConfig,
-      queueThreshold: number,
-      now: number
+      queueThreshold: number
     ) => Promise<uc.StatusCodes>
   >([
     [
@@ -123,17 +116,15 @@ export class CommandSender {
     ],
     [
       uc.MediaPlayerCommands.VolumeUp,
-      async (_e, zone, _sz, _p, _t, _q, now) => {
-        this.lastCommandTime = now;
-        await this.eiscp.raw(ZONE_VOLUME_UP_DOWN[zone].up);
+      async (_e, zone) => {
+        await this.eiscp.rawIfAvailable(ZONE_VOLUME_UP_DOWN[zone].up);
         return uc.StatusCodes.Ok;
       }
     ],
     [
       uc.MediaPlayerCommands.VolumeDown,
-      async (_e, zone, _sz, _p, _t, _q, now) => {
-        this.lastCommandTime = now;
-        await this.eiscp.raw(ZONE_VOLUME_UP_DOWN[zone].down);
+      async (_e, zone) => {
+        await this.eiscp.rawIfAvailable(ZONE_VOLUME_UP_DOWN[zone].down);
         return uc.StatusCodes.Ok;
       }
     ],
@@ -151,7 +142,7 @@ export class CommandSender {
         const adjustVolumeDispl = this.config.adjustVolumeDispl ?? true;
         const avrDisplayValue = Math.round((sliderValue * volumeScale) / 100);
         const eiscpValue = adjustVolumeDispl ? avrDisplayValue * 2 : avrDisplayValue;
-        await this.eiscp.raw(`${ZONE_VOLUME_PREFIX[zone]}${toHex(eiscpValue, 2)}`);
+        await this.eiscp.rawIfAvailable(`${ZONE_VOLUME_PREFIX[zone]}${toHex(eiscpValue, 2)}`);
         return uc.StatusCodes.Ok;
       }
     ],

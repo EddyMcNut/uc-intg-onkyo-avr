@@ -2,7 +2,6 @@ import {
   hasTuneInPresets,
   ingestDeezerListEntry,
   ingestDeezerXmlEntries,
-  ingestMusicServerListEntry,
   ingestMusicServerXmlEntries,
   ingestTidalListEntry,
   ingestTidalXmlEntries,
@@ -209,11 +208,10 @@ export class MusicServerZoneAgnosticAdapter implements ZoneAgnosticServiceAdapte
     }
   }
 
-  handleNls(sourceEntityId: string, entry: string): void {
-    for (const zoneEntityId of this.getActiveZones(sourceEntityId)) {
-      ingestMusicServerListEntry(zoneEntityId, entry);
-    }
-  }
+  // Music Server browsing is XML-only. The Onkyo app does not use the legacy
+  // NLS ten-line list for this service; accepting it here can mix stale list
+  // entries into an active NLA/NLAL browse context.
+  handleNls(_sourceEntityId: string, _entry: string): void {}
 
   handleNla(sourceEntityId: string, xmlPayload: string): void {
     for (const zoneEntityId of this.getActiveZones(sourceEntityId)) {

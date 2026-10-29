@@ -55,6 +55,10 @@ class MockEiscp {
   async raw(cmd: string) {
     this.lastRaw = cmd;
   }
+  async rawIfAvailable(cmd: string) {
+    this.lastRaw = cmd;
+    return true;
+  }
 }
 
 import * as uc from "@unfoldedcircle/integration-api";

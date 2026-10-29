@@ -6,8 +6,8 @@ This is an event-driven Unfolded Circle integration for Onkyo, Pioneer and Integ
 
 ## Way of working
 
-- First make it work; then iterate toward nicer implementations.
-- Aim for the sweet spot between **SOLID** and **KISS**, while staying pragmatic.
+- First make it work; then iterate towards nicer implementations.
+- Aim for the pragmatic sweet spot between **SOLID** and **KISS**
 - Perfect is the enemy of good.
 - Prefer small, testable responsibilities, but do not create abstractions without a useful reason.
 

@@ -1,5 +1,5 @@
 import type { MenuBrowseOption } from "./menuBrowseState.js";
-import { musicServerStore } from "./musicServerBrowserStore.js";
+import { getMusicServerBrowseState, musicServerStore } from "./musicServerBrowserStore.js";
 import { createMediaBrowser, type MediaBrowserApi } from "./menuMediaBrowser.js";
 import type * as uc from "@unfoldedcircle/integration-api";
 
@@ -84,11 +84,12 @@ const browser: MediaBrowserApi = createMediaBrowser(
 
 export class MusicServerMediaBrowser {
   ingestXmlEntries(entityId: string, xmlPayload: string): void {
+    const totalItems = xmlPayload.match(/<items\b[^>]*\btotalitems="(\d+)"/i)?.[1];
+    if (totalItems !== undefined) {
+      const state = getMusicServerBrowseState(entityId);
+      if (state) state.totalListItemCount = Math.max(state.totalListItemCount, parseInt(totalItems, 10));
+    }
     browser.ingestXmlEntries(entityId, xmlPayload);
-  }
-
-  ingestListEntry(entityId: string, entry: string): void {
-    browser.ingestListEntry(entityId, entry);
   }
 
   resolveMenuOption(mediaId?: string, mediaType?: string): MenuBrowseOption | undefined {

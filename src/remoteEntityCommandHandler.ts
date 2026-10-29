@@ -168,10 +168,10 @@ export class remoteEntityCommandHandler {
       case uc.MediaPlayerCommands.Toggle:
         return this.sendToggle(eiscp, zone, entity, avrEntry);
       case uc.MediaPlayerCommands.VolumeUp:
-        await eiscp.raw(ZONE_VOLUME_UP_DOWN[zone].up);
+        await eiscp.rawIfAvailable(ZONE_VOLUME_UP_DOWN[zone].up);
         return uc.StatusCodes.Ok;
       case uc.MediaPlayerCommands.VolumeDown:
-        await eiscp.raw(ZONE_VOLUME_UP_DOWN[zone].down);
+        await eiscp.rawIfAvailable(ZONE_VOLUME_UP_DOWN[zone].down);
         return uc.StatusCodes.Ok;
       case uc.MediaPlayerCommands.Volume:
         return this.setVolume(eiscp, cfg, params);
@@ -247,7 +247,7 @@ export class remoteEntityCommandHandler {
     const adjustVolumeDispl = cfg.adjustVolumeDispl ?? true;
     const avrDisplayValue = Math.round((sliderValue * volumeScale) / 100);
     const eiscpValue = adjustVolumeDispl ? avrDisplayValue * 2 : avrDisplayValue;
-    await eiscp.raw(`${ZONE_VOLUME_PREFIX[cfg.zone]}${toHex(eiscpValue, 2)}`);
+    await eiscp.rawIfAvailable(`${ZONE_VOLUME_PREFIX[cfg.zone]}${toHex(eiscpValue, 2)}`);
     return uc.StatusCodes.Ok;
   }
 

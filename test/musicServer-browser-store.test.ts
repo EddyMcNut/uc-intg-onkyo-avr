@@ -78,8 +78,7 @@ describe("MusicServerMediaBrowser", () => {
   it("browse returns items from list entries", async () => {
     const { MusicServerMediaBrowser } = await import("../src/musicServerMediaBrowser.js");
     const browser = new MusicServerMediaBrowser();
-    browser.ingestListEntry(ENTITY_ID, "U0-My Folder");
-    browser.ingestListEntry(ENTITY_ID, "U1-Song - Artist");
+    browser.ingestXmlEntries(ENTITY_ID, '<items offset="0"><item title="My Folder"/><item title="Song - Artist"/></items>');
 
     const result = await browser.browse(ENTITY_ID, { paging: new uc.Paging(1, 25) });
     expect(result).toBeDefined();
@@ -89,7 +88,7 @@ describe("MusicServerMediaBrowser", () => {
     const store = await import("../src/musicServerBrowserStore.js");
     const { MusicServerMediaBrowser } = await import("../src/musicServerMediaBrowser.js");
     const browser = new MusicServerMediaBrowser();
-    browser.ingestListEntry(ENTITY_ID, "U0-Song - Artist");
+    browser.ingestXmlEntries(ENTITY_ID, '<items offset="0"><item title="Song - Artist"/></items>');
     const state = store.getMusicServerBrowseState(ENTITY_ID)!;
     state.nowPlayingTitle = "Song - Artist";
     await browser.browse(ENTITY_ID, { media_id: "music-server:root", media_type: "music-server://menu", paging: new uc.Paging(1, 25) });
@@ -168,7 +167,7 @@ describe("MusicServerMediaBrowser", () => {
   it("browse with root id", async () => {
     const { MusicServerMediaBrowser } = await import("../src/musicServerMediaBrowser.js");
     const browser = new MusicServerMediaBrowser();
-    browser.ingestListEntry(ENTITY_ID, "U0-Folder");
+    browser.ingestXmlEntries(ENTITY_ID, '<items offset="0"><item title="Folder"/></items>');
     const result = await browser.browse(ENTITY_ID, { media_id: "music-server:root", media_type: "music-server://menu", paging: new uc.Paging(1, 25) });
     expect(result).toBeDefined();
   });

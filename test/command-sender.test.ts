@@ -8,6 +8,7 @@ type MockEiscp = {
   raws: string[];
   command: (cmd: string) => Promise<void>;
   raw: (cmd: string) => Promise<void>;
+  rawIfAvailable: (cmd: string) => Promise<boolean>;
   connect: (_opts: unknown) => Promise<void>;
   waitForConnect: (_timeout?: number) => Promise<void>;
 };
@@ -23,6 +24,10 @@ function makeMockEiscp(connected = true): MockEiscp {
     },
     async raw(cmd: string): Promise<void> {
       this.raws.push(cmd);
+    },
+    async rawIfAvailable(cmd: string): Promise<boolean> {
+      this.raws.push(cmd);
+      return true;
     },
     async connect(): Promise<void> {
       this.connected = true;
@@ -208,9 +213,8 @@ it("CommandSender handles relative volume ignore and throttle", async () => {
   expect(await sender.sharedCmdHandler(mainEntity, uc.MediaPlayerCommands.Volume, { volume: 77 })).toBe(uc.StatusCodes.Ok);
   expect(mockEiscp.raws.length).toBe(0);
 
-  (sender as any).lastCommandTime = Date.now();
   expect(await sender.sharedCmdHandler(mainEntity, uc.MediaPlayerCommands.Next)).toBe(uc.StatusCodes.Ok);
-  expect(mockEiscp.commands.includes("network-usb trup")).toBe(false);
+  expect(mockEiscp.commands.includes("network-usb trup")).toBe(true);
 });
 
 it("CommandSender handles known simple commands via handleSimpleCommand fallthrough", async () => {
@@ -307,6 +311,10 @@ it("CommandSender routes main-zone VolumeUp/Down and Volume with fallback settin
     async raw(cmd: string): Promise<void> {
       this.raws.push(cmd);
     },
+    async rawIfAvailable(cmd: string): Promise<boolean> {
+      this.raws.push(cmd);
+      return true;
+    },
     async connect(): Promise<void> {
       this.connected = true;
     },
@@ -327,23 +335,19 @@ it("CommandSender routes main-zone VolumeUp/Down and Volume with fallback settin
   const mainEntity = { id: "TX-RZ50 192.168.2.103 main", attributes: { state: uc.MediaPlayerStates.On } } as any;
 
   // Bypass throttle so queueThreshold fallback doesn't block commands
-  (sender as any).lastCommandTime = -999999;
 
   // L126/L134 — main zone VolumeUp/VolumeDown → uses fallback "MVLUP1"/"MVLDOWN1"
   expect(await sender.sharedCmdHandler(mainEntity, uc.MediaPlayerCommands.VolumeUp)).toBe(uc.StatusCodes.Ok);
   expect(eiscp.raws.includes("MVLUP1")).toBe(true);
 
-  (sender as any).lastCommandTime = -999999;
   expect(await sender.sharedCmdHandler(mainEntity, uc.MediaPlayerCommands.VolumeDown)).toBe(uc.StatusCodes.Ok);
   expect(eiscp.raws.includes("MVLDOWN1")).toBe(true);
 
   // L141 — Volume without volume param → returns Ok without sending
-  (sender as any).lastCommandTime = -999999;
   expect(await sender.sharedCmdHandler(mainEntity, uc.MediaPlayerCommands.Volume)).toBe(uc.StatusCodes.Ok);
   expect(await sender.sharedCmdHandler(mainEntity, uc.MediaPlayerCommands.Volume, {})).toBe(uc.StatusCodes.Ok);
 
   // L148/L149/L152 — Volume with volume param uses fallback volumeScale (100), adjustVolumeDispl (true), and "MVL" prefix
-  (sender as any).lastCommandTime = -999999;
   expect(await sender.sharedCmdHandler(mainEntity, uc.MediaPlayerCommands.Volume, { volume: 50 })).toBe(uc.StatusCodes.Ok);
   expect(eiscp.raws.includes("MVL64")).toBe(true);
 });

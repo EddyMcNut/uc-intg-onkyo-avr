@@ -172,7 +172,12 @@ export function createMediaBrowser(cfg: MediaBrowserConfig, store: MenuBrowseSto
   async function browse(entityId: string, options: uc.BrowseOptions): Promise<uc.StatusCodes | uc.BrowseResult> {
     const menuOptions = store.listOptions(entityId);
     const browseState = store.getBrowseState(entityId);
-    const totalCount = menuOptions.length + ((browseState?.showMainMenuShortcut ?? false) ? 2 : 0);
+    // NLT reports the complete AVR list size before NLAL pages arrive. Expose
+    // that total to the remote so it requests subsequent pages instead of
+    // treating the currently-ingested first page as the end of the list.
+    const listedTotal = Math.max(menuOptions.length, browseState?.totalListItemCount ?? 0);
+    const totalCount = listedTotal + ((browseState?.showMainMenuShortcut ?? false) ? 2 : 0);
+    log.info("%s [%s] browse page=%d offset=%d limit=%d loaded=%d total=%d", logSource, entityId, options.paging.page, options.paging.offset, options.paging.limit, menuOptions.length, totalCount);
     if (!options.media_id || options.media_id === cfg.rootId || isMainMenuRequest(options.media_id, options.media_type) || isBackRequest(options.media_id, options.media_type)) {
       log.info("%s [%s] browsable %s menu options: %d", logSource, entityId, cfg.providerLabel, menuOptions.length);
       return uc.BrowseResult.fromPaging(createRootItem(entityId, options.paging), options.paging, totalCount);

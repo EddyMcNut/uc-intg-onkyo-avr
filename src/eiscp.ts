@@ -92,6 +92,8 @@ export class EiscpDriver extends EventEmitter {
   private disconnectRequested = false;
   private connectPromise: Promise<{ model: string; host: string; port: number } | null> | null = null;
   private sendQueue: Promise<void> = Promise.resolve();
+  private pendingSendCount = 0;
+  private lastSendTime = 0;
   private receiveQueue: Promise<void> = Promise.resolve();
   private readonly pendingIncoming = new Map<string, DataPayload>();
   private incomingDrainScheduled = false;
@@ -339,7 +341,7 @@ export class EiscpDriver extends EventEmitter {
           let command = iscpMessage.slice(0, 3);
           let value = iscpMessage.slice(3);
 
-          // log.info("%s RAW (0) RECEIVE: [%s] %s %s", logSource, command, value);
+          log.info("%s RAW (0) RECEIVE: [%s] %s %s", logSource, command, value);
 
           if (IGNORED_COMMANDS.has(command)) {
             continue;
@@ -394,19 +396,25 @@ export class EiscpDriver extends EventEmitter {
   // Enqueue a command to be sent with proper delay between commands
   private enqueueSend(data: string | string[]): Promise<void> {
     const prevQueue = this.sendQueue;
+    this.pendingSendCount++;
     const task = (async () => {
-      await prevQueue;
-      if (this.isConnected && this.eiscp) {
-        if (typeof data === "string") {
-          this.eiscp.write(createEiscpPacket(data));
-        } else {
-          for (const cmd of data) {
-            this.eiscp.write(createEiscpPacket(cmd));
+      try {
+        await prevQueue;
+        if (this.isConnected && this.eiscp) {
+          if (typeof data === "string") {
+            this.eiscp.write(createEiscpPacket(data));
+          } else {
+            for (const cmd of data) {
+              this.eiscp.write(createEiscpPacket(cmd));
+            }
           }
+          this.lastSendTime = Date.now();
+          await delay(this.config.sendDelay! ?? DEFAULT_QUEUE_THRESHOLD);
+        } else {
+          throw new Error("Send command while not connected");
         }
-        await delay(this.config.sendDelay! ?? DEFAULT_QUEUE_THRESHOLD);
-      } else {
-        throw new Error("Send command while not connected");
+      } finally {
+        this.pendingSendCount--;
       }
     })();
     this.sendQueue = task.catch(() => {});
@@ -447,6 +455,32 @@ export class EiscpDriver extends EventEmitter {
       throw new Error("No data provided");
     }
     return this.enqueueSend(data);
+  }
+
+  // Drop a command when the transport is still pacing a previous send. This is
+  // used for repeat-style commands such as volume up/down, where queuing stale
+  // requests would continue changing the AVR after the button is released.
+  async rawIfAvailable(data: string): Promise<boolean> {
+    if (!data) {
+      throw new Error("No data provided");
+    }
+    const sendDelay = this.config.sendDelay ?? DEFAULT_QUEUE_THRESHOLD;
+    const elapsed = Date.now() - this.lastSendTime;
+    const reason =
+      !this.isConnected || !this.eiscp
+        ? "not connected"
+        : this.pendingSendCount > 0
+          ? `transport busy (${this.pendingSendCount} pending)`
+          : elapsed < sendDelay
+            ? `send pacing (${elapsed}ms/${sendDelay}ms)`
+            : undefined;
+    if (reason) {
+      log.debug("%s Dropping paced raw command %s: %s", logSource, data, reason);
+      return false;
+    }
+    log.debug("%s Accepting paced raw command %s", logSource, data);
+    await this.enqueueSend(data);
+    return true;
   }
 
   private async sendIscp(iscpCommand: string, zone: string = "main"): Promise<void> {
@@ -540,6 +574,11 @@ export class EiscpDriver extends EventEmitter {
   private commandToIscp(command: string, args: string | number | undefined, zone: string): string {
     const prefix = (COMMAND_MAPPINGS as Record<string, string>)[command];
     let value: string;
+    // Music Server is selected directly by the Onkyo app. SLI27 only moves
+    // the NET menu cursor; it does not activate the service.
+    if (prefix === "SLI" && typeof args === "string" && stripInputSourceMarker(args).toLowerCase() === "music-server") {
+      return "NSV000";
+    }
     const valueMap = (VALUE_MAPPINGS as unknown as Record<string, Record<string, { value: string }>>)[prefix];
     if (args !== undefined && valueMap && Object.prototype.hasOwnProperty.call(valueMap, args)) {
       value = valueMap[String(args)].value;

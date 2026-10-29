@@ -58,6 +58,7 @@ export class ConfigManager {
       queueThreshold: avr.queueThreshold ?? AVR_DEFAULTS.queueThreshold,
       albumArtURL: avr.albumArtURL ?? AVR_DEFAULTS.albumArtURL,
       volumeScale: parseVolumeScale(avr.volumeScale),
+      volumeScaleDiscovered: Boolean(avr.volumeScaleDiscovered),
       useAvrReportedInputs: parseBoolean(avr.useAvrReportedInputs, AVR_DEFAULTS.useAvrReportedInputs),
       volumeDisplay: avr.volumeDisplay ?? AVR_DEFAULTS.volumeDisplay,
       adjustVolumeDispl: avr.adjustVolumeDispl ?? AVR_DEFAULTS.adjustVolumeDispl,
