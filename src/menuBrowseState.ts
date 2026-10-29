@@ -23,6 +23,7 @@ export type MenuBrowseState<TOption extends MenuBrowseOption> = {
   // Incremented whenever navigation starts a new AVR menu context. Background
   // NLAL harvests from the previous context must not continue updating it.
   harvestGeneration: number;
+  xmlResponseSequence: number;
   browseListFrozen: boolean;
 };
 
@@ -40,6 +41,7 @@ export function createMenuBrowseState<TOption extends MenuBrowseOption>(): MenuB
     nlsLayerNumber: 0,
     harvestMode: false,
     harvestGeneration: 0,
+    xmlResponseSequence: 0,
     browseListFrozen: false
   };
 }

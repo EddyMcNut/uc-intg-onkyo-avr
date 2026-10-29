@@ -341,7 +341,7 @@ export class EiscpDriver extends EventEmitter {
           let command = iscpMessage.slice(0, 3);
           let value = iscpMessage.slice(3);
 
-          log.info("%s RAW (0) RECEIVE: [%s] %s %s", logSource, command, value);
+          // log.info("%s RAW (0) RECEIVE: [%s] %s %s", logSource, command, value);
 
           if (IGNORED_COMMANDS.has(command)) {
             continue;

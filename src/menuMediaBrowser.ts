@@ -91,6 +91,8 @@ export function createMediaBrowser(cfg: MediaBrowserConfig, store: MenuBrowseSto
 
   function ingestXmlEntries(entityId: string, xmlPayload: string): void {
     if (!xmlPayload) return;
+    const browseState = store.getBrowseState(entityId);
+    if (browseState) browseState.xmlResponseSequence += 1;
     const xmlOffset = getXmlOffset(xmlPayload);
     const xmlItems = parseXmlItems(xmlPayload);
     for (let i = 0; i < xmlItems.length; i++) {

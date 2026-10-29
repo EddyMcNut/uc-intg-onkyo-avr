@@ -76,6 +76,7 @@ export default class EntityRegistrar {
         getBrowseState: getTidalBrowseState,
         listMenuItems: listTidalMenuOptions,
         waitForMenuStableBeforeHarvest: false,
+        waitForXmlResponse: true,
         isServiceActive: (entityId) => !this.avrStateApi || this.avrStateApi.getSubSource(entityId) === "tidal"
       }),
       createMenuBrowseHandler({
@@ -92,6 +93,7 @@ export default class EntityRegistrar {
         getBrowseState: getDeezerBrowseState,
         listMenuItems: listDeezerMenuOptions,
         isServiceActive: (entityId) => !this.avrStateApi || this.avrStateApi.getSubSource(entityId) === "deezer",
+        waitForXmlResponse: true,
         waitForMenuStableBeforeHarvest: false
       }),
       createMenuBrowseHandler({
@@ -108,6 +110,7 @@ export default class EntityRegistrar {
         getBrowseState: getMusicServerBrowseState,
         listMenuItems: listMusicServerMenuOptions,
         waitForMenuStableBeforeHarvest: false,
+        waitForXmlResponse: true,
         isServiceActive: (entityId) => !this.avrStateApi || this.avrStateApi.getSubSource(entityId) === "music-server",
        })
     ];

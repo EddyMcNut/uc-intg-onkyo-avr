@@ -71,7 +71,10 @@ export function normalizeInputSources(raw: unknown): InputSourceSettings {
 // Resolve configured input-source settings into the names exposed by a selector entity.
 export function resolveConfiguredInputSources(settings: InputSourceSettings | undefined): string[] {
   return Object.entries(settings ?? {})
-    .filter(([, entry]) => entry.setting !== DONT_INCLUDE_INPUT_SOURCE)
+    .filter(([, entry]) => {
+      const setting = entry.setting.trim().toLowerCase();
+      return setting !== DONT_INCLUDE_INPUT_SOURCE && setting !== "exclude";
+    })
     .map(([id, entry]) => ([DISCOVER_INPUT_SOURCE, DISCOVERED_INPUT_SOURCE].includes(entry.setting) ? entry.name : entry.setting || entry.name || getInputSourceAliases(id)[0]))
     .filter((name, index, all) => Boolean(name) && all.indexOf(name) === index)
     .sort((a, b) => a.localeCompare(b));

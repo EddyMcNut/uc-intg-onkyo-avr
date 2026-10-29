@@ -34,6 +34,7 @@ export type MenuBrowseHandlerConfig = {
   // Some XML-only services leave the browse context entirely on Back.
   harvestAfterBack?: boolean;
   isServiceActive?: (entityId: string) => boolean;
+  waitForXmlResponse?: boolean;
 };
 
 export type MenuBrowseHandlerApi = MenuBrowseHandlerBase & {
@@ -54,6 +55,7 @@ export function createMenuBrowseHandler(cfg: MenuBrowseHandlerConfig): MenuBrows
   class Handler extends MenuBrowseHandlerBase {
     protected readonly logSource = logSource;
     protected phase2HarvestEnabled = true;
+    protected waitForXmlResponse = cfg.waitForXmlResponse ?? false;
 
     protected getServiceLabel(): string {
       return cfg.providerLabel;

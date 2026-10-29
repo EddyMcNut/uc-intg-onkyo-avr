@@ -6,6 +6,7 @@ export type MenuHarvestState = {
   totalListItemCount: number;
   nlsLayerNumber: number;
   harvestGeneration?: number;
+  xmlResponseSequence?: number;
 };
 
 export type MenuSignatureItem = {
@@ -27,6 +28,7 @@ export abstract class MenuBrowseHandlerBase {
   protected abstract getContiguousItemCount(entityId: string): number;
   protected abstract getMenuDelay(entityId: string): number;
   protected phase2HarvestEnabled = false;
+  protected waitForXmlResponse = false;
 
   protected buildMenuSignature(entityId: string): string {
     return this.listMenuItems(entityId)
@@ -72,6 +74,14 @@ export abstract class MenuBrowseHandlerBase {
     while (Date.now() < deadline) {
       if (this.listMenuItems(entityId).length >= requiredCount) return;
       await delay(100);
+    }
+  }
+
+  protected async waitForXmlResponseSequence(entityId: string, previousSequence: number, timeoutMs: number): Promise<void> {
+    const deadline = Date.now() + Math.max(500, timeoutMs);
+    while (Date.now() < deadline) {
+      if ((this.getMenuState(entityId)?.xmlResponseSequence ?? 0) > previousSequence) return;
+      await delay(20);
     }
   }
 
@@ -150,9 +160,11 @@ export abstract class MenuBrowseHandlerBase {
         const offsetHex = toHex(offset, 4);
         const remaining = Math.max(1, state.totalListItemCount - offset);
         const pageSize = toHex(Math.min(parseInt(MenuBrowseHandlerBase.NLAL_PAGE_SIZE, 16), remaining), 4);
+        const previousXmlResponseSequence = state.xmlResponseSequence ?? 0;
         await rawSend(`NLAL${this.nextListSequence()}${layer}${offsetHex}${pageSize}`);
         requestCount++;
-        await delay(scanDelay);
+        if (this.waitForXmlResponse) await this.waitForXmlResponseSequence(entityId, previousXmlResponseSequence, scanDelay * 8);
+        else await delay(scanDelay);
         if ((state.harvestGeneration ?? 0) !== harvestGeneration) return;
         if (this.getContiguousItemCount(entityId) >= state.totalListItemCount) return;
         if (requestCount >= maxRequests) return;
