@@ -8,7 +8,7 @@ import { SetupFormBuilder } from "./setupFormBuilder.js";
 import { BackupRestoreManager } from "./backupRestoreManager.js";
 import { ConfigPersistenceManager } from "./configPersistenceManager.js";
 import type { AvrInput } from "./inputSourceStore.js";
-import { LEARNED_INPUT_SOURCE, LEARN_INPUT_SOURCE } from "./inputSourcePreferences.js";
+import { DISCOVERED_INPUT_SOURCE, DISCOVER_INPUT_SOURCE } from "./inputSourcePreferences.js";
 import { IDLE_SETUP_PAGE, type SetupFlowPage } from "./setupFlowState.js";
 
 const logSource = "setupHandler:";
@@ -106,6 +106,10 @@ export default class SetupHandler {
 
     if (this.setupPage.kind !== "idle" && this.hasManualConfigFields(input)) {
       this.pendingManualConfig = { ...this.pendingManualConfig, ...input };
+      if (Object.prototype.hasOwnProperty.call(input, "volumeScale") && this.pendingManualConfig.volumeScale !== undefined) {
+        const previous = ConfigManager.load().avrs?.[0]?.volumeScale;
+        if (previous !== undefined && String(input.volumeScale) !== String(previous)) this.pendingManualConfig.volumeScaleDiscovered = false;
+      }
       const parsed = this.configParser.parse(this.pendingManualConfig, ConfigManager.get().logLevel ?? "warn");
       if (this.setupPage.kind === "manual" && this.setupPage.page === 1) {
         const discovery = this.host.queryInputSources
@@ -270,6 +274,7 @@ export default class SetupHandler {
         listeningModeNames: Object.fromEntries(Object.entries(currentAvr?.listeningModes ?? {}).map(([code, mode]) => [code, mode.name])),
         idInputSources: currentAvr?.idInputSources,
         volumeScale: currentAvr?.volumeScale,
+        volumeScaleDiscovered: currentAvr?.volumeScaleDiscovered,
         useAvrReportedInputs: currentAvr?.useAvrReportedInputs,
         volumeDisplay: currentAvr?.volumeDisplay,
         adjustVolumeDispl: currentAvr?.adjustVolumeDispl,
@@ -300,6 +305,7 @@ export default class SetupHandler {
       listeningModeNames: parsedConfig.listeningModeNames,
       idInputSources: parsedConfig.idInputSources,
       volumeScale: parsedConfig.volumeScaleValue,
+      volumeScaleDiscovered: parsedConfig.volumeScaleDiscoveredValue,
       useAvrReportedInputs: parsedConfig.useAvrReportedInputsValue,
       inputSources: parsedConfig.inputSources,
       inputSourceDiscoveryAvailable: parsedConfig.inputSourceDiscoveryAvailable,
@@ -362,8 +368,8 @@ export default class SetupHandler {
     const idInputSources = { ...((config.idInputSources as Record<string, { name: string; setting: string }> | undefined) ?? {}) };
     for (const id of reportedIds) {
       const entry = idInputSources[id];
-      if (entry?.setting === LEARN_INPUT_SOURCE) {
-        idInputSources[id] = { ...entry, setting: LEARNED_INPUT_SOURCE };
+      if (entry?.setting === DISCOVER_INPUT_SOURCE) {
+        idInputSources[id] = { ...entry, setting: DISCOVERED_INPUT_SOURCE };
       }
     }
     return { ...config, idInputSources, inputSources: inputs, inputSourceDiscoveryAvailable: available };

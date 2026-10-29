@@ -1,8 +1,8 @@
 // Focused responsibility: Generate UI forms for setup flows
 import * as uc from "@unfoldedcircle/integration-api";
 import { ParsedManualConfig } from "./manualConfigParser.js";
-import { EXCLUDE_LISTENING_MODE, getKnownListeningModes, LEARNED_LISTENING_MODE, LEARN_LISTENING_MODE, normalizeListeningModeSetting } from "./listeningModePreferences.js";
-import { EXCLUDE_INPUT_SOURCE, getAliasesForReportedInput, getKnownInputSources, LEARNED_INPUT_SOURCE, LEARN_INPUT_SOURCE } from "./inputSourcePreferences.js";
+import { DONT_INCLUDE_LISTENING_MODE, getKnownListeningModes, DISCOVERED_LISTENING_MODE, DISCOVER_LISTENING_MODE, normalizeListeningModeSetting } from "./listeningModePreferences.js";
+import { DONT_INCLUDE_INPUT_SOURCE, getAliasesForReportedInput, getKnownInputSources, DISCOVERED_INPUT_SOURCE, DISCOVER_INPUT_SOURCE } from "./inputSourcePreferences.js";
 import { NETWORK_INPUT_MARKERS } from "./configConstants.js";
 import { SETUP_SELECTION_PAGE_SIZE } from "./inputSourcePresentation.js";
 
@@ -98,7 +98,7 @@ export class SetupFormBuilder {
       settings.unshift({
         id: `listeningModesPageInfo_${title.replace(/\W/g, "_")}`,
         label: { en: title },
-        field: { label: { value: { en: "Choose Learn from AVR, Disable, or an alternate alias for each mode." } } }
+        field: { label: { value: { en: "Choose whether to use the name discovered from the AVR, select an integration alias, or don't include the mode." } } }
       });
     }
     if (title.startsWith("Input Sources")) {
@@ -153,9 +153,9 @@ export class SetupFormBuilder {
           dropdown: {
             value: String(values.volumeScaleValue),
             items: [
-              { id: "auto", label: { en: "Auto (default)" } },
-              { id: "80", label: { en: "0-80" } },
-              { id: "100", label: { en: "0-100" } }
+              { id: "auto", label: { en: "✨ Auto (default)" } },
+              { id: "80", label: { en: values.volumeScaleDiscoveredValue && values.volumeScaleValue === 80 ? "✅ 0-80 (discovered from AVR)" : "0-80" } },
+              { id: "100", label: { en: values.volumeScaleDiscoveredValue && values.volumeScaleValue === 100 ? "✅ 0-100 (discovered from AVR)" : "0-100" } }
             ]
           }
         },
@@ -342,22 +342,22 @@ export class SetupFormBuilder {
         field: {
           dropdown: {
             value:
-              (normalizeListeningModeSetting(values.listeningModePreferences[mode.code] ?? LEARN_LISTENING_MODE) === LEARN_LISTENING_MODE ||
-                normalizeListeningModeSetting(values.listeningModePreferences[mode.code] ?? LEARN_LISTENING_MODE) === LEARNED_LISTENING_MODE) &&
+              (normalizeListeningModeSetting(values.listeningModePreferences[mode.code] ?? DISCOVER_LISTENING_MODE) === DISCOVER_LISTENING_MODE ||
+                normalizeListeningModeSetting(values.listeningModePreferences[mode.code] ?? DISCOVER_LISTENING_MODE) === DISCOVERED_LISTENING_MODE) &&
               values.listeningModeNames[mode.code] &&
               values.listeningModeNames[mode.code] !== mode.aliases[0]
-                ? LEARNED_LISTENING_MODE
-                : normalizeListeningModeSetting(values.listeningModePreferences[mode.code] ?? LEARN_LISTENING_MODE),
+                ? DISCOVERED_LISTENING_MODE
+                : normalizeListeningModeSetting(values.listeningModePreferences[mode.code] ?? DISCOVER_LISTENING_MODE),
             items: [
-              ...(values.listeningModePreferences[mode.code] === LEARNED_LISTENING_MODE ||
-              (values.listeningModePreferences[mode.code] === LEARN_LISTENING_MODE && values.listeningModeNames[mode.code] && values.listeningModeNames[mode.code] !== mode.aliases[0])
-                ? [{ id: LEARNED_LISTENING_MODE, label: { en: "✅ Learned from AVR" } }]
+              ...(values.listeningModePreferences[mode.code] === DISCOVERED_LISTENING_MODE ||
+              (values.listeningModePreferences[mode.code] === DISCOVER_LISTENING_MODE && values.listeningModeNames[mode.code] && values.listeningModeNames[mode.code] !== mode.aliases[0])
+                ? [{ id: DISCOVERED_LISTENING_MODE, label: { en: "✅ Using AVR-discovered name" } }]
                 : []),
               {
-                id: LEARN_LISTENING_MODE,
-                label: { en: "✨ Learn from AVR (default)" }
+                id: DISCOVER_LISTENING_MODE,
+                label: { en: "✨ Discover from AVR (default)" }
               },
-              { id: EXCLUDE_LISTENING_MODE, label: { en: "🚫 Exclude from integration" } },
+              { id: DONT_INCLUDE_LISTENING_MODE, label: { en: "🚫 Don't include" } },
               ...mode.aliases.map((alias) => ({ id: alias, label: { en: alias } }))
             ]
           }
@@ -386,26 +386,26 @@ export class SetupFormBuilder {
       const avrSource = reported.get(id);
       const configured = values.idInputSources[id];
       const aliases = avrSource ? getAliasesForReportedInput(id, avrSource.name) : (knownSource?.aliases ?? []);
-      const learned = avrSource?.name ?? (configured?.setting === LEARNED_INPUT_SOURCE ? configured.name : undefined);
+      const learned = avrSource?.name ?? (configured?.setting === DISCOVERED_INPUT_SOURCE ? configured.name : undefined);
       const items = [
-        ...(learned ? [{ id: LEARNED_INPUT_SOURCE, label: { en: "✅ Learned from AVR" } }] : []),
-        ...(learned ? [{ id: LEARN_INPUT_SOURCE, label: { en: "✨ Learn from AVR (default)" } }] : []),
-        { id: EXCLUDE_INPUT_SOURCE, label: { en: "🚫 Exclude from integration" } },
+        ...(learned ? [{ id: DISCOVERED_INPUT_SOURCE, label: { en: "✅ Using AVR-discovered name" } }] : []),
+        ...(learned ? [{ id: DISCOVER_INPUT_SOURCE, label: { en: "✨ Discover from AVR (default)" } }] : []),
+        { id: DONT_INCLUDE_INPUT_SOURCE, label: { en: "🚫 Don't include" } },
         ...aliases.map((alias) => ({ id: alias, label: { en: alias } }))
       ];
       const value = hasUsableReport
-        ? configured?.setting === EXCLUDE_INPUT_SOURCE
-          ? EXCLUDE_INPUT_SOURCE
-          : configured?.setting === LEARNED_INPUT_SOURCE
-            ? LEARNED_INPUT_SOURCE
-            : configured?.setting === LEARN_INPUT_SOURCE
-              ? LEARN_INPUT_SOURCE
+        ? configured?.setting === DONT_INCLUDE_INPUT_SOURCE
+          ? DONT_INCLUDE_INPUT_SOURCE
+          : configured?.setting === DISCOVERED_INPUT_SOURCE
+            ? DISCOVERED_INPUT_SOURCE
+            : configured?.setting === DISCOVER_INPUT_SOURCE
+              ? DISCOVER_INPUT_SOURCE
               : configured?.setting && aliases.includes(configured.setting)
                 ? configured.setting
                 : learned
-                  ? LEARNED_INPUT_SOURCE
-                  : EXCLUDE_INPUT_SOURCE
-        : configured?.setting || (learned ? LEARNED_INPUT_SOURCE : (aliases[0] ?? EXCLUDE_INPUT_SOURCE));
+                  ? DISCOVERED_INPUT_SOURCE
+                  : DONT_INCLUDE_INPUT_SOURCE
+        : configured?.setting || (learned ? DISCOVERED_INPUT_SOURCE : (aliases[0] ?? DONT_INCLUDE_INPUT_SOURCE));
       return { id, label: learned ?? aliases[0] ?? `AVR input ${id}`, value, items };
     });
   }

@@ -1,5 +1,6 @@
 import { ConfigManager, physicalAvrIdFromEntityId } from "./configManager.js";
 import { normalizeLearnedListeningModes, type LearnedListeningMode } from "./configConstants.js";
+import { DISCOVER_LISTENING_MODE } from "./listeningModePreferences.js";
 
 function key(value: string): string {
   return value.trim().toLowerCase();
@@ -38,7 +39,7 @@ export function learnListeningMode(entityId: string, mode: LearnedListeningMode)
   const avr = (ConfigManager.get().avrs ?? []).find((item) => `${item.model} ${item.ip}` === avrId);
   if (!avr) return false;
   const listeningModes = { ...(avr.listeningModes ?? {}) };
-  for (const item of merged) listeningModes[item.code] = { name: item.name, setting: listeningModes[item.code]?.setting ?? "learn" };
+  for (const item of merged) listeningModes[item.code] = { name: item.name, setting: listeningModes[item.code]?.setting ?? DISCOVER_LISTENING_MODE };
   const avrs = (ConfigManager.get().avrs ?? []).map((item) => (`${item.model} ${item.ip}` === avrId ? { ...item, listeningModes } : item));
   ConfigManager.save({ avrs });
   return true;

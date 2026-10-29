@@ -4,7 +4,7 @@ import { normalizeListeningModes, resolveListeningModes } from "../src/listening
 describe("unified listening modes", () => {
   it("preserves learned names and filters disabled modes", () => {
     const modes = normalizeListeningModes({
-      "00": { name: "Stereo", setting: "learn" },
+      "00": { name: "Stereo", setting: "discover" },
       "0F": { name: "Mono", setting: "disable" },
       "0D": { name: "Theater-Dimensional", setting: "dolby-surround-front-stage-surround" }
     });

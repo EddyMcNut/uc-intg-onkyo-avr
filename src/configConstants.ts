@@ -202,6 +202,7 @@ export interface AvrConfig {
   queueThreshold?: number;
   albumArtURL?: string;
   volumeScale?: VolumeScale; // "auto" (resolve from the AVR), 80 or 100
+  volumeScaleDiscovered?: boolean; // true when the concrete scale was reported by the AVR
   useAvrReportedInputs?: boolean; // use AVR-reported names and IDs when available
   volumeDisplay?: VolumeDisplay; // absolute = 1-100 style, relative = dB style
   adjustVolumeDispl?: boolean; // true = use 0.5 dB steps (×2 / ÷2), false = direct EISCP value
@@ -249,6 +250,7 @@ export interface NormalizedAvrConfig {
   queueThreshold: number;
   albumArtURL: string;
   volumeScale: VolumeScale;
+  volumeScaleDiscovered: boolean;
   useAvrReportedInputs: boolean;
   volumeDisplay: VolumeDisplay;
   adjustVolumeDispl: boolean;
@@ -325,6 +327,7 @@ export function normalizeAvrConfig(raw: AvrConfig): NormalizedAvrConfig {
     queueThreshold,
     albumArtURL,
     volumeScale,
+    volumeScaleDiscovered: Boolean(raw.volumeScaleDiscovered),
     useAvrReportedInputs,
     volumeDisplay,
     adjustVolumeDispl,

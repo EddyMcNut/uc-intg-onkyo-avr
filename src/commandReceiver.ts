@@ -13,7 +13,7 @@ import { diracServiceKeyToOption } from "./diracSelect.js";
 import { AV_INFO_REQUERY_DELAY } from "./constants.js";
 import type { AvrStateApi } from "./types.js";
 import { findLearnedListeningModeName, getLearnedListeningModes, learnListeningMode } from "./learnedListeningModeStore.js";
-import { EXCLUDE_LISTENING_MODE, resolveListeningModes } from "./listeningModePreferences.js";
+import { DISCOVER_LISTENING_MODE, DONT_INCLUDE_LISTENING_MODE, resolveListeningModes } from "./listeningModePreferences.js";
 import { getKnownListeningModes } from "./listeningModePreferences.js";
 import { displayInputSourceOption } from "./inputSourcePresentation.js";
 
@@ -344,7 +344,7 @@ export class CommandReceiver {
     }
     if (cfgAvr?.listeningModes && configuredCode) {
       const configured = cfgAvr.listeningModes[configuredCode]?.setting;
-      if (configured && configured !== "learn" && configured !== EXCLUDE_LISTENING_MODE && configured !== "disable") listeningMode = configured;
+      if (configured && configured !== DISCOVER_LISTENING_MODE && configured !== DONT_INCLUDE_LISTENING_MODE && configured !== "disable") listeningMode = configured;
     }
     log.info("%s [%s] listening-mode set to: %s", logSource, entityId, listeningMode);
     this.driver.updateEntityAttributes(`${entityId}_listening_mode`, {

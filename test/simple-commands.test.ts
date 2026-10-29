@@ -27,16 +27,16 @@ describe("simpleCommands", () => {
     const knownCode = getKnownListeningModes().find((mode) => mode.aliases.includes("direct"))!.code;
 
     addListeningModeSimpleCommands({
-      [knownCode]: { name: "Direct learned", setting: "learned" },
-      "00": { name: "Custom Stereo", setting: "learned" },
+      [knownCode]: { name: "Direct learned", setting: "discovered" },
+      "00": { name: "Custom Stereo", setting: "discovered" },
       "03": { name: "Disabled", setting: "disable" },
-      "02": { name: "Excluded", setting: "exclude" },
-      "04": { name: "  ", setting: "learn" }
+      "02": { name: "Excluded", setting: "dont-include" },
+      "04": { name: "  ", setting: "discover" }
     });
 
     expect(SIMPLE_COMMANDS_MAP.LISTENING_MODE_CUSTOM_STEREO).toBe("listening-mode Custom Stereo");
     expect(SIMPLE_COMMANDS_MAP.LISTENING_MODE_DIRECT_LEARNED).toBe("listening-mode Direct learned");
-    addListeningModeSimpleCommands({ "00": { name: "Custom Stereo", setting: "learn" } });
+    addListeningModeSimpleCommands({ "00": { name: "Custom Stereo", setting: "discover" } });
     expect(SIMPLE_COMMANDS_MAP.LISTENING_MODE_CUSTOM_STEREO).toBe("listening-mode Custom Stereo");
   });
 });

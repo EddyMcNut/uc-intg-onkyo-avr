@@ -19,8 +19,8 @@ function responseValues(action: uc.SetupAction): Record<string, unknown> {
   };
   if (action instanceof uc.RequestUserInput) {
     for (const setting of action.settings as Array<{ id: string }>) {
-      if (setting.id.startsWith("ids_")) values[setting.id] = "exclude";
-      if (setting.id.startsWith("lmd_")) values[setting.id] = "learn";
+      if (setting.id.startsWith("ids_")) values[setting.id] = "dont-include";
+      if (setting.id.startsWith("lmd_")) values[setting.id] = "discover";
     }
   }
   return values;

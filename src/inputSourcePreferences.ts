@@ -1,9 +1,9 @@
 import { eiscpMappings } from "./eiscp-mappings.js";
 import { normalizeInputSourceSettings, type InputSourceSettings } from "./configConstants.js";
 
-export const LEARNED_INPUT_SOURCE = "learned";
-export const LEARN_INPUT_SOURCE = "learn";
-export const EXCLUDE_INPUT_SOURCE = "exclude";
+export const DISCOVERED_INPUT_SOURCE = "discovered";
+export const DISCOVER_INPUT_SOURCE = "discover";
+export const DONT_INCLUDE_INPUT_SOURCE = "dont-include";
 
 export type KnownInputSource = { id: string; aliases: string[] };
 
@@ -71,8 +71,8 @@ export function normalizeInputSources(raw: unknown): InputSourceSettings {
 // Resolve configured input-source settings into the names exposed by a selector entity.
 export function resolveConfiguredInputSources(settings: InputSourceSettings | undefined): string[] {
   return Object.entries(settings ?? {})
-    .filter(([, entry]) => entry.setting !== EXCLUDE_INPUT_SOURCE)
-    .map(([id, entry]) => ([LEARN_INPUT_SOURCE, LEARNED_INPUT_SOURCE].includes(entry.setting) ? entry.name : entry.setting || entry.name || getInputSourceAliases(id)[0]))
+    .filter(([, entry]) => entry.setting !== DONT_INCLUDE_INPUT_SOURCE)
+    .map(([id, entry]) => ([DISCOVER_INPUT_SOURCE, DISCOVERED_INPUT_SOURCE].includes(entry.setting) ? entry.name : entry.setting || entry.name || getInputSourceAliases(id)[0]))
     .filter((name, index, all) => Boolean(name) && all.indexOf(name) === index)
     .sort((a, b) => a.localeCompare(b));
 }

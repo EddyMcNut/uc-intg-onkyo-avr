@@ -1,10 +1,10 @@
 // Focused responsibility: Handle auto-discovery and configuration persistence
 import EiscpDriver from "./eiscp.js";
 import { ConfigManager, type AvrConfig, type AvrZone, AVR_DEFAULTS, type IntegrationConfig } from "./configManager.js";
-import { getKnownListeningModes } from "./listeningModePreferences.js";
+import { DISCOVER_LISTENING_MODE, getKnownListeningModes } from "./listeningModePreferences.js";
 import log, { setLogLevel } from "./loggers.js";
 import { type ParsedManualConfig } from "./manualConfigParser.js";
-import { getInputSourceAliases, EXCLUDE_INPUT_SOURCE, LEARNED_INPUT_SOURCE, getKnownInputSources } from "./inputSourcePreferences.js";
+import { getInputSourceAliases, DONT_INCLUDE_INPUT_SOURCE, DISCOVERED_INPUT_SOURCE, getKnownInputSources } from "./inputSourcePreferences.js";
 import type { InputSourceSettings } from "./configConstants.js";
 
 const logSource = "configPersistenceManager:";
@@ -74,6 +74,7 @@ export class ConfigPersistenceManager {
       albumArtURL: parsedConfig.albumArtURLValue,
       listeningModes: this.buildListeningModes(listeningModePreferences, parsedConfig.listeningModeNames, parsedConfig.modelName, parsedConfig.ipVal),
       volumeScale: parsedConfig.volumeScaleValue,
+      volumeScaleDiscovered: parsedConfig.volumeScaleDiscoveredValue,
       useAvrReportedInputs: parsedConfig.useAvrReportedInputsValue,
       inputSourceLayout: parsedConfig.inputSourceLayoutValue,
       networkInputMarker: parsedConfig.networkInputMarkerValue,
@@ -127,11 +128,11 @@ export class ConfigPersistenceManager {
       getKnownListeningModes().map((mode) => [
         mode.code,
         {
-          // Keep the AVR-learned name when the user selects "learn" again. The
+          // Keep the AVR-discovered name when the user selects "discover" again. The
           // setting controls whether the learned value is used; replacing its
           // name here would erase the learned mode during setup reconfiguration.
           name: names[mode.code] ?? existing[mode.code]?.name ?? mode.aliases[0],
-          setting: preferences[mode.code] ?? existing[mode.code]?.setting ?? "learn"
+          setting: preferences[mode.code] ?? existing[mode.code]?.setting ?? DISCOVER_LISTENING_MODE
         }
       ])
     );
@@ -157,8 +158,12 @@ export class ConfigPersistenceManager {
         // reported. Sources known to the integration but absent from that report
         // must remain excluded; otherwise saving setup adds legacy names back into
         // the selector alongside the learned AVR names.
-        (parsed.inputSourceDiscoveryAvailable && (parsed.inputSources?.length ?? 0) > 0 ? (reported.has(id) ? LEARNED_INPUT_SOURCE : EXCLUDE_INPUT_SOURCE) : (aliases[0] ?? EXCLUDE_INPUT_SOURCE));
-      result[id] = { name, setting: selected || LEARNED_INPUT_SOURCE };
+        (parsed.inputSourceDiscoveryAvailable && (parsed.inputSources?.length ?? 0) > 0
+          ? reported.has(id)
+            ? DISCOVERED_INPUT_SOURCE
+            : DONT_INCLUDE_INPUT_SOURCE
+          : (aliases[0] ?? DONT_INCLUDE_INPUT_SOURCE));
+      result[id] = { name, setting: selected || DISCOVERED_INPUT_SOURCE };
     }
     return result;
   }

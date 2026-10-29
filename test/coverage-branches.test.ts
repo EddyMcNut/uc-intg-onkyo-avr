@@ -94,7 +94,7 @@ describe("listening mode branch coverage", () => {
           ]
         }
       ])
-    ).toEqual({ "0A": { name: "Learned", setting: "learn" } });
+    ).toEqual({ "0A": { name: "Learned", setting: "discover" } });
     expect(normalizeListeningModes({ "00": { name: "stereo", setting: "stereo" }, bad: {}, "01": null })).toEqual({ "00": { name: "stereo", setting: "stereo" } });
   });
 
@@ -102,7 +102,7 @@ describe("listening mode branch coverage", () => {
     const known = getKnownListeningModes();
     const stereo = known.find((mode) => mode.aliases.includes("stereo"))!;
     const direct = known.find((mode) => mode.aliases.includes("direct"))!;
-    const preferences = { [stereo.code]: "learn", [direct.code]: "disable", FF: "learn" };
+    const preferences = { [stereo.code]: "discover", [direct.code]: "disable", FF: "discover" };
     expect(resolveListeningModePreferences(undefined, [])).toBeUndefined();
     expect(
       resolveListeningModePreferences(preferences, [
@@ -110,7 +110,7 @@ describe("listening mode branch coverage", () => {
         { code: "FF", name: "Future" }
       ])
     ).toEqual(["AVR Stereo", "Future"]);
-    expect(resolveListeningModes({ "00": { name: "same", setting: "learn" }, "01": { name: "same", setting: "learned" }, "02": { name: "off", setting: "disable" } }, [])).toEqual(["same"]);
+    expect(resolveListeningModes({ "00": { name: "same", setting: "discover" }, "01": { name: "same", setting: "discovered" }, "02": { name: "off", setting: "disable" } }, [])).toEqual(["same"]);
   });
 });
 

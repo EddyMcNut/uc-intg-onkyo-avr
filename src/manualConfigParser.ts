@@ -12,6 +12,7 @@ export interface ManualConfigInput {
   listeningModePreferences?: unknown;
   listeningModeNames?: unknown;
   volumeScale?: unknown;
+  volumeScaleDiscovered?: unknown;
   useAvrReportedInputs?: unknown;
   idInputSources?: unknown;
   inputSources?: unknown;
@@ -41,6 +42,7 @@ export interface ParsedManualConfig {
   listeningModePreferences: Record<string, string>;
   listeningModeNames: Record<string, string>;
   volumeScaleValue: VolumeScale;
+  volumeScaleDiscoveredValue: boolean;
   useAvrReportedInputsValue: boolean;
   idInputSources: InputSourceSettings;
   inputSources: AvrInput[];
@@ -74,6 +76,7 @@ export class ManualConfigParser {
       listeningModePreferences: this.parseListeningModePreferences(input),
       listeningModeNames: this.parseListeningModeNames(input),
       volumeScaleValue: this.parseVolumeScale(input.volumeScale),
+      volumeScaleDiscoveredValue: parseBoolean(input.volumeScaleDiscovered, false),
       useAvrReportedInputsValue,
       idInputSources: this.parseInputSourceSettings(input),
       inputSources: Array.isArray(input.inputSources) ? (input.inputSources as AvrInput[]) : [],

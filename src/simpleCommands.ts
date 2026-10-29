@@ -1,6 +1,6 @@
 import { eiscpCommands } from "./eiscp-commands.js";
 import log from "./loggers.js";
-import { EXCLUDE_LISTENING_MODE, getKnownListeningModes } from "./listeningModePreferences.js";
+import { DISCOVERED_LISTENING_MODE, DONT_INCLUDE_LISTENING_MODE, getKnownListeningModes } from "./listeningModePreferences.js";
 
 const logSource = "simpleCommands:";
 
@@ -135,8 +135,8 @@ export const ALL_SIMPLE_COMMANDS = Object.keys(SIMPLE_COMMANDS_MAP);
 // Add AVR-specific listening-mode names using the same IDs as generated simple commands.
 export function addListeningModeSimpleCommands(modes: Record<string, { name: string; setting: string }> | undefined): void {
   for (const [code, mode] of Object.entries(modes ?? {})) {
-    if (!mode.name || mode.setting === EXCLUDE_LISTENING_MODE || mode.setting === "disable") continue;
-    if (mode.setting === "learned") {
+    if (!mode.name || mode.setting === DONT_INCLUDE_LISTENING_MODE || mode.setting === "disable") continue;
+    if (mode.setting === DISCOVERED_LISTENING_MODE) {
       const known = getKnownListeningModes().find((candidate) => candidate.code === code.toUpperCase());
       for (const alias of known?.aliases ?? []) {
         const aliasId = `LISTENING_MODE_${alias

@@ -352,7 +352,7 @@ export default class Driver {
 
       const volumeResolution = resolveAutoVolumeScale(avrConfig, entityId);
       if (volumeResolution) {
-        if (ConfigManager.patchAvr(avrConfig.ip, avrConfig.zone, { volumeScale: volumeResolution.scale })) {
+        if (ConfigManager.patchAvr(avrConfig.ip, avrConfig.zone, { volumeScale: volumeResolution.scale, volumeScaleDiscovered: volumeResolution.discovered })) {
           log.debug("%s [%s] Volume scale 'auto' resolved to 0-%d: %s", logSource, zoneEntry, volumeResolution.scale, volumeResolution.reason);
           configChanged = true;
           changed = true;
