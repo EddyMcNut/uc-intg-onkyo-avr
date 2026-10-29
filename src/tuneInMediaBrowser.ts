@@ -117,12 +117,13 @@ export class TuneInMediaBrowser {
     const xmlItems = parseTuneInXmlItems(xmlPayload);
     for (let i = 0; i < xmlItems.length; i++) {
       const item = xmlItems[i];
-      if (!item.title || TUNEIN_EXCLUDED_MENU_TITLES.has(item.title.toLowerCase())) continue;
+      if (!item.title) continue;
 
       const menuIndex = xmlOffset + i + 1;
       const isStationLike = item.title.includes("|") || /\(.+\)/.test(item.title);
       const isBrowsable = looksLikeTuneInDirectory(item.title, item.iconId) || !isStationLike;
-      addTuneInMenuOption(entityId, menuIndex, item.title, isBrowsable, getOrCreateTuneInThumbnail);
+      const hidden = !item.selectable || TUNEIN_EXCLUDED_MENU_TITLES.has(item.title.toLowerCase());
+      addTuneInMenuOption(entityId, menuIndex, item.title, isBrowsable, getOrCreateTuneInThumbnail, hidden, true);
     }
   }
 
@@ -138,7 +139,7 @@ export class TuneInMediaBrowser {
 
     const xmlOffset = getXmlOffset(xmlPayload);
     for (const [i, item] of parseTuneInXmlItems(xmlPayload).entries()) {
-      if (!item.title || looksLikeTuneInDirectory(item.title, item.iconId)) {
+      if (!item.title || !item.selectable || looksLikeTuneInDirectory(item.title, item.iconId)) {
         continue;
       }
 

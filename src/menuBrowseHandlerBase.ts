@@ -148,7 +148,9 @@ export abstract class MenuBrowseHandlerBase {
         if ((state.harvestGeneration ?? 0) !== harvestGeneration) return;
         const offset = this.getContiguousItemCount(entityId);
         const offsetHex = toHex(offset, 4);
-        await rawSend(`NLAL${this.nextListSequence()}${layer}${offsetHex}${MenuBrowseHandlerBase.NLAL_PAGE_SIZE}`);
+        const remaining = Math.max(1, state.totalListItemCount - offset);
+        const pageSize = toHex(Math.min(parseInt(MenuBrowseHandlerBase.NLAL_PAGE_SIZE, 16), remaining), 4);
+        await rawSend(`NLAL${this.nextListSequence()}${layer}${offsetHex}${pageSize}`);
         requestCount++;
         await delay(scanDelay);
         if ((state.harvestGeneration ?? 0) !== harvestGeneration) return;

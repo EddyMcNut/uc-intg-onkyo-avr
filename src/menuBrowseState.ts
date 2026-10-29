@@ -4,6 +4,7 @@ export type MenuBrowseOption = {
   mediaId: string;
   thumbnail?: string;
   isBrowsable: boolean;
+  hidden?: boolean;
 };
 
 export type MenuBrowseState<TOption extends MenuBrowseOption> = {
@@ -43,8 +44,8 @@ export function createMenuBrowseState<TOption extends MenuBrowseOption>(): MenuB
   };
 }
 
-export function upsertMenuOption<TOption extends MenuBrowseOption>(state: MenuBrowseState<TOption>, menuIndex: number, createOption: () => TOption): void {
-  if (state.browseListFrozen) {
+export function upsertMenuOption<TOption extends MenuBrowseOption>(state: MenuBrowseState<TOption>, menuIndex: number, createOption: () => TOption, allowWhenFrozen = false): void {
+  if (state.browseListFrozen && !allowWhenFrozen) {
     return;
   }
 

@@ -12,6 +12,9 @@ import { browseMedia, isMediaBrowsingAvailable } from "./mediaBrowser.js";
 import { PlayMediaCommandHandler } from "./playMediaCommandHandler.js";
 import { findAvrSourceId } from "./avrSourceCatalog.js";
 import { stripInputSourceMarker } from "./inputSourcePresentation.js";
+import { resetDeezerBrowseState } from "./deezerBrowserStore.js";
+import { resetMusicServerBrowseState } from "./musicServerBrowserStore.js";
+import { resetTidalBrowseState } from "./tidalBrowserStore.js";
 
 const logSource = "commandSender:";
 
@@ -194,14 +197,17 @@ export class CommandSender {
         if (request.startsWith("multi-zone")) {
           await this.eiscp.command(request);
         } else if (INPUT_NAMES_SET.has(request)) {
+          this.resetBrowseStateBeforeSourceSelection(_e.id, request);
           await this.eiscp.command(sz(`input-selector ${request}`));
         } else if (physicalAvrIdFromEntityId(_e.id) && findAvrSourceId(physicalAvrIdFromEntityId(_e.id)!, request)) {
+          this.resetBrowseStateBeforeSourceSelection(_e.id, request);
           await this.eiscp.command({ zone, command: "input-selector", args: request });
         } else {
           // AVR-reported service names can contain spaces (e.g. "TuneIn Radio"); use the
           // structured form so the complete name remains the input-selector argument.
           const inputPrefix = "input-selector ";
           if (request.startsWith(inputPrefix)) {
+            this.resetBrowseStateBeforeSourceSelection(_e.id, request.substring(inputPrefix.length));
             await this.eiscp.command({ zone, command: "input-selector", args: request.substring(inputPrefix.length) });
           } else {
             await this.eiscp.command(sz(request));
@@ -322,5 +328,20 @@ export class CommandSender {
     log.info("%s executing simple command '%s' → %s", logSource, cmdId, zonePrefixed);
     await this.eiscp.command(zonePrefixed);
     return uc.StatusCodes.Ok;
+  }
+
+  private resetBrowseStateBeforeSourceSelection(entityId: string, source: string): void {
+    const normalized = stripInputSourceMarker(source).toLowerCase().replace(/\s+/g, "-");
+    if (normalized === "tidal") resetTidalBrowseState(entityId);
+    else if (normalized === "deezer") resetDeezerBrowseState(entityId);
+    else if (normalized === "music-server" || normalized === "musicserver") resetMusicServerBrowseState(entityId);
+
+    // The AVR reports the new NLT service entry shortly after accepting the
+    // source command. Mark the requested service active immediately so a
+    // browse request arriving in that gap cannot be handled by the previous
+    // service's handler or return its cached menu.
+    if (normalized === "tidal" || normalized === "deezer" || normalized === "music-server" || normalized === "musicserver" || normalized === "spotify" || normalized === "tunein") {
+      this.avrStateApi.setSubSource(entityId, normalized === "musicserver" ? "music-server" : normalized);
+    }
   }
 }

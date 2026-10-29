@@ -409,7 +409,10 @@ export class IscpCommandParser {
           if (deezerState) {
             if (!deezerState.harvestMode) deezerState.nlsCursorOffset = cursorOffset;
             deezerState.totalListItemCount = totalCount;
-            if (layerNumber > 0) deezerState.nlsLayerNumber = layerNumber;
+            // Once a track is selected, NLT describes the playback context,
+            // not the XML browse list. Keep the browse layer for subsequent
+            // selections from the still-visible frozen list.
+            if (layerNumber > 0 && !deezerState.browseListFrozen) deezerState.nlsLayerNumber = layerNumber;
           }
         }
 
@@ -419,7 +422,7 @@ export class IscpCommandParser {
             // Don't overwrite the cursor during harvest — the loop manages it locally.
             if (!tidalState.harvestMode) tidalState.nlsCursorOffset = cursorOffset;
             tidalState.totalListItemCount = totalCount;
-            if (layerNumber > 0) tidalState.nlsLayerNumber = layerNumber;
+            if (layerNumber > 0 && !tidalState.browseListFrozen) tidalState.nlsLayerNumber = layerNumber;
           }
         }
 
@@ -437,7 +440,7 @@ export class IscpCommandParser {
           if (musicServerState) {
             if (!musicServerState.harvestMode) musicServerState.nlsCursorOffset = cursorOffset;
             musicServerState.totalListItemCount = totalCount;
-            if (layerNumber > 0) musicServerState.nlsLayerNumber = layerNumber;
+            if (layerNumber > 0 && !musicServerState.browseListFrozen) musicServerState.nlsLayerNumber = layerNumber;
           }
         }
       }
@@ -462,6 +465,24 @@ export class IscpCommandParser {
     // Check if the title contains a known network service name
     const detectedService = detectServiceFromText(text);
     if (detectedService) {
+      // NLT can arrive before avrState has committed the canonical sub-source
+      // (the capture shows the service title and list metadata in that order).
+      // Preserve the list total/layer immediately so XML-only browsers do not
+      // fall back to requesting a single root item.
+      if (value.length >= 14 && /^[0-9A-Fa-f]{4}$/.test(value.substring(4, 8)) && /^[0-9A-Fa-f]{4}$/.test(value.substring(8, 12))) {
+        const cursorOffset = parseInt(value.substring(4, 8), 16);
+        const totalCount = parseInt(value.substring(8, 12), 16);
+        const layerNumber = /^[0-9A-Fa-f]{2}$/.test(value.substring(12, 14)) ? parseInt(value.substring(12, 14), 16) : 0;
+        const updateBrowseState = (state: { totalListItemCount: number; nlsCursorOffset: number; nlsLayerNumber: number; browseListFrozen?: boolean } | null): void => {
+          if (!state) return;
+          if (!state.browseListFrozen) state.nlsCursorOffset = cursorOffset;
+          state.totalListItemCount = totalCount;
+          if (layerNumber > 0 && !state.browseListFrozen) state.nlsLayerNumber = layerNumber;
+        };
+        if (detectedService === "tidal") updateBrowseState(this.tidalStore.getBrowseState(entityId));
+        else if (detectedService === "deezer") updateBrowseState(this.deezerStore.getBrowseState(entityId));
+        else if (detectedService === "music-server") updateBrowseState(this.musicServerStore.getBrowseState(entityId));
+      }
       const currentSubSource = this.stateReader.getSubSource(entityId);
       if (currentSubSource !== detectedService) {
         result.command = "NLT";

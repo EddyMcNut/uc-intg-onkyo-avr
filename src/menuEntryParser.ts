@@ -34,17 +34,21 @@ export function unescapeXml(value: string): string {
 }
 
 // Parses XML item elements from response payload. Extracts title, icon ID, and other attributes from <item> tags. @param xmlPayload - XML payload containing <item> elements @returns Array of parsed items with title, iconId, and raw data
-export function parseXmlItems(xmlPayload: string): Array<{ title: string; iconId: string; rawTitle: string }> {
+export function parseXmlItems(xmlPayload: string): Array<{ title: string; iconId: string; iconType: string; selectable: boolean; rawTitle: string }> {
   const itemMatches = [...xmlPayload.matchAll(/<item\b([^>]*)\/?>/gi)];
 
   return itemMatches.map((match) => {
     const attributes = match[1] || "";
     const rawTitle = unescapeXml((attributes.match(/\btitle="([^"]*)"/i)?.[1] || "").trim());
     const iconId = (attributes.match(/\biconid="([^"]*)"/i)?.[1] || "").trim();
+    const iconType = (attributes.match(/\bicontype="([^"]*)"/i)?.[1] || "").trim().toUpperCase();
+    const selectable = (attributes.match(/\bselectable="([^"]*)"/i)?.[1] || "1") !== "0";
 
     return {
       title: rawTitle,
       iconId,
+      iconType,
+      selectable,
       rawTitle
     };
   });

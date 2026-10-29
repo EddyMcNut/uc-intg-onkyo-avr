@@ -1,19 +1,16 @@
 import {
   hasTuneInPresets,
-  ingestDeezerListEntry,
   ingestDeezerXmlEntries,
   ingestMusicServerXmlEntries,
-  ingestTidalListEntry,
   ingestTidalXmlEntries,
   ingestTuneInListEntry,
-  ingestTuneInMenuListEntry,
   ingestTuneInMenuXmlEntries,
   ingestTuneInXmlEntries,
   setTuneInBrowseContext
 } from "./mediaBrowser.js";
-import { getDeezerBrowseState, resetDeezerBrowseState } from "./deezerBrowserStore.js";
-import { getMusicServerBrowseState, resetMusicServerBrowseState } from "./musicServerBrowserStore.js";
-import { getTidalBrowseState, resetTidalBrowseState } from "./tidalBrowserStore.js";
+import { getDeezerBrowseState } from "./deezerBrowserStore.js";
+import { getMusicServerBrowseState } from "./musicServerBrowserStore.js";
+import { getTidalBrowseState } from "./tidalBrowserStore.js";
 import { clearTuneInPresets, resetTuneInBrowseState, updateNowPlayingStation } from "./tuneInBrowserStore.js";
 import { resetTuneInMenuBrowseState, setTuneInMenuNowPlayingStation, updateTuneInMenuNowPlayingStation } from "./tuneInMenuStore.js";
 import { DEEZER_SERVICE_ID, MUSIC_SERVER_SERVICE_ID, TIDAL_SERVICE_ID, TUNEIN_SERVICE_ID } from "./browseServiceContract.js";
@@ -98,8 +95,9 @@ export class TuneInZoneAgnosticAdapter implements ZoneAgnosticServiceAdapter {
 
   handleNls(sourceEntityId: string, entry: string): void {
     for (const zoneEntityId of this.getActiveZones(sourceEntityId)) {
+      // Full Menu is XML-backed. NLS is retained only for the configured
+      // My Presets station list, where the AVR still reports preset rows.
       ingestTuneInListEntry(zoneEntityId, entry);
-      ingestTuneInMenuListEntry(zoneEntityId, entry);
     }
   }
 
@@ -136,17 +134,11 @@ export class TidalZoneAgnosticAdapter implements ZoneAgnosticServiceAdapter {
     return getServiceZones(sourceEntityId, this.service, this.deps);
   }
 
-  async onServiceEntered(_sourceEntityId: string, _affectedZones: string[], enteringZones: string[]): Promise<void> {
-    for (const zoneEntityId of enteringZones) {
-      resetTidalBrowseState(zoneEntityId);
-    }
-  }
+  async onServiceEntered(_sourceEntityId: string, _affectedZones: string[], _enteringZones: string[]): Promise<void> {}
 
-  handleNls(sourceEntityId: string, entry: string): void {
-    for (const zoneEntityId of this.getActiveZones(sourceEntityId)) {
-      ingestTidalListEntry(zoneEntityId, entry);
-    }
-  }
+  // Tidal browsing is XML-only. Ignore legacy NLS ten-line updates so they
+  // cannot overwrite an active NLA/NLAL browse context.
+  handleNls(_sourceEntityId: string, _entry: string): void {}
 
   handleNla(sourceEntityId: string, xmlPayload: string): void {
     for (const zoneEntityId of this.getActiveZones(sourceEntityId)) {
@@ -169,17 +161,10 @@ export class DeezerZoneAgnosticAdapter implements ZoneAgnosticServiceAdapter {
     return getServiceZones(sourceEntityId, this.service, this.deps);
   }
 
-  async onServiceEntered(_sourceEntityId: string, _affectedZones: string[], enteringZones: string[]): Promise<void> {
-    for (const zoneEntityId of enteringZones) {
-      resetDeezerBrowseState(zoneEntityId);
-    }
-  }
+  async onServiceEntered(_sourceEntityId: string, _affectedZones: string[], _enteringZones: string[]): Promise<void> {}
 
-  handleNls(sourceEntityId: string, entry: string): void {
-    for (const zoneEntityId of this.getActiveZones(sourceEntityId)) {
-      ingestDeezerListEntry(zoneEntityId, entry);
-    }
-  }
+  // Deezer browsing is XML-only; ignore legacy NLS list updates.
+  handleNls(_sourceEntityId: string, _entry: string): void {}
 
   handleNla(sourceEntityId: string, xmlPayload: string): void {
     for (const zoneEntityId of this.getActiveZones(sourceEntityId)) {
@@ -202,11 +187,7 @@ export class MusicServerZoneAgnosticAdapter implements ZoneAgnosticServiceAdapte
     return getServiceZones(sourceEntityId, this.service, this.deps);
   }
 
-  async onServiceEntered(_sourceEntityId: string, _affectedZones: string[], enteringZones: string[]): Promise<void> {
-    for (const zoneEntityId of enteringZones) {
-      resetMusicServerBrowseState(zoneEntityId);
-    }
-  }
+  async onServiceEntered(_sourceEntityId: string, _affectedZones: string[], _enteringZones: string[]): Promise<void> {}
 
   // Music Server browsing is XML-only. The Onkyo app does not use the legacy
   // NLS ten-line list for this service; accepting it here can mix stale list

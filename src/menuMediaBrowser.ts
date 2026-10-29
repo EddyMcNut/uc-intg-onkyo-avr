@@ -95,10 +95,12 @@ export function createMediaBrowser(cfg: MediaBrowserConfig, store: MenuBrowseSto
     const xmlItems = parseXmlItems(xmlPayload);
     for (let i = 0; i < xmlItems.length; i++) {
       const item = xmlItems[i];
-      if (!item.title) continue;
+      if (!item.title || !item.selectable) continue;
       if (isExcludedTitle(item.title)) continue;
       const menuIndex = xmlOffset + i + 1;
-      store.addMenuOption(entityId, menuIndex, item.title, getOrCreateThumbnail);
+      // XML responses are explicit browse results. They must still populate
+      // later pages after playback has frozen the now-playing decoration.
+      store.addMenuOption(entityId, menuIndex, item.title, getOrCreateThumbnail, item.iconType === "M" ? false : undefined, true);
     }
   }
 

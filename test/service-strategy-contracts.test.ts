@@ -74,7 +74,7 @@ it("MenuBrowseHandlerBase harvest contract populates contiguous items and clears
   expect(handler.getHarvestMode()).toBe(false);
 });
 
-it("TuneIn adapter contract ingests NLS only for active TuneIn zones", async () => {
+it("TuneIn adapter contract ignores legacy NLS menu updates", async () => {
   const adaptersModule = await import("../src/zoneAgnosticServiceAdapters.js");
   const tuneInStoreModule = await import("../src/tuneInMenuStore.js");
 
@@ -109,7 +109,7 @@ it("TuneIn adapter contract ingests NLS only for active TuneIn zones", async () 
 
   adapter.handleNls(activeZone, "U0-Browse");
 
-  expect(listTuneInMenuOptions(activeZone).length).toBe(1);
+  expect(listTuneInMenuOptions(activeZone).length).toBe(0);
   expect(listTuneInMenuOptions(controlZone).length).toBe(0);
 });
 

@@ -1,5 +1,6 @@
 import type { MenuBrowseOption } from "./menuBrowseState.js";
 import { tidalStore } from "./tidalBrowserStore.js";
+import { getTidalBrowseState } from "./tidalBrowserStore.js";
 import { createMediaBrowser, type MediaBrowserApi } from "./menuMediaBrowser.js";
 import type * as uc from "@unfoldedcircle/integration-api";
 
@@ -74,6 +75,11 @@ const browser: MediaBrowserApi = createMediaBrowser(
 
 export class TidalMediaBrowser {
   ingestXmlEntries(entityId: string, xmlPayload: string): void {
+    const totalItems = xmlPayload.match(/<items\b[^>]*\btotalitems="(\d+)"/i)?.[1];
+    if (totalItems !== undefined) {
+      const state = getTidalBrowseState(entityId);
+      if (state) state.totalListItemCount = Math.max(state.totalListItemCount, parseInt(totalItems, 10));
+    }
     browser.ingestXmlEntries(entityId, xmlPayload);
   }
 

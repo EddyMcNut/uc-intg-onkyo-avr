@@ -17,7 +17,7 @@ export type MenuBrowseStoreConfig = {
 
 export type MenuBrowseStore = {
   getBrowseState(entityId: string): MenuBrowseState<MenuBrowseOption> | null;
-  addMenuOption(entityId: string, menuIndex: number, title: string, thumbnailResolver?: (state: MenuBrowseState<MenuBrowseOption>, title: string) => string): void;
+  addMenuOption(entityId: string, menuIndex: number, title: string, thumbnailResolver?: (state: MenuBrowseState<MenuBrowseOption>, title: string) => string, isBrowsable?: boolean, allowWhenFrozen?: boolean): void;
   listOptions(entityId: string): MenuBrowseOption[];
   getContiguousItemCount(entityId: string): number;
   resetState(entityId: string): void;
@@ -49,13 +49,13 @@ export function createMenuBrowseStore(cfg: MenuBrowseStoreConfig): MenuBrowseSto
     return created;
   }
 
-  function addMenuOption(entityId: string, menuIndex: number, title: string, thumbnailResolver?: (state: MenuBrowseState<MenuBrowseOption>, title: string) => string): void {
+  function addMenuOption(entityId: string, menuIndex: number, title: string, thumbnailResolver?: (state: MenuBrowseState<MenuBrowseOption>, title: string) => string, isBrowsableOverride?: boolean, allowWhenFrozen = false): void {
     const state = getBrowseState(entityId);
     if (!state) {
       return;
     }
 
-    const isBrowsable = cfg.isBrowsableRule(title);
+    const isBrowsable = isBrowsableOverride ?? cfg.isBrowsableRule(title);
 
     upsertMenuOption(state, menuIndex, () => ({
       menuIndex,
@@ -63,7 +63,7 @@ export function createMenuBrowseStore(cfg: MenuBrowseStoreConfig): MenuBrowseSto
       mediaId: buildMediaId(menuIndex, title),
       thumbnail: thumbnailResolver ? thumbnailResolver(state, title) : undefined,
       isBrowsable
-    }));
+    }), allowWhenFrozen);
   }
 
   function listOptions(entityId: string): MenuBrowseOption[] {

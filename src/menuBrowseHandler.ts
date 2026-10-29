@@ -33,6 +33,7 @@ export type MenuBrowseHandlerConfig = {
   waitForMenuStableBeforeHarvest?: boolean;
   // Some XML-only services leave the browse context entirely on Back.
   harvestAfterBack?: boolean;
+  isServiceActive?: (entityId: string) => boolean;
 };
 
 export type MenuBrowseHandlerApi = MenuBrowseHandlerBase & {
@@ -100,6 +101,8 @@ export function createMenuBrowseHandler(cfg: MenuBrowseHandlerConfig): MenuBrows
       cmdHandler: CmdHandlerFn | undefined,
       rawSend: RawSendFn | undefined
     ): Promise<uc.StatusCodes | uc.BrowseResult | undefined> {
+      if (cfg.isServiceActive && !cfg.isServiceActive(entityId)) return undefined;
+      const serviceIsActive = () => !cfg.isServiceActive || cfg.isServiceActive(entityId);
       const mainMenu = cfg.isMainMenuRequest(options.media_id, options.media_type);
       const backRequest = cfg.isBackRequest(options.media_id, options.media_type);
       const selection = cfg.resolveMenuOption(options.media_id, options.media_type);
@@ -111,6 +114,27 @@ export function createMenuBrowseHandler(cfg: MenuBrowseHandlerConfig): MenuBrows
       const rootRequest = !options.media_id || options.media_id === cfg.rootId;
       if (rootRequest && !waitForMenuStableBeforeHarvest && rawSend) {
         const browseState = cfg.getBrowseState(entityId);
+        if (!mainMenu && browseState?.browseListFrozen && cmdHandler) {
+          // After playback the AVR is no longer in the XML browse context.
+          // The Onkyo app returns to that context before allowing another
+          // track selection, then re-harvests the list.
+          cfg.resetState(entityId);
+          const returnedState = cfg.getBrowseState(entityId);
+          if (returnedState) {
+            returnedState.listModeActive = true;
+          }
+          log.info("%s [%s] returning to %s XML browse context after playback", logSource, entityId, cfg.providerLabel);
+          await cmdHandler(mediaPlayerEntity, uc.MediaPlayerCommands.PlayMedia, {
+            media_id: cfg.backId,
+            media_type: cfg.rootType
+          });
+          await this.waitForListMetadata(entityId, this.getMenuDelay(entityId));
+          await this.harvestListItems(entityId, rawSend);
+          if (!serviceIsActive()) return undefined;
+          if (cfg.afterHarvest) {
+            await cfg.afterHarvest(entityId, rawSend);
+          }
+        }
         if (cfg.listMenuItems(entityId).length === 0) {
           if (browseState) browseState.listModeActive = true;
           await this.waitForListMetadata(entityId, this.getMenuDelay(entityId));
@@ -121,6 +145,7 @@ export function createMenuBrowseHandler(cfg: MenuBrowseHandlerConfig): MenuBrows
             await this.waitForListMetadata(entityId, this.getMenuDelay(entityId));
           }
           await this.harvestListItems(entityId, rawSend);
+          if (!serviceIsActive()) return undefined;
           if (cfg.afterHarvest) {
             await cfg.afterHarvest(entityId, rawSend);
           }
@@ -128,6 +153,7 @@ export function createMenuBrowseHandler(cfg: MenuBrowseHandlerConfig): MenuBrows
         const paging = options.paging;
         const requiredCount = (paging?.offset ?? 0) + (paging?.limit ?? 0);
         await this.waitForMenuItems(entityId, requiredCount, this.getMenuDelay(entityId) * 4);
+        if (!serviceIsActive()) return undefined;
         return cfg.browseMedia(entityId, {
           ...options,
           media_id: cfg.rootId,
@@ -162,6 +188,7 @@ export function createMenuBrowseHandler(cfg: MenuBrowseHandlerConfig): MenuBrows
             browseState.listModeActive = true;
           }
           await this.harvestListItems(entityId, rawSend);
+          if (!serviceIsActive()) return undefined;
           if (cfg.afterHarvest) {
             await cfg.afterHarvest(entityId, rawSend);
           }
@@ -191,6 +218,7 @@ export function createMenuBrowseHandler(cfg: MenuBrowseHandlerConfig): MenuBrows
         if (browseState) browseState.listModeActive = true;
         if (rawSend) {
           await this.harvestListItems(entityId, rawSend);
+          if (!serviceIsActive()) return undefined;
           if (cfg.afterHarvest) {
             await cfg.afterHarvest(entityId, rawSend);
           }
@@ -225,9 +253,17 @@ export function createMenuBrowseHandler(cfg: MenuBrowseHandlerConfig): MenuBrows
 
             if (waitForMenuStableBeforeHarvest) await this.waitForMenuStable(entityId, beforeSignature, menuDelay);
             else await this.waitForListMetadata(entityId, menuDelay);
+            if (!waitForMenuStableBeforeHarvest && rawSend && browseState && browseState.totalListItemCount === 0 && cfg.listMenuItems(entityId).length === 0) {
+              // Some AVRs emit NLS/NLT only after NLAI. The app immediately
+              // probes the next XML layer in that case.
+              const layer = Math.max(1, browseState.nlsLayerNumber + 1).toString(16).padStart(2, "0").toUpperCase();
+              await rawSend(`NLAL${this.nextListSequence()}${layer}00000001`);
+              await this.waitForListMetadata(entityId, menuDelay);
+            }
             if (browseState) browseState.listModeActive = true;
             if (rawSend) {
               await this.harvestListItems(entityId, rawSend);
+              if (!serviceIsActive()) return undefined;
               if (cfg.afterHarvest) {
                 await cfg.afterHarvest(entityId, rawSend);
               }

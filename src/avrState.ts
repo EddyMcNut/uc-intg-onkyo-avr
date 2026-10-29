@@ -5,9 +5,6 @@ import log from "./loggers.js";
 import { delay } from "./utils.js";
 import { ALBUM_ART, SONG_INFO, QUERY_DEFAULT_DELAY } from "./constants.js";
 import type { ICommandReceiver } from "./types.js";
-import { resetDeezerBrowseState } from "./deezerBrowserStore.js";
-import { resetMusicServerBrowseState } from "./musicServerBrowserStore.js";
-import { resetTidalBrowseState } from "./tidalBrowserStore.js";
 import { REMOTE_SUFFIX } from "./sensorSuffixes.js";
 
 const logSource = "avrState:";
@@ -380,18 +377,6 @@ export class AvrStateManager {
     // For Tidal and Deezer, reset browse state and re-request the NLS list so
     // the media browser stays fresh. Music Server follows the app's direct
     // NSV000 + NLA/NLAL flow and must not use the legacy NET menu commands.
-    if (currentSubSource === "tidal" || currentSubSource === "deezer") {
-      log.info("%s [%s] refreshing %s browse state via NTCTOP + NTCSELECT", logSource, entityId, currentSubSource);
-      if (currentSubSource === "tidal") {
-        resetTidalBrowseState(entityId);
-      } else if (currentSubSource === "deezer") {
-        resetDeezerBrowseState(entityId);
-      }
-      await eiscpInstance.raw("NTCTOP");
-      await eiscpInstance.raw("NTCSELECT");
-    } else if (currentSubSource === "music-server") {
-      resetMusicServerBrowseState(entityId);
-    }
   }
 }
 

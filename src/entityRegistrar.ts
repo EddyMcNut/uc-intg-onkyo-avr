@@ -74,7 +74,9 @@ export default class EntityRegistrar {
         resolveMenuOption: (mediaId, mediaType) => resolveTidalMenuOption(mediaId, mediaType),
         resetState: resetTidalBrowseState,
         getBrowseState: getTidalBrowseState,
-        listMenuItems: listTidalMenuOptions
+        listMenuItems: listTidalMenuOptions,
+        waitForMenuStableBeforeHarvest: false,
+        isServiceActive: (entityId) => !this.avrStateApi || this.avrStateApi.getSubSource(entityId) === "tidal"
       }),
       createMenuBrowseHandler({
         providerLabel: "Deezer",
@@ -88,7 +90,9 @@ export default class EntityRegistrar {
         resolveMenuOption: (mediaId, mediaType) => resolveDeezerMenuOption(mediaId, mediaType),
         resetState: resetDeezerBrowseState,
         getBrowseState: getDeezerBrowseState,
-        listMenuItems: listDeezerMenuOptions
+        listMenuItems: listDeezerMenuOptions,
+        isServiceActive: (entityId) => !this.avrStateApi || this.avrStateApi.getSubSource(entityId) === "deezer",
+        waitForMenuStableBeforeHarvest: false
       }),
       createMenuBrowseHandler({
         providerLabel: "Music Server",
@@ -102,8 +106,9 @@ export default class EntityRegistrar {
         resolveMenuOption: (mediaId, mediaType) => resolveMusicServerMenuOption(mediaId, mediaType),
         resetState: resetMusicServerBrowseState,
         getBrowseState: getMusicServerBrowseState,
-         listMenuItems: listMusicServerMenuOptions,
-         waitForMenuStableBeforeHarvest: false,
+        listMenuItems: listMusicServerMenuOptions,
+        waitForMenuStableBeforeHarvest: false,
+        isServiceActive: (entityId) => !this.avrStateApi || this.avrStateApi.getSubSource(entityId) === "music-server",
        })
     ];
   }

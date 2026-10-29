@@ -579,6 +579,12 @@ export class EiscpDriver extends EventEmitter {
     if (prefix === "SLI" && typeof args === "string" && stripInputSourceMarker(args).toLowerCase() === "music-server") {
       return "NSV000";
     }
+    if (prefix === "SLI" && typeof args === "string" && stripInputSourceMarker(args).toLowerCase() === "tidal") {
+      return "NSV1B0";
+    }
+    if (prefix === "SLI" && typeof args === "string" && stripInputSourceMarker(args).toLowerCase() === "deezer") {
+      return "NSV120";
+    }
     const valueMap = (VALUE_MAPPINGS as unknown as Record<string, Record<string, { value: string }>>)[prefix];
     if (args !== undefined && valueMap && Object.prototype.hasOwnProperty.call(valueMap, args)) {
       value = valueMap[String(args)].value;
