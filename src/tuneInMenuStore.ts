@@ -39,20 +39,33 @@ export function getTuneInMenuBrowseState(entityId: string): TuneInMenuBrowseStat
   return created;
 }
 
-export function addTuneInMenuOption(entityId: string, menuIndex: number, title: string, isBrowsable: boolean, thumbnailResolver?: (state: TuneInMenuBrowseState, title: string) => string, hidden = false, allowWhenFrozen = false): void {
+export function addTuneInMenuOption(
+  entityId: string,
+  menuIndex: number,
+  title: string,
+  isBrowsable: boolean,
+  thumbnailResolver?: (state: TuneInMenuBrowseState, title: string) => string,
+  hidden = false,
+  allowWhenFrozen = false
+): void {
   const state = getTuneInMenuBrowseState(entityId);
   if (!state) {
     return;
   }
 
-  upsertMenuOption(state, menuIndex, () => ({
+  upsertMenuOption(
+    state,
     menuIndex,
-    title,
-    mediaId: buildTuneInMenuMediaId(menuIndex, title),
-    thumbnail: thumbnailResolver ? thumbnailResolver(state, title) : undefined,
-    isBrowsable,
-    hidden
-  }), allowWhenFrozen);
+    () => ({
+      menuIndex,
+      title,
+      mediaId: buildTuneInMenuMediaId(menuIndex, title),
+      thumbnail: thumbnailResolver ? thumbnailResolver(state, title) : undefined,
+      isBrowsable,
+      hidden
+    }),
+    allowWhenFrozen
+  );
 }
 
 export function listTuneInMenuOptions(entityId: string): TuneInMenuOption[] {

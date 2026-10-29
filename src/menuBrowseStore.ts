@@ -17,7 +17,14 @@ export type MenuBrowseStoreConfig = {
 
 export type MenuBrowseStore = {
   getBrowseState(entityId: string): MenuBrowseState<MenuBrowseOption> | null;
-  addMenuOption(entityId: string, menuIndex: number, title: string, thumbnailResolver?: (state: MenuBrowseState<MenuBrowseOption>, title: string) => string, isBrowsable?: boolean, allowWhenFrozen?: boolean): void;
+  addMenuOption(
+    entityId: string,
+    menuIndex: number,
+    title: string,
+    thumbnailResolver?: (state: MenuBrowseState<MenuBrowseOption>, title: string) => string,
+    isBrowsable?: boolean,
+    allowWhenFrozen?: boolean
+  ): void;
   listOptions(entityId: string): MenuBrowseOption[];
   getContiguousItemCount(entityId: string): number;
   resetState(entityId: string): void;
@@ -49,7 +56,14 @@ export function createMenuBrowseStore(cfg: MenuBrowseStoreConfig): MenuBrowseSto
     return created;
   }
 
-  function addMenuOption(entityId: string, menuIndex: number, title: string, thumbnailResolver?: (state: MenuBrowseState<MenuBrowseOption>, title: string) => string, isBrowsableOverride?: boolean, allowWhenFrozen = false): void {
+  function addMenuOption(
+    entityId: string,
+    menuIndex: number,
+    title: string,
+    thumbnailResolver?: (state: MenuBrowseState<MenuBrowseOption>, title: string) => string,
+    isBrowsableOverride?: boolean,
+    allowWhenFrozen = false
+  ): void {
     const state = getBrowseState(entityId);
     if (!state) {
       return;
@@ -57,13 +71,18 @@ export function createMenuBrowseStore(cfg: MenuBrowseStoreConfig): MenuBrowseSto
 
     const isBrowsable = isBrowsableOverride ?? cfg.isBrowsableRule(title);
 
-    upsertMenuOption(state, menuIndex, () => ({
+    upsertMenuOption(
+      state,
       menuIndex,
-      title,
-      mediaId: buildMediaId(menuIndex, title),
-      thumbnail: thumbnailResolver ? thumbnailResolver(state, title) : undefined,
-      isBrowsable
-    }), allowWhenFrozen);
+      () => ({
+        menuIndex,
+        title,
+        mediaId: buildMediaId(menuIndex, title),
+        thumbnail: thumbnailResolver ? thumbnailResolver(state, title) : undefined,
+        isBrowsable
+      }),
+      allowWhenFrozen
+    );
   }
 
   function listOptions(entityId: string): MenuBrowseOption[] {

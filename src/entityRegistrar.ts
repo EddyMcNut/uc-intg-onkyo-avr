@@ -111,8 +111,8 @@ export default class EntityRegistrar {
         listMenuItems: listMusicServerMenuOptions,
         waitForMenuStableBeforeHarvest: false,
         waitForXmlResponse: true,
-        isServiceActive: (entityId) => !this.avrStateApi || this.avrStateApi.getSubSource(entityId) === "music-server",
-       })
+        isServiceActive: (entityId) => !this.avrStateApi || this.avrStateApi.getSubSource(entityId) === "music-server"
+      })
     ];
   }
 

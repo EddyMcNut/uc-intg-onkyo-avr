@@ -140,7 +140,14 @@ export abstract class MenuBrowseHandlerBase {
     })();
   }
 
-  private async harvestNlalChunks(entityId: string, layersToTry: string[], scanDelay: number, rawSend: (cmd: string) => Promise<void>, harvestGeneration: number, maxRequests = Number.POSITIVE_INFINITY): Promise<void> {
+  private async harvestNlalChunks(
+    entityId: string,
+    layersToTry: string[],
+    scanDelay: number,
+    rawSend: (cmd: string) => Promise<void>,
+    harvestGeneration: number,
+    maxRequests = Number.POSITIVE_INFINITY
+  ): Promise<void> {
     const state = this.getMenuState(entityId);
     if (!state) return;
 

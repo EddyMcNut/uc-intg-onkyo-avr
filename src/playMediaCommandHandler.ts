@@ -46,14 +46,26 @@ const logSource = "playMediaCommandHandler:";
 // the object/layer selected by the NLA/NLAL browser.  NLAI uses a zero-based
 // item index, while our media IDs and store use one-based menu indices.
 function musicServerSelectCommand(menuIndex: number, layerNumber: number | undefined): string {
-  const layer = Math.max(1, layerNumber ?? 1).toString(16).padStart(2, "0").toUpperCase();
-  const index = Math.max(0, menuIndex - 1).toString(16).padStart(4, "0").toUpperCase();
+  const layer = Math.max(1, layerNumber ?? 1)
+    .toString(16)
+    .padStart(2, "0")
+    .toUpperCase();
+  const index = Math.max(0, menuIndex - 1)
+    .toString(16)
+    .padStart(4, "0")
+    .toUpperCase();
   return `NLAI${layer}${index}----`;
 }
 
 function xmlBrowseSelectCommand(menuIndex: number, layerNumber: number | undefined): string {
-  const layer = Math.max(1, layerNumber ?? 1).toString(16).padStart(2, "0").toUpperCase();
-  const index = Math.max(0, menuIndex - 1).toString(16).padStart(4, "0").toUpperCase();
+  const layer = Math.max(1, layerNumber ?? 1)
+    .toString(16)
+    .padStart(2, "0")
+    .toUpperCase();
+  const index = Math.max(0, menuIndex - 1)
+    .toString(16)
+    .padStart(4, "0")
+    .toUpperCase();
   return `NLAI${layer}${index}----`;
 }
 
@@ -134,7 +146,16 @@ export class PlayMediaCommandHandler {
     // Do not wait for the AVR's asynchronous NLT notification before routing
     // browse requests. A remote may ask for the root immediately after NSV;
     // keep that request from being handled by the previous service.
-    const pendingSubSource = serviceId === TUNEIN_SERVICE_ID ? "tunein" : serviceId === MUSIC_SERVER_SERVICE_ID ? "music-server" : serviceId === TIDAL_SERVICE_ID ? "tidal" : serviceId === DEEZER_SERVICE_ID ? "deezer" : undefined;
+    const pendingSubSource =
+      serviceId === TUNEIN_SERVICE_ID
+        ? "tunein"
+        : serviceId === MUSIC_SERVER_SERVICE_ID
+          ? "music-server"
+          : serviceId === TIDAL_SERVICE_ID
+            ? "tidal"
+            : serviceId === DEEZER_SERVICE_ID
+              ? "deezer"
+              : undefined;
     if (pendingSubSource) this.avrStateApi.setSubSource(entityId, pendingSubSource);
 
     // The Onkyo app enters Music Server directly with NSV000. This avoids the

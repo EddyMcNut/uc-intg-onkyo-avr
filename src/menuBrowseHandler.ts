@@ -258,7 +258,10 @@ export function createMenuBrowseHandler(cfg: MenuBrowseHandlerConfig): MenuBrows
             if (!waitForMenuStableBeforeHarvest && rawSend && browseState && browseState.totalListItemCount === 0 && cfg.listMenuItems(entityId).length === 0) {
               // Some AVRs emit NLS/NLT only after NLAI. The app immediately
               // probes the next XML layer in that case.
-              const layer = Math.max(1, browseState.nlsLayerNumber + 1).toString(16).padStart(2, "0").toUpperCase();
+              const layer = Math.max(1, browseState.nlsLayerNumber + 1)
+                .toString(16)
+                .padStart(2, "0")
+                .toUpperCase();
               await rawSend(`NLAL${this.nextListSequence()}${layer}00000001`);
               await this.waitForListMetadata(entityId, menuDelay);
             }
