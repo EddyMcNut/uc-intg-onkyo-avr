@@ -1,10 +1,10 @@
 // Focused responsibility: Handle auto-discovery and configuration persistence
 import EiscpDriver from "./eiscp.js";
 import { ConfigManager, type AvrConfig, type AvrZone, AVR_DEFAULTS, type IntegrationConfig } from "./configManager.js";
-import { DISCOVER_LISTENING_MODE, getKnownListeningModes } from "./listeningModePreferences.js";
+import { DISCOVER_LISTENING_MODE, INTEGRATION_PREFERRED_LISTENING_MODE, getKnownListeningModes } from "./listeningModePreferences.js";
 import log, { setLogLevel } from "./loggers.js";
 import { type ParsedManualConfig } from "./manualConfigParser.js";
-import { getInputSourceAliases, DONT_INCLUDE_INPUT_SOURCE, DISCOVERED_INPUT_SOURCE, getKnownInputSources } from "./inputSourcePreferences.js";
+import { getInputSourceAliases, DONT_INCLUDE_INPUT_SOURCE, DETECTED_INPUT_SOURCE, getKnownInputSources } from "./inputSourcePreferences.js";
 import type { InputSourceSettings } from "./configConstants.js";
 
 const logSource = "configPersistenceManager:";
@@ -122,19 +122,25 @@ export class ConfigPersistenceManager {
     return { errors: [], success: true };
   }
 
-  private buildListeningModes(preferences: Record<string, string>, names: Record<string, string>, model?: string, ip?: string): Record<string, { name: string; setting: string }> {
+  private buildListeningModes(preferences: Record<string, string>, names: Record<string, string>, model?: string, ip?: string): Record<string, { name: string; setting: string; contexts?: import("./configConstants.js").ListeningModeContext[] }> {
     const existing = ConfigManager.get().avrs?.find((avr) => avr.model === model && avr.ip === ip)?.listeningModes ?? {};
     const rebuilt = Object.fromEntries(
-      getKnownListeningModes().map((mode) => [
-        mode.code,
-        {
-          // Keep the AVR-discovered name when the user selects "discover" again. The
+      getKnownListeningModes().map((mode) => {
+        const existingMode = existing[mode.code];
+        return [
+          mode.code,
+          {
+          // Keep the AVR-detected name when the user selects "discover" again. The
           // setting controls whether the learned value is used; replacing its
           // name here would erase the learned mode during setup reconfiguration.
-          name: names[mode.code] ?? existing[mode.code]?.name ?? mode.aliases[0],
-          setting: preferences[mode.code] ?? existing[mode.code]?.setting ?? DISCOVER_LISTENING_MODE
-        }
-      ])
+           // Setup labels may summarize multiple detected context names. Never persist that
+           // summary as the primary AVR name; keep the real learned name instead.
+            name: existingMode?.contexts?.length ? existingMode.contexts[existingMode.contexts.length - 1].name : names[mode.code] ?? existingMode?.name ?? mode.aliases[0],
+            setting: preferences[mode.code] ?? existingMode?.setting ?? (mode.aliases[0] === "straight-decode" ? INTEGRATION_PREFERRED_LISTENING_MODE : DISCOVER_LISTENING_MODE),
+            ...(existingMode?.contexts ? { contexts: existingMode.contexts } : {})
+          }
+        ];
+      })
     );
     for (const [code, entry] of Object.entries(existing)) {
       if (!rebuilt[code]) rebuilt[code] = entry;
@@ -160,10 +166,10 @@ export class ConfigPersistenceManager {
         // the selector alongside the learned AVR names.
         (parsed.inputSourceDiscoveryAvailable && (parsed.inputSources?.length ?? 0) > 0
           ? reported.has(id)
-            ? DISCOVERED_INPUT_SOURCE
+            ? DETECTED_INPUT_SOURCE
             : DONT_INCLUDE_INPUT_SOURCE
           : (aliases[0] ?? DONT_INCLUDE_INPUT_SOURCE));
-      result[id] = { name, setting: selected || DISCOVERED_INPUT_SOURCE };
+      result[id] = { name, setting: selected || DETECTED_INPUT_SOURCE };
     }
     return result;
   }

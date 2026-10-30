@@ -1,7 +1,7 @@
 import { eiscpMappings } from "./eiscp-mappings.js";
 import { normalizeInputSourceSettings, type InputSourceSettings } from "./configConstants.js";
 
-export const DISCOVERED_INPUT_SOURCE = "discovered";
+export const DETECTED_INPUT_SOURCE = "detected";
 export const DISCOVER_INPUT_SOURCE = "discover";
 export const DONT_INCLUDE_INPUT_SOURCE = "dont-include";
 
@@ -75,7 +75,7 @@ export function resolveConfiguredInputSources(settings: InputSourceSettings | un
       const setting = entry.setting.trim().toLowerCase();
       return setting !== DONT_INCLUDE_INPUT_SOURCE && setting !== "exclude";
     })
-    .map(([id, entry]) => ([DISCOVER_INPUT_SOURCE, DISCOVERED_INPUT_SOURCE].includes(entry.setting) ? entry.name : entry.setting || entry.name || getInputSourceAliases(id)[0]))
+    .map(([id, entry]) => ([DISCOVER_INPUT_SOURCE, DETECTED_INPUT_SOURCE].includes(entry.setting) ? entry.name : entry.setting || entry.name || getInputSourceAliases(id)[0]))
     .filter((name, index, all) => Boolean(name) && all.indexOf(name) === index)
     .sort((a, b) => a.localeCompare(b));
 }

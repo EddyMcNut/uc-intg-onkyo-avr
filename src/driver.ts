@@ -12,7 +12,8 @@ import {
   buildPhysicalAvrId,
   physicalAvrIdFromEntityId,
   DEFAULT_QUEUE_THRESHOLD,
-  normalizeAvrConfig
+  normalizeAvrConfig,
+  getConfigPath
 } from "./configManager.js";
 import { CommandSender } from "./commandSender.js";
 import { CommandReceiver } from "./commandReceiver.js";
@@ -89,12 +90,14 @@ export default class Driver {
     try {
       const configDir = this.driver.getConfigDirPath();
       setConfigDir(configDir);
+      log.info("%s Using persistent config directory: %s", logSource, configDir ?? process.cwd());
     } catch (err) {
       log.warn("%s Could not determine driver config directory, falling back to environment or CWD", logSource, err);
     }
 
     // Now load config from the correct path and continue setup
     this.config = ConfigManager.load();
+    log.info("%s Active config file: %s", logSource, getConfigPath());
     for (const avr of this.config.avrs ?? []) addListeningModeSimpleCommands(avr.listeningModes);
     if (this.config.logLevel) setLogLevel(this.config.logLevel);
     logGeneratedCount();

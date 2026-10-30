@@ -23,6 +23,7 @@ const ZONE4_REVERSE_MAP: Record<string, string> = { VL4: "MVL", PW4: "PWR", MT4:
 
 export interface AvrStateReader {
   getSource(entityId: string): string;
+  getAudioFormat?(entityId: string): string;
   getSubSource(entityId: string): string;
 }
 

@@ -134,6 +134,7 @@ vi.mock("../src/configManager.js", () => {
   return {
     ConfigManager: { load: vi.fn(() => ({ avrs: [], logLevel: "info" })), patchAvr: vi.fn(() => true) },
     setConfigDir: vi.fn(),
+    getConfigPath: vi.fn(() => "/tmp/config.json"),
     buildEntityId: mockBuildId,
     buildPhysicalAvrId: mockBuildPhys,
     physicalAvrIdFromEntityId: vi.fn((id: string) => id.split("_").slice(0, 2).join("_")),

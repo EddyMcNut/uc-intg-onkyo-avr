@@ -110,7 +110,7 @@ describe("listening mode branch coverage", () => {
         { code: "FF", name: "Future" }
       ])
     ).toEqual(["AVR Stereo", "Future"]);
-    expect(resolveListeningModes({ "00": { name: "same", setting: "discover" }, "01": { name: "same", setting: "discovered" }, "02": { name: "off", setting: "disable" } }, [])).toEqual(["same"]);
+    expect(resolveListeningModes({ "00": { name: "same", setting: "discover" }, "01": { name: "same", setting: "detected" }, "02": { name: "off", setting: "disable" } }, [])).toEqual(["same"]);
   });
 });
 
@@ -125,6 +125,10 @@ describe("learned mode store branches", () => {
     expect(learnListeningMode("bad", { code: "01", name: "Bad" })).toBe(false);
     expect(learnListeningMode("M 1.2.3.4 main", { code: "01", name: "Direct" })).toBe(true);
     expect(learnListeningMode("M 1.2.3.4 main", { code: "01", name: "Direct" })).toBe(false);
+    expect(learnListeningMode("M 1.2.3.4 main", { code: "80", name: "Dolby Audio - Surr", source: "stm", audioFormat: "PCM Stereo", inputChannels: "2.0 ch" })).toBe(true);
+    expect(learnListeningMode("M 1.2.3.4 main", { code: "80", name: "Dolby Atmos", source: "stm", audioFormat: "Dolby Atmos", inputChannels: "5.1 ch" })).toBe(true);
+    expect(getLearnedListeningModes("M 1.2.3.4 main", "stm", "PCM Stereo", "2.0 ch").map((mode) => mode.name)).toContain("Dolby Audio - Surr");
+    expect(getLearnedListeningModes("M 1.2.3.4 main", "stm", "Dolby Atmos", "5.1 ch").map((mode) => mode.name)).toContain("Dolby Atmos");
     expect(learnListeningMode("M 1.2.3.4 main", { code: "bad", name: "Bad" })).toBe(false);
   });
 });
@@ -207,6 +211,7 @@ describe("eISCP command routing branches", () => {
     await driver.sendIscp("NSS01", "main");
     expect(raw).toHaveBeenCalledWith("NTCTOP");
     expect(driver.commandToIscp("listening-mode", "not-known", "main")).toBe("LMDnot-known");
+    expect(driver.commandToIscp("listening-mode", "Stereo", "main")).toBe("LMD00");
   });
 
   it("covers waitForConnect success, close, error and timeout paths", async () => {

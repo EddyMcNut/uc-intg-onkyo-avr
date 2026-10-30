@@ -13,8 +13,7 @@ import { diracServiceKeyToOption } from "./diracSelect.js";
 import { AV_INFO_REQUERY_DELAY } from "./constants.js";
 import type { AvrStateApi } from "./types.js";
 import { findLearnedListeningModeName, getLearnedListeningModes, learnListeningMode } from "./learnedListeningModeStore.js";
-import { DISCOVER_LISTENING_MODE, DONT_INCLUDE_LISTENING_MODE, resolveListeningModes } from "./listeningModePreferences.js";
-import { getKnownListeningModes } from "./listeningModePreferences.js";
+import { DETECTED_LISTENING_MODE, DISCOVER_LISTENING_MODE, DONT_INCLUDE_LISTENING_MODE, INTEGRATION_PREFERRED_LISTENING_MODE, displayListeningModeName, getKnownListeningModes, resolveListeningModes } from "./listeningModePreferences.js";
 import { displayInputSourceOption } from "./inputSourcePresentation.js";
 
 const logSource = "commandReceiver:";
@@ -65,6 +64,7 @@ export class CommandReceiver {
         await this.zoneAgnosticProcessor.handleIfa(entityId, eventZone, argument, async (zoneEntityId, audioInputValue) => {
           await this.updateListeningModeOptionsForAudioFormat(zoneEntityId, audioInputValue, argument?.inputChannels);
         });
+        this.updateListeningModeCurrentOptionFromIfa(entityId, argument);
         const audioInputValue = argument?.audioInputValue ?? "";
         this.maybeScheduleAvInfoRequery(audioInputValue, eventZone);
       },
@@ -124,7 +124,7 @@ export class CommandReceiver {
 
     const audioFormat = formatAudioTypeName(classifyAudioFormat(argument.audioInputValue));
     const source = this.avrStateApi.getSource(entityId) || argument.inputSource;
-    const changed = learnListeningMode(entityId, { code, name: argument.listeningMode });
+    const changed = learnListeningMode(entityId, { code, name: argument.listeningMode, source, audioFormat, inputChannels: argument.inputChannels });
     if (changed) {
       log.info("%s [%s] learned listening mode %s = %s for source %s / format %s", logSource, entityId, code, argument.listeningMode, source, audioFormat);
     }
@@ -137,7 +137,7 @@ export class CommandReceiver {
     const selectEntityId = `${zoneEntityId}_listening_mode`;
     const compatibleModes = getCompatibleListeningModes(audioFormatType);
     const source = this.avrStateApi.getSource(zoneEntityId);
-    const learned = getLearnedListeningModes(zoneEntityId, source, audioFormatType);
+    const learned = getLearnedListeningModes(zoneEntityId, source, audioFormatType, inputChannels);
     if (!formatChanged && learned.length === 0) {
       return;
     }
@@ -160,13 +160,27 @@ export class CommandReceiver {
 
     if (!formatChanged || !compatibleModes) return;
 
-    const allModes = getKnownListeningModes().map((mode) => mode.aliases[0]);
+    const allModes = getKnownListeningModes().map((mode) => displayListeningModeName(mode.aliases[0]));
     const filteredOptions = allModes.filter((mode) => compatibleModes.includes(mode)).sort();
 
     log.info("%s [%s] updating listening mode options for format: %s (%d modes)", logSource, zoneEntityId, audioFormatType, filteredOptions.length);
     this.driver.updateEntityAttributes(selectEntityId, {
       [SelectAttributes.Options]: filteredOptions
     });
+  }
+
+  private updateListeningModeCurrentOptionFromIfa(entityId: string, argument: Record<string, string> | undefined): void {
+    if (!argument?.listeningMode || ["n/a", "unknown", "---"].includes(argument.listeningMode.trim().toLowerCase())) return;
+    const code = this.pendingListeningModeCodes.get(entityId);
+    const physicalAvr = physicalAvrIdFromEntityId(entityId);
+    const cfgAvr = this.config.avrs?.find((avr) => buildPhysicalAvrId(avr.model, avr.ip) === physicalAvr);
+    const configured = code ? cfgAvr?.listeningModes?.[code]?.setting : undefined;
+    const current = configured === INTEGRATION_PREFERRED_LISTENING_MODE
+      ? displayListeningModeName(getKnownListeningModes().find((mode) => mode.code === code)?.aliases[0] ?? argument.listeningMode)
+      : configured && ![DISCOVER_LISTENING_MODE, DETECTED_LISTENING_MODE, DONT_INCLUDE_LISTENING_MODE, "disable"].includes(configured)
+        ? configured
+        : argument.listeningMode;
+    this.driver.updateEntityAttributes(`${entityId}_listening_mode`, { [SelectAttributes.CurrentOption]: current });
   }
 
   // Schedule a delayed re-query so the sensor reflects the final stable value instead of staying stuck at UNKNOWN. Cancels the timer if a known format arrives before it fires.
@@ -340,11 +354,20 @@ export class CommandReceiver {
     const cfgAvr = this.config.avrs ? this.config.avrs.find((a) => a.model === avrUpdates.model && a.ip === avrUpdates.host) : undefined;
     const configuredCode = this.pendingListeningModeCodes.get(entityId);
     if (configuredCode) {
-      listeningMode = findLearnedListeningModeName(buildPhysicalAvrId(avrUpdates.model, avrUpdates.host), configuredCode) ?? listeningMode;
+      listeningMode = findLearnedListeningModeName(
+        buildPhysicalAvrId(avrUpdates.model, avrUpdates.host),
+        configuredCode,
+        this.avrStateApi.getSource(entityId),
+        this.avrStateApi.getAudioFormat(entityId)
+      ) ?? listeningMode;
     }
     if (cfgAvr?.listeningModes && configuredCode) {
       const configured = cfgAvr.listeningModes[configuredCode]?.setting;
-      if (configured && configured !== DISCOVER_LISTENING_MODE && configured !== DONT_INCLUDE_LISTENING_MODE && configured !== "disable") listeningMode = configured;
+      if (configured === INTEGRATION_PREFERRED_LISTENING_MODE) {
+        listeningMode = displayListeningModeName(getKnownListeningModes().find((mode) => mode.code === configuredCode)?.aliases[0] ?? listeningMode);
+      } else if (configured && configured !== DISCOVER_LISTENING_MODE && configured !== DETECTED_LISTENING_MODE && configured !== DONT_INCLUDE_LISTENING_MODE && configured !== "disable") {
+        listeningMode = configured;
+      }
     }
     log.info("%s [%s] listening-mode set to: %s", logSource, entityId, listeningMode);
     this.driver.updateEntityAttributes(`${entityId}_listening_mode`, {

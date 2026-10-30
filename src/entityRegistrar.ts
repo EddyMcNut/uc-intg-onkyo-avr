@@ -10,7 +10,7 @@ import { getAvrSourceCatalog } from "./avrSourceCatalog.js";
 import { getEffectiveInputSourceOptions } from "./inputSourceResolver.js";
 import { getTunerPresetNames } from "./tunerPresetStore.js";
 import { getLearnedListeningModes } from "./learnedListeningModeStore.js";
-import { resolveListeningModes } from "./listeningModePreferences.js";
+import { displayListeningModeName, resolveListeningModes } from "./listeningModePreferences.js";
 import { getKnownListeningModes } from "./listeningModePreferences.js";
 import {
   browseMedia,
@@ -171,7 +171,7 @@ export default class EntityRegistrar {
 
     const lmdMappings = getKnownListeningModes();
     const excludeKeys = ["up", "down", "movie", "music", "game", "query"];
-    const allModes = lmdMappings.map((mode) => mode.aliases[0]).filter((key) => !excludeKeys.includes(key));
+    const allModes = lmdMappings.map((mode) => displayListeningModeName(mode.aliases[0])).filter((key) => !excludeKeys.includes(key));
     const compatibleModes = getCompatibleListeningModes(audioFormat);
     if (compatibleModes) {
       return allModes.filter((mode) => compatibleModes.includes(mode)).sort();

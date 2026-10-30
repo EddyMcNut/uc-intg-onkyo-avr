@@ -8,7 +8,7 @@ import { SetupFormBuilder } from "./setupFormBuilder.js";
 import { BackupRestoreManager } from "./backupRestoreManager.js";
 import { ConfigPersistenceManager } from "./configPersistenceManager.js";
 import type { AvrInput } from "./inputSourceStore.js";
-import { DISCOVERED_INPUT_SOURCE, DISCOVER_INPUT_SOURCE } from "./inputSourcePreferences.js";
+import { DETECTED_INPUT_SOURCE, DISCOVER_INPUT_SOURCE } from "./inputSourcePreferences.js";
 import { IDLE_SETUP_PAGE, type SetupFlowPage } from "./setupFlowState.js";
 
 const logSource = "setupHandler:";
@@ -66,6 +66,12 @@ export default class SetupHandler {
 
   private async handleDriverSetupReconfigure(msg: uc.DriverSetupRequest): Promise<uc.SetupAction | undefined> {
     const setupData = (msg as uc.DriverSetupRequest).setupData ?? {};
+
+    // The confirmation form only submits confirm_delete_config; it does not repeat
+    // the original choice field.
+    if (parseBoolean(setupData.confirm_delete_config, false)) {
+      return this.handleDeleteConfigPayload(true, true);
+    }
 
     if (setupData && Object.prototype.hasOwnProperty.call(setupData, "choice")) {
       const selected = String(setupData.choice ?? "").toLowerCase();
@@ -271,7 +277,12 @@ export default class SetupHandler {
         queueThreshold: currentAvr?.queueThreshold,
         albumArtURL: currentAvr?.albumArtURL,
         listeningModePreferences: Object.fromEntries(Object.entries(currentAvr?.listeningModes ?? {}).map(([code, mode]) => [code, mode.setting])),
-        listeningModeNames: Object.fromEntries(Object.entries(currentAvr?.listeningModes ?? {}).map(([code, mode]) => [code, mode.name])),
+        listeningModeNames: Object.fromEntries(
+          Object.entries(currentAvr?.listeningModes ?? {}).map(([code, mode]) => {
+            const names = [...new Set((mode.contexts?.length ? mode.contexts.map((context) => context.name) : [mode.name]).filter(Boolean))];
+            return [code, names.join(" / ")];
+          })
+        ),
         idInputSources: currentAvr?.idInputSources,
         volumeScale: currentAvr?.volumeScale,
         volumeScaleDiscovered: currentAvr?.volumeScaleDiscovered,
@@ -369,7 +380,7 @@ export default class SetupHandler {
     for (const id of reportedIds) {
       const entry = idInputSources[id];
       if (entry?.setting === DISCOVER_INPUT_SOURCE) {
-        idInputSources[id] = { ...entry, setting: DISCOVERED_INPUT_SOURCE };
+          idInputSources[id] = { ...entry, setting: DETECTED_INPUT_SOURCE };
       }
     }
     return { ...config, idInputSources, inputSources: inputs, inputSourceDiscoveryAvailable: available };

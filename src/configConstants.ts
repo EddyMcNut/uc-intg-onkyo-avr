@@ -31,6 +31,8 @@ export type SelectOptions = string[] | "all" | null;
 export type ListeningModePreferences = Record<string, string>;
 export type InputSourceEntry = { name: string; setting: string };
 export type InputSourceSettings = Record<string, InputSourceEntry>;
+export type ListeningModeContext = { source: string; audioFormat: string; inputChannels?: string; name: string };
+export type ListeningModeEntry = { name: string; setting: string; contexts?: ListeningModeContext[] };
 
 export function normalizeInputSourceSettings(raw: unknown): InputSourceSettings {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
@@ -50,20 +52,26 @@ export function normalizeInputSourceSettings(raw: unknown): InputSourceSettings 
 export type LearnedListeningMode = {
   code: string;
   name: string;
+  source?: string;
+  audioFormat?: string;
+  inputChannels?: string;
 };
 
 // Normalize persisted learned listening modes and drop malformed entries.
 export function normalizeLearnedListeningModes(raw: unknown): LearnedListeningMode[] {
   if (!Array.isArray(raw)) return [];
   const modes: LearnedListeningMode[] = [];
+  const add = (item: LearnedListeningMode): void => {
+    const existing = modes.find((candidate) => candidate.code === item.code && candidate.source === item.source && candidate.audioFormat === item.audioFormat && candidate.inputChannels === item.inputChannels);
+    if (existing) Object.assign(existing, item);
+    else modes.push(item);
+  };
   for (const rawMode of raw) {
     if (!rawMode || typeof rawMode !== "object") continue;
     const mode = rawMode as Record<string, unknown>;
     if (Array.isArray(mode.modes)) {
       for (const nested of normalizeLearnedListeningModes(mode.modes)) {
-        const existingNested = modes.find((item) => item.code === nested.code);
-        if (existingNested) existingNested.name = nested.name;
-        else modes.push(nested);
+        add(nested);
       }
       continue;
     }
@@ -72,9 +80,10 @@ export function normalizeLearnedListeningModes(raw: unknown): LearnedListeningMo
       .toUpperCase();
     const name = String(mode.name ?? "").trim();
     if (!code || !/^[0-9A-F]{2}$/i.test(code) || !name || name.length > MAX_LENGTHS.USER_COMMAND) continue;
-    const existing = modes.find((item) => item.code === code);
-    if (existing) existing.name = name;
-    else modes.push({ code, name });
+    const source = String(mode.source ?? "").trim();
+    const audioFormat = String(mode.audioFormat ?? "").trim();
+    const inputChannels = String(mode.inputChannels ?? "").trim();
+    add({ code, name, ...(source ? { source } : {}), ...(audioFormat ? { audioFormat } : {}), ...(inputChannels ? { inputChannels } : {}) });
   }
   return modes;
 }
@@ -217,7 +226,7 @@ export interface AvrConfig {
   inputSourceLayout?: InputSourceLayout;
   networkInputMarker?: NetworkInputMarker;
   // undefined = all options, non-empty = exact options, null = don't create entity. Empty input is normalized to "all".
-  listeningModes?: Record<string, { name: string; setting: string }>;
+  listeningModes?: Record<string, ListeningModeEntry>;
   idInputSources?: InputSourceSettings;
 }
 
@@ -264,7 +273,7 @@ export interface NormalizedAvrConfig {
   tuneinMenuStyle: TuneInMenuStyle;
   inputSourceLayout: InputSourceLayout;
   networkInputMarker: NetworkInputMarker;
-  listeningModes: Record<string, { name: string; setting: string }>;
+  listeningModes: Record<string, ListeningModeEntry>;
   idInputSources: InputSourceSettings;
 }
 

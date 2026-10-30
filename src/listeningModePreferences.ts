@@ -1,8 +1,9 @@
 import { eiscpCommands } from "./eiscp-commands.js";
-import type { LearnedListeningMode } from "./configConstants.js";
+import type { LearnedListeningMode, ListeningModeContext } from "./configConstants.js";
 
 export const DISCOVER_LISTENING_MODE = "discover";
-export const DISCOVERED_LISTENING_MODE = "discovered";
+export const DETECTED_LISTENING_MODE = "detected";
+export const INTEGRATION_PREFERRED_LISTENING_MODE = "integration-preferred";
 export const DONT_INCLUDE_LISTENING_MODE = "dont-include";
 const LEGACY_DISABLE_LISTENING_MODE = "disable";
 
@@ -15,8 +16,12 @@ function isExcludedListeningModeSetting(setting: string): boolean {
 }
 
 export type ListeningModePreferences = Record<string, string>;
-export type ListeningModeEntry = { name: string; setting: string };
+export type ListeningModeEntry = { name: string; setting: string; contexts?: ListeningModeContext[] };
 export type ListeningModes = Record<string, ListeningModeEntry>;
+
+export function displayListeningModeName(name: string): string {
+  return name === "straight-decode" ? "Straight Decode" : name;
+}
 
 export type KnownListeningMode = {
   code: string;
@@ -52,7 +57,7 @@ export function normalizeListeningModePreferences(raw: unknown): ListeningModePr
   const normalized: ListeningModePreferences = {};
   for (const mode of getKnownListeningModes()) {
     const value = String(input[mode.code] ?? "").trim();
-    if (value === DISCOVER_LISTENING_MODE || isExcludedListeningModeSetting(value) || mode.aliases.includes(value)) {
+    if (value === DISCOVER_LISTENING_MODE || value === INTEGRATION_PREFERRED_LISTENING_MODE || isExcludedListeningModeSetting(value) || mode.aliases.includes(value)) {
       normalized[mode.code] = value;
     }
   }
@@ -80,17 +85,28 @@ export function normalizeListeningModes(raw: unknown): ListeningModes {
     const entry = rawEntry as Record<string, unknown>;
     const name = String(entry.name ?? "").trim();
     const setting = String(entry.setting ?? DISCOVER_LISTENING_MODE).trim();
+    const contexts = Array.isArray(entry.contexts)
+      ? entry.contexts
+          .filter((context): context is Record<string, unknown> => Boolean(context) && typeof context === "object")
+          .map((context) => ({
+            source: String(context.source ?? "").trim(),
+            audioFormat: String(context.audioFormat ?? "").trim(),
+            ...(context.inputChannels ? { inputChannels: String(context.inputChannels).trim() } : {}),
+            name: String(context.name ?? "").trim()
+          }))
+          .filter((context) => context.source && context.audioFormat && context.name)
+      : undefined;
     if (
       !name ||
-      ![DISCOVER_LISTENING_MODE, DISCOVERED_LISTENING_MODE, DONT_INCLUDE_LISTENING_MODE, LEGACY_DISABLE_LISTENING_MODE, ...getKnownListeningModes().flatMap((mode) => mode.aliases)].includes(setting)
+      ![DISCOVER_LISTENING_MODE, DETECTED_LISTENING_MODE, INTEGRATION_PREFERRED_LISTENING_MODE, DONT_INCLUDE_LISTENING_MODE, LEGACY_DISABLE_LISTENING_MODE, ...getKnownListeningModes().flatMap((mode) => mode.aliases)].includes(setting)
     )
       continue;
-    result[code] = { name, setting };
+    result[code] = { name, setting, ...(contexts?.length ? { contexts } : {}) };
   }
   return result;
 }
 
-// Resolve configured options, using the discovered AVR name for the default "discover" choice.
+// Resolve configured options, using the detected AVR name for the default "discover" choice.
 export function resolveListeningModePreferences(preferences: ListeningModePreferences | undefined, learned: LearnedListeningMode[]): string[] | undefined {
   if (!preferences) return undefined;
   const learnedByCode = new Map(learned.map((mode) => [mode.code.toUpperCase(), mode.name]));
@@ -101,7 +117,11 @@ export function resolveListeningModePreferences(preferences: ListeningModePrefer
     if (!Object.prototype.hasOwnProperty.call(preferences, mode.code)) continue;
     const choice = preferences[mode.code] ?? DISCOVER_LISTENING_MODE;
     if (isExcludedListeningModeSetting(choice)) continue;
-    const option = [DISCOVER_LISTENING_MODE, DISCOVERED_LISTENING_MODE].includes(choice) ? (learnedByCode.get(mode.code) ?? mode.aliases[0]) : choice;
+    const option = [DISCOVER_LISTENING_MODE, DETECTED_LISTENING_MODE].includes(choice)
+      ? displayListeningModeName(learnedByCode.get(mode.code) ?? mode.aliases[0])
+      : choice === INTEGRATION_PREFERRED_LISTENING_MODE
+          ? displayListeningModeName(mode.aliases[0])
+        : choice;
     if (option && !options.includes(option)) options.push(option);
   }
   // New firmware can report a mode code not present in our static catalog. Learn mode is
@@ -118,7 +138,13 @@ export function resolveListeningModes(modes: ListeningModes | undefined, learned
   const learnedByCode = new Map(learned.map((mode) => [mode.code.toUpperCase(), mode.name]));
   return Object.entries(modes ?? {})
     .filter(([, mode]) => !isExcludedListeningModeSetting(mode.setting))
-    .map(([code, mode]) => ([DISCOVER_LISTENING_MODE, DISCOVERED_LISTENING_MODE].includes(mode.setting) ? (learnedByCode.get(code) ?? mode.name) : mode.setting))
+    .map(([code, mode]) =>
+      [DISCOVER_LISTENING_MODE, DETECTED_LISTENING_MODE].includes(mode.setting)
+        ? displayListeningModeName(learnedByCode.get(code) ?? mode.name)
+        : mode.setting === INTEGRATION_PREFERRED_LISTENING_MODE
+          ? displayListeningModeName(getKnownListeningModes().find((known) => known.code === code)?.aliases[0] ?? mode.name)
+          : mode.setting
+    )
     .filter((name, index, list) => name && list.indexOf(name) === index)
     .sort((a, b) => a.localeCompare(b));
 }
