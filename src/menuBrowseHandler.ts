@@ -120,10 +120,12 @@ export function createMenuBrowseHandler(cfg: MenuBrowseHandlerConfig): MenuBrows
           // After playback the AVR is no longer in the XML browse context.
           // The Onkyo app returns to that context before allowing another
           // track selection, then re-harvests the list.
+          const nowPlayingTitle = browseState.nowPlayingTitle;
           cfg.resetState(entityId);
           const returnedState = cfg.getBrowseState(entityId);
           if (returnedState) {
             returnedState.listModeActive = true;
+            returnedState.nowPlayingTitle = nowPlayingTitle;
           }
           log.info("%s [%s] returning to %s XML browse context after playback", logSource, entityId, cfg.providerLabel);
           await cmdHandler(mediaPlayerEntity, uc.MediaPlayerCommands.PlayMedia, {
@@ -164,6 +166,8 @@ export function createMenuBrowseHandler(cfg: MenuBrowseHandlerConfig): MenuBrows
       }
 
       if (backRequest && cmdHandler) {
+        const browseStateBeforeBack = cfg.getBrowseState(entityId);
+        const nowPlayingTitle = browseStateBeforeBack?.nowPlayingTitle ?? "";
         cfg.resetState(entityId);
         const beforeSignature = this.buildMenuSignature(entityId);
         const menuDelay = this.getMenuDelay(entityId);
@@ -173,7 +177,10 @@ export function createMenuBrowseHandler(cfg: MenuBrowseHandlerConfig): MenuBrows
           media_type: cfg.rootType
         });
         const backBrowseState = cfg.getBrowseState(entityId);
-        if (backBrowseState) backBrowseState.showMainMenuShortcut = true;
+        if (backBrowseState) {
+          backBrowseState.showMainMenuShortcut = true;
+          backBrowseState.nowPlayingTitle = nowPlayingTitle;
+        }
         if (!harvestAfterBack) {
           return cfg.browseMedia(entityId, {
             ...options,

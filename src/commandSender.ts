@@ -10,8 +10,9 @@ import log from "./loggers.js";
 import { toHex, ensureEiscpConnected } from "./utils.js";
 import { browseMedia, isMediaBrowsingAvailable } from "./mediaBrowser.js";
 import { PlayMediaCommandHandler } from "./playMediaCommandHandler.js";
-import { findAvrSourceId } from "./avrSourceCatalog.js";
+import { findAvrSourceId, getAvrSourcesByPhysicalId } from "./avrSourceCatalog.js";
 import { stripInputSourceMarker } from "./inputSourcePresentation.js";
+import { isNetworkInputSource } from "./inputSourcePreferences.js";
 import { resetDeezerBrowseState } from "./deezerBrowserStore.js";
 import { resetMusicServerBrowseState } from "./musicServerBrowserStore.js";
 import { resetTidalBrowseState } from "./tidalBrowserStore.js";
@@ -171,6 +172,13 @@ export class CommandSender {
         // can send the displayed label back verbatim, so remove the marker
         // before validating or resolving the command.
         const request = stripInputSourceMarker(params.source).toLowerCase();
+        const physicalAvrId = physicalAvrIdFromEntityId(_e.id);
+        const reportedSourceId = physicalAvrId ? findAvrSourceId(physicalAvrId, request) : undefined;
+        const isNetworkService = isNetworkInputSource(reportedSourceId ?? request, request);
+        const discoveredSourceName =
+          physicalAvrId && reportedSourceId
+            ? getAvrSourcesByPhysicalId(physicalAvrId).find((input) => input.id.toLowerCase() === reportedSourceId.toLowerCase())?.name
+            : undefined;
         if (request.startsWith("raw ")) {
           const rawCmd = request.substring(3).trim().toUpperCase();
           if (rawCmd.length > MAX_LENGTHS.RAW_COMMAND) {
@@ -212,6 +220,18 @@ export class CommandSender {
           } else {
             await this.eiscp.command(sz(request));
           }
+        }
+
+        // FLD/NLT service notifications are not guaranteed after a source
+        // selection. In particular, once the sub-source is set optimistically,
+        // the parser may suppress the matching FLD event as redundant. Update
+        // the sensor from the selected source immediately instead of leaving
+        // the previous DAB/TuneIn display in place.
+        if (isNetworkService && typeof this.driver.updateEntityAttributes === "function") {
+          this.driver.updateEntityAttributes(`${_e.id}_front_panel_display_sensor`, {
+            [uc.SensorAttributes.State]: uc.SensorStates.On,
+            [uc.SensorAttributes.Value]: discoveredSourceName ?? stripInputSourceMarker(params.source)
+          });
         }
         return uc.StatusCodes.Ok;
       }

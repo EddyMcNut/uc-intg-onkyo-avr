@@ -2,11 +2,13 @@ import type { AvrConfig } from "./configManager.js";
 import { getAvrSourcesByPhysicalId } from "./avrSourceCatalog.js";
 import { eiscpMappings } from "./eiscp-mappings.js";
 import { getAliasesForReportedInput, getInputSourceAliases, isNetworkInputSource, resolveConfiguredInputSources } from "./inputSourcePreferences.js";
+import { NETWORK_INPUT_MARKERS } from "./configConstants.js";
 
 export const SETUP_SELECTION_PAGE_SIZE = 10;
 
 export function stripInputSourceMarker(option: string): string {
-  return option.replace(/^(?:🌐|📡|🔗|☁️|🛜|🎵|▶️)\s+/u, "");
+  const markers = NETWORK_INPUT_MARKERS.filter((marker) => marker !== "none").map((marker) => marker.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|");
+  return option.replace(new RegExp(`^(?:${markers})\\s+`, "u"), "");
 }
 
 export function presentInputSourceOptions(avrConfig: AvrConfig, physicalAvrId: string, builtInOptions: string[]): string[] {

@@ -180,7 +180,8 @@ export function createMediaBrowser(cfg: MediaBrowserConfig, store: MenuBrowseSto
     // that total to the remote so it requests subsequent pages instead of
     // treating the currently-ingested first page as the end of the list.
     const listedTotal = Math.max(menuOptions.length, browseState?.totalListItemCount ?? 0);
-    const totalCount = listedTotal + ((browseState?.showMainMenuShortcut ?? false) ? 2 : 0);
+    const showNavigationShortcuts = (browseState?.showMainMenuShortcut ?? false) || (browseState?.nowPlayingTitle ?? "").length > 0 || (browseState?.browseListFrozen ?? false);
+    const totalCount = listedTotal + (showNavigationShortcuts ? 2 : 0);
     log.info("%s [%s] browse page=%d offset=%d limit=%d loaded=%d total=%d", logSource, entityId, options.paging.page, options.paging.offset, options.paging.limit, menuOptions.length, totalCount);
     if (!options.media_id || options.media_id === cfg.rootId || isMainMenuRequest(options.media_id, options.media_type) || isBackRequest(options.media_id, options.media_type)) {
       log.info("%s [%s] browsable %s menu options: %d", logSource, entityId, cfg.providerLabel, menuOptions.length);
@@ -230,8 +231,13 @@ export function createMediaBrowser(cfg: MediaBrowserConfig, store: MenuBrowseSto
     const options = store.listOptions(entityId);
     const browseState = store.getBrowseState(entityId);
     const nowPlayingTitle = browseState?.nowPlayingTitle ?? "";
+    // Returning to the browser after playback may recreate the browse context
+    // and clear the transient shortcut flag. An active now-playing title is
+    // enough evidence that this is a post-playback root, so restore the same
+    // Main Menu/Back navigation the user had before selecting the track.
+    const showNavigationShortcuts = (browseState?.showMainMenuShortcut ?? false) || nowPlayingTitle.length > 0 || (browseState?.browseListFrozen ?? false);
     const rootItems =
-      (browseState?.showMainMenuShortcut ?? false)
+      showNavigationShortcuts
         ? [createMainMenuItem(entityId), createBackItem(), ...options.map((option) => createMenuItem(option, nowPlayingTitle))]
         : options.map((option) => createMenuItem(option, nowPlayingTitle));
     const items = slicePagedItems(rootItems, paging);

@@ -11,6 +11,7 @@ const logSource = "zoneMediaRenderer:";
 
 export class ZoneMediaRenderer {
   private readonly imageHashInFlight = new Map<string, Promise<string>>();
+  private readonly imageUpdateInFlight = new Map<string, Promise<void>>();
 
   constructor(
     private readonly driver: uc.IntegrationAPI,
@@ -28,8 +29,27 @@ export class ZoneMediaRenderer {
       return;
     }
 
-    const sharedState = this.mediaStateStore.getSharedAvrMediaState(entityId);
     const physicalAvrId = this.mediaStateStore.getPhysicalAvrId(entityId);
+    const existingRequest = this.imageUpdateInFlight.get(physicalAvrId);
+    if (existingRequest) {
+      await existingRequest;
+      return;
+    }
+
+    const request = this.updateImage(entityId, physicalAvrId);
+    this.imageUpdateInFlight.set(physicalAvrId, request);
+    try {
+      await request;
+    } finally {
+      if (this.imageUpdateInFlight.get(physicalAvrId) === request) {
+        this.imageUpdateInFlight.delete(physicalAvrId);
+      }
+    }
+  }
+
+  private async updateImage(entityId: string, physicalAvrId: string): Promise<void> {
+
+    const sharedState = this.mediaStateStore.getSharedAvrMediaState(entityId);
 
     const imageUrl = `http://${this.config.ip}/${this.config.albumArtURL}`;
     const previousHash = sharedState.lastImageHash;
@@ -40,7 +60,11 @@ export class ZoneMediaRenderer {
     while (newHash === previousHash && attempts < 3) {
       attempts += 1;
       await delay(500);
-      newHash = await this.getImageHash(imageUrl, entityId);
+      // Some AVR web servers briefly serve the previous jacket after the
+      // metadata event and cache HEAD responses. A cache-busting probe lets
+      // the next track's artwork become visible without waiting for another
+      // unrelated update event.
+      newHash = await this.getImageHash(`${imageUrl}${imageUrl.includes("?") ? "&" : "?"}_=${Date.now()}`, entityId);
     }
 
     if (newHash !== previousHash) {

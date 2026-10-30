@@ -34,7 +34,7 @@ const NOOP_STATE_READER: AvrStateReader = {
 const COMMAND_MAPPINGS = eiscpMappings.command_mappings;
 const VALUE_MAPPINGS = eiscpMappings.value_mappings;
 const logSource = "eISCP:";
-const IGNORED_COMMANDS = new Set(["NMS", "NPB", "NJA", "EDV", "NFI", "NDN", "NTR", "NDS"]); // Commands to ignore from AVR (NMS=menu, NPB=playback info)
+const IGNORED_COMMANDS = new Set(["NMS", "NPB", "NJA", "EDV", "NFI", "NDN", "NTR", "NDS", "NLU"]); // Commands to ignore from AVR (NMS=menu, NPB=playback info, NLU=list URL info)
 const THROTTLED_COMMANDS = new Set(["IFA", "IFV", "FLD"]); // Commands to send to incoming queue for throttling
 const FLD_VOLUME_HEX_PREFIX = "566F6C756D65"; // "Volume" in hex - skip these FLD messages
 

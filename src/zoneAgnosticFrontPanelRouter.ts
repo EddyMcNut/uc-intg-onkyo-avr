@@ -21,7 +21,20 @@ type FrontPanelRouterDeps = {
 };
 
 export class ZoneAgnosticFrontPanelRouter {
+  private readonly tuneInRenderTimers = new Map<string, ReturnType<typeof setTimeout>>();
+
   constructor(private readonly deps: FrontPanelRouterDeps) {}
+
+  private scheduleTuneInRender(entityId: string): void {
+    const existingTimer = this.tuneInRenderTimers.get(entityId);
+    if (existingTimer) clearTimeout(existingTimer);
+
+    const timer = setTimeout(() => {
+      this.tuneInRenderTimers.delete(entityId);
+      void this.deps.renderZoneMedia(entityId, true);
+    }, 150);
+    this.tuneInRenderTimers.set(entityId, timer);
+  }
 
   async handleFld(sourceEntityId: string, frontPanelText: string, eventZone: string): Promise<void> {
     const physicalAvrId = this.deps.getPhysicalAvrId(sourceEntityId);
@@ -91,11 +104,30 @@ export class ZoneAgnosticFrontPanelRouter {
 
     const affectedZones = this.deps.getNetZones(sourceEntityId);
     for (const zoneEntityId of affectedZones) {
-      this.deps.mediaStateStore.updateNowPlaying(zoneEntityId, "net", { title, album, artist });
-      await this.deps.renderZoneMedia(zoneEntityId, true);
+      const service = this.deps.state.getSubSource(zoneEntityId);
+      // NAT, NTI and NAL arrive as separate events. Do not render or update
+      // browse matching state for partial metadata from music services; the
+      // next event carries the completed track information. TuneIn is kept
+      // permissive because its station identity is commonly reported in only
+      // one metadata field.
+      if (service !== "tunein" && (title === "unknown" || artist === "unknown")) {
+        continue;
+      }
 
-      const serviceAdapter = this.deps.getServiceAdapter(this.deps.state.getSubSource(zoneEntityId));
+      this.deps.mediaStateStore.updateNowPlaying(zoneEntityId, "net", { title, album, artist });
+      const serviceAdapter = this.deps.getServiceAdapter(service);
+
+      if (service === "tunein") {
+        // TuneIn commonly sends NAT/NTI/NAL in a burst. Keep browse matching
+        // immediate, but collapse the redundant media-widget/artwork renders.
+        serviceAdapter?.handleMetadata(zoneEntityId, artist);
+        this.scheduleTuneInRender(zoneEntityId);
+        continue;
+      }
+
+      await this.deps.renderZoneMedia(zoneEntityId, true);
       serviceAdapter?.handleMetadata(zoneEntityId, artist);
+      serviceAdapter?.handleTrackMetadata?.(zoneEntityId, title, artist);
     }
 
     if (affectedZones.length > 0) {

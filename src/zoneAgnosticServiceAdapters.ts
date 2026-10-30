@@ -29,6 +29,7 @@ export type ZoneAgnosticServiceAdapter = {
   handleNls(sourceEntityId: string, entry: string): void;
   handleNla(sourceEntityId: string, xmlPayload: string): void;
   handleMetadata(zoneEntityId: string, artist: string): void;
+  handleTrackMetadata?(zoneEntityId: string, title: string, artist: string): void;
   // Drop stale now-playing marks so a fresh (re-)entry of the service starts with a clean browser.
   clearNowPlayingForZones?(zoneEntityIds: string[]): void;
 };
@@ -134,7 +135,15 @@ export class TidalZoneAgnosticAdapter implements ZoneAgnosticServiceAdapter {
     return getServiceZones(sourceEntityId, this.service, this.deps);
   }
 
-  async onServiceEntered(_sourceEntityId: string, _affectedZones: string[], _enteringZones: string[]): Promise<void> {}
+  async onServiceEntered(_sourceEntityId: string, _affectedZones: string[], enteringZones: string[]): Promise<void> {
+    for (const zoneEntityId of enteringZones) {
+      const state = getTidalBrowseState(zoneEntityId);
+      if (state) {
+        state.nowPlayingTitle = "";
+        state.browseListFrozen = false;
+      }
+    }
+  }
 
   // Tidal browsing is XML-only. Ignore legacy NLS ten-line updates so they
   // cannot overwrite an active NLA/NLAL browse context.
@@ -150,6 +159,7 @@ export class TidalZoneAgnosticAdapter implements ZoneAgnosticServiceAdapter {
     const tidalState = getTidalBrowseState(zoneEntityId);
     if (tidalState) tidalState.nowPlayingTitle = artist;
   }
+
 }
 
 export class DeezerZoneAgnosticAdapter implements ZoneAgnosticServiceAdapter {
@@ -161,7 +171,15 @@ export class DeezerZoneAgnosticAdapter implements ZoneAgnosticServiceAdapter {
     return getServiceZones(sourceEntityId, this.service, this.deps);
   }
 
-  async onServiceEntered(_sourceEntityId: string, _affectedZones: string[], _enteringZones: string[]): Promise<void> {}
+  async onServiceEntered(_sourceEntityId: string, _affectedZones: string[], enteringZones: string[]): Promise<void> {
+    for (const zoneEntityId of enteringZones) {
+      const state = getDeezerBrowseState(zoneEntityId);
+      if (state) {
+        state.nowPlayingTitle = "";
+        state.browseListFrozen = false;
+      }
+    }
+  }
 
   // Deezer browsing is XML-only; ignore legacy NLS list updates.
   handleNls(_sourceEntityId: string, _entry: string): void {}
@@ -173,9 +191,37 @@ export class DeezerZoneAgnosticAdapter implements ZoneAgnosticServiceAdapter {
   }
 
   handleMetadata(zoneEntityId: string, artist: string): void {
-    const deezerState = getDeezerBrowseState(zoneEntityId);
-    if (deezerState) deezerState.nowPlayingTitle = artist;
+    // Deezer uses a dedicated title/artist reconstruction in
+    // handleTrackMetadata; do not overwrite its complete browse match with
+    // the artist-only NTI value first.
   }
+
+  handleTrackMetadata(zoneEntityId: string, title: string, artist: string): void {
+    const deezerState = getDeezerBrowseState(zoneEntityId);
+    if (!deezerState || title === "unknown") return;
+
+    const previousTitle = deezerState.nowPlayingTitle;
+    let candidate: string;
+
+    // On this AVR Deezer reports the complete "Track / Artist" value in NTI,
+    // while NAT contains only the artist. Prefer that complete browse value.
+    if (artist !== "unknown" && (artist.includes(" / ") || artist.includes(" - "))) {
+      candidate = artist;
+    } else if (title !== "unknown" && title.includes(" / ")) {
+      candidate = title;
+    } else {
+      // A plain NAT/NTI pair can be a stale partial update from the previous
+      // Deezer context. Keep the selected/current full browse title until the
+      // AVR provides the complete formatted track value.
+      return;
+    }
+
+    // NAT/NTI updates can briefly contain a truncated artist suffix. Keep the
+    // complete title already stored by play_media until a different track is
+    // reported, otherwise the exact Deezer browse match is lost.
+    deezerState.nowPlayingTitle = previousTitle && previousTitle.toLowerCase().startsWith(candidate.toLowerCase()) ? previousTitle : candidate;
+  }
+
 }
 
 export class MusicServerZoneAgnosticAdapter implements ZoneAgnosticServiceAdapter {
@@ -187,7 +233,15 @@ export class MusicServerZoneAgnosticAdapter implements ZoneAgnosticServiceAdapte
     return getServiceZones(sourceEntityId, this.service, this.deps);
   }
 
-  async onServiceEntered(_sourceEntityId: string, _affectedZones: string[], _enteringZones: string[]): Promise<void> {}
+  async onServiceEntered(_sourceEntityId: string, _affectedZones: string[], enteringZones: string[]): Promise<void> {
+    for (const zoneEntityId of enteringZones) {
+      const state = getMusicServerBrowseState(zoneEntityId);
+      if (state) {
+        state.nowPlayingTitle = "";
+        state.browseListFrozen = false;
+      }
+    }
+  }
 
   // Music Server browsing is XML-only. The Onkyo app does not use the legacy
   // NLS ten-line list for this service; accepting it here can mix stale list
@@ -204,4 +258,5 @@ export class MusicServerZoneAgnosticAdapter implements ZoneAgnosticServiceAdapte
     const musicServerState = getMusicServerBrowseState(zoneEntityId);
     if (musicServerState) musicServerState.nowPlayingTitle = artist;
   }
+
 }
