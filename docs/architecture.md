@@ -35,6 +35,16 @@ The persisted configuration is an `IntegrationConfig` containing an array of `Av
 
 The physical connection key is `model + ip`. Zone entity IDs additionally include `zone`.
 
+Listening-mode preferences and input-source preferences are physical-AVR settings. They are
+stored on the configured AVR-zone entries for compatibility with the current configuration schema,
+but the setup flow applies the same settings to every configured zone belonging to that physical
+AVR. AVR-reported input catalogs and learned listening-mode names are also kept per physical AVR,
+not per zone.
+
+During initial setup, the integration applies the default preferences. Users can configure them
+afterward through setup. When more than one physical AVR is configured, setup first asks which AVR
+should be reconfigured; zones are not selected separately.
+
 ### One AVR, one zone
 
 ```mermaid

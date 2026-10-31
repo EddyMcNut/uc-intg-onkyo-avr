@@ -6,6 +6,8 @@ As from v0.7.0, this integration can handle multiple zones for each configured A
 
   ![](/screenshots/zone-setting.png)
 
+- Listening-mode and input-source preferences belong to the physical AVR and are shared by all of its configured zones. Zones are configured separately for entity and control purposes, not for these preferences.
+
 - Add your AVR zones as entities: In `Integrations` select `Onkyo AVR custom`, click the `+` next to `Configured entities`, each zone is an AVR entity.
 
   ![](/screenshots/configured-zones.png)

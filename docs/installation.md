@@ -23,9 +23,15 @@
   - Populate `AVR Model` and `AVR IP Address`.
 - Check if the endpoint for Album Art corresponds with your AVR model, if it does not have an Album Art endpoint, set it to `na` to prevent errors.
 - Configure also the other settings for your AVR.
+- Initial setup applies the default listening-mode and input-source settings automatically. To customize them, complete setup first and then choose **Configure listening modes** or **Configure input sources**.
+- If more than one AVR is configured, reconfiguration first asks which AVR you want to configure. The selected settings apply to all zones of that AVR.
 - Example of the entity names long or short configuration: `TX-RZ50 192.168.2.103 main` or `TX-RZ50 main`
 - Click `Next`.
 - Click `Add all`, click `Done`.
+
+When upgrading to version 0.9.9, configure listening modes and input sources once for each AVR if you want to change the defaults.
+
+![](../screenshots/setup-int-lmd-sli.png)
 
 ### Available entities
 

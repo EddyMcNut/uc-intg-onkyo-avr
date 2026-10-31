@@ -4,7 +4,16 @@
 
 The `Input source` command offers a dropdown list [based on your config](./source-webconfigurator-mediawidget.md), so depending on how you configured [Input Select](./select-input-selector.md) the integration will show a list of input sources. By default AVR-reported names and IDs are used when available.
 
+Input sources are configured per physical AVR and apply to all of that AVR's configured zones. During setup, choose **Configure input sources**. If more than one AVR is configured, setup first asks which AVR to configure.
+
+After upgrading to version 0.9.9, configure the input sources once for each AVR so you can choose which sources to include and which names to display.
+
 ![](/screenshots/input-source2.png)
+
+## AVR specific names
+The integration is now able to collect the exact names that your specific AVR is using. It can however only learn that name that kind of reporting is supported by your AVR. So, with inital install of v0.9.9. all input sources known by this integration are set to `✨ Discover from AVR`. When your AVR reports its own dialect of that specific input source, this integration will learn it, and status changes to `✅ AVR-discovered` and from now on use that name instead of one of the aliases. You can change this behavior by selecting the alias you prefer. You can also `🚫 Don't include` aan input source if you never use it anyway. Then the list of linput sources in the select-entity will be shorter.
+
+![](../screenshots/setup-inputsources.png)
 
 ### NET
 
