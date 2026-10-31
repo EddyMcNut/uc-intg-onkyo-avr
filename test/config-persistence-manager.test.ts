@@ -97,7 +97,7 @@ describe("configPersistenceManager", () => {
 
       const written = JSON.parse(mockWriteFileSync.mock.calls[0][1] as string);
       const avr = written.avrs.find((entry: any) => entry.ip === "9.8.7.6");
-      expect(avr.idInputSources["10"]).toEqual({ name: "Blu-ray", setting: "detected" });
+      expect(avr.idInputSources["10"]).toEqual({ name: "Blu-ray", setting: "discovered" });
       expect(avr.idInputSources["02"].setting).toBe("dont-include");
     });
 

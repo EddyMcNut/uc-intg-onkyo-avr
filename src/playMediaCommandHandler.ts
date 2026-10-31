@@ -158,8 +158,6 @@ export class PlayMediaCommandHandler {
               : undefined;
     if (pendingSubSource) this.avrStateApi.setSubSource(entityId, pendingSubSource);
 
-    // The Onkyo app enters Music Server directly with NSV000. This avoids the
-    // legacy NET menu/NLS path and matches the captured NLA/NLAL browse flow.
     if (serviceId === TUNEIN_SERVICE_ID) {
       await this.eiscp.raw("NSV0E0");
     } else if (serviceId === MUSIC_SERVER_SERVICE_ID) {

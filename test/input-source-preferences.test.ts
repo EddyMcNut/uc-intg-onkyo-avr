@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   DONT_INCLUDE_INPUT_SOURCE,
-  DETECTED_INPUT_SOURCE,
+  DISCOVERED_INPUT_SOURCE,
   findConfiguredInputId,
   getAliasesForReportedInput,
   getInputSourceAliases,
@@ -22,7 +22,7 @@ describe("input source preferences", () => {
 
   it("normalizes settings and resolves learned, aliases, exclusions, and duplicates", () => {
     const settings = normalizeInputSources({
-      "02": { name: "GAME", setting: DETECTED_INPUT_SOURCE },
+       "02": { name: "GAME", setting: DISCOVERED_INPUT_SOURCE },
       "03": { name: "AUX", setting: DONT_INCLUDE_INPUT_SOURCE },
       "04": { name: "AUX2", setting: "aux2" },
       bad: null,

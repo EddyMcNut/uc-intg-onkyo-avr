@@ -15,9 +15,6 @@ export type MenuSignatureItem = {
 };
 
 export abstract class MenuBrowseHandlerBase {
-  // Observed in the Onkyo app: NLAL requests are paged in 20-item chunks.
-  // Asking for 0x03E7 items makes this AVR stay on its ten-line display
-  // window instead of returning the full XML list.
   private static readonly NLAL_PAGE_SIZE = "0014";
 
   protected abstract readonly logSource: string;

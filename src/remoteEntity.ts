@@ -55,7 +55,7 @@ function buildRemoteButtonMapping(): uc.DeviceButtonMapping[] {
 function buildRemoteUiPages(reportedInputNames?: string[]): uc.UiPage[] {
   const pages: uc.UiPage[] = [];
 
-  const avrPage1 = new uc.UiPage("onkyo_avr_commands1", "AVR commands (1)", new uc.Size(GRID_WIDTH, 8));
+  const avrPage1 = new uc.UiPage("avr_commands1", "AVR commands (1)", new uc.Size(GRID_WIDTH, 8));
   avrPage1.add(uc.createUiIcon("uc:power-on", 0, 0, uc.createRemoteSendCmd(uc.MediaPlayerCommands.Toggle)));
   avrPage1.add(uc.createUiText("SLEEP", 6, 0, uc.createRemoteSendCmd("SLEEP_UP"), new uc.Size(1, 1)));
 
@@ -84,7 +84,7 @@ function buildRemoteUiPages(reportedInputNames?: string[]): uc.UiPage[] {
   avrPage1.add(uc.createUiIcon("uc:plus", 6, 6, uc.createRemoteSendCmd("SUBWOOFER_TEMP_LEVEL_UP"), new uc.Size(1, 1)));
   pages.push(avrPage1);
 
-  const avrPage2 = new uc.UiPage("onkyo_avr_commands2", "AVR commands (2)", new uc.Size(GRID_WIDTH, 8));
+  const avrPage2 = new uc.UiPage("avr_commands2", "AVR commands (2)", new uc.Size(GRID_WIDTH, 8));
   avrPage2.add(uc.createUiText("Listening Mode:", 0, 0, undefined, new uc.Size(7, 1)));
   avrPage2.add(uc.createUiText("Music", 0, 1, uc.createRemoteSendCmd("LISTENING_MODE_MUSIC"), new uc.Size(2, 1)));
   avrPage2.add(uc.createUiText("Movie", 2, 1, uc.createRemoteSendCmd("LISTENING_MODE_MOVIE"), new uc.Size(2, 1)));
@@ -104,7 +104,7 @@ function buildRemoteUiPages(reportedInputNames?: string[]): uc.UiPage[] {
 
   pages.push(avrPage2);
 
-  const avrPage3 = reportedInputNames ? buildReportedInputPage(reportedInputNames) : new uc.UiPage("onkyo_avr_commands3", "AVR commands (3)", new uc.Size(6, 11));
+  const avrPage3 = reportedInputNames ? buildReportedInputPage(reportedInputNames) : new uc.UiPage("avr_commands3", "AVR commands (3)", new uc.Size(6, 11));
   if (reportedInputNames) {
     pages.push(avrPage3);
   } else {
@@ -154,7 +154,7 @@ function buildRemoteUiPages(reportedInputNames?: string[]): uc.UiPage[] {
     pages.push(avrPage3);
   }
 
-  const avrPage4 = new uc.UiPage("onkyo_avr_commands4", "AVR commands (4)", new uc.Size(GRID_WIDTH, 8));
+  const avrPage4 = new uc.UiPage("avr_commands4", "AVR commands (4)", new uc.Size(GRID_WIDTH, 8));
   avrPage4.add(uc.createUiText("HDMI", 0, 0, uc.createRemoteSendCmd("HDMI_OUTPUT_UP"), new uc.Size(7, 1)));
   avrPage4.add(uc.createUiText("LipSync", 0, 1, uc.createRemoteSendCmd("LIP_SYNC_UP"), new uc.Size(7, 1)));
   avrPage4.add(uc.createUiText("PanelDisplayMode", 0, 2, uc.createRemoteSendCmd("DISPLAY_MODE_TOGGLE"), new uc.Size(7, 1)));
@@ -171,7 +171,7 @@ function buildRemoteUiPages(reportedInputNames?: string[]): uc.UiPage[] {
 function buildReportedInputPage(names: string[]): uc.UiPage {
   const columns = 3;
   const rows = Math.max(1, Math.ceil(names.length / columns));
-  const page = new uc.UiPage("onkyo_avr_sources", "AVR sources", new uc.Size(6, rows));
+  const page = new uc.UiPage("avr_sources", "AVR sources", new uc.Size(6, rows));
   names.forEach((name, index) => {
     page.add(uc.createUiText(name, (index % columns) * 2, Math.floor(index / columns), uc.createRemoteSendCmd(`${REPORTED_INPUT_COMMAND_PREFIX}${encodeURIComponent(name)}`), new uc.Size(2, 1)));
   });

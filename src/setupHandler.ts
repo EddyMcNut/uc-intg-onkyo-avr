@@ -8,7 +8,7 @@ import { SetupFormBuilder } from "./setupFormBuilder.js";
 import { BackupRestoreManager } from "./backupRestoreManager.js";
 import { ConfigPersistenceManager } from "./configPersistenceManager.js";
 import type { AvrInput } from "./inputSourceStore.js";
-import { DETECTED_INPUT_SOURCE, DISCOVER_INPUT_SOURCE } from "./inputSourcePreferences.js";
+import { DISCOVERED_INPUT_SOURCE, DISCOVER_INPUT_SOURCE } from "./inputSourcePreferences.js";
 import { IDLE_SETUP_PAGE, type SetupFlowPage } from "./setupFlowState.js";
 
 const logSource = "setupHandler:";
@@ -427,7 +427,7 @@ export default class SetupHandler {
     for (const id of reportedIds) {
       const entry = idInputSources[id];
       if (entry?.setting === DISCOVER_INPUT_SOURCE) {
-        idInputSources[id] = { ...entry, setting: DETECTED_INPUT_SOURCE };
+        idInputSources[id] = { ...entry, setting: DISCOVERED_INPUT_SOURCE };
       }
     }
     return { ...config, idInputSources, inputSources: inputs, inputSourceDiscoveryAvailable: available };

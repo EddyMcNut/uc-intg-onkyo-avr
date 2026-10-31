@@ -828,7 +828,7 @@ export const eiscpCommands = {
       values: {
         "1,999": {
           name: "no-1-99",
-          description: "sets Preset No. 1 - 999 (custom for UCR3 Onkyo integration)"
+          description: "sets Preset No. 1 - 999 (custom for UCR3 integration)"
         }
       }
     },

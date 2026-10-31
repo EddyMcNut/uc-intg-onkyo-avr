@@ -1,12 +1,3 @@
-// Resolve the "auto" volume scale setting against what the AVR reports about itself.
-//
-// The AVR display of an Onkyo/Pioneer/Integra receiver runs either 0-80 or 0-100, and NRI states which
-// one per zone in the `volmax` attribute of the zone list. Guessing it wrongly means the remote shows a
-// different volume than the AVR, so "auto" reads the real value the first time NRI arrives, stores it
-// as an explicit scale and then never looks at it again.
-//
-// Nothing is resolved for AVRs that do not support NRI at all: no NRI reply ever arrives, so the
-// setting stays "auto" and volume arithmetic keeps using the documented 0-100 default.
 import { VOLUME_SCALE_AUTO, VOLUME_SCALE_FALLBACK, type AvrConfig, type VolumeScale } from "./configManager.js";
 import { getAvrVolumeScale } from "./avrInfoStore.js";
 

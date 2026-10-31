@@ -110,7 +110,7 @@ describe("listening mode branch coverage", () => {
         { code: "FF", name: "Future" }
       ])
     ).toEqual(["AVR Stereo", "Future"]);
-    expect(resolveListeningModes({ "00": { name: "same", setting: "discover" }, "01": { name: "same", setting: "detected" }, "02": { name: "off", setting: "disable" } }, [])).toEqual(["same"]);
+    expect(resolveListeningModes({ "00": { name: "same", setting: "discover" }, "01": { name: "same", setting: "discovered" }, "02": { name: "off", setting: "disable" } }, [])).toEqual(["same"]);
   });
 });
 

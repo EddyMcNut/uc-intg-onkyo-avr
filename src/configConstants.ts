@@ -42,7 +42,8 @@ export function normalizeInputSourceSettings(raw: unknown): InputSourceSettings 
     const entry = rawEntry as Record<string, unknown>;
     const id = rawId.trim().toUpperCase();
     const name = String(entry.name ?? "").trim();
-    const setting = String(entry.setting ?? "").trim();
+    const rawSetting = String(entry.setting ?? "").trim();
+    const setting = rawSetting === "detected" ? "discovered" : rawSetting;
     if (id && name && setting) result[id] = { name, setting };
   }
   return result;

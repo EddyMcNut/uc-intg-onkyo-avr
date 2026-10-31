@@ -13,7 +13,7 @@ import { diracServiceKeyToOption } from "./diracSelect.js";
 import { AV_INFO_REQUERY_DELAY } from "./constants.js";
 import type { AvrStateApi } from "./types.js";
 import { findLearnedListeningModeName, getLearnedListeningModes, learnListeningMode } from "./learnedListeningModeStore.js";
-import { DETECTED_LISTENING_MODE, DISCOVER_LISTENING_MODE, DONT_INCLUDE_LISTENING_MODE, INTEGRATION_PREFERRED_LISTENING_MODE, displayListeningModeName, getKnownListeningModes, resolveListeningModes } from "./listeningModePreferences.js";
+import { DISCOVERED_LISTENING_MODE, DISCOVER_LISTENING_MODE, DONT_INCLUDE_LISTENING_MODE, INTEGRATION_PREFERRED_LISTENING_MODE, displayListeningModeName, getKnownListeningModes, resolveListeningModes } from "./listeningModePreferences.js";
 import { displayInputSourceOption } from "./inputSourcePresentation.js";
 
 const logSource = "commandReceiver:";
@@ -177,7 +177,7 @@ export class CommandReceiver {
     const configured = code ? cfgAvr?.listeningModes?.[code]?.setting : undefined;
     const current = configured === INTEGRATION_PREFERRED_LISTENING_MODE
       ? displayListeningModeName(getKnownListeningModes().find((mode) => mode.code === code)?.aliases[0] ?? argument.listeningMode)
-      : configured && ![DISCOVER_LISTENING_MODE, DETECTED_LISTENING_MODE, DONT_INCLUDE_LISTENING_MODE, "disable"].includes(configured)
+      : configured && ![DISCOVER_LISTENING_MODE, DISCOVERED_LISTENING_MODE, DONT_INCLUDE_LISTENING_MODE, "disable"].includes(configured)
         ? configured
         : argument.listeningMode;
     this.driver.updateEntityAttributes(`${entityId}_listening_mode`, { [SelectAttributes.CurrentOption]: current });
@@ -233,7 +233,7 @@ export class CommandReceiver {
 
   private async handleSystemPower(avrUpdates: AvrUpdateEvent, entityId: string): Promise<void> {
     const powerState = avrUpdates.argument === "on" ? uc.MediaPlayerStates.On : uc.MediaPlayerStates.Standby;
-    log.info("%s ** Onkyo AVR custom integration version %s **", logSource, this.driverVersion);
+    log.info("%s ** Onkyo/Pioneer/Integra AVR custom integration version %s **", logSource, this.driverVersion);
     log.info("%s [%s] power set to: %s (log level: %s)", logSource, entityId, powerState, getLogLevel());
     this.avrStateApi.setPowerState(entityId, avrUpdates.argument as string, this.driver);
     if (avrUpdates.argument !== "on") {
@@ -365,7 +365,7 @@ export class CommandReceiver {
       const configured = cfgAvr.listeningModes[configuredCode]?.setting;
       if (configured === INTEGRATION_PREFERRED_LISTENING_MODE) {
         listeningMode = displayListeningModeName(getKnownListeningModes().find((mode) => mode.code === configuredCode)?.aliases[0] ?? listeningMode);
-      } else if (configured && configured !== DISCOVER_LISTENING_MODE && configured !== DETECTED_LISTENING_MODE && configured !== DONT_INCLUDE_LISTENING_MODE && configured !== "disable") {
+      } else if (configured && configured !== DISCOVER_LISTENING_MODE && configured !== DISCOVERED_LISTENING_MODE && configured !== DONT_INCLUDE_LISTENING_MODE && configured !== "disable") {
         listeningMode = configured;
       }
     }

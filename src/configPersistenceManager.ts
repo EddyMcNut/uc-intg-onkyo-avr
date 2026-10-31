@@ -4,7 +4,7 @@ import { ConfigManager, type AvrConfig, type AvrZone, AVR_DEFAULTS, type Integra
 import { DISCOVER_LISTENING_MODE, INTEGRATION_PREFERRED_LISTENING_MODE, getKnownListeningModes } from "./listeningModePreferences.js";
 import log, { setLogLevel } from "./loggers.js";
 import { type ParsedManualConfig } from "./manualConfigParser.js";
-import { getInputSourceAliases, DONT_INCLUDE_INPUT_SOURCE, DETECTED_INPUT_SOURCE, getKnownInputSources } from "./inputSourcePreferences.js";
+import { getInputSourceAliases, DONT_INCLUDE_INPUT_SOURCE, DISCOVERED_INPUT_SOURCE, getKnownInputSources } from "./inputSourcePreferences.js";
 import type { InputSourceSettings } from "./configConstants.js";
 
 const logSource = "configPersistenceManager:";
@@ -130,7 +130,7 @@ export class ConfigPersistenceManager {
         return [
           mode.code,
           {
-          // Keep the AVR-detected name when the user selects "discover" again. The
+          // Keep the AVR-discovered name when the user selects "discover" again. The
           // setting controls whether the learned value is used; replacing its
           // name here would erase the learned mode during setup reconfiguration.
            // Setup labels may summarize multiple detected context names. Never persist that
@@ -166,10 +166,10 @@ export class ConfigPersistenceManager {
         // the selector alongside the learned AVR names.
         (parsed.inputSourceDiscoveryAvailable && (parsed.inputSources?.length ?? 0) > 0
           ? reported.has(id)
-            ? DETECTED_INPUT_SOURCE
+            ? DISCOVERED_INPUT_SOURCE
             : DONT_INCLUDE_INPUT_SOURCE
           : (aliases[0] ?? DONT_INCLUDE_INPUT_SOURCE));
-      result[id] = { name, setting: selected || DETECTED_INPUT_SOURCE };
+      result[id] = { name, setting: selected || DISCOVERED_INPUT_SOURCE };
     }
     return result;
   }

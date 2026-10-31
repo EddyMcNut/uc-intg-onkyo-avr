@@ -109,17 +109,10 @@ export function createMenuBrowseHandler(cfg: MenuBrowseHandlerConfig): MenuBrows
       const backRequest = cfg.isBackRequest(options.media_id, options.media_type);
       const selection = cfg.resolveMenuOption(options.media_id, options.media_type);
 
-      // For XML-only services the remote normally asks for the root directly
-      // after source selection. The Onkyo app responds to NSV000/NLT by
-      // issuing NLAL; do the same instead of waiting for a synthetic main
-      // menu selection that the remote may never send.
       const rootRequest = !options.media_id || options.media_id === cfg.rootId;
       if (rootRequest && !waitForMenuStableBeforeHarvest && rawSend) {
         const browseState = cfg.getBrowseState(entityId);
         if (!mainMenu && browseState?.browseListFrozen && cmdHandler) {
-          // After playback the AVR is no longer in the XML browse context.
-          // The Onkyo app returns to that context before allowing another
-          // track selection, then re-harvests the list.
           const nowPlayingTitle = browseState.nowPlayingTitle;
           cfg.resetState(entityId);
           const returnedState = cfg.getBrowseState(entityId);
@@ -143,8 +136,6 @@ export function createMenuBrowseHandler(cfg: MenuBrowseHandlerConfig): MenuBrows
           if (browseState) browseState.listModeActive = true;
           await this.waitForListMetadata(entityId, this.getMenuDelay(entityId));
           if ((browseState?.totalListItemCount ?? 0) === 0 && cfg.listMenuItems(entityId).length === 0) {
-            // The AVR can reset the NLT metadata while changing source. The
-            // Onkyo app still starts the XML browser with this exact request.
             await rawSend(`NLAL00000100000001`);
             await this.waitForListMetadata(entityId, this.getMenuDelay(entityId));
           }

@@ -574,8 +574,6 @@ export class EiscpDriver extends EventEmitter {
   private commandToIscp(command: string, args: string | number | undefined, zone: string): string {
     const prefix = (COMMAND_MAPPINGS as Record<string, string>)[command];
     let value: string;
-    // Music Server is selected directly by the Onkyo app. SLI27 only moves
-    // the NET menu cursor; it does not activate the service.
     if (prefix === "SLI" && typeof args === "string" && stripInputSourceMarker(args).toLowerCase() === "music-server") {
       return "NSV000";
     }
@@ -605,8 +603,7 @@ export class EiscpDriver extends EventEmitter {
         return `NSV${reportedService.id.toUpperCase()}0`;
       }
 
-      // An input name the AVR reported itself ("BD/DVD", "CBL/SAT") is not in the hardcoded SLI
-      // table: send the input id the AVR gave for it instead.
+      // An input name the AVR reported itself ("BD/DVD", "CBL/SAT") is not in the hardcoded SLI table: send the input id the AVR gave for it instead.
       const inputId = findAvrInputId(physicalAvrId, args) ?? findConfiguredInputId(this.config.idInputSources, args);
       if (inputId) {
         log.debug("%s Sending input-selector %s as %s%s (id reported by the AVR)", logSource, args, getZonePrefix(prefix, zone), inputId);

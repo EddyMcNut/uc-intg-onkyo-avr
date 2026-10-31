@@ -249,6 +249,9 @@ export class IscpCommandParser {
 
     const inputRateChannels = inputFormat === "" ? inputSource : this.joinFiltered([inputRate, inputChannels], " ");
     const audioInputValue = this.joinFiltered([inputFormat, inputRateChannels]);
+    // Keep the audio-output sensor compatible with the established representation:
+    // listening mode followed by the output channel layout.
+    const audioOutputValue = this.joinFiltered([listeningMode, outputChannels]);
 
     result.command = "IFA";
     result.argument = {
@@ -259,7 +262,7 @@ export class IscpCommandParser {
       inputChannels,
       outputChannels,
       audioInputValue,
-      audioOutputValue: outputChannels
+      audioOutputValue
     };
     return result;
   }

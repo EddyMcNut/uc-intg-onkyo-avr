@@ -228,7 +228,7 @@ it("IscpCommandParser parses IFA payload into normalized audio fields", async ()
   expect(audio.inputFormat).toBe("PCM");
   expect(audio.listeningMode).toBe("AllCh Stereo");
   expect(audio.audioInputValue).toBe("PCM | 48kHz 2ch");
-  expect(audio.audioOutputValue).toBe("5.1.4ch");
+  expect(audio.audioOutputValue).toBe("AllCh Stereo | 5.1.4ch");
 
   const noFormat = parser.parse("IFA", "NET,,, ,AllCh Stereo,2ch");
   const noFormatAudio = noFormat?.argument as Record<string, string>;

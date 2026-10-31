@@ -1,6 +1,6 @@
 import { ConfigManager, physicalAvrIdFromEntityId } from "./configManager.js";
 import { normalizeLearnedListeningModes, type LearnedListeningMode, type ListeningModeContext } from "./configConstants.js";
-import { DETECTED_LISTENING_MODE } from "./listeningModePreferences.js";
+import { DISCOVERED_LISTENING_MODE } from "./listeningModePreferences.js";
 
 function key(value: string | undefined): string {
   return (value ?? "").trim().toLowerCase().replace(/\s+/g, " ");
@@ -61,7 +61,7 @@ export function learnListeningMode(entityId: string, mode: LearnedListeningMode)
   if (!avr) return false;
   const listeningModes = { ...(avr.listeningModes ?? {}) };
   const wasExisting = Boolean(listeningModes[observed.code]);
-  const existing = listeningModes[observed.code] ?? { name: observed.name, setting: DETECTED_LISTENING_MODE };
+  const existing = listeningModes[observed.code] ?? { name: observed.name, setting: DISCOVERED_LISTENING_MODE };
   const contexts = [...(existing.contexts ?? [])];
   const context: ListeningModeContext | undefined = observed.source && observed.audioFormat
     ? { source: observed.source, audioFormat: observed.audioFormat, ...(observed.inputChannels ? { inputChannels: observed.inputChannels } : {}), name: observed.name }
@@ -77,7 +77,7 @@ export function learnListeningMode(entityId: string, mode: LearnedListeningMode)
       changed = true;
     }
   }
-  listeningModes[observed.code] = { ...existing, name: observed.name, setting: existing.setting ?? DETECTED_LISTENING_MODE, ...(contexts.length ? { contexts } : {}) };
+  listeningModes[observed.code] = { ...existing, name: observed.name, setting: existing.setting ?? DISCOVERED_LISTENING_MODE, ...(contexts.length ? { contexts } : {}) };
   if (!changed) return false;
   ConfigManager.save({ avrs: (ConfigManager.get().avrs ?? []).map((item) => (`${item.model} ${item.ip}` === avrId ? { ...item, listeningModes } : item)) });
   return true;

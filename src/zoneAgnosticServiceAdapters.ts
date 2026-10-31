@@ -243,9 +243,6 @@ export class MusicServerZoneAgnosticAdapter implements ZoneAgnosticServiceAdapte
     }
   }
 
-  // Music Server browsing is XML-only. The Onkyo app does not use the legacy
-  // NLS ten-line list for this service; accepting it here can mix stale list
-  // entries into an active NLA/NLAL browse context.
   handleNls(_sourceEntityId: string, _entry: string): void {}
 
   handleNla(sourceEntityId: string, xmlPayload: string): void {

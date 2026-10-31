@@ -2,13 +2,15 @@ import { eiscpCommands } from "./eiscp-commands.js";
 import type { LearnedListeningMode, ListeningModeContext } from "./configConstants.js";
 
 export const DISCOVER_LISTENING_MODE = "discover";
-export const DETECTED_LISTENING_MODE = "detected";
+export const DISCOVERED_LISTENING_MODE = "discovered";
+const LEGACY_DETECTED_LISTENING_MODE = "detected";
 export const INTEGRATION_PREFERRED_LISTENING_MODE = "integration-preferred";
 export const DONT_INCLUDE_LISTENING_MODE = "dont-include";
 const LEGACY_DISABLE_LISTENING_MODE = "disable";
 
 export function normalizeListeningModeSetting(setting: string): string {
-  return setting === LEGACY_DISABLE_LISTENING_MODE ? DONT_INCLUDE_LISTENING_MODE : setting;
+  if (setting === LEGACY_DISABLE_LISTENING_MODE) return DONT_INCLUDE_LISTENING_MODE;
+  return setting === LEGACY_DETECTED_LISTENING_MODE ? DISCOVERED_LISTENING_MODE : setting;
 }
 
 function isExcludedListeningModeSetting(setting: string): boolean {
@@ -84,7 +86,7 @@ export function normalizeListeningModes(raw: unknown): ListeningModes {
     if (!/^[0-9A-F]{2}$/.test(code) || !rawEntry || typeof rawEntry !== "object") continue;
     const entry = rawEntry as Record<string, unknown>;
     const name = String(entry.name ?? "").trim();
-    const setting = String(entry.setting ?? DISCOVER_LISTENING_MODE).trim();
+    const setting = normalizeListeningModeSetting(String(entry.setting ?? DISCOVER_LISTENING_MODE).trim());
     const contexts = Array.isArray(entry.contexts)
       ? entry.contexts
           .filter((context): context is Record<string, unknown> => Boolean(context) && typeof context === "object")
@@ -98,7 +100,7 @@ export function normalizeListeningModes(raw: unknown): ListeningModes {
       : undefined;
     if (
       !name ||
-      ![DISCOVER_LISTENING_MODE, DETECTED_LISTENING_MODE, INTEGRATION_PREFERRED_LISTENING_MODE, DONT_INCLUDE_LISTENING_MODE, LEGACY_DISABLE_LISTENING_MODE, ...getKnownListeningModes().flatMap((mode) => mode.aliases)].includes(setting)
+      ![DISCOVER_LISTENING_MODE, DISCOVERED_LISTENING_MODE, INTEGRATION_PREFERRED_LISTENING_MODE, DONT_INCLUDE_LISTENING_MODE, ...getKnownListeningModes().flatMap((mode) => mode.aliases)].includes(setting)
     )
       continue;
     result[code] = { name, setting, ...(contexts?.length ? { contexts } : {}) };
@@ -115,9 +117,9 @@ export function resolveListeningModePreferences(preferences: ListeningModePrefer
     // When preferences exist, only explicitly configured settings are offered. This prevents
     // newly added catalog entries from silently reappearing after an older setup.
     if (!Object.prototype.hasOwnProperty.call(preferences, mode.code)) continue;
-    const choice = preferences[mode.code] ?? DISCOVER_LISTENING_MODE;
+    const choice = normalizeListeningModeSetting(preferences[mode.code] ?? DISCOVER_LISTENING_MODE);
     if (isExcludedListeningModeSetting(choice)) continue;
-    const option = [DISCOVER_LISTENING_MODE, DETECTED_LISTENING_MODE].includes(choice)
+    const option = [DISCOVER_LISTENING_MODE, DISCOVERED_LISTENING_MODE].includes(choice)
       ? displayListeningModeName(learnedByCode.get(mode.code) ?? mode.aliases[0])
       : choice === INTEGRATION_PREFERRED_LISTENING_MODE
           ? displayListeningModeName(mode.aliases[0])
@@ -139,7 +141,7 @@ export function resolveListeningModes(modes: ListeningModes | undefined, learned
   return Object.entries(modes ?? {})
     .filter(([, mode]) => !isExcludedListeningModeSetting(mode.setting))
     .map(([code, mode]) =>
-      [DISCOVER_LISTENING_MODE, DETECTED_LISTENING_MODE].includes(mode.setting)
+      [DISCOVER_LISTENING_MODE, DISCOVERED_LISTENING_MODE].includes(normalizeListeningModeSetting(mode.setting))
         ? displayListeningModeName(learnedByCode.get(code) ?? mode.name)
         : mode.setting === INTEGRATION_PREFERRED_LISTENING_MODE
           ? displayListeningModeName(getKnownListeningModes().find((known) => known.code === code)?.aliases[0] ?? mode.name)
