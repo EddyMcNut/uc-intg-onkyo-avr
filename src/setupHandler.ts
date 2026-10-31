@@ -111,6 +111,7 @@ export default class SetupHandler {
       const configured = new Set((ConfigManager.get().avrs ?? []).map((avr) => `${avr.model} ${avr.ip}`));
       if (configured.has(selected)) {
         this.selectedPhysicalAvr = selected;
+        if (this.setupPage.target === "integration") return this.startIntegrationConfiguration(selected);
         if (this.setupPage.target === "listeningModes") return this.startListeningModeConfiguration(selected);
         return this.startInputSourceConfiguration(selected);
       }
@@ -283,11 +284,7 @@ export default class SetupHandler {
     this.integrationOnlyConfiguration = false;
     this.pendingManualConfig = {};
     const cfg = ConfigManager.load();
-    const currentAvr = physicalAvrId
-      ? cfg.avrs?.find((avr) => `${avr.model} ${avr.ip}` === physicalAvrId)
-      : cfg.avrs && cfg.avrs.length > 0
-        ? cfg.avrs[0]
-        : undefined;
+    const currentAvr = physicalAvrId ? cfg.avrs?.find((avr) => `${avr.model} ${avr.ip}` === physicalAvrId) : cfg.avrs && cfg.avrs.length > 0 ? cfg.avrs[0] : undefined;
     this.selectedPhysicalAvr = currentAvr ? `${currentAvr.model} ${currentAvr.ip}` : physicalAvrId;
     const parsedConfig = this.configParser.parse(
       {
@@ -434,7 +431,16 @@ export default class SetupHandler {
   }
 
   private requestIntegrationConfiguration(): uc.RequestUserInput {
-    const form = this.requestManualConfiguration();
+    const avrs = this.getPhysicalAvrChoices();
+    if (avrs.length > 1) {
+      this.setupPage = { kind: "selectAvr", target: "integration" };
+      return this.formBuilder.buildAvrSelectionForm("integration", avrs);
+    }
+    return this.startIntegrationConfiguration(avrs[0]?.id);
+  }
+
+  private startIntegrationConfiguration(physicalAvrId?: string): uc.RequestUserInput {
+    const form = this.requestManualConfiguration(physicalAvrId);
     this.integrationOnlyConfiguration = true;
     return form;
   }
@@ -460,6 +466,9 @@ export default class SetupHandler {
       }
 
       await this.persistenceManager.restoreConfiguration(validation.normalized!);
+      // A successful restore completes the current setup flow. Clear the initial-setup marker so a
+      // later reconfigure request in the same handler instance is not mistaken for initial setup.
+      this.initialConfiguration = false;
       return new uc.SetupComplete();
     } catch (err) {
       log.error("%s Failed to restore configuration:", logSource, err);

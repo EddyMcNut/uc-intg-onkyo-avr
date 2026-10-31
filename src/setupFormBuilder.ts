@@ -1,7 +1,14 @@
 // Focused responsibility: Generate UI forms for setup flows
 import * as uc from "@unfoldedcircle/integration-api";
 import { ParsedManualConfig } from "./manualConfigParser.js";
-import { DONT_INCLUDE_LISTENING_MODE, getKnownListeningModes, DISCOVERED_LISTENING_MODE, DISCOVER_LISTENING_MODE, INTEGRATION_PREFERRED_LISTENING_MODE, normalizeListeningModeSetting } from "./listeningModePreferences.js";
+import {
+  DONT_INCLUDE_LISTENING_MODE,
+  getKnownListeningModes,
+  DISCOVERED_LISTENING_MODE,
+  DISCOVER_LISTENING_MODE,
+  INTEGRATION_PREFERRED_LISTENING_MODE,
+  normalizeListeningModeSetting
+} from "./listeningModePreferences.js";
 import { DONT_INCLUDE_INPUT_SOURCE, getAliasesForReportedInput, getKnownInputSources, DISCOVERED_INPUT_SOURCE, DISCOVER_INPUT_SOURCE } from "./inputSourcePreferences.js";
 import { NETWORK_INPUT_MARKERS } from "./configConstants.js";
 import { SETUP_SELECTION_PAGE_SIZE } from "./inputSourcePresentation.js";
@@ -338,22 +345,25 @@ export class SetupFormBuilder {
       },
       ...getKnownListeningModes().map((mode) => ({
         id: `lmd_${mode.code}`,
-        label: { en: values.listeningModeNames[mode.code] === "straight-decode" ? "Straight Decode" : values.listeningModeNames[mode.code] ?? (mode.aliases[0] === "straight-decode" ? "Straight Decode" : mode.aliases[0]) },
+        label: {
+          en:
+            values.listeningModeNames[mode.code] === "straight-decode"
+              ? "Straight Decode"
+              : (values.listeningModeNames[mode.code] ?? (mode.aliases[0] === "straight-decode" ? "Straight Decode" : mode.aliases[0]))
+        },
         field: {
           dropdown: {
             value: (() => {
               const defaultSetting = mode.aliases[0] === "straight-decode" ? INTEGRATION_PREFERRED_LISTENING_MODE : DISCOVER_LISTENING_MODE;
               const setting = normalizeListeningModeSetting(values.listeningModePreferences[mode.code] ?? defaultSetting);
-               return (setting === DISCOVER_LISTENING_MODE || setting === DISCOVERED_LISTENING_MODE || setting === INTEGRATION_PREFERRED_LISTENING_MODE) &&
-              values.listeningModeNames[mode.code] &&
-              values.listeningModeNames[mode.code] !== mode.aliases[0]
-                 ? DISCOVERED_LISTENING_MODE
+              return (setting === DISCOVER_LISTENING_MODE || setting === DISCOVERED_LISTENING_MODE || setting === INTEGRATION_PREFERRED_LISTENING_MODE) &&
+                values.listeningModeNames[mode.code] &&
+                values.listeningModeNames[mode.code] !== mode.aliases[0]
+                ? DISCOVERED_LISTENING_MODE
                 : setting;
             })(),
             items: [
-              ...(values.listeningModeNames[mode.code] && values.listeningModeNames[mode.code] !== mode.aliases[0]
-                 ? [{ id: DISCOVERED_LISTENING_MODE, label: { en: "✅ AVR-discovered" } }]
-                : []),
+              ...(values.listeningModeNames[mode.code] && values.listeningModeNames[mode.code] !== mode.aliases[0] ? [{ id: DISCOVERED_LISTENING_MODE, label: { en: "✅ AVR-discovered" } }] : []),
               ...(mode.aliases[0] === "straight-decode" ? [{ id: INTEGRATION_PREFERRED_LISTENING_MODE, label: { en: "✅ Integration-preferred" } }] : []),
               {
                 id: DISCOVER_LISTENING_MODE,
@@ -388,9 +398,9 @@ export class SetupFormBuilder {
       const avrSource = reported.get(id);
       const configured = values.idInputSources[id];
       const aliases = avrSource ? getAliasesForReportedInput(id, avrSource.name) : (knownSource?.aliases ?? []);
-       const learned = avrSource?.name ?? (configured?.setting === DISCOVERED_INPUT_SOURCE ? configured.name : undefined);
+      const learned = avrSource?.name ?? (configured?.setting === DISCOVERED_INPUT_SOURCE ? configured.name : undefined);
       const items = [
-         ...(learned ? [{ id: DISCOVERED_INPUT_SOURCE, label: { en: "✅ AVR-discovered" } }] : []),
+        ...(learned ? [{ id: DISCOVERED_INPUT_SOURCE, label: { en: "✅ AVR-discovered" } }] : []),
         ...(learned ? [{ id: DISCOVER_INPUT_SOURCE, label: { en: "✨ Discover from AVR (default)" } }] : []),
         { id: DONT_INCLUDE_INPUT_SOURCE, label: { en: "🚫 Don't include" } },
         ...aliases.map((alias) => ({ id: alias, label: { en: alias } }))
@@ -398,16 +408,16 @@ export class SetupFormBuilder {
       const value = hasUsableReport
         ? configured?.setting === DONT_INCLUDE_INPUT_SOURCE
           ? DONT_INCLUDE_INPUT_SOURCE
-           : configured?.setting === DISCOVERED_INPUT_SOURCE
-             ? DISCOVERED_INPUT_SOURCE
+          : configured?.setting === DISCOVERED_INPUT_SOURCE
+            ? DISCOVERED_INPUT_SOURCE
             : configured?.setting === DISCOVER_INPUT_SOURCE
               ? DISCOVER_INPUT_SOURCE
               : configured?.setting && aliases.includes(configured.setting)
                 ? configured.setting
-                 : learned
-                   ? DISCOVERED_INPUT_SOURCE
+                : learned
+                  ? DISCOVERED_INPUT_SOURCE
                   : DONT_INCLUDE_INPUT_SOURCE
-         : configured?.setting || (learned ? DISCOVERED_INPUT_SOURCE : (aliases[0] ?? DONT_INCLUDE_INPUT_SOURCE));
+        : configured?.setting || (learned ? DISCOVERED_INPUT_SOURCE : (aliases[0] ?? DONT_INCLUDE_INPUT_SOURCE));
       return { id, label: learned ?? aliases[0] ?? `AVR input ${id}`, value, items };
     });
   }
@@ -434,8 +444,8 @@ export class SetupFormBuilder {
     ]);
   }
 
-  buildAvrSelectionForm(target: "inputSources" | "listeningModes", avrs: Array<{ id: string; label: string }>): uc.RequestUserInput {
-    const label = target === "inputSources" ? "input sources" : "listening modes";
+  buildAvrSelectionForm(target: "integration" | "inputSources" | "listeningModes", avrs: Array<{ id: string; label: string }>): uc.RequestUserInput {
+    const label = target === "inputSources" ? "input sources" : target === "listeningModes" ? "listening modes" : "integration settings";
     return new uc.RequestUserInput(`Select AVR for ${label}`, [
       {
         id: "selectedAvr",

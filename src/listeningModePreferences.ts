@@ -100,7 +100,9 @@ export function normalizeListeningModes(raw: unknown): ListeningModes {
       : undefined;
     if (
       !name ||
-      ![DISCOVER_LISTENING_MODE, DISCOVERED_LISTENING_MODE, INTEGRATION_PREFERRED_LISTENING_MODE, DONT_INCLUDE_LISTENING_MODE, ...getKnownListeningModes().flatMap((mode) => mode.aliases)].includes(setting)
+      ![DISCOVER_LISTENING_MODE, DISCOVERED_LISTENING_MODE, INTEGRATION_PREFERRED_LISTENING_MODE, DONT_INCLUDE_LISTENING_MODE, ...getKnownListeningModes().flatMap((mode) => mode.aliases)].includes(
+        setting
+      )
     )
       continue;
     result[code] = { name, setting, ...(contexts?.length ? { contexts } : {}) };
@@ -122,7 +124,7 @@ export function resolveListeningModePreferences(preferences: ListeningModePrefer
     const option = [DISCOVER_LISTENING_MODE, DISCOVERED_LISTENING_MODE].includes(choice)
       ? displayListeningModeName(learnedByCode.get(mode.code) ?? mode.aliases[0])
       : choice === INTEGRATION_PREFERRED_LISTENING_MODE
-          ? displayListeningModeName(mode.aliases[0])
+        ? displayListeningModeName(mode.aliases[0])
         : choice;
     if (option && !options.includes(option)) options.push(option);
   }

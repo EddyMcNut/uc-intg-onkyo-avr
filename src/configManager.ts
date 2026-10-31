@@ -233,7 +233,7 @@ export class ConfigManager {
     this.config = {} as IntegrationConfig;
     try {
       fs.writeFileSync(CONFIG_PATH, JSON.stringify(this.config, null, 2), "utf-8");
-       log.info(`${logSource} Cleared configuration and persisted empty config file: ${CONFIG_PATH}`);
+      log.info(`${logSource} Cleared configuration and persisted empty config file: ${CONFIG_PATH}`);
     } catch (err) {
       log.error(`${logSource} Failed to clear config:`, err);
     }

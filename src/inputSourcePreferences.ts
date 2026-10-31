@@ -76,7 +76,9 @@ export function resolveConfiguredInputSources(settings: InputSourceSettings | un
       const setting = entry.setting.trim().toLowerCase();
       return setting !== DONT_INCLUDE_INPUT_SOURCE && setting !== "exclude";
     })
-    .map(([id, entry]) => ([DISCOVER_INPUT_SOURCE, DISCOVERED_INPUT_SOURCE, LEGACY_DETECTED_INPUT_SOURCE].includes(entry.setting) ? entry.name : entry.setting || entry.name || getInputSourceAliases(id)[0]))
+    .map(([id, entry]) =>
+      [DISCOVER_INPUT_SOURCE, DISCOVERED_INPUT_SOURCE, LEGACY_DETECTED_INPUT_SOURCE].includes(entry.setting) ? entry.name : entry.setting || entry.name || getInputSourceAliases(id)[0]
+    )
     .filter((name, index, all) => Boolean(name) && all.indexOf(name) === index)
     .sort((a, b) => a.localeCompare(b));
 }

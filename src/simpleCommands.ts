@@ -1,6 +1,5 @@
 import { eiscpCommands } from "./eiscp-commands.js";
 import log from "./loggers.js";
-import { getKnownListeningModes } from "./listeningModePreferences.js";
 
 const logSource = "simpleCommands:";
 
@@ -132,7 +131,7 @@ const COMMAND_DEFS: SimpleCommandDef[] = [
 export const SIMPLE_COMMANDS_MAP = generateSimpleCommands(COMMAND_DEFS);
 export const ALL_SIMPLE_COMMANDS = Object.keys(SIMPLE_COMMANDS_MAP);
 
-  // AVR-discovered listening names are context-dependent, so they are intentionally not
+// AVR-discovered listening names are context-dependent, so they are intentionally not
 // exposed as simple commands. Stable integration aliases are generated from COMMAND_DEFS.
 export function addListeningModeSimpleCommands(_modes: Record<string, { name: string; setting: string }> | undefined): void {
   // Kept as a lifecycle hook for callers; there is nothing to add dynamically.

@@ -25,7 +25,9 @@ function matchingModes(modes: LearnedListeningMode[], source?: string, audioForm
   const wantedSource = key(source);
   const wantedFormat = key(audioFormat);
   const wantedChannels = key(inputChannels);
-  const exact = modes.filter((mode) => key(mode.source) === wantedSource && key(mode.audioFormat) === wantedFormat && (!wantedChannels || !mode.inputChannels || key(mode.inputChannels) === wantedChannels));
+  const exact = modes.filter(
+    (mode) => key(mode.source) === wantedSource && key(mode.audioFormat) === wantedFormat && (!wantedChannels || !mode.inputChannels || key(mode.inputChannels) === wantedChannels)
+  );
   if (exact.length > 0) return exact;
   return modes.filter((mode) => !mode.source && !mode.audioFormat);
 }
@@ -63,9 +65,10 @@ export function learnListeningMode(entityId: string, mode: LearnedListeningMode)
   const wasExisting = Boolean(listeningModes[observed.code]);
   const existing = listeningModes[observed.code] ?? { name: observed.name, setting: DISCOVERED_LISTENING_MODE };
   const contexts = [...(existing.contexts ?? [])];
-  const context: ListeningModeContext | undefined = observed.source && observed.audioFormat
-    ? { source: observed.source, audioFormat: observed.audioFormat, ...(observed.inputChannels ? { inputChannels: observed.inputChannels } : {}), name: observed.name }
-    : undefined;
+  const context: ListeningModeContext | undefined =
+    observed.source && observed.audioFormat
+      ? { source: observed.source, audioFormat: observed.audioFormat, ...(observed.inputChannels ? { inputChannels: observed.inputChannels } : {}), name: observed.name }
+      : undefined;
   let changed = !wasExisting || existing.name !== observed.name;
   if (context) {
     const index = contexts.findIndex((item) => contextKey(item) === contextKey(context));

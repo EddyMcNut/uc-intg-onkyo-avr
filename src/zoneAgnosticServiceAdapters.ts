@@ -159,7 +159,6 @@ export class TidalZoneAgnosticAdapter implements ZoneAgnosticServiceAdapter {
     const tidalState = getTidalBrowseState(zoneEntityId);
     if (tidalState) tidalState.nowPlayingTitle = artist;
   }
-
 }
 
 export class DeezerZoneAgnosticAdapter implements ZoneAgnosticServiceAdapter {
@@ -190,7 +189,7 @@ export class DeezerZoneAgnosticAdapter implements ZoneAgnosticServiceAdapter {
     }
   }
 
-  handleMetadata(zoneEntityId: string, artist: string): void {
+  handleMetadata(_zoneEntityId: string, _artist: string): void {
     // Deezer uses a dedicated title/artist reconstruction in
     // handleTrackMetadata; do not overwrite its complete browse match with
     // the artist-only NTI value first.
@@ -221,7 +220,6 @@ export class DeezerZoneAgnosticAdapter implements ZoneAgnosticServiceAdapter {
     // reported, otherwise the exact Deezer browse match is lost.
     deezerState.nowPlayingTitle = previousTitle && previousTitle.toLowerCase().startsWith(candidate.toLowerCase()) ? previousTitle : candidate;
   }
-
 }
 
 export class MusicServerZoneAgnosticAdapter implements ZoneAgnosticServiceAdapter {
@@ -255,5 +253,4 @@ export class MusicServerZoneAgnosticAdapter implements ZoneAgnosticServiceAdapte
     const musicServerState = getMusicServerBrowseState(zoneEntityId);
     if (musicServerState) musicServerState.nowPlayingTitle = artist;
   }
-
 }

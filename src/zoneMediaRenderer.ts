@@ -48,7 +48,6 @@ export class ZoneMediaRenderer {
   }
 
   private async updateImage(entityId: string, physicalAvrId: string): Promise<void> {
-
     const sharedState = this.mediaStateStore.getSharedAvrMediaState(entityId);
 
     const imageUrl = `http://${this.config.ip}/${this.config.albumArtURL}`;

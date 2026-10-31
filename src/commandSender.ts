@@ -176,9 +176,7 @@ export class CommandSender {
         const reportedSourceId = physicalAvrId ? findAvrSourceId(physicalAvrId, request) : undefined;
         const isNetworkService = isNetworkInputSource(reportedSourceId ?? request, request);
         const discoveredSourceName =
-          physicalAvrId && reportedSourceId
-            ? getAvrSourcesByPhysicalId(physicalAvrId).find((input) => input.id.toLowerCase() === reportedSourceId.toLowerCase())?.name
-            : undefined;
+          physicalAvrId && reportedSourceId ? getAvrSourcesByPhysicalId(physicalAvrId).find((input) => input.id.toLowerCase() === reportedSourceId.toLowerCase())?.name : undefined;
         if (request.startsWith("raw ")) {
           const rawCmd = request.substring(3).trim().toUpperCase();
           if (rawCmd.length > MAX_LENGTHS.RAW_COMMAND) {

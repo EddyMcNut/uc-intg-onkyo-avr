@@ -1,4 +1,4 @@
-export type SetupTargetConfiguration = "inputSources" | "listeningModes";
+export type SetupTargetConfiguration = "integration" | "inputSources" | "listeningModes";
 export type SetupFlowPage =
   | { kind: "idle" }
   | { kind: "manual"; page: 1 | 2 | 3 }

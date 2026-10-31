@@ -7,7 +7,9 @@ import { NETWORK_INPUT_MARKERS } from "./configConstants.js";
 export const SETUP_SELECTION_PAGE_SIZE = 10;
 
 export function stripInputSourceMarker(option: string): string {
-  const markers = NETWORK_INPUT_MARKERS.filter((marker) => marker !== "none").map((marker) => marker.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|");
+  const markers = NETWORK_INPUT_MARKERS.filter((marker) => marker !== "none")
+    .map((marker) => marker.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+    .join("|");
   return option.replace(new RegExp(`^(?:${markers})\\s+`, "u"), "");
 }
 

@@ -584,9 +584,17 @@ export class EiscpDriver extends EventEmitter {
       return "NSV120";
     }
     const valueMap = (VALUE_MAPPINGS as unknown as Record<string, Record<string, { value: string }>>)[prefix];
-    const mappedKey = args !== undefined && valueMap
-      ? Object.keys(valueMap).find((key) => key.toLowerCase() === String(args).toLowerCase() || key.toLowerCase().replace(/[\s_-]+/g, "") === String(args).toLowerCase().replace(/[\s_-]+/g, ""))
-      : undefined;
+    const mappedKey =
+      args !== undefined && valueMap
+        ? Object.keys(valueMap).find(
+            (key) =>
+              key.toLowerCase() === String(args).toLowerCase() ||
+              key.toLowerCase().replace(/[\s_-]+/g, "") ===
+                String(args)
+                  .toLowerCase()
+                  .replace(/[\s_-]+/g, "")
+          )
+        : undefined;
     if (args !== undefined && valueMap && mappedKey !== undefined) {
       value = valueMap[mappedKey].value;
     } else if (prefix === "SLI" && typeof args === "string") {
@@ -613,13 +621,8 @@ export class EiscpDriver extends EventEmitter {
       value = String(args ?? "");
     } else if (prefix === "LMD" && typeof args === "string") {
       const physicalAvrId = buildPhysicalAvrId(this.config.model ?? "", this.config.host ?? "");
-       const entityId = buildEntityId(this.config.model ?? "", this.config.host ?? "", zone);
-       const learnedCode = findLearnedListeningModeCode(
-         physicalAvrId,
-         args,
-         this.stateReader.getSource(entityId),
-         this.stateReader.getAudioFormat?.(entityId)
-       );
+      const entityId = buildEntityId(this.config.model ?? "", this.config.host ?? "", zone);
+      const learnedCode = findLearnedListeningModeCode(physicalAvrId, args, this.stateReader.getSource(entityId), this.stateReader.getAudioFormat?.(entityId));
       if (learnedCode) {
         log.debug("%s Sending learned listening mode %s as LMD%s", logSource, args, learnedCode);
         value = learnedCode;

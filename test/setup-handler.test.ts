@@ -40,8 +40,10 @@ it("handleRestorePayload: applies valid payload and calls onConfigSaved", async 
     const payload = { meta: { driver_id: driverJson.driver_id, version: driverJson.version }, config: targetConfig };
     const payloadString = JSON.stringify(payload);
 
+    (setup as any).initialConfiguration = true;
     const res = await (setup as any).handleRestorePayload(payloadString);
     expect(res).toBeInstanceOf(uc.SetupComplete);
+    expect((setup as any).initialConfiguration).toBe(false);
 
     const reloaded = ConfigManager.load();
     expect(reloaded.avrs).toBeTruthy();
@@ -69,6 +71,10 @@ it("offers physical AVR selection for listening-mode reconfiguration and loads t
     });
     const host: any = { driver: {}, getConfigDirPath: () => tmp, onConfigSaved: async () => {}, onConfigCleared: async () => {}, log: console };
     const setup = new SetupHandlerModule.default(host);
+
+    const integrationSelection = await (setup as any).requestIntegrationConfiguration();
+    expect(integrationSelection.title).toContain("Select AVR");
+    expect((integrationSelection.settings as any[]).find((item) => item.id === "selectedAvr").field.dropdown.items).toHaveLength(2);
 
     const selection = await (setup as any).requestListeningModeConfiguration();
     expect(selection.title).toContain("Select AVR");

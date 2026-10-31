@@ -236,10 +236,9 @@ export function createMediaBrowser(cfg: MediaBrowserConfig, store: MenuBrowseSto
     // enough evidence that this is a post-playback root, so restore the same
     // Main Menu/Back navigation the user had before selecting the track.
     const showNavigationShortcuts = (browseState?.showMainMenuShortcut ?? false) || nowPlayingTitle.length > 0 || (browseState?.browseListFrozen ?? false);
-    const rootItems =
-      showNavigationShortcuts
-        ? [createMainMenuItem(entityId), createBackItem(), ...options.map((option) => createMenuItem(option, nowPlayingTitle))]
-        : options.map((option) => createMenuItem(option, nowPlayingTitle));
+    const rootItems = showNavigationShortcuts
+      ? [createMainMenuItem(entityId), createBackItem(), ...options.map((option) => createMenuItem(option, nowPlayingTitle))]
+      : options.map((option) => createMenuItem(option, nowPlayingTitle));
     const items = slicePagedItems(rootItems, paging);
 
     return new uc.BrowseMediaItem(cfg.rootId, cfg.rootLabel, {

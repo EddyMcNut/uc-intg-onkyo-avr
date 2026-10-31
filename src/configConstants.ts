@@ -63,7 +63,9 @@ export function normalizeLearnedListeningModes(raw: unknown): LearnedListeningMo
   if (!Array.isArray(raw)) return [];
   const modes: LearnedListeningMode[] = [];
   const add = (item: LearnedListeningMode): void => {
-    const existing = modes.find((candidate) => candidate.code === item.code && candidate.source === item.source && candidate.audioFormat === item.audioFormat && candidate.inputChannels === item.inputChannels);
+    const existing = modes.find(
+      (candidate) => candidate.code === item.code && candidate.source === item.source && candidate.audioFormat === item.audioFormat && candidate.inputChannels === item.inputChannels
+    );
     if (existing) Object.assign(existing, item);
     else modes.push(item);
   };
