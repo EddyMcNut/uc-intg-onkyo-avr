@@ -163,6 +163,18 @@ describe("avrInfoStore", () => {
       expect(info.controls).toHaveLength(1);
       expect(info.controls[0].id).toBe("TUNER Control");
     });
+
+    it("ignores malformed entries and handles missing attributes", () => {
+      const xml =
+        '<response><device><preset id="01"/><presetlist count="4"><preset id="gg"/><preset id="02" name=" P2 " /></presetlist><netservice id="orphan"/><netservicelist><netservice enable="wat" password="secret" /></netservicelist><selector id="orphan"/><selectorlist><selector /></selectorlist><control id="orphan"/><controllist><control id="C" zone="bad" min="x" max="" step="no" /></controllist><zone id="orphan"/><zonelist><zone id="bad"/><zone id="2" value="true" /></zonelist><tuner min="bad"/><tuners><tuner min="1" max="2" step="bad"/><tuner min="1" max="2" step="1" /></tuners></device></response>';
+      const info = store.parseAvrInfo(xml);
+      expect(info.presets).toEqual([{ slot: 2, name: "P2", band: "0", freq: "" }]);
+      expect(info.netServices[0]).toMatchObject({ enabled: false, hasAccount: true });
+      expect(info.selectors).toEqual([{ id: "", name: "" }]);
+      expect(info.controls[0]).toMatchObject({ id: "C", zone: undefined, min: undefined });
+      expect(info.zones).toEqual([{ id: 2, name: "", enabled: true }]);
+      expect(info.tunerBands).toEqual([{ band: "", min: 1, max: 2, step: 1 }]);
+    });
   });
 
   describe("store accessors", () => {

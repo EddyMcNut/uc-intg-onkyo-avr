@@ -14,7 +14,7 @@ import type { TuneInMenuBrowseState } from "./tuneInMenuStore.js";
 
 const COMMANDS = eiscpCommands.commands;
 const VALUE_MAPPINGS = eiscpMappings.value_mappings;
-const integrationName = "eiscpCommandParser:";
+const logSource = "eiscpCommandParser:";
 
 // Zone-specific command codes → main-zone equivalent (for incoming command parsing)
 const ZONE2_REVERSE_MAP: Record<string, string> = { ZVL: "MVL", ZPW: "PWR", ZMT: "AMT", SLZ: "SLI", TUZ: "TUN" };
@@ -23,6 +23,7 @@ const ZONE4_REVERSE_MAP: Record<string, string> = { VL4: "MVL", PW4: "PWR", MT4:
 
 export interface AvrStateReader {
   getSource(entityId: string): string;
+  getAudioFormat?(entityId: string): string;
   getSubSource(entityId: string): string;
 }
 
@@ -92,12 +93,12 @@ export class IscpCommandParser {
     };
   }
 
-  /** Read the current metadata snapshot (title, artist, album). */
+  // Read the current metadata snapshot (title, artist, album).
   getMetadata(): Readonly<Metadata> {
     return { ...this.currentMetadata };
   }
 
-  /** Partially update the current metadata (used by the driver during TuneIn navigation). */
+  // Partially update the current metadata (used by the driver during TuneIn navigation).
   patchMetadata(patch: Partial<Metadata>): void {
     Object.assign(this.currentMetadata, patch);
   }
@@ -242,20 +243,23 @@ export class IscpCommandParser {
     const inputFormat = this.getAvPart(parts, 1);
     const inputRate = this.getAvPart(parts, 2);
     const inputChannels = this.getAvPart(parts, 3);
-    const outputFormat = this.getAvPart(parts, 4);
+    // IFA fields: input, format, rate, input channels, listening mode, output channels.
+    const listeningMode = this.getAvPart(parts, 4);
     const outputChannels = this.getAvPart(parts, 5);
 
     const inputRateChannels = inputFormat === "" ? inputSource : this.joinFiltered([inputRate, inputChannels], " ");
     const audioInputValue = this.joinFiltered([inputFormat, inputRateChannels]);
-    const audioOutputValue = this.joinFiltered([outputFormat, outputChannels]);
+    // Keep the audio-output sensor compatible with the established representation:
+    // listening mode followed by the output channel layout.
+    const audioOutputValue = this.joinFiltered([listeningMode, outputChannels]);
 
     result.command = "IFA";
     result.argument = {
       inputSource,
       inputFormat,
+      listeningMode,
       inputRate,
       inputChannels,
-      outputFormat,
       outputChannels,
       audioInputValue,
       audioOutputValue
@@ -409,7 +413,10 @@ export class IscpCommandParser {
           if (deezerState) {
             if (!deezerState.harvestMode) deezerState.nlsCursorOffset = cursorOffset;
             deezerState.totalListItemCount = totalCount;
-            if (layerNumber > 0) deezerState.nlsLayerNumber = layerNumber;
+            // Once a track is selected, NLT describes the playback context,
+            // not the XML browse list. Keep the browse layer for subsequent
+            // selections from the still-visible frozen list.
+            if (layerNumber > 0 && !deezerState.browseListFrozen) deezerState.nlsLayerNumber = layerNumber;
           }
         }
 
@@ -419,7 +426,7 @@ export class IscpCommandParser {
             // Don't overwrite the cursor during harvest — the loop manages it locally.
             if (!tidalState.harvestMode) tidalState.nlsCursorOffset = cursorOffset;
             tidalState.totalListItemCount = totalCount;
-            if (layerNumber > 0) tidalState.nlsLayerNumber = layerNumber;
+            if (layerNumber > 0 && !tidalState.browseListFrozen) tidalState.nlsLayerNumber = layerNumber;
           }
         }
 
@@ -437,7 +444,7 @@ export class IscpCommandParser {
           if (musicServerState) {
             if (!musicServerState.harvestMode) musicServerState.nlsCursorOffset = cursorOffset;
             musicServerState.totalListItemCount = totalCount;
-            if (layerNumber > 0) musicServerState.nlsLayerNumber = layerNumber;
+            if (layerNumber > 0 && !musicServerState.browseListFrozen) musicServerState.nlsLayerNumber = layerNumber;
           }
         }
       }
@@ -462,6 +469,24 @@ export class IscpCommandParser {
     // Check if the title contains a known network service name
     const detectedService = detectServiceFromText(text);
     if (detectedService) {
+      // NLT can arrive before avrState has committed the canonical sub-source
+      // (the capture shows the service title and list metadata in that order).
+      // Preserve the list total/layer immediately so XML-only browsers do not
+      // fall back to requesting a single root item.
+      if (value.length >= 14 && /^[0-9A-Fa-f]{4}$/.test(value.substring(4, 8)) && /^[0-9A-Fa-f]{4}$/.test(value.substring(8, 12))) {
+        const cursorOffset = parseInt(value.substring(4, 8), 16);
+        const totalCount = parseInt(value.substring(8, 12), 16);
+        const layerNumber = /^[0-9A-Fa-f]{2}$/.test(value.substring(12, 14)) ? parseInt(value.substring(12, 14), 16) : 0;
+        const updateBrowseState = (state: { totalListItemCount: number; nlsCursorOffset: number; nlsLayerNumber: number; browseListFrozen?: boolean } | null): void => {
+          if (!state) return;
+          if (!state.browseListFrozen) state.nlsCursorOffset = cursorOffset;
+          state.totalListItemCount = totalCount;
+          if (layerNumber > 0 && !state.browseListFrozen) state.nlsLayerNumber = layerNumber;
+        };
+        if (detectedService === "tidal") updateBrowseState(this.tidalStore.getBrowseState(entityId));
+        else if (detectedService === "deezer") updateBrowseState(this.deezerStore.getBrowseState(entityId));
+        else if (detectedService === "music-server") updateBrowseState(this.musicServerStore.getBrowseState(entityId));
+      }
       const currentSubSource = this.stateReader.getSubSource(entityId);
       if (currentSubSource !== detectedService) {
         result.command = "NLT";
@@ -514,27 +539,27 @@ export class IscpCommandParser {
     // frame with SUB (0x1A), which is not XML and is stripped.
     if (getLogLevel() === "debug") {
       const dumpable = xml.replace(/\x1a+$/, "");
-      log.debug("%s [%s] Complete NRI payload (%d chars):\n%s", integrationName, entityId, dumpable.length, dumpable.replace(/></g, ">\n<").replace(/>\n<\//g, "></"));
+      log.debug("%s [%s] Complete NRI payload (%d chars):\n%s", logSource, entityId, dumpable.length, dumpable.replace(/></g, ">\n<").replace(/>\n<\//g, "></"));
     }
 
     setAvrInfo(entityId, info);
     const dabPresets = listDabPresets(entityId);
     const fmPresets = listFmPresets(entityId);
     const emptyPresets = info.presets.filter((preset) => preset.band === PRESET_BAND_EMPTY);
-    log.debug("%s [%s] Collected AVR info: %d DAB preset(s), %d FM preset(s) of %d slot(s)", integrationName, entityId, dabPresets.length, fmPresets.length, info.presetCount);
+    log.debug("%s [%s] Collected AVR info: %d DAB preset(s), %d FM preset(s) of %d slot(s)", logSource, entityId, dabPresets.length, fmPresets.length, info.presetCount);
     if (dabPresets.length > 0) {
-      log.debug("%s [%s] DAB presets (band=2, no frequency):\n%s", integrationName, entityId, dabPresets.map((preset) => `  slot ${String(preset.slot).padStart(2, " ")}: ${preset.name}`).join("\n"));
+      log.debug("%s [%s] DAB presets (band=2, no frequency):\n%s", logSource, entityId, dabPresets.map((preset) => `  slot ${String(preset.slot).padStart(2, " ")}: ${preset.name}`).join("\n"));
     }
     if (fmPresets.length > 0) {
       log.debug(
         "%s [%s] FM presets (band=1, carries a frequency):\n%s",
-        integrationName,
+        logSource,
         entityId,
         fmPresets.map((preset) => `  slot ${String(preset.slot).padStart(2, " ")}: ${preset.name} @ ${preset.freq} MHz`).join("\n")
       );
     }
     if (emptyPresets.length > 0) {
-      log.debug("%s [%s] Empty slots (band=0): %d (slots %s)", integrationName, entityId, emptyPresets.length, emptyPresets.map((preset) => preset.slot).join(", "));
+      log.debug("%s [%s] Empty slots (band=0): %d (slots %s)", logSource, entityId, emptyPresets.length, emptyPresets.map((preset) => preset.slot).join(", "));
     }
 
     // Use the command name, not the raw NRI opcode, so the command receiver can dispatch it.
@@ -556,10 +581,10 @@ export class IscpCommandParser {
     if (imageType === "2") {
       // The URL form. AVRs commonly report a link-local address, which is not reachable from the
       // UC host, so the link is logged rather than followed.
-      log.debug("%s [%s] AVR offered jacket art by URL: %s", integrationName, entityId, value.substring(1).trim());
+      log.debug("%s [%s] AVR offered jacket art by URL: %s", logSource, entityId, value.substring(1).trim());
     } else {
       const inlineBytes = Math.floor(value.length / 2);
-      log.debug("%s [%s] AVR sent inline jacket art data (image type %s, %d bytes) which is not used", integrationName, entityId, imageType || "n", inlineBytes);
+      log.debug("%s [%s] AVR sent inline jacket art data (image type %s, %d bytes) which is not used", logSource, entityId, imageType || "n", inlineBytes);
     }
 
     return result;

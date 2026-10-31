@@ -1,23 +1,26 @@
 import * as uc from "@unfoldedcircle/integration-api";
 import crypto from "crypto";
-import { OnkyoConfig } from "./configManager.js";
+import { IntegrationConfig } from "./configManager.js";
 import type { AvrStateApi } from "./types.js";
 import log from "./loggers.js";
 import { delay } from "./utils.js";
 import { createTunerArtwork } from "./serviceThumbnails.js";
 import { ZoneAgnosticMediaStateStore } from "./zoneAgnosticMediaState.js";
 
-const integrationName = "zoneMediaRenderer:";
+const logSource = "zoneMediaRenderer:";
 
 export class ZoneMediaRenderer {
+  private readonly imageHashInFlight = new Map<string, Promise<string>>();
+  private readonly imageUpdateInFlight = new Map<string, Promise<void>>();
+
   constructor(
     private readonly driver: uc.IntegrationAPI,
-    private config: OnkyoConfig,
+    private config: IntegrationConfig,
     private readonly mediaStateStore: ZoneAgnosticMediaStateStore,
     private readonly avrStateApi: AvrStateApi
   ) {}
 
-  public updateConfig(config: OnkyoConfig): void {
+  public updateConfig(config: IntegrationConfig): void {
     this.config = config;
   }
 
@@ -26,27 +29,49 @@ export class ZoneMediaRenderer {
       return;
     }
 
-    const sharedState = this.mediaStateStore.getSharedAvrMediaState(entityId);
     const physicalAvrId = this.mediaStateStore.getPhysicalAvrId(entityId);
+    const existingRequest = this.imageUpdateInFlight.get(physicalAvrId);
+    if (existingRequest) {
+      await existingRequest;
+      return;
+    }
+
+    const request = this.updateImage(entityId, physicalAvrId);
+    this.imageUpdateInFlight.set(physicalAvrId, request);
+    try {
+      await request;
+    } finally {
+      if (this.imageUpdateInFlight.get(physicalAvrId) === request) {
+        this.imageUpdateInFlight.delete(physicalAvrId);
+      }
+    }
+  }
+
+  private async updateImage(entityId: string, physicalAvrId: string): Promise<void> {
+    const sharedState = this.mediaStateStore.getSharedAvrMediaState(entityId);
 
     const imageUrl = `http://${this.config.ip}/${this.config.albumArtURL}`;
     const previousHash = sharedState.lastImageHash;
 
-    log.debug("%s [%s] collecting album art from %s", integrationName, entityId, imageUrl);
+    log.debug("%s [%s] collecting album art from %s", logSource, entityId, imageUrl);
     let newHash = await this.getImageHash(imageUrl, entityId);
     let attempts = 0;
     while (newHash === previousHash && attempts < 3) {
       attempts += 1;
       await delay(500);
-      newHash = await this.getImageHash(imageUrl, entityId);
+      // Some AVR web servers briefly serve the previous jacket after the
+      // metadata event and cache HEAD responses. A cache-busting probe lets
+      // the next track's artwork become visible without waiting for another
+      // unrelated update event.
+      newHash = await this.getImageHash(`${imageUrl}${imageUrl.includes("?") ? "&" : "?"}_=${Date.now()}`, entityId);
     }
 
     if (newHash !== previousHash) {
       sharedState.lastImageHash = newHash;
       sharedState.currentImageUrl = `${imageUrl}?hash=${newHash}`;
-      log.debug("%s [%s] album art URL updated to %s", integrationName, entityId, sharedState.currentImageUrl);
+      log.debug("%s [%s] album art URL updated to %s", logSource, entityId, sharedState.currentImageUrl);
     } else {
-      log.debug("%s [%s] album art unchanged (hash %s)", integrationName, entityId, newHash || "empty");
+      log.debug("%s [%s] album art unchanged (hash %s)", logSource, entityId, newHash || "empty");
     }
 
     if (sharedState.currentImageUrl) {
@@ -118,11 +143,28 @@ export class ZoneMediaRenderer {
   }
 
   private async getImageHash(url: string, entityId: string): Promise<string> {
+    const existingRequest = this.imageHashInFlight.get(url);
+    if (existingRequest) {
+      return existingRequest;
+    }
+
+    const request = this.fetchImageHash(url, entityId);
+    this.imageHashInFlight.set(url, request);
+    try {
+      return await request;
+    } finally {
+      if (this.imageHashInFlight.get(url) === request) {
+        this.imageHashInFlight.delete(url);
+      }
+    }
+  }
+
+  private async fetchImageHash(url: string, entityId: string): Promise<string> {
     // Fast path: cheap conditional check via HTTP headers so an unchanged image is never
     // fully re-downloaded. Most AVR web servers expose an ETag or Last-Modified header.
     try {
       const headResponse = await fetch(url, { method: "HEAD" });
-      log.debug("%s [%s] album art HEAD %s -> HTTP %s", integrationName, entityId, url, headResponse.status);
+      log.debug("%s [%s] album art HEAD %s -> HTTP %s", logSource, entityId, url, headResponse.status);
       const etag = headResponse.headers.get("etag");
       const lastModified = headResponse.headers.get("last-modified");
       const token = etag ?? lastModified;
@@ -135,7 +177,7 @@ export class ZoneMediaRenderer {
 
     try {
       const response = await fetch(url);
-      log.debug("%s [%s] album art GET %s -> HTTP %s", integrationName, entityId, url, response.status);
+      log.debug("%s [%s] album art GET %s -> HTTP %s", logSource, entityId, url, response.status);
       if (!response.ok) {
         return "";
       }
@@ -157,7 +199,7 @@ export class ZoneMediaRenderer {
       }
       return hash.digest("hex");
     } catch (err) {
-      log.warn("%s failed to fetch/hash image: %s", integrationName, err);
+      log.warn("%s failed to fetch/hash image: %s", logSource, err);
       return "";
     }
   }

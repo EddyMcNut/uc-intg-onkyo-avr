@@ -19,16 +19,16 @@ export function getLogLevel(): LogLevel {
 }
 
 const log = {
-  debug: (...args: any[]) => {
+  debug: (...args: unknown[]) => {
     if (LEVEL_RANK["debug"] >= LEVEL_RANK[currentLevel]) console.log("[DEBUG]", util.format(...args));
   },
-  info: (...args: any[]) => {
+  info: (...args: unknown[]) => {
     if (LEVEL_RANK["info"] >= LEVEL_RANK[currentLevel]) console.log("[INFO]", util.format(...args));
   },
-  warn: (...args: any[]) => {
+  warn: (...args: unknown[]) => {
     if (LEVEL_RANK["warn"] >= LEVEL_RANK[currentLevel]) console.log("[WARN]", util.format(...args));
   },
-  error: (...args: any[]) => {
+  error: (...args: unknown[]) => {
     console.log("[ERROR]", util.format(...args));
   }
 };

@@ -1,5 +1,7 @@
 // Focused responsibility: Parse and validate manual configuration input
 import { LogLevel, AVR_DEFAULTS, parseBoolean, parseVolumeScale, type VolumeScale } from "./configManager.js";
+import type { AvrInput } from "./inputSourceStore.js";
+import { NETWORK_INPUT_MARKERS, type InputSourceLayout, type InputSourceSettings, type NetworkInputMarker } from "./configConstants.js";
 
 export interface ManualConfigInput {
   model?: unknown;
@@ -7,10 +9,14 @@ export interface ManualConfigInput {
   port?: unknown;
   queueThreshold?: unknown;
   albumArtURL?: unknown;
-  listeningModeOptions?: unknown;
-  inputSelectorOptions?: unknown;
+  listeningModePreferences?: unknown;
+  listeningModeNames?: unknown;
   volumeScale?: unknown;
+  volumeScaleDiscovered?: unknown;
   useAvrReportedInputs?: unknown;
+  idInputSources?: unknown;
+  inputSources?: unknown;
+  inputSourceDiscoveryAvailable?: unknown;
   volumeDisplay?: unknown;
   adjustVolumeDispl?: unknown;
   zoneCount?: unknown;
@@ -21,6 +27,8 @@ export interface ManualConfigInput {
   netMenuDelay?: unknown;
   tuneinPresetPosition?: unknown;
   tuneinMenuStyle?: unknown;
+  inputSourceLayout?: unknown;
+  networkInputMarker?: unknown;
   entityNameStyle?: unknown;
   logLevel?: unknown;
 }
@@ -31,10 +39,14 @@ export interface ParsedManualConfig {
   portNum: number;
   queueThresholdValue: number;
   albumArtURLValue: string;
-  listeningModeOptions: string;
-  inputSelectorOptions: string;
+  listeningModePreferences: Record<string, string>;
+  listeningModeNames: Record<string, string>;
   volumeScaleValue: VolumeScale;
+  volumeScaleDiscoveredValue: boolean;
   useAvrReportedInputsValue: boolean;
+  idInputSources: InputSourceSettings;
+  inputSources: AvrInput[];
+  inputSourceDiscoveryAvailable: boolean;
   volumeDisplayValue: "absolute" | "relative";
   adjustVolumeDisplValue: boolean;
   entityNameStyleValue: "long" | "short";
@@ -46,6 +58,8 @@ export interface ParsedManualConfig {
   netMenuDelayValue: number;
   tuneinPresetPositionValue: number;
   tuneinMenuStyleValue: "mypresets" | "full";
+  inputSourceLayoutValue: InputSourceLayout;
+  networkInputMarkerValue: NetworkInputMarker;
   logLevelValue: LogLevel;
   errorMessage?: string;
 }
@@ -59,10 +73,14 @@ export class ManualConfigParser {
       portNum: this.parsePort(input.port),
       queueThresholdValue: this.parseQueueThreshold(input.queueThreshold),
       albumArtURLValue: this.parseAlbumArtUrl(input.albumArtURL),
-      listeningModeOptions: String(input.listeningModeOptions ?? ""),
-      inputSelectorOptions: useAvrReportedInputsValue ? "all" : String(input.inputSelectorOptions ?? ""),
+      listeningModePreferences: this.parseListeningModePreferences(input),
+      listeningModeNames: this.parseListeningModeNames(input),
       volumeScaleValue: this.parseVolumeScale(input.volumeScale),
+      volumeScaleDiscoveredValue: parseBoolean(input.volumeScaleDiscovered, false),
       useAvrReportedInputsValue,
+      idInputSources: this.parseInputSourceSettings(input),
+      inputSources: Array.isArray(input.inputSources) ? (input.inputSources as AvrInput[]) : [],
+      inputSourceDiscoveryAvailable: Boolean(input.inputSourceDiscoveryAvailable),
       volumeDisplayValue: this.parseVolumeDisplay(input.volumeDisplay),
       adjustVolumeDisplValue: parseBoolean(input.adjustVolumeDispl, true),
       entityNameStyleValue: this.parseEntityNameStyle(input.entityNameStyle),
@@ -73,9 +91,51 @@ export class ManualConfigParser {
       netMenuDelayValue: this.parseNetMenuDelay(input.netMenuDelay),
       tuneinPresetPositionValue: this.parseTuneInPresetPosition(input.tuneinPresetPosition),
       tuneinMenuStyleValue: this.parseTuneInMenuStyle(input.tuneinMenuStyle),
+      inputSourceLayoutValue: this.parseInputSourceLayout(input.inputSourceLayout),
+      networkInputMarkerValue: this.parseNetworkInputMarker(input.networkInputMarker),
       logLevelValue: this.parseLogLevel(input.logLevel, fallbackLogLevel),
       zoneCountValue: this.parseZoneCount(input.zoneCount)
     };
+  }
+
+  private parseInputSourceLayout(raw: unknown): InputSourceLayout {
+    const value = String(raw ?? "combined").toLowerCase();
+    if (value === "network-first") return "network-first";
+    if (value === "network-last" || value === "separate") return "network-last";
+    return "combined";
+  }
+
+  private parseListeningModePreferences(input: ManualConfigInput): Record<string, string> {
+    const preferences: Record<string, string> = {};
+    if (input.listeningModePreferences && typeof input.listeningModePreferences === "object" && !Array.isArray(input.listeningModePreferences)) {
+      Object.assign(preferences, input.listeningModePreferences);
+    }
+    for (const [key, value] of Object.entries(input as Record<string, unknown>)) {
+      if (key.startsWith("lmd_") && value !== undefined) {
+        preferences[key.substring(4).toUpperCase()] = String(value);
+      }
+    }
+    return preferences;
+  }
+
+  private parseListeningModeNames(input: ManualConfigInput): Record<string, string> {
+    const names = input.listeningModeNames;
+    return names && typeof names === "object" && !Array.isArray(names) ? { ...(names as Record<string, string>) } : {};
+  }
+
+  private parseInputSourceSettings(input: ManualConfigInput): InputSourceSettings {
+    const settings: InputSourceSettings = {};
+    if (input.idInputSources && typeof input.idInputSources === "object" && !Array.isArray(input.idInputSources)) {
+      Object.assign(settings, input.idInputSources);
+    }
+    for (const [key, value] of Object.entries(input as Record<string, unknown>)) {
+      if (key.startsWith("ids_") && value !== undefined) {
+        const id = key.substring(4).toUpperCase();
+        const existing = settings[id];
+        settings[id] = { name: existing?.name ?? "", setting: String(value) };
+      }
+    }
+    return settings;
   }
 
   private parsePort(port: unknown): number {
@@ -118,6 +178,10 @@ export class ManualConfigParser {
 
   private parseTuneInMenuStyle(style: unknown): "mypresets" | "full" {
     return String(style ?? AVR_DEFAULTS.tuneinMenuStyle).toLowerCase() === "full" ? "full" : "mypresets";
+  }
+
+  private parseNetworkInputMarker(marker: unknown): NetworkInputMarker {
+    return NETWORK_INPUT_MARKERS.includes(marker as NetworkInputMarker) ? (marker as NetworkInputMarker) : "none";
   }
 
   private parseLogLevel(level: unknown, fallback: LogLevel): LogLevel {

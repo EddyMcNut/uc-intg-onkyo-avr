@@ -1,8 +1,13 @@
 // Focused responsibility: Handle auto-discovery and configuration persistence
 import EiscpDriver from "./eiscp.js";
-import { ConfigManager, type AvrConfig, type AvrZone, AVR_DEFAULTS, parseSelectOptions, ALL_OPTIONS, type OnkyoConfig } from "./configManager.js";
-import { setLogLevel } from "./loggers.js";
+import { ConfigManager, type AvrConfig, type AvrZone, AVR_DEFAULTS, type IntegrationConfig } from "./configManager.js";
+import { DISCOVER_LISTENING_MODE, INTEGRATION_PREFERRED_LISTENING_MODE, getKnownListeningModes } from "./listeningModePreferences.js";
+import log, { setLogLevel } from "./loggers.js";
 import { type ParsedManualConfig } from "./manualConfigParser.js";
+import { getInputSourceAliases, DONT_INCLUDE_INPUT_SOURCE, DISCOVERED_INPUT_SOURCE, getKnownInputSources } from "./inputSourcePreferences.js";
+import type { InputSourceSettings } from "./configConstants.js";
+
+const logSource = "configPersistenceManager:";
 
 export interface OnConfigSavedCallback {
   (): Promise<void>;
@@ -25,12 +30,14 @@ export class ConfigPersistenceManager {
         host: found.host,
         port: Number(found.port) || AVR_DEFAULTS.port
       };
-    } catch (_err) {
+    } catch (err) {
+      log.debug("%s Auto-discovery failed, setup will continue without discovered AVR details: %s", logSource, err);
       return { success: false };
     }
   }
 
   async saveDiscoveredAvr(discovered: { model: string; host: string; port: number }, parsedConfig: ParsedManualConfig): Promise<void> {
+    const listeningModePreferences = parsedConfig.listeningModePreferences ?? {};
     const discoveredAvr: Partial<AvrConfig> = {
       model: discovered.model,
       ip: discovered.host,
@@ -42,18 +49,14 @@ export class ConfigPersistenceManager {
       createTunerPresets: parsedConfig.createTunerPresetsValue,
       createDiracSelectEntity: parsedConfig.createDiracSelectEntityValue,
       tuneinMenuStyle: parsedConfig.tuneinMenuStyleValue,
-      useAvrReportedInputs: parsedConfig.useAvrReportedInputsValue
+      useAvrReportedInputs: parsedConfig.useAvrReportedInputsValue,
+      inputSourceLayout: parsedConfig.inputSourceLayoutValue,
+      networkInputMarker: parsedConfig.networkInputMarkerValue,
+      idInputSources: this.buildInputSources(parsedConfig, undefined, discovered.host)
     };
 
     // Use parseSelectOptions which handles the 'none' sentinel (-> null = don't create entity) and 'all'/empty (-> "all" = show all)
-    const lmoResult = parseSelectOptions(parsedConfig.listeningModeOptions);
-    if (lmoResult === null || lmoResult === ALL_OPTIONS || (Array.isArray(lmoResult) && lmoResult.length > 0)) {
-      discoveredAvr.listeningModeOptions = lmoResult;
-    }
-    const isoResult = parseSelectOptions(parsedConfig.inputSelectorOptions);
-    if (isoResult === null || isoResult === ALL_OPTIONS || (Array.isArray(isoResult) && isoResult.length > 0)) {
-      discoveredAvr.inputSelectorOptions = isoResult;
-    }
+    discoveredAvr.listeningModes = this.buildListeningModes(listeningModePreferences, parsedConfig.listeningModeNames);
 
     ConfigManager.addAvr(discoveredAvr);
     ConfigManager.save({ logLevel: parsedConfig.logLevelValue });
@@ -62,16 +65,20 @@ export class ConfigPersistenceManager {
   }
 
   async saveManualConfiguration(parsedConfig: ParsedManualConfig): Promise<{ errors: string[]; success: boolean }> {
+    const listeningModePreferences = parsedConfig.listeningModePreferences ?? {};
     const basePayload = {
       model: parsedConfig.modelName,
       ip: parsedConfig.ipVal,
       port: parsedConfig.portNum,
       queueThreshold: parsedConfig.queueThresholdValue,
       albumArtURL: parsedConfig.albumArtURLValue,
-      listeningModeOptions: parsedConfig.listeningModeOptions,
-      inputSelectorOptions: parsedConfig.inputSelectorOptions,
+      listeningModes: this.buildListeningModes(listeningModePreferences, parsedConfig.listeningModeNames, parsedConfig.modelName, parsedConfig.ipVal),
       volumeScale: parsedConfig.volumeScaleValue,
+      volumeScaleDiscovered: parsedConfig.volumeScaleDiscoveredValue,
       useAvrReportedInputs: parsedConfig.useAvrReportedInputsValue,
+      inputSourceLayout: parsedConfig.inputSourceLayoutValue,
+      networkInputMarker: parsedConfig.networkInputMarkerValue,
+      idInputSources: this.buildInputSources(parsedConfig, parsedConfig.modelName, parsedConfig.ipVal),
       volumeDisplay: parsedConfig.volumeDisplayValue,
       adjustVolumeDispl: parsedConfig.adjustVolumeDisplValue,
       entityNameStyle: parsedConfig.entityNameStyleValue,
@@ -115,7 +122,64 @@ export class ConfigPersistenceManager {
     return { errors: [], success: true };
   }
 
-  async restoreConfiguration(normalizedConfig: Partial<OnkyoConfig>): Promise<void> {
+  private buildListeningModes(
+    preferences: Record<string, string>,
+    names: Record<string, string>,
+    model?: string,
+    ip?: string
+  ): Record<string, { name: string; setting: string; contexts?: import("./configConstants.js").ListeningModeContext[] }> {
+    const existing = ConfigManager.get().avrs?.find((avr) => avr.model === model && avr.ip === ip)?.listeningModes ?? {};
+    const rebuilt = Object.fromEntries(
+      getKnownListeningModes().map((mode) => {
+        const existingMode = existing[mode.code];
+        return [
+          mode.code,
+          {
+            // Keep the AVR-discovered name when the user selects "discover" again. The
+            // setting controls whether the learned value is used; replacing its
+            // name here would erase the learned mode during setup reconfiguration.
+            // Setup labels may summarize multiple detected context names. Never persist that
+            // summary as the primary AVR name; keep the real learned name instead.
+            name: existingMode?.contexts?.length ? existingMode.contexts[existingMode.contexts.length - 1].name : (names[mode.code] ?? existingMode?.name ?? mode.aliases[0]),
+            setting: preferences[mode.code] ?? existingMode?.setting ?? (mode.aliases[0] === "straight-decode" ? INTEGRATION_PREFERRED_LISTENING_MODE : DISCOVER_LISTENING_MODE),
+            ...(existingMode?.contexts ? { contexts: existingMode.contexts } : {})
+          }
+        ];
+      })
+    );
+    for (const [code, entry] of Object.entries(existing)) {
+      if (!rebuilt[code]) rebuilt[code] = entry;
+    }
+    return rebuilt;
+  }
+
+  private buildInputSources(parsed: ParsedManualConfig, model?: string, ip?: string): InputSourceSettings {
+    const existing = ConfigManager.get().avrs?.find((avr) => avr.model === model && avr.ip === ip)?.idInputSources ?? {};
+    const reported = new Map((parsed.inputSources ?? []).map((input) => [input.id.toUpperCase(), input.name]));
+    const ids = new Set([...getKnownInputSources().map((source) => source.id), ...Object.keys(parsed.idInputSources ?? {}), ...reported.keys()]);
+    const result: InputSourceSettings = {};
+    for (const id of ids) {
+      const aliases = getInputSourceAliases(id);
+      const name = reported.get(id) ?? existing[id]?.name ?? aliases[0];
+      if (!name) continue;
+      const selected =
+        parsed.idInputSources?.[id]?.setting ??
+        existing[id]?.setting ??
+        // A discovered AVR name is the default choice for sources the AVR actually
+        // reported. Sources known to the integration but absent from that report
+        // must remain excluded; otherwise saving setup adds legacy names back into
+        // the selector alongside the learned AVR names.
+        (parsed.inputSourceDiscoveryAvailable && (parsed.inputSources?.length ?? 0) > 0
+          ? reported.has(id)
+            ? DISCOVERED_INPUT_SOURCE
+            : DONT_INCLUDE_INPUT_SOURCE
+          : (aliases[0] ?? DONT_INCLUDE_INPUT_SOURCE));
+      result[id] = { name, setting: selected || DISCOVERED_INPUT_SOURCE };
+    }
+    return result;
+  }
+
+  async restoreConfiguration(normalizedConfig: Partial<IntegrationConfig>): Promise<void> {
     ConfigManager.save(normalizedConfig);
     await this.onConfigSaved();
   }

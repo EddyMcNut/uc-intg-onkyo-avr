@@ -4,6 +4,7 @@ export type MenuBrowseOption = {
   mediaId: string;
   thumbnail?: string;
   isBrowsable: boolean;
+  hidden?: boolean;
 };
 
 export type MenuBrowseState<TOption extends MenuBrowseOption> = {
@@ -19,6 +20,10 @@ export type MenuBrowseState<TOption extends MenuBrowseOption> = {
   nlsCursorOffset: number;
   nlsLayerNumber: number;
   harvestMode: boolean;
+  // Incremented whenever navigation starts a new AVR menu context. Background
+  // NLAL harvests from the previous context must not continue updating it.
+  harvestGeneration: number;
+  xmlResponseSequence: number;
   browseListFrozen: boolean;
 };
 
@@ -35,12 +40,14 @@ export function createMenuBrowseState<TOption extends MenuBrowseOption>(): MenuB
     nlsCursorOffset: 0,
     nlsLayerNumber: 0,
     harvestMode: false,
+    harvestGeneration: 0,
+    xmlResponseSequence: 0,
     browseListFrozen: false
   };
 }
 
-export function upsertMenuOption<TOption extends MenuBrowseOption>(state: MenuBrowseState<TOption>, menuIndex: number, createOption: () => TOption): void {
-  if (state.browseListFrozen) {
+export function upsertMenuOption<TOption extends MenuBrowseOption>(state: MenuBrowseState<TOption>, menuIndex: number, createOption: () => TOption, allowWhenFrozen = false): void {
+  if (state.browseListFrozen && !allowWhenFrozen) {
     return;
   }
 
@@ -82,6 +89,7 @@ export function resetMenuBrowseState<TOption extends MenuBrowseOption>(state: Me
   state.nlsCursorOffset = 0;
   state.nlsLayerNumber = 0;
   state.harvestMode = false;
+  state.harvestGeneration += 1;
   state.browseListFrozen = false;
 }
 

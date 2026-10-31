@@ -2,14 +2,14 @@
 "use strict";
 import * as uc from "@unfoldedcircle/integration-api";
 import { browseMedia, TUNEIN_MENU_BACK_ID, TUNEIN_MENU_ROOT_ID, TUNEIN_MENU_ROOT_TYPE } from "./mediaBrowser.js";
-import { listTuneInMenuOptions, getTuneInMenuBrowseState } from "./tuneInMenuStore.js";
+import { listTuneInMenuOptions, getTuneInMenuBrowseState, resetTuneInMenuBrowseState } from "./tuneInMenuStore.js";
 import { looksLikeTuneInDirectory } from "./tuneInFilters.js";
 import { ConfigManager, AVR_DEFAULTS, buildEntityId } from "./configManager.js";
 import type { AvrStateApi } from "./types.js";
 import log from "./loggers.js";
 import { MenuBrowseHandlerBase } from "./menuBrowseHandlerBase.js";
 
-const integrationName = "tuneInBrowseHandler:";
+const logSource = "tuneInBrowseHandler:";
 
 type CmdHandlerFn = (entity: uc.Entity, cmdId: string, params?: { [key: string]: string | number | boolean }) => Promise<uc.StatusCodes>;
 type RawSendFn = (cmd: string) => Promise<void>;
@@ -62,7 +62,7 @@ function resolveTuneInMenuSelection(entityId: string, mediaId?: string, mediaTyp
 }
 
 export class TuneInBrowseHandler extends MenuBrowseHandlerBase {
-  protected readonly integrationName = integrationName;
+  protected readonly logSource = logSource;
   protected getServiceLabel(): string {
     return "TuneIn";
   }
@@ -124,14 +124,19 @@ export class TuneInBrowseHandler extends MenuBrowseHandlerBase {
     const menuDelay = getMenuDelay(entityId);
 
     if (isBackRequest && cmdHandler) {
-      const beforeSignature = this.buildMenuSignature(entityId);
       const menuDelay = getMenuDelay(entityId);
-      log.info("%s [%s] sending TuneIn Back command to AVR", integrationName, entityId);
+      log.info("%s [%s] sending TuneIn Back command to AVR", logSource, entityId);
+      resetTuneInMenuBrowseState(entityId);
+      const backBrowseState = getTuneInMenuBrowseState(entityId);
+      if (backBrowseState) {
+        backBrowseState.showMainMenuShortcut = true;
+        backBrowseState.listModeActive = true;
+      }
       await cmdHandler(mediaPlayerEntity, uc.MediaPlayerCommands.PlayMedia, {
         media_id: TUNEIN_MENU_BACK_ID,
         media_type: TUNEIN_MENU_ROOT_TYPE
       });
-      await this.waitForMenuStable(entityId, beforeSignature, menuDelay);
+      await this.waitForListMetadata(entityId, menuDelay);
       if (rawSend) {
         await this.harvestListItems(entityId, rawSend);
       }
@@ -143,6 +148,9 @@ export class TuneInBrowseHandler extends MenuBrowseHandlerBase {
     }
 
     if (isRootRequest) {
+      if (isExplicitMainMenuSelection) {
+        resetTuneInMenuBrowseState(entityId);
+      }
       const state = getTuneInMenuBrowseState(entityId);
       if (state) {
         state.browseListFrozen = false;
@@ -152,14 +160,13 @@ export class TuneInBrowseHandler extends MenuBrowseHandlerBase {
       }
 
       if (state && (state.optionsByMenuIndex.size === 0 || isExplicitMainMenuSelection)) {
-        log.info("%s [%s] Loading TuneIn full menu root", integrationName, entityId);
+        log.info("%s [%s] Loading TuneIn full menu root", logSource, entityId);
         await cmdHandler(mediaPlayerEntity, uc.MediaPlayerCommands.PlayMedia, {
           media_id: TUNEIN_MENU_ROOT_ID,
           media_type: TUNEIN_MENU_ROOT_TYPE
         });
 
-        const beforeSignature = this.buildMenuSignature(entityId);
-        await this.waitForMenuStable(entityId, beforeSignature, menuDelay);
+        await this.waitForListMetadata(entityId, menuDelay);
         if (rawSend) {
           await this.harvestListItems(entityId, rawSend);
         }
@@ -172,6 +179,12 @@ export class TuneInBrowseHandler extends MenuBrowseHandlerBase {
     }
 
     if (selection) {
+      if (selection.isBrowsable && (options.paging?.offset ?? 0) === 0) {
+        // A new TuneIn folder is a new XML context. Clear the previous
+        // folder before harvesting so NLAL starts at offset 0 instead of
+        // appending to the old menu.
+        resetTuneInMenuBrowseState(entityId);
+      }
       const browseState = getTuneInMenuBrowseState(entityId);
       if (browseState) browseState.showMainMenuShortcut = true;
 
@@ -182,8 +195,7 @@ export class TuneInBrowseHandler extends MenuBrowseHandlerBase {
         });
 
         if (selection.isBrowsable) {
-          const beforeSignature = this.buildMenuSignature(entityId);
-          await this.waitForMenuStable(entityId, beforeSignature, menuDelay);
+          await this.waitForListMetadata(entityId, menuDelay);
           if (browseState) browseState.listModeActive = true;
           if (rawSend) {
             await this.harvestListItems(entityId, rawSend);

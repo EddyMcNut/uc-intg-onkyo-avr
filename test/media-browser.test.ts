@@ -436,9 +436,7 @@ it("Tidal browse survives DAB-to-NET transition when NLT/NLS arrive early", asyn
   avrStateManager.setSource(entityId, "dab", undefined, undefined, mockDriver);
 
   await processor.handleNlt(entityId, "Tidal", "main");
-  await processor.handleNls(entityId, "U0-New %s");
-  await processor.handleNls(entityId, "U1-TIDAL Rising %s");
-  await processor.handleNls(entityId, "U2-Playlists %s");
+  await processor.handleNla(entityId, '<items offset="0" totalitems="3"><item title="New"/><item title="TIDAL Rising"/><item title="Playlists"/></items>');
 
   avrStateManager.setSource(entityId, "net", undefined, undefined, mockDriver);
 
@@ -473,9 +471,7 @@ it("Repeated NLT tidal updates do not clear existing Tidal menu options", async 
   avrStateManager.setSubSource(entityId, "spotify", undefined, undefined, mockDriver);
 
   await processor.handleNlt(entityId, "Tidal", "main");
-  await processor.handleNls(entityId, "U0-New %s");
-  await processor.handleNls(entityId, "U1-TIDAL Rising %s");
-  await processor.handleNls(entityId, "U2-Playlists %s");
+  await processor.handleNla(entityId, '<items offset="0" totalitems="3"><item title="New"/><item title="TIDAL Rising"/><item title="Playlists"/></items>');
 
   await processor.handleNlt(entityId, "Tidal", "main");
 
@@ -495,6 +491,7 @@ it("TuneIn service selection preloads My Presets for browsing", async () => {
   const mockDriver = { updateEntityAttributes: () => true } as any;
   const mockEiscp = {
     config: { netMenuDelay: 0, tuneinPresetPosition: 1 },
+    eiscpConfig: { netMenuDelay: 0, tuneinPresetPosition: 1 },
     command: async () => undefined,
     raw: async (cmd: string) => {
       rawCommands.push(cmd);
@@ -530,7 +527,7 @@ it("clears the stale TuneIn now-playing mark after switching to DAB and back to 
   const mockDriver = { updateEntityAttributes: () => true } as any;
   const mockEiscp = {
     config: { netMenuDelay: 0, tuneinPresetPosition: 1 },
-    eiscpConfig: { sendDelay: 0 },
+    eiscpConfig: { sendDelay: 0, netMenuDelay: 0, tuneinPresetPosition: 1 },
     command: async () => undefined,
     raw: async (cmd: string) => {
       rawCommands.push(cmd);
@@ -613,6 +610,7 @@ it("CommandSender play_media routes TuneIn preset IDs to tunein-preset", async (
   class MockEiscp {
     public connected = true;
     public commands: string[] = [];
+    public rawCommands: string[] = [];
 
     async waitForConnect() {
       return;
@@ -620,6 +618,10 @@ it("CommandSender play_media routes TuneIn preset IDs to tunein-preset", async (
 
     async command(cmd: string) {
       this.commands.push(cmd);
+    }
+
+    async raw(cmd: string) {
+      this.rawCommands.push(cmd);
     }
   }
 
@@ -642,7 +644,8 @@ it("CommandSender play_media routes TuneIn preset IDs to tunein-preset", async (
   } as any);
 
   expect(status).toBe(uc.StatusCodes.Ok);
-  expect(eiscp.commands).toEqual(["input-selector tunein", "tunein-preset 2"]);
+  expect(eiscp.commands).toEqual(["tunein-preset 2"]);
+  expect(eiscp.rawCommands).toEqual(["NSV0E0"]);
 });
 
 it("CommandSender play_media routes Tidal menu IDs to NLSI", async () => {
@@ -689,11 +692,11 @@ it("CommandSender play_media routes Tidal menu IDs to NLSI", async () => {
   } as any);
 
   expect(status).toBe(uc.StatusCodes.Ok);
-  expect(eiscp.commands).toEqual(["input-selector tidal"]);
-  expect(eiscp.rawCommands).toEqual(["NLSI00004"]);
+  expect(eiscp.commands).toEqual([]);
+  expect(eiscp.rawCommands).toEqual(["NSV1B0", "NLAI010003----"]);
 });
 
-it("CommandSender play_media routes Deezer menu IDs to NLSI", async () => {
+it("CommandSender play_media routes Deezer menu IDs through XML browsing", async () => {
   const senderModule = await import("../src/commandSender.js");
   const avrStateModule = await import("../src/avrState.js");
 
@@ -737,11 +740,11 @@ it("CommandSender play_media routes Deezer menu IDs to NLSI", async () => {
   } as any);
 
   expect(status).toBe(uc.StatusCodes.Ok);
-  expect(eiscp.commands).toEqual(["input-selector deezer"]);
-  expect(eiscp.rawCommands).toEqual(["NLSI00004"]);
+  expect(eiscp.commands).toEqual([]);
+  expect(eiscp.rawCommands).toEqual(["NSV120", "NLAI010003----"]);
 });
 
-it("CommandSender Deezer track selection freezes browse list and sets now-playing title", async () => {
+it("CommandSender Deezer track selection uses XML browsing and sets now-playing title", async () => {
   const senderModule = await import("../src/commandSender.js");
   const avrStateModule = await import("../src/avrState.js");
   const mediaBrowserModule = await import("../src/mediaBrowser.js");
@@ -790,7 +793,7 @@ it("CommandSender Deezer track selection freezes browse list and sets now-playin
   } as any);
 
   expect(status).toBe(uc.StatusCodes.Ok);
-  expect(eiscp.rawCommands).toEqual(["NLSI00001"]);
+  expect(eiscp.rawCommands).toEqual(["NLAI010000----"]);
   expect(getDeezerBrowseState(entityId)?.browseListFrozen).toBe(true);
   expect(getDeezerBrowseState(entityId)?.nowPlayingTitle).toBe("My Song Title / Artist Name");
 });
@@ -845,7 +848,7 @@ it("CommandSender remaps stale Tidal index using title encoded in media_id", asy
 
   expect(status).toBe(uc.StatusCodes.Ok);
   expect(eiscp.commands).toEqual([]);
-  expect(eiscp.rawCommands).toEqual(["NLSI00001"]);
+  expect(eiscp.rawCommands).toEqual(["NLAI010000----"]);
 });
 
 it("CommandSender first selection after Main Tidal Menu skips pre-list command", async () => {
@@ -897,7 +900,7 @@ it("CommandSender first selection after Main Tidal Menu skips pre-list command",
 
   expect(status).toBe(uc.StatusCodes.Ok);
   expect(eiscp.commands).toEqual([]);
-  expect(eiscp.rawCommands).toEqual(["NLSI00003"]);
+  expect(eiscp.rawCommands).toEqual(["NLAI010002----"]);
 });
 
 it("CommandSender in-Tidal track selection uses direct NLSI when AVR is in list mode", async () => {
@@ -950,7 +953,7 @@ it("CommandSender in-Tidal track selection uses direct NLSI when AVR is in list 
   expect(status).toBe(uc.StatusCodes.Ok);
   // listModeActive flag causes pre-list to be skipped even though a song is playing
   expect(eiscp.commands).toEqual([]);
-  expect(eiscp.rawCommands).toEqual(["NLSI00004"]);
+  expect(eiscp.rawCommands).toEqual(["NLAI010003----"]);
 });
 
 it("CommandSender in-Tidal track selection sends list before NLSI when AVR is playing", async () => {
@@ -995,8 +998,8 @@ it("CommandSender in-Tidal track selection sends list before NLSI when AVR is pl
   } as any);
 
   expect(status).toBe(uc.StatusCodes.Ok);
-  expect(eiscp.commands).toEqual(["network-usb list"]);
-  expect(eiscp.rawCommands).toEqual(["NLSI00004"]);
+  expect(eiscp.commands).toEqual([]);
+  expect(eiscp.rawCommands).toEqual(["NLAI010003----"]);
 });
 
 it("CommandSender in-Tidal menu selection uses direct NLSI even when AVR is playing", async () => {
@@ -1042,7 +1045,7 @@ it("CommandSender in-Tidal menu selection uses direct NLSI even when AVR is play
 
   expect(status).toBe(uc.StatusCodes.Ok);
   expect(eiscp.commands).toEqual([]);
-  expect(eiscp.rawCommands).toEqual(["NLSI00003"]);
+  expect(eiscp.rawCommands).toEqual(["NLAI010002----"]);
 });
 
 it("CommandSender play_media routes Main Tidal Menu to input-selector tidal", async () => {
@@ -1078,10 +1081,10 @@ it("CommandSender play_media routes Main Tidal Menu to input-selector tidal", as
   });
 
   expect(result).toBe(uc.StatusCodes.Ok);
-  expect(commandCalls).toEqual(["input-selector tidal"]);
+  expect(commandCalls).toEqual([]);
 });
 
-it("CommandSender play_media routes TuneIn main menu to input-selector tunein", async () => {
+it("CommandSender play_media routes TuneIn main menu through NSV0E0", async () => {
   const senderModule = await import("../src/commandSender.js");
   const avrStateModule = await import("../src/avrState.js");
 
@@ -1089,6 +1092,7 @@ it("CommandSender play_media routes TuneIn main menu to input-selector tunein", 
   const { avrStateManager } = avrStateModule as any;
 
   const commandCalls: string[] = [];
+  const rawCalls: string[] = [];
 
   class MockEiscp {
     public connected = true;
@@ -1097,7 +1101,9 @@ it("CommandSender play_media routes TuneIn main menu to input-selector tunein", 
     async command(cmd: string) {
       commandCalls.push(cmd);
     }
-    async raw() {}
+    async raw(cmd: string) {
+      rawCalls.push(cmd);
+    }
   }
 
   const entityId = "M 1.2.3.6 main";
@@ -1113,7 +1119,8 @@ it("CommandSender play_media routes TuneIn main menu to input-selector tunein", 
   } as any);
 
   expect(result).toBe(uc.StatusCodes.Ok);
-  expect(commandCalls).toEqual(["input-selector tunein"]);
+  expect(commandCalls).toEqual([]);
+  expect(rawCalls).toEqual(["NSV0E0", "NTCTOP", "NTCSELECT"]);
 });
 
 it("CommandSender play_media routes Tidal Back option to RETURN", async () => {

@@ -1,5 +1,5 @@
 import * as uc from "@unfoldedcircle/integration-api";
-import { ConfigManager, OnkyoConfig, buildEntityId } from "./configManager.js";
+import { ConfigManager, IntegrationConfig, buildEntityId } from "./configManager.js";
 import { EiscpDriver } from "./eiscp.js";
 import log from "./loggers.js";
 import { SONG_INFO } from "./constants.js";
@@ -13,7 +13,7 @@ import { TUNEIN_SERVICE_ID } from "./browseServiceContract.js";
 import type { AvrStateApi } from "./types.js";
 import { findTunerPresetByName } from "./tunerPresetStore.js";
 
-const integrationName = "zoneAgnosticUpdateProcessor:";
+const logSource = "zoneAgnosticUpdateProcessor:";
 
 export class ZoneAgnosticUpdateProcessor {
   public static readonly ZONE_AGNOSTIC_COMMANDS = new Set<string>(["IFA", "DSN", "NST", "NLT", "NLT_CONTEXT", "NLS", "NLA", "FLD", "NTM", "metadata", "avr-info"]);
@@ -24,13 +24,15 @@ export class ZoneAgnosticUpdateProcessor {
   private readonly serviceAdapters: ZoneAgnosticServiceAdapter[];
   private readonly serviceCommandRouter: ZoneAgnosticServiceCommandRouter;
   private readonly frontPanelRouter: ZoneAgnosticFrontPanelRouter;
+  private config: IntegrationConfig;
 
   constructor(
     private readonly driver: uc.IntegrationAPI,
-    config: OnkyoConfig,
+    config: IntegrationConfig,
     private readonly eiscpInstance: EiscpDriver,
     private readonly state: AvrStateApi
   ) {
+    this.config = config;
     this.tuneInPreloader = new TuneInPreloader(eiscpInstance, (entityId) => this.mediaStateStore.getPhysicalAvrId(entityId));
     this.mediaRenderer = new ZoneMediaRenderer(driver, config, this.mediaStateStore, this.state);
     this.serviceAdapters = [
@@ -69,7 +71,8 @@ export class ZoneAgnosticUpdateProcessor {
     });
   }
 
-  public updateConfig(config: OnkyoConfig): void {
+  public updateConfig(config: IntegrationConfig): void {
+    this.config = config;
     this.mediaRenderer.updateConfig(config);
   }
 
@@ -162,6 +165,7 @@ export class ZoneAgnosticUpdateProcessor {
   ): Promise<void> {
     const audioInputValue = argument?.audioInputValue ?? "";
     const audioOutputValue = argument?.audioOutputValue ?? "";
+    const listeningMode = argument?.listeningMode ?? "";
     const source = this.state.getSource(sourceEntityId);
     const affectedZones = this.state.getEntitiesBySource(source);
     const targetZones = affectedZones.length > 0 ? affectedZones : [sourceEntityId];
@@ -185,7 +189,13 @@ export class ZoneAgnosticUpdateProcessor {
         });
       }
 
-      log.debug("%s IFA sync for [%s] (event zone %s)", integrationName, zoneEntityId, _eventZone);
+      if (listeningMode) {
+        this.driver.updateEntityAttributes(`${zoneEntityId}_listening_mode`, {
+          [uc.SelectAttributes.CurrentOption]: listeningMode
+        });
+      }
+
+      log.debug("%s IFA sync for [%s] (event zone %s)", logSource, zoneEntityId, _eventZone);
     }
   }
 
@@ -206,7 +216,7 @@ export class ZoneAgnosticUpdateProcessor {
       await this.renderZoneMedia(zoneEntityId, true);
     }
 
-    log.info("%s DAB station set to %s (updated %d zone(s))", integrationName, stationName, affectedZones.length);
+    log.info("%s DAB station set to %s (updated %d zone(s))", logSource, stationName, affectedZones.length);
   }
 
   async handleNlt(sourceEntityId: string, serviceName: string, eventZone: string): Promise<void> {
@@ -274,7 +284,7 @@ export class ZoneAgnosticUpdateProcessor {
     const artist = argument?.artist || "unknown";
     const affectedZones = argument ? this.getNetZones(sourceEntityId) : [];
     if (affectedZones.length > 0) {
-      log.info("%s metadata updated: %s - %s (updated %d zone(s))", integrationName, artist, title, affectedZones.length);
+      log.info("%s metadata updated: %s - %s (updated %d zone(s))", logSource, artist, title, affectedZones.length);
     }
   }
 

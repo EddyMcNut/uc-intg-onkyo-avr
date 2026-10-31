@@ -1,6 +1,6 @@
 import * as uc from "@unfoldedcircle/integration-api";
 import { EiscpDriver } from "./eiscp.js";
-import { buildEntityId, DEFAULT_QUEUE_THRESHOLD, OnkyoConfig, physicalAvrIdFromEntityId, resolveVolumeScale } from "./configManager.js";
+import { buildEntityId, DEFAULT_QUEUE_THRESHOLD, IntegrationConfig, physicalAvrIdFromEntityId, resolveVolumeScale } from "./configManager.js";
 import { MAX_LENGTHS, PATTERNS } from "./configConstants.js";
 import { ICommandReceiver, AvrStateApi } from "./types.js";
 import { ZONE_VOLUME_PREFIX, ZONE_VOLUME_UP_DOWN } from "./zoneMappings.js";
@@ -10,20 +10,24 @@ import log from "./loggers.js";
 import { toHex, ensureEiscpConnected } from "./utils.js";
 import { browseMedia, isMediaBrowsingAvailable } from "./mediaBrowser.js";
 import { PlayMediaCommandHandler } from "./playMediaCommandHandler.js";
-import { findAvrSourceId } from "./avrSourceCatalog.js";
+import { findAvrSourceId, getAvrSourcesByPhysicalId } from "./avrSourceCatalog.js";
+import { stripInputSourceMarker } from "./inputSourcePresentation.js";
+import { isNetworkInputSource } from "./inputSourcePreferences.js";
+import { resetDeezerBrowseState } from "./deezerBrowserStore.js";
+import { resetMusicServerBrowseState } from "./musicServerBrowserStore.js";
+import { resetTidalBrowseState } from "./tidalBrowserStore.js";
 
-const integrationName = "commandSender:";
+const logSource = "commandSender:";
 
 export class CommandSender {
   private driver: uc.IntegrationAPI;
-  private config: OnkyoConfig;
+  private config: IntegrationConfig;
   private eiscp: EiscpDriver;
   private avrStateApi: AvrStateApi;
-  private lastCommandTime: number = 0;
   private commandReceiver: ICommandReceiver | undefined;
   private playMediaCommandHandler: PlayMediaCommandHandler;
 
-  constructor(driver: uc.IntegrationAPI, config: OnkyoConfig, eiscp: EiscpDriver, avrStateApi: AvrStateApi, commandReceiver: ICommandReceiver | undefined) {
+  constructor(driver: uc.IntegrationAPI, config: IntegrationConfig, eiscp: EiscpDriver, avrStateApi: AvrStateApi, commandReceiver: ICommandReceiver | undefined) {
     this.driver = driver;
     this.config = config;
     this.eiscp = eiscp;
@@ -32,14 +36,14 @@ export class CommandSender {
     this.playMediaCommandHandler = new PlayMediaCommandHandler(this.eiscp, this.avrStateApi, this.commandReceiver);
   }
 
-  public updateConfig(config: OnkyoConfig): void {
+  public updateConfig(config: IntegrationConfig): void {
     this.config = config;
   }
 
   async sharedCmdHandler(entity: uc.Entity, cmdId: string, params?: { [key: string]: string | number | boolean }): Promise<uc.StatusCodes> {
     const entityParts = entity.id.split(" ");
     if (entityParts.length < 3) {
-      log.error("%s [%s] Cannot route command: entity id does not contain model, host, and zone", integrationName, entity.id);
+      log.error("%s [%s] Cannot route command: entity id does not contain model, host, and zone", logSource, entity.id);
       return uc.StatusCodes.BadRequest;
     }
 
@@ -49,35 +53,30 @@ export class CommandSender {
     const targetAvr = this.config.avrs?.find((avr) => buildEntityId(avr.model, avr.ip, avr.zone) === entity.id) ?? this.config.avrs?.find((avr) => avr.model === model && avr.ip === host) ?? null;
 
     if (!targetAvr) {
-      log.error("%s [%s] Cannot route command: no configured AVR matches model='%s' host='%s' zone='%s'", integrationName, entity.id, model, host, zone);
+      log.error("%s [%s] Cannot route command: no configured AVR matches model='%s' host='%s' zone='%s'", logSource, entity.id, model, host, zone);
       return uc.StatusCodes.BadRequest;
     }
 
-    if (!(await ensureEiscpConnected(this.eiscp, { model: targetAvr.model, host: targetAvr.ip, port: targetAvr.port }, entity.id, integrationName))) {
+    if (!(await ensureEiscpConnected(this.eiscp, { model: targetAvr.model, host: targetAvr.ip, port: targetAvr.port }, entity.id, logSource))) {
       return uc.StatusCodes.Timeout;
     }
 
-    log.info("%s [%s] media-player command request: %s", integrationName, entity.id, cmdId, params || "");
+    log.info("%s [%s] media-player command request: %s", logSource, entity.id, cmdId, params || "");
 
     const setZonePrefix = (cmd: string): string => (zone === "main" ? cmd : `${zone}.${cmd}`);
 
-    const now = Date.now();
     const queueThreshold = this.config.queueThreshold ?? (typeof this.eiscp.eiscpConfig?.sendDelay === "number" ? this.eiscp.eiscpConfig.sendDelay : DEFAULT_QUEUE_THRESHOLD);
-
-    if (now - this.lastCommandTime <= queueThreshold) {
-      return uc.StatusCodes.Ok;
-    }
 
     const handler = this.handlers.get(cmdId);
     if (!handler) {
       if (cmdId === uc.MediaPlayerCommands.Shuffle || cmdId === uc.MediaPlayerCommands.Repeat) {
-        log.debug("%s [%s] ignoring unsupported media-player command '%s'", integrationName, entity.id, cmdId);
+        log.debug("%s [%s] ignoring unsupported media-player command '%s'", logSource, entity.id, cmdId);
         return uc.StatusCodes.Ok;
       }
       return this.handleSimpleCommand(cmdId, zone);
     }
 
-    return handler(entity, zone, setZonePrefix, params, targetAvr, queueThreshold, now);
+    return handler(entity, zone, setZonePrefix, params, targetAvr, queueThreshold);
   }
 
   private readonly handlers = new Map<
@@ -88,8 +87,7 @@ export class CommandSender {
       setZonePrefix: (cmd: string) => string,
       params: { [key: string]: string | number | boolean } | undefined,
       targetAvr: import("./configManager.js").AvrConfig,
-      queueThreshold: number,
-      now: number
+      queueThreshold: number
     ) => Promise<uc.StatusCodes>
   >([
     [
@@ -122,17 +120,15 @@ export class CommandSender {
     ],
     [
       uc.MediaPlayerCommands.VolumeUp,
-      async (_e, zone, _sz, _p, _t, _q, now) => {
-        this.lastCommandTime = now;
-        await this.eiscp.raw(ZONE_VOLUME_UP_DOWN[zone].up);
+      async (_e, zone) => {
+        await this.eiscp.rawIfAvailable(ZONE_VOLUME_UP_DOWN[zone].up);
         return uc.StatusCodes.Ok;
       }
     ],
     [
       uc.MediaPlayerCommands.VolumeDown,
-      async (_e, zone, _sz, _p, _t, _q, now) => {
-        this.lastCommandTime = now;
-        await this.eiscp.raw(ZONE_VOLUME_UP_DOWN[zone].down);
+      async (_e, zone) => {
+        await this.eiscp.rawIfAvailable(ZONE_VOLUME_UP_DOWN[zone].down);
         return uc.StatusCodes.Ok;
       }
     ],
@@ -142,7 +138,7 @@ export class CommandSender {
         if (params?.volume === undefined) return uc.StatusCodes.Ok;
         const volumeDisplay = String(this.config.volumeDisplay ?? "absolute").toLowerCase() === "relative" ? "relative" : "absolute";
         if (volumeDisplay !== "absolute") {
-          log.debug("%s volume set to relative so slider is ignored.", integrationName);
+          log.debug("%s volume set to relative so slider is ignored.", logSource);
           return uc.StatusCodes.Ok;
         }
         const sliderValue = Math.max(0, Math.min(100, Number(params.volume)));
@@ -150,7 +146,7 @@ export class CommandSender {
         const adjustVolumeDispl = this.config.adjustVolumeDispl ?? true;
         const avrDisplayValue = Math.round((sliderValue * volumeScale) / 100);
         const eiscpValue = adjustVolumeDispl ? avrDisplayValue * 2 : avrDisplayValue;
-        await this.eiscp.raw(`${ZONE_VOLUME_PREFIX[zone]}${toHex(eiscpValue, 2)}`);
+        await this.eiscp.rawIfAvailable(`${ZONE_VOLUME_PREFIX[zone]}${toHex(eiscpValue, 2)}`);
         return uc.StatusCodes.Ok;
       }
     ],
@@ -172,15 +168,23 @@ export class CommandSender {
       uc.MediaPlayerCommands.SelectSource,
       async (_e, zone, sz, params) => {
         if (!params?.source || typeof params.source !== "string") return uc.StatusCodes.Ok;
-        const request = params.source.toLowerCase();
+        // Network-source markers are display decoration. The Web Configurator
+        // can send the displayed label back verbatim, so remove the marker
+        // before validating or resolving the command.
+        const request = stripInputSourceMarker(params.source).toLowerCase();
+        const physicalAvrId = physicalAvrIdFromEntityId(_e.id);
+        const reportedSourceId = physicalAvrId ? findAvrSourceId(physicalAvrId, request) : undefined;
+        const isNetworkService = isNetworkInputSource(reportedSourceId ?? request, request);
+        const discoveredSourceName =
+          physicalAvrId && reportedSourceId ? getAvrSourcesByPhysicalId(physicalAvrId).find((input) => input.id.toLowerCase() === reportedSourceId.toLowerCase())?.name : undefined;
         if (request.startsWith("raw ")) {
           const rawCmd = request.substring(3).trim().toUpperCase();
           if (rawCmd.length > MAX_LENGTHS.RAW_COMMAND) {
-            log.error("%s Raw command too long (%d chars), rejecting", integrationName, rawCmd.length);
+            log.error("%s Raw command too long (%d chars), rejecting", logSource, rawCmd.length);
             return uc.StatusCodes.BadRequest;
           }
           if (!PATTERNS.RAW_COMMAND.test(rawCmd)) {
-            log.error("%s Raw command contains invalid characters, rejecting", integrationName);
+            log.error("%s Raw command contains invalid characters, rejecting", logSource);
             return uc.StatusCodes.BadRequest;
           }
           await this.eiscp.raw(rawCmd);
@@ -188,29 +192,44 @@ export class CommandSender {
         }
 
         if (request.length > MAX_LENGTHS.USER_COMMAND) {
-          log.error("%s Command too long (%d chars), rejecting", integrationName, request.length);
+          log.error("%s Command too long (%d chars), rejecting", logSource, request.length);
           return uc.StatusCodes.BadRequest;
         }
         if (!PATTERNS.USER_COMMAND.test(request)) {
-          log.error("%s Command contains invalid characters, rejecting", integrationName);
+          log.error("%s Command contains invalid characters, rejecting", logSource);
           return uc.StatusCodes.BadRequest;
         }
 
         if (request.startsWith("multi-zone")) {
           await this.eiscp.command(request);
         } else if (INPUT_NAMES_SET.has(request)) {
+          this.resetBrowseStateBeforeSourceSelection(_e.id, request);
           await this.eiscp.command(sz(`input-selector ${request}`));
         } else if (physicalAvrIdFromEntityId(_e.id) && findAvrSourceId(physicalAvrIdFromEntityId(_e.id)!, request)) {
+          this.resetBrowseStateBeforeSourceSelection(_e.id, request);
           await this.eiscp.command({ zone, command: "input-selector", args: request });
         } else {
           // AVR-reported service names can contain spaces (e.g. "TuneIn Radio"); use the
           // structured form so the complete name remains the input-selector argument.
           const inputPrefix = "input-selector ";
           if (request.startsWith(inputPrefix)) {
+            this.resetBrowseStateBeforeSourceSelection(_e.id, request.substring(inputPrefix.length));
             await this.eiscp.command({ zone, command: "input-selector", args: request.substring(inputPrefix.length) });
           } else {
             await this.eiscp.command(sz(request));
           }
+        }
+
+        // FLD/NLT service notifications are not guaranteed after a source
+        // selection. In particular, once the sub-source is set optimistically,
+        // the parser may suppress the matching FLD event as redundant. Update
+        // the sensor from the selected source immediately instead of leaving
+        // the previous DAB/TuneIn display in place.
+        if (isNetworkService && typeof this.driver.updateEntityAttributes === "function") {
+          this.driver.updateEntityAttributes(`${_e.id}_front_panel_display_sensor`, {
+            [uc.SensorAttributes.State]: uc.SensorStates.On,
+            [uc.SensorAttributes.Value]: discoveredSourceName ?? stripInputSourceMarker(params.source)
+          });
         }
         return uc.StatusCodes.Ok;
       }
@@ -324,8 +343,23 @@ export class CommandSender {
     }
 
     const zonePrefixed = zone === "main" ? commandStr : `${zone}.${commandStr}`;
-    log.info("%s executing simple command '%s' → %s", integrationName, cmdId, zonePrefixed);
+    log.info("%s executing simple command '%s' → %s", logSource, cmdId, zonePrefixed);
     await this.eiscp.command(zonePrefixed);
     return uc.StatusCodes.Ok;
+  }
+
+  private resetBrowseStateBeforeSourceSelection(entityId: string, source: string): void {
+    const normalized = stripInputSourceMarker(source).toLowerCase().replace(/\s+/g, "-");
+    if (normalized === "tidal") resetTidalBrowseState(entityId);
+    else if (normalized === "deezer") resetDeezerBrowseState(entityId);
+    else if (normalized === "music-server" || normalized === "musicserver") resetMusicServerBrowseState(entityId);
+
+    // The AVR reports the new NLT service entry shortly after accepting the
+    // source command. Mark the requested service active immediately so a
+    // browse request arriving in that gap cannot be handled by the previous
+    // service's handler or return its cached menu.
+    if (normalized === "tidal" || normalized === "deezer" || normalized === "music-server" || normalized === "musicserver" || normalized === "spotify" || normalized === "tunein") {
+      this.avrStateApi.setSubSource(entityId, normalized === "musicserver" ? "music-server" : normalized);
+    }
   }
 }

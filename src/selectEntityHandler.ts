@@ -9,40 +9,37 @@ import { ensureEiscpConnected } from "./utils.js";
 import log from "./loggers.js";
 
 export class SelectEntityHandler {
-  private readonly integrationName: string;
+  private readonly logSource: string;
 
   constructor(
     private readonly driver: uc.IntegrationAPI,
     private readonly connectionManager: IPhysicalConnectionLookup,
     private readonly avrInstanceManager: IAvrInstanceLookup,
-    /** Entity ID suffix to strip when deriving the AVR entry (e.g. "_listening_mode"). */
+    // Entity ID suffix to strip when deriving the AVR entry (e.g. "_listening_mode").
     private readonly entitySuffix: string,
-    /** EISCP command name to send (e.g. "listening-mode"). */
+    // EISCP command name to send (e.g. "listening-mode").
     private readonly eiscpCommand: string,
-    /** Human-readable label used in log messages (e.g. "Listening Mode"). */
+    // Human-readable label used in log messages (e.g. "Listening Mode").
     private readonly logLabel: string,
-    /** Returns the ordered list of valid option strings for the given AVR entry. */
+    // Returns the ordered list of valid option strings for the given AVR entry.
     private readonly getOptions: (avrEntry: string) => string[],
-    /** Optional: translate a UI option label to the eiscp argument sent to the AVR (default: identity). */
+    // Optional: translate a UI option label to the eiscp argument sent to the AVR (default: identity).
     private readonly optionToArg: (option: string) => string = (o) => o,
-    /**
-     * Optional: send a selection to the AVR in a way the command table cannot express. Defaults to
-     * `eiscp.command()` with the configured command and `optionToArg`.
-     */
+    // Optional: send a selection to the AVR in a way the command table cannot express. Defaults to `eiscp.command()` with the configured command and `optionToArg`.
     private readonly sendOptionToAvr?: (eiscp: EiscpInstance, avrEntry: string, zone: string, option: string) => Promise<void>
   ) {
     // Derive "listeningModeHandler:" / "inputSelectorHandler:" from the suffix.
-    this.integrationName = entitySuffix.slice(1).replace(/_(\w)/g, (_, c: string) => c.toUpperCase()) + "Handler:";
+    this.logSource = entitySuffix.slice(1).replace(/_(\w)/g, (_, c: string) => c.toUpperCase()) + "Handler:";
   }
 
   public async handle(entity: uc.Entity, cmdId: string, params?: { [key: string]: string | number | boolean }): Promise<uc.StatusCodes> {
-    log.info("%s [%s] %s command: %s", this.integrationName, entity.id, this.logLabel, cmdId, params);
+    log.info("%s [%s] %s command: %s", this.logSource, entity.id, this.logLabel, cmdId, params);
 
     const avrEntry = entity.id.replace(this.entitySuffix, "");
     const instance = this.avrInstanceManager.get(avrEntry);
 
     if (!instance) {
-      log.error("%s [%s] No AVR instance found", this.integrationName, entity.id);
+      log.error("%s [%s] No AVR instance found", this.logSource, entity.id);
       return uc.StatusCodes.NotFound;
     }
 
@@ -50,11 +47,11 @@ export class SelectEntityHandler {
     const physicalConnection = this.connectionManager.getPhysicalConnection(physicalAVR);
 
     if (!physicalConnection) {
-      log.error("%s [%s] No physical connection found", this.integrationName, entity.id);
+      log.error("%s [%s] No physical connection found", this.logSource, entity.id);
       return uc.StatusCodes.ServiceUnavailable;
     }
 
-    if (!(await ensureEiscpConnected(physicalConnection.eiscp, { model: instance.config.model, host: instance.config.ip, port: instance.config.port }, entity.id, this.integrationName))) {
+    if (!(await ensureEiscpConnected(physicalConnection.eiscp, { model: instance.config.model, host: instance.config.ip, port: instance.config.port }, entity.id, this.logSource))) {
       return uc.StatusCodes.Timeout;
     }
 
@@ -86,16 +83,16 @@ export class SelectEntityHandler {
           break;
         }
         default:
-          log.warn("%s [%s] Unknown command: %s", this.integrationName, entity.id, cmdId);
+          log.warn("%s [%s] Unknown command: %s", this.logSource, entity.id, cmdId);
           return uc.StatusCodes.BadRequest;
       }
 
       if (!newOption) {
-        log.warn("%s [%s] No option selected", this.integrationName, entity.id);
+        log.warn("%s [%s] No option selected", this.logSource, entity.id);
         return uc.StatusCodes.BadRequest;
       }
 
-      log.info("%s [%s] Setting %s to: %s", this.integrationName, entity.id, this.logLabel.toLowerCase(), newOption);
+      log.info("%s [%s] Setting %s to: %s", this.logSource, entity.id, this.logLabel.toLowerCase(), newOption);
       if (this.sendOptionToAvr) {
         await this.sendOptionToAvr(physicalConnection.eiscp, avrEntry, instance.config.zone, newOption);
       } else {
@@ -112,7 +109,7 @@ export class SelectEntityHandler {
 
       return uc.StatusCodes.Ok;
     } catch (err) {
-      log.error("%s [%s] Failed to set %s:", this.integrationName, entity.id, this.logLabel.toLowerCase(), err);
+      log.error("%s [%s] Failed to set %s:", this.logSource, entity.id, this.logLabel.toLowerCase(), err);
       return uc.StatusCodes.ServerError;
     }
   }

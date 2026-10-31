@@ -107,6 +107,23 @@ describe("BackupRestoreManager", () => {
       expect(parsed.meta.version).toBe("2.0.0");
     });
 
+    it("does not include the legacy configVersion in backups", async () => {
+      fsMock.readFileSync.mockImplementation((path: string) => {
+        if (path.endsWith("driver.json")) {
+          return JSON.stringify({ driver_id: "my-driver", version: "0.9.8" });
+        }
+        return JSON.stringify({ configVersion: "0.9.6", avrs: [{ model: "TX-RZ50", ip: "1.2.3.4" }] });
+      });
+      fsMock.existsSync.mockReturnValue(true);
+
+      const mgr = new BackupRestoreManager();
+      const result = await mgr.buildBackupString(() => "/tmp/uc-test");
+      const parsed = JSON.parse(result);
+
+      expect(parsed.meta.version).toBe("0.9.8");
+      expect(parsed.config.configVersion).toBeUndefined();
+    });
+
     it("falls back to unknown for empty driver metadata", async () => {
       fsMock.readFileSync.mockImplementation((path: string) => {
         if (path.endsWith("driver.json")) {

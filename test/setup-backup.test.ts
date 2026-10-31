@@ -22,7 +22,7 @@ it("backup flow returns backup_data JSON", async () => {
     // Seed a sample config
     const sampleConfig = {
       avrs: [{ model: "TX-RZ50", ip: "192.168.2.103", port: 60128, zone: "main", entityNameStyle: "short" }]
-    } as Partial<import("../src/configManager.js").OnkyoConfig>;
+    } as Partial<import("../src/configManager.js").IntegrationConfig>;
     ConfigManager.save(sampleConfig);
     console.log("on-disk-config (after src save):", fs.readFileSync(path.join(tmp, "config.json"), "utf-8"));
 
@@ -148,7 +148,7 @@ it("restore flow applies provided backup_data", async () => {
 
     // Create a backup payload to restore
     const driverJson = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), "driver.json"), "utf-8"));
-    const targetConfig = { avrs: [{ model: "TX-RZ50", ip: "192.168.2.103", port: 60128, zone: "main", entityNameStyle: "short" }] } as Partial<import("../src/configManager.js").OnkyoConfig>;
+    const targetConfig = { avrs: [{ model: "TX-RZ50", ip: "192.168.2.103", port: 60128, zone: "main", entityNameStyle: "short" }] } as Partial<import("../src/configManager.js").IntegrationConfig>;
     const payload = { meta: { driver_id: driverJson.driver_id, version: driverJson.version }, config: targetConfig };
     const payloadString = JSON.stringify(payload);
 
@@ -195,7 +195,7 @@ it("restore flow defaults missing TuneIn menu setting to mypresets", async () =>
     drv.registerAvailableEntities = (OnkyoDriver.prototype as any).registerAvailableEntities.bind(drv);
 
     const driverJson = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), "driver.json"), "utf-8"));
-    const targetConfig = { avrs: [{ model: "TX-RZ50", ip: "192.168.2.103", port: 60128, zone: "main", entityNameStyle: "short" }] } as Partial<import("../src/configManager.js").OnkyoConfig>;
+    const targetConfig = { avrs: [{ model: "TX-RZ50", ip: "192.168.2.103", port: 60128, zone: "main", entityNameStyle: "short" }] } as Partial<import("../src/configManager.js").IntegrationConfig>;
     const payload = { meta: { driver_id: driverJson.driver_id, version: driverJson.version }, config: targetConfig };
     const payloadString = JSON.stringify(payload);
 
@@ -241,7 +241,7 @@ it("restore flow accepts intg-manager restore_from_backup payload", async () => 
     drv.registerAvailableEntities = (OnkyoDriver.prototype as any).registerAvailableEntities.bind(drv);
 
     const driverJson = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), "driver.json"), "utf-8"));
-    const targetConfig = { avrs: [{ model: "TX-RZ50", ip: "192.168.2.103", port: 60128, zone: "main", entityNameStyle: "short" }] } as Partial<import("../src/configManager.js").OnkyoConfig>;
+    const targetConfig = { avrs: [{ model: "TX-RZ50", ip: "192.168.2.103", port: 60128, zone: "main", entityNameStyle: "short" }] } as Partial<import("../src/configManager.js").IntegrationConfig>;
     const payload = { meta: { driver_id: driverJson.driver_id, version: driverJson.version }, config: targetConfig };
     const payloadString = JSON.stringify(payload);
 
@@ -292,7 +292,7 @@ it("restore flow applies restore_data submitted from the restore form", async ()
     drv.registerAvailableEntities = (OnkyoDriver.prototype as any).registerAvailableEntities.bind(drv);
 
     const driverJson = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), "driver.json"), "utf-8"));
-    const targetConfig = { avrs: [{ model: "TX-RZ50", ip: "192.168.2.103", port: 60128, zone: "main", entityNameStyle: "short" }] } as Partial<import("../src/configManager.js").OnkyoConfig>;
+    const targetConfig = { avrs: [{ model: "TX-RZ50", ip: "192.168.2.103", port: 60128, zone: "main", entityNameStyle: "short" }] } as Partial<import("../src/configManager.js").IntegrationConfig>;
     const payload = { meta: { driver_id: driverJson.driver_id, version: driverJson.version }, config: targetConfig };
     const payloadString = JSON.stringify(payload);
 

@@ -136,7 +136,7 @@ it("disconnectAll disconnects all connected AVRs", async () => {
   cm.disconnectAll();
 
   expect(eiscp1.disconnect).toHaveBeenCalledTimes(1);
-  expect(eiscp2.disconnect).not.toHaveBeenCalled();
+  expect(eiscp2.disconnect).toHaveBeenCalledTimes(1);
   expect(eiscp3.disconnect).toHaveBeenCalledTimes(1);
 });
 

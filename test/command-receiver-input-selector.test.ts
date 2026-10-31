@@ -67,7 +67,7 @@ it("CommandReceiver uses user-configured input selector when it matches a report
 
     const isoUpdates = updates.filter((u) => u.id.endsWith("_input_selector") && u.attrs && u.attrs.current_option);
     expect(isoUpdates.length > 0).toBe(true);
-    expect(isoUpdates[isoUpdates.length - 1].attrs.current_option).toBe("dvd");
+    expect(isoUpdates[isoUpdates.length - 1].attrs.current_option).toBe("bd");
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
   }
@@ -168,7 +168,7 @@ it("CommandReceiver applies inputSelectorOptions to non-main zones (per-AVR conf
     const isoUpdates = updates.filter((u) => u.id.endsWith("_input_selector") && u.attrs && u.attrs.current_option);
     expect(isoUpdates.length > 0).toBe(true);
     expect(isoUpdates[isoUpdates.length - 1].id).toBe("M 1.2.3.4 zone2_input_selector");
-    expect(isoUpdates[isoUpdates.length - 1].attrs.current_option).toBe("dvd");
+    expect(isoUpdates[isoUpdates.length - 1].attrs.current_option).toBe("bd");
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
   }
@@ -279,7 +279,7 @@ it("CommandReceiver ignores collected inputs once the input source list is manua
     });
 
     const isoUpdates = updates.filter((u) => u.id.endsWith("_input_selector") && u.attrs && u.attrs.current_option);
-    expect(isoUpdates[isoUpdates.length - 1].attrs.current_option).toBe("dvd");
+    expect(isoUpdates[isoUpdates.length - 1].attrs.current_option).toBe("bd");
   } finally {
     ((await import("../src/inputSourceStore.js")) as any).clearAllAvrInputs();
     fs.rmSync(tmp, { recursive: true, force: true });

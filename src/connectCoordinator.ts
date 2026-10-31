@@ -1,12 +1,12 @@
 /*jslint node:true nomen:true*/
 "use strict";
 import log from "./loggers.js";
-import { OnkyoConfig, AvrConfig, buildPhysicalAvrId, buildEntityId } from "./configManager.js";
+import { IntegrationConfig, AvrConfig, buildPhysicalAvrId, buildEntityId } from "./configManager.js";
 import ConnectionManager from "./connectionManager.js";
 import { DEFAULT_QUEUE_THRESHOLD } from "./configManager.js";
 import { delay } from "./utils.js";
 
-const integrationName = "connectCoordinator:";
+const logSource = "connectCoordinator:";
 
 import { AvrInstance, PhysicalConnection, CreateCommandReceiverFactory, CreateCommandSenderFn, QueryAvrStateFn, QueryAllZonesStateFn } from "./types.js";
 
@@ -15,7 +15,7 @@ export async function ensureZoneInstances(
   instances: Map<string, AvrInstance>,
   avrs: AvrConfig[],
   getPhysicalConnection: (physicalAvr: string) => PhysicalConnection | undefined,
-  createAvrSpecificConfig: (cfg: AvrConfig) => OnkyoConfig,
+  createAvrSpecificConfig: (cfg: AvrConfig) => IntegrationConfig,
   createCommandSender: CreateCommandSenderFn
 ): Promise<void> {
   for (const avrConfig of avrs) {
@@ -27,19 +27,19 @@ export async function ensureZoneInstances(
     if (existing) {
       existing.config = avrConfig;
       existing.commandSender.updateConfig(avrSpecificConfig);
-      log.info("%s [%s] Zone instance already exists (runtime config refreshed)", integrationName, avrEntry);
+      log.info("%s [%s] Zone instance already exists (runtime config refreshed)", logSource, avrEntry);
       continue;
     }
 
     const physicalConnection = getPhysicalConnection(physicalAVR);
     if (!physicalConnection) {
-      log.warn("%s [%s] Cannot create zone instance - no physical connection object exists", integrationName, avrEntry);
+      log.warn("%s [%s] Cannot create zone instance - no physical connection object exists", logSource, avrEntry);
       continue;
     }
 
     const commandSender = createCommandSender(avrSpecificConfig, physicalConnection.eiscp, physicalConnection.commandReceiver);
     instances.set(avrEntry, { config: avrConfig, commandSender });
-    log.info("%s [%s] Zone instance created%s", integrationName, avrEntry, physicalConnection.eiscp.connected ? " (connected)" : " (will connect when AVR available)");
+    log.info("%s [%s] Zone instance created%s", logSource, avrEntry, physicalConnection.eiscp.connected ? " (connected)" : " (will connect when AVR available)");
   }
 }
 
@@ -48,26 +48,40 @@ export default class ConnectCoordinator {
   private avrInstances: Map<string, AvrInstance>;
   private queryAvrState: QueryAvrStateFn;
   private queryAllZonesState: QueryAllZonesStateFn;
-  private readonly createAvrSpecificConfig: (cfg: AvrConfig) => OnkyoConfig;
+  private readonly createAvrSpecificConfig: (cfg: AvrConfig) => IntegrationConfig;
 
   constructor(
     connectionManager: ConnectionManager,
     avrInstances: Map<string, AvrInstance>,
     queryAvrState: QueryAvrStateFn,
     queryAllZonesState: QueryAllZonesStateFn,
-    createAvrSpecificConfig?: (cfg: AvrConfig) => OnkyoConfig
+    createAvrSpecificConfig?: (cfg: AvrConfig) => IntegrationConfig
   ) {
     this.connectionManager = connectionManager;
     this.avrInstances = avrInstances;
     this.queryAvrState = queryAvrState;
     this.queryAllZonesState = queryAllZonesState;
-    this.createAvrSpecificConfig = createAvrSpecificConfig ?? ((c) => ({ ...c, queueThreshold: c.queueThreshold ?? DEFAULT_QUEUE_THRESHOLD }) as OnkyoConfig);
+    this.createAvrSpecificConfig = createAvrSpecificConfig ?? ((c) => ({ ...c, queueThreshold: c.queueThreshold ?? DEFAULT_QUEUE_THRESHOLD }) as IntegrationConfig);
   }
 
-  /** Orchestrate connecting physical AVRs and creating zone instances. Returns true if any zone instances exist after connect. */
-  async connect(config: OnkyoConfig, createCommandReceiverFactory: CreateCommandReceiverFactory, createCommandSender: CreateCommandSenderFn): Promise<boolean> {
+  reconcile(config: IntegrationConfig): string[] {
+    const desiredPhysicalAvrs = new Set(config.avrs?.map((avr) => buildPhysicalAvrId(avr.model, avr.ip)) ?? []);
+    this.connectionManager.reconcilePhysicalConnections([...desiredPhysicalAvrs]);
+
+    const desiredZones = new Set(config.avrs?.map((avr) => buildEntityId(avr.model, avr.ip, avr.zone)) ?? []);
+    const removedZones: string[] = [];
+    for (const entityId of this.avrInstances.keys()) {
+      if (desiredZones.has(entityId)) continue;
+      this.avrInstances.delete(entityId);
+      removedZones.push(entityId);
+    }
+    return removedZones;
+  }
+
+  // Orchestrate connecting physical AVRs and creating zone instances. Returns true if any zone instances exist after connect.
+  async connect(config: IntegrationConfig, createCommandReceiverFactory: CreateCommandReceiverFactory, createCommandSender: CreateCommandSenderFn): Promise<boolean> {
     if (!config || !config.avrs || config.avrs.length === 0) {
-      log.info("%s No AVRs configured", integrationName);
+      log.info("%s No AVRs configured", logSource);
       return false;
     }
 
@@ -96,7 +110,7 @@ export default class ConnectCoordinator {
         this.connectionManager.updateConnectionConfig(physicalAVR, avrConfig, configuredZones, avrSpecificConfig);
 
         if (!physicalConnection.eiscp.connected) {
-          log.info("%s [%s] TCP connection lost, reconnecting to AVR...", integrationName, physicalAVR);
+          log.info("%s [%s] TCP connection lost, reconnecting to AVR...", logSource, physicalAVR);
           const result = await this.connectionManager.attemptReconnection(physicalAVR);
           if (result.success) {
             this.connectionManager.cancelScheduledReconnection(physicalAVR);

@@ -1,24 +1,20 @@
 # Select Listening Mode
 
-As from v0.8.0 this integration offers a 'select' entity for [Listening Mode](./listening-modes.md).
+The integration provides a select entity for [Listening Mode](./listening-modes.md).
 
 ![](./../screenshots/select.png)
 
-This entity will offer a drop down of all Listening Modes (for example `stereo`, `straight-decode`, `tv-logic`).
+## Configure listening modes
 
-As the list of all known options is very long and the AVR does not return a dynamic list of valid options for the playing source, the integration tries to shorten the list of options based on the audio-input format but the end result is still a (too?) long list of options. So, as an alternative you can configure which options you want to have in the selection.
+After initial setup, choose **Configure listening modes** in the integration setup. If more than one physical AVR is configured, setup first asks which AVR to configure. The settings apply to all configured zones of that AVR; zones are not configured separately.
 
-### Customizing the `listening-mode` select
+For each listening-mode code, choose one of:
 
-- You can configure a per‑AVR custom list of listening modes during setup.
-- During manual setup provide a semicolon-separated list in the **Listening mode select options** field, for example:
+- **✨ Discover from AVR** — obtain the AVR-specific name when the relevant input and audio format are active.
+- **✅ AVR-discovered** — use the name that has already been learned from the AVR.
+- An integration alias — use the integration's standard name.
+- **🚫 Don't include** — hide the mode from the select entity.
 
-  `stereo; straight-decode; neural-thx; full-mono`
+Listening-mode names can depend on the selected input and audio format. The integration learns these context-specific names from the AVR and uses the learned code when sending the mode back to the AVR. This also allows modes that are not present in the integration's built-in mappings to be selected.
 
-  ![](./../screenshots/listening-mode-config.png)
-
-- Behavior:
-  - If you provide a list, the `listening-mode` select-entity will show _only_ those options for that AVR regardless of the current source/activity.
-  - If you set it to `all` the driver continues to use the dynamic, audio-format filtered list.
-  - If you enter `none` the select-entity will not be created.
-  - The configured list is saved, included in backups, and persists across reboots.
+The discovered names and contexts are saved in the AVR configuration and included in backups.

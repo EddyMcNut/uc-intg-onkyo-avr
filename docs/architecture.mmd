@@ -1,0 +1,42 @@
+flowchart LR
+  Remote[Physical UC Remote]
+  API[Unfolded Circle Integration API]
+  Driver[Driver<br/>src/driver.ts]
+  Setup[SetupHandler<br/>SetupInputSourceProbe]
+  Entities[EntityRegistrationCoordinator<br/>EntityRegistrar]
+  Connect[ConnectCoordinator]
+  Connection[ConnectionManager]
+  Retry[ReconnectionManager]
+  Receiver[CommandReceiver]
+  State[AVR state and media stores]
+  Workflow[EiscpCommandWorkflow]
+  Eiscp[EiscpDriver<br/>TCP/UDP eISCP transport]
+  AVR[Onkyo / Pioneer / Integra AVR<br/>TCP :60128]
+
+  Remote <--> API
+  API <--> Driver
+  Driver --> Setup
+  Driver --> Entities
+  Driver --> Connect
+  Connect --> Connection
+  Connection --> Retry
+  Connection --> Eiscp
+  Eiscp --> Workflow
+  Eiscp <--> AVR
+  Eiscp --> Receiver
+  Receiver --> State
+  State --> API
+
+  classDef platform fill:#5c5f7a,color:#fff,stroke:#fff
+  classDef app fill:#3a7abd,color:#fff,stroke:#fff
+  classDef infra fill:#2d8a4a,color:#fff,stroke:#fff
+  classDef domain fill:#a07c1a,color:#fff,stroke:#fff
+  classDef protocol fill:#5b2d8a,color:#fff,stroke:#fff
+  classDef physical fill:#c0392b,color:#fff,stroke:#fff
+
+  class Remote platform
+  class API,Driver,Setup,Entities app
+  class Connect,Connection,Retry infra
+  class Receiver,State,Workflow domain
+  class Eiscp protocol
+  class AVR physical

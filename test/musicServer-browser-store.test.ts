@@ -15,7 +15,7 @@ describe("waitForNlaIngestion", () => {
 
   it("returns immediately when state is null (no browse state for entityId)", async () => {
     const { waitForNlaIngestion } = await import("../src/musicServerBrowserStore.js");
-    await waitForNlaIngestion("nonexistent nohost main");
+    await waitForNlaIngestion("invalid");
   });
 
   it("returns immediately when totalExpected is 0", async () => {
@@ -47,9 +47,9 @@ describe("waitForNlaIngestion", () => {
     const { waitForNlaIngestion } = await import("../src/musicServerBrowserStore.js");
     const p = waitForNlaIngestion(ENTITY_ID);
 
-    vi.advanceTimersByTime(350);
+    await vi.advanceTimersByTimeAsync(350);
     store.addMusicServerMenuOption(ENTITY_ID, 2, "Item 2");
-    vi.advanceTimersByTime(350);
+    await vi.advanceTimersByTimeAsync(350);
 
     await p;
   });
@@ -64,7 +64,7 @@ describe("waitForNlaIngestion", () => {
     const { waitForNlaIngestion } = await import("../src/musicServerBrowserStore.js");
     const p = waitForNlaIngestion(ENTITY_ID);
 
-    vi.advanceTimersByTime(4000);
+    await vi.advanceTimersByTimeAsync(4000);
 
     await p;
   });
@@ -78,11 +78,22 @@ describe("MusicServerMediaBrowser", () => {
   it("browse returns items from list entries", async () => {
     const { MusicServerMediaBrowser } = await import("../src/musicServerMediaBrowser.js");
     const browser = new MusicServerMediaBrowser();
-    browser.ingestListEntry(ENTITY_ID, "U0-My Folder");
-    browser.ingestListEntry(ENTITY_ID, "U1-Song - Artist");
+    browser.ingestXmlEntries(ENTITY_ID, '<items offset="0"><item title="My Folder"/><item title="Song - Artist"/></items>');
 
     const result = await browser.browse(ENTITY_ID, { paging: new uc.Paging(1, 25) });
     expect(result).toBeDefined();
+  });
+
+  it("marks fuzzy-matching music server tracks as now playing", async () => {
+    const store = await import("../src/musicServerBrowserStore.js");
+    const { MusicServerMediaBrowser } = await import("../src/musicServerMediaBrowser.js");
+    const browser = new MusicServerMediaBrowser();
+    browser.ingestXmlEntries(ENTITY_ID, '<items offset="0"><item title="Song - Artist"/></items>');
+    const state = store.getMusicServerBrowseState(ENTITY_ID)!;
+    state.nowPlayingTitle = "Song - Artist";
+    await browser.browse(ENTITY_ID, { media_id: "music-server:root", media_type: "music-server://menu", paging: new uc.Paging(1, 25) });
+    state.nowPlayingTitle = "Song";
+    await browser.browse(ENTITY_ID, { media_id: "music-server:root", media_type: "music-server://menu", paging: new uc.Paging(1, 25) });
   });
 
   it("ingestXmlEntries parses XML items", async () => {
@@ -156,7 +167,7 @@ describe("MusicServerMediaBrowser", () => {
   it("browse with root id", async () => {
     const { MusicServerMediaBrowser } = await import("../src/musicServerMediaBrowser.js");
     const browser = new MusicServerMediaBrowser();
-    browser.ingestListEntry(ENTITY_ID, "U0-Folder");
+    browser.ingestXmlEntries(ENTITY_ID, '<items offset="0"><item title="Folder"/></items>');
     const result = await browser.browse(ENTITY_ID, { media_id: "music-server:root", media_type: "music-server://menu", paging: new uc.Paging(1, 25) });
     expect(result).toBeDefined();
   });

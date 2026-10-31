@@ -16,7 +16,7 @@ export type MenuItemLister = (entityId: string) => MenuSignatureItem[];
 
 export type MenuBrowseHandlerConfig = {
   providerLabel: string;
-  integrationName: string;
+  logSource: string;
   rootId: string;
   rootType: string;
   backId: string;
@@ -28,6 +28,13 @@ export type MenuBrowseHandlerConfig = {
   getBrowseState: BrowseStateGetter;
   listMenuItems: MenuItemLister;
   afterHarvest?: (entityId: string, rawSend: RawSendFn) => Promise<void>;
+  // XML-only services (such as Music Server) must request NLAL before waiting
+  // for a list signature; the list does not exist until that request is made.
+  waitForMenuStableBeforeHarvest?: boolean;
+  // Some XML-only services leave the browse context entirely on Back.
+  harvestAfterBack?: boolean;
+  isServiceActive?: (entityId: string) => boolean;
+  waitForXmlResponse?: boolean;
 };
 
 export type MenuBrowseHandlerApi = MenuBrowseHandlerBase & {
@@ -41,11 +48,14 @@ export type MenuBrowseHandlerApi = MenuBrowseHandlerBase & {
 };
 
 export function createMenuBrowseHandler(cfg: MenuBrowseHandlerConfig): MenuBrowseHandlerApi {
-  const integrationName = cfg.integrationName;
+  const logSource = cfg.logSource;
+  const waitForMenuStableBeforeHarvest = cfg.waitForMenuStableBeforeHarvest ?? true;
+  const harvestAfterBack = cfg.harvestAfterBack ?? true;
 
   class Handler extends MenuBrowseHandlerBase {
-    protected readonly integrationName = integrationName;
+    protected readonly logSource = logSource;
     protected phase2HarvestEnabled = true;
+    protected waitForXmlResponse = cfg.waitForXmlResponse ?? false;
 
     protected getServiceLabel(): string {
       return cfg.providerLabel;
@@ -93,20 +103,84 @@ export function createMenuBrowseHandler(cfg: MenuBrowseHandlerConfig): MenuBrows
       cmdHandler: CmdHandlerFn | undefined,
       rawSend: RawSendFn | undefined
     ): Promise<uc.StatusCodes | uc.BrowseResult | undefined> {
+      if (cfg.isServiceActive && !cfg.isServiceActive(entityId)) return undefined;
+      const serviceIsActive = () => !cfg.isServiceActive || cfg.isServiceActive(entityId);
       const mainMenu = cfg.isMainMenuRequest(options.media_id, options.media_type);
       const backRequest = cfg.isBackRequest(options.media_id, options.media_type);
       const selection = cfg.resolveMenuOption(options.media_id, options.media_type);
 
+      const rootRequest = !options.media_id || options.media_id === cfg.rootId;
+      if (rootRequest && !waitForMenuStableBeforeHarvest && rawSend) {
+        const browseState = cfg.getBrowseState(entityId);
+        if (!mainMenu && browseState?.browseListFrozen && cmdHandler) {
+          const nowPlayingTitle = browseState.nowPlayingTitle;
+          cfg.resetState(entityId);
+          const returnedState = cfg.getBrowseState(entityId);
+          if (returnedState) {
+            returnedState.listModeActive = true;
+            returnedState.nowPlayingTitle = nowPlayingTitle;
+          }
+          log.info("%s [%s] returning to %s XML browse context after playback", logSource, entityId, cfg.providerLabel);
+          await cmdHandler(mediaPlayerEntity, uc.MediaPlayerCommands.PlayMedia, {
+            media_id: cfg.backId,
+            media_type: cfg.rootType
+          });
+          await this.waitForListMetadata(entityId, this.getMenuDelay(entityId));
+          await this.harvestListItems(entityId, rawSend);
+          if (!serviceIsActive()) return undefined;
+          if (cfg.afterHarvest) {
+            await cfg.afterHarvest(entityId, rawSend);
+          }
+        }
+        if (cfg.listMenuItems(entityId).length === 0) {
+          if (browseState) browseState.listModeActive = true;
+          await this.waitForListMetadata(entityId, this.getMenuDelay(entityId));
+          if ((browseState?.totalListItemCount ?? 0) === 0 && cfg.listMenuItems(entityId).length === 0) {
+            await rawSend(`NLAL00000100000001`);
+            await this.waitForListMetadata(entityId, this.getMenuDelay(entityId));
+          }
+          await this.harvestListItems(entityId, rawSend);
+          if (!serviceIsActive()) return undefined;
+          if (cfg.afterHarvest) {
+            await cfg.afterHarvest(entityId, rawSend);
+          }
+        }
+        const paging = options.paging;
+        const requiredCount = (paging?.offset ?? 0) + (paging?.limit ?? 0);
+        await this.waitForMenuItems(entityId, requiredCount, this.getMenuDelay(entityId) * 4);
+        if (!serviceIsActive()) return undefined;
+        return cfg.browseMedia(entityId, {
+          ...options,
+          media_id: cfg.rootId,
+          media_type: cfg.rootType
+        });
+      }
+
       if (backRequest && cmdHandler) {
+        const browseStateBeforeBack = cfg.getBrowseState(entityId);
+        const nowPlayingTitle = browseStateBeforeBack?.nowPlayingTitle ?? "";
         cfg.resetState(entityId);
         const beforeSignature = this.buildMenuSignature(entityId);
         const menuDelay = this.getMenuDelay(entityId);
-        log.info("%s [%s] sending %s Back command to AVR", integrationName, entityId, cfg.providerLabel);
+        log.info("%s [%s] sending %s Back command to AVR", logSource, entityId, cfg.providerLabel);
         await cmdHandler(mediaPlayerEntity, uc.MediaPlayerCommands.PlayMedia, {
           media_id: cfg.backId,
           media_type: cfg.rootType
         });
-        await this.waitForMenuStable(entityId, beforeSignature, menuDelay);
+        const backBrowseState = cfg.getBrowseState(entityId);
+        if (backBrowseState) {
+          backBrowseState.showMainMenuShortcut = true;
+          backBrowseState.nowPlayingTitle = nowPlayingTitle;
+        }
+        if (!harvestAfterBack) {
+          return cfg.browseMedia(entityId, {
+            ...options,
+            media_id: cfg.rootId,
+            media_type: cfg.rootType
+          });
+        }
+        if (waitForMenuStableBeforeHarvest) await this.waitForMenuStable(entityId, beforeSignature, menuDelay);
+        else await this.waitForListMetadata(entityId, menuDelay);
         if (rawSend) {
           const browseState = cfg.getBrowseState(entityId);
           if (browseState) {
@@ -114,6 +188,7 @@ export function createMenuBrowseHandler(cfg: MenuBrowseHandlerConfig): MenuBrows
             browseState.listModeActive = true;
           }
           await this.harvestListItems(entityId, rawSend);
+          if (!serviceIsActive()) return undefined;
           if (cfg.afterHarvest) {
             await cfg.afterHarvest(entityId, rawSend);
           }
@@ -129,7 +204,7 @@ export function createMenuBrowseHandler(cfg: MenuBrowseHandlerConfig): MenuBrows
         cfg.resetState(entityId);
         const browseState = cfg.getBrowseState(entityId);
         if (browseState) browseState.traceNextSelectionAfterMainMenu = true;
-        log.info("%s [%s] %s Main Menu selected; next %s selection will be traced", integrationName, entityId, cfg.providerLabel, cfg.providerLabel);
+        log.info("%s [%s] %s Main Menu selected; next %s selection will be traced", logSource, entityId, cfg.providerLabel, cfg.providerLabel);
         await cmdHandler(mediaPlayerEntity, uc.MediaPlayerCommands.PlayMedia, {
           media_id: String(options.media_id),
           media_type: cfg.rootType
@@ -138,10 +213,12 @@ export function createMenuBrowseHandler(cfg: MenuBrowseHandlerConfig): MenuBrows
         const beforeSignature = this.buildMenuSignature(entityId);
         const menuDelay = this.getMenuDelay(entityId);
 
-        await this.waitForMenuStable(entityId, beforeSignature, menuDelay);
+        if (waitForMenuStableBeforeHarvest) await this.waitForMenuStable(entityId, beforeSignature, menuDelay);
+        else await this.waitForListMetadata(entityId, menuDelay);
         if (browseState) browseState.listModeActive = true;
         if (rawSend) {
           await this.harvestListItems(entityId, rawSend);
+          if (!serviceIsActive()) return undefined;
           if (cfg.afterHarvest) {
             await cfg.afterHarvest(entityId, rawSend);
           }
@@ -155,6 +232,12 @@ export function createMenuBrowseHandler(cfg: MenuBrowseHandlerConfig): MenuBrows
       }
 
       if (selection && cmdHandler) {
+        // A browsable selection creates a new AVR menu context. Invalidate
+        // any background NLAL harvest belonging to the previous folder before
+        // asking the AVR for the next one.
+        if (selection.isBrowsable && (options.paging?.offset ?? 0) === 0) {
+          cfg.resetState(entityId);
+        }
         const browseState = cfg.getBrowseState(entityId);
         if (browseState) browseState.showMainMenuShortcut = true;
 
@@ -168,10 +251,22 @@ export function createMenuBrowseHandler(cfg: MenuBrowseHandlerConfig): MenuBrows
             const beforeSignature = this.buildMenuSignature(entityId);
             const menuDelay = this.getMenuDelay(entityId);
 
-            await this.waitForMenuStable(entityId, beforeSignature, menuDelay);
+            if (waitForMenuStableBeforeHarvest) await this.waitForMenuStable(entityId, beforeSignature, menuDelay);
+            else await this.waitForListMetadata(entityId, menuDelay);
+            if (!waitForMenuStableBeforeHarvest && rawSend && browseState && browseState.totalListItemCount === 0 && cfg.listMenuItems(entityId).length === 0) {
+              // Some AVRs emit NLS/NLT only after NLAI. The app immediately
+              // probes the next XML layer in that case.
+              const layer = Math.max(1, browseState.nlsLayerNumber + 1)
+                .toString(16)
+                .padStart(2, "0")
+                .toUpperCase();
+              await rawSend(`NLAL${this.nextListSequence()}${layer}00000001`);
+              await this.waitForListMetadata(entityId, menuDelay);
+            }
             if (browseState) browseState.listModeActive = true;
             if (rawSend) {
               await this.harvestListItems(entityId, rawSend);
+              if (!serviceIsActive()) return undefined;
               if (cfg.afterHarvest) {
                 await cfg.afterHarvest(entityId, rawSend);
               }

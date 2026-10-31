@@ -1,6 +1,19 @@
 // Focused responsibility: Generate UI forms for setup flows
 import * as uc from "@unfoldedcircle/integration-api";
 import { ParsedManualConfig } from "./manualConfigParser.js";
+import {
+  DONT_INCLUDE_LISTENING_MODE,
+  getKnownListeningModes,
+  DISCOVERED_LISTENING_MODE,
+  DISCOVER_LISTENING_MODE,
+  INTEGRATION_PREFERRED_LISTENING_MODE,
+  normalizeListeningModeSetting
+} from "./listeningModePreferences.js";
+import { DONT_INCLUDE_INPUT_SOURCE, getAliasesForReportedInput, getKnownInputSources, DISCOVERED_INPUT_SOURCE, DISCOVER_INPUT_SOURCE } from "./inputSourcePreferences.js";
+import { NETWORK_INPUT_MARKERS } from "./configConstants.js";
+import { SETUP_SELECTION_PAGE_SIZE } from "./inputSourcePresentation.js";
+
+type FormSetting = { id: string; [key: string]: object | string };
 
 export class SetupFormBuilder {
   buildManualConfigForm(values: ParsedManualConfig): uc.RequestUserInput {
@@ -27,23 +40,81 @@ export class SetupFormBuilder {
       "volumeScale",
       "volumeDisplay",
       "adjustVolumeDispl",
-      "useAvrReportedInputs",
       "tuneinPresetPosition",
-      "tuneinMenuStyle"
+      "tuneinMenuStyle",
+      "inputSourceLayout",
+      "networkInputMarker"
     ]);
   }
 
   buildManualConfigPage3(values: ParsedManualConfig): uc.RequestUserInput {
-    const ids = ["createRemoteEntity", "createSensors", "createTunerPresets", "createDiracSelectEntity", "listeningModeOptions", "inputSelectorOptions", "logLevel"];
-    if (values.useAvrReportedInputsValue) {
-      ids.splice(ids.indexOf("inputSelectorOptions"), 1);
-    }
-    return this.buildManualConfigFormPage(values, "Manual configuration (3/3)", ids);
+    const ids = ["createRemoteEntity", "createSensors", "createTunerPresets", "createDiracSelectEntity", "logLevel"];
+    return this.buildManualConfigFormPage(values, "Manual configuration (3/4)", ids);
+  }
+
+  buildInputSourcePage(values: ParsedManualConfig, page: number, total: number): uc.RequestUserInput {
+    const sources = this.getInputSourceRows(values);
+    const pageSize = SETUP_SELECTION_PAGE_SIZE;
+    const ids = sources.slice((page - 1) * pageSize, page * pageSize).map((source) => `ids_${source.id}`);
+    return this.buildManualConfigFormPage(values, `Input Sources (${page}/${total})`, ids);
+  }
+
+  getInputSourcePageCount(values: ParsedManualConfig): number {
+    return Math.ceil(this.getInputSourceRows(values).length / SETUP_SELECTION_PAGE_SIZE);
+  }
+
+  buildListeningModePage(values: ParsedManualConfig, page: number): uc.RequestUserInput {
+    const modes = getKnownListeningModes();
+    const pageSize = SETUP_SELECTION_PAGE_SIZE;
+    const ids = modes.slice((page - 1) * pageSize, page * pageSize).map((mode) => `lmd_${mode.code}`);
+    return this.buildManualConfigFormPage(values, `Listening Modes (${page}/${this.getListeningModePageCount()})`, ids);
+  }
+
+  getListeningModePageCount(): number {
+    return Math.ceil(getKnownListeningModes().length / SETUP_SELECTION_PAGE_SIZE);
+  }
+
+  buildManualConfigPage4(values: ParsedManualConfig): uc.RequestUserInput {
+    return this.buildListeningModePage(values, 1);
+  }
+
+  buildManualConfigPage5(values: ParsedManualConfig): uc.RequestUserInput {
+    return this.buildListeningModePage(values, 2);
+  }
+
+  buildManualConfigPage6(values: ParsedManualConfig): uc.RequestUserInput {
+    return this.buildListeningModePage(values, 3);
+  }
+
+  buildManualConfigPage7(values: ParsedManualConfig): uc.RequestUserInput {
+    return this.buildListeningModePage(values, 4);
+  }
+
+  buildManualConfigPage8(values: ParsedManualConfig): uc.RequestUserInput {
+    return this.buildListeningModePage(values, 5);
+  }
+
+  buildManualConfigPage9(values: ParsedManualConfig): uc.RequestUserInput {
+    return this.buildListeningModePage(values, 6);
   }
 
   private buildManualConfigFormPage(values: ParsedManualConfig, title: string, ids: string[]): uc.RequestUserInput {
     const form = this.buildManualConfigFormAll(values);
-    const settings = (form.settings as Array<{ id: string }>).filter((setting) => ids.includes(setting.id));
+    const settings = (form.settings as FormSetting[]).filter((setting) => ids.includes(setting.id));
+    if (title.startsWith("Listening Modes")) {
+      settings.unshift({
+        id: `listeningModesPageInfo_${title.replace(/\W/g, "_")}`,
+        label: { en: title },
+        field: { label: { value: { en: "Choose whether to use the name detected from the AVR, select an integration alias, or don't include the mode." } } }
+      });
+    }
+    if (title.startsWith("Input Sources")) {
+      settings.unshift({
+        id: `inputSourcesPageInfo_${title.replace(/\W/g, "_")}`,
+        label: { en: title },
+        field: { label: { value: { en: "Choose the AVR name, an integration alias, or Exclude from integration." } } }
+      });
+    }
     return new uc.RequestUserInput(title, settings);
   }
 
@@ -89,9 +160,9 @@ export class SetupFormBuilder {
           dropdown: {
             value: String(values.volumeScaleValue),
             items: [
-              { id: "auto", label: { en: "Auto (default)" } },
-              { id: "80", label: { en: "0-80" } },
-              { id: "100", label: { en: "0-100" } }
+              { id: "auto", label: { en: "✨ Auto (default)" } },
+              { id: "80", label: { en: values.volumeScaleDiscoveredValue && values.volumeScaleValue === 80 ? "✅ 0-80 (AVR discovered)" : "0-80" } },
+              { id: "100", label: { en: values.volumeScaleDiscoveredValue && values.volumeScaleValue === 100 ? "✅ 0-100 (AVR discovered)" : "0-100" } }
             ]
           }
         },
@@ -139,20 +210,30 @@ export class SetupFormBuilder {
         }
       },
       {
-        id: "useAvrReportedInputs",
-        label: { en: "Input source names" },
+        id: "inputSourceLayout",
+        label: { en: "Input source layout" },
         field: {
           dropdown: {
-            value: String(values.useAvrReportedInputsValue),
+            value: values.inputSourceLayoutValue,
             items: [
-              { id: "true", label: { en: "Use AVR names (default)" } },
-              { id: "false", label: { en: "Use integration names" } }
+              { id: "combined", label: { en: "Combined (default)" } },
+              { id: "network-first", label: { en: "Network first" } },
+              { id: "network-last", label: { en: "Network last" } }
             ]
           }
         },
-        description: {
-          en: "Use AVR-reported names and IDs when available. Older AVRs without a usable input list fall back to the integration mappings."
-        }
+        description: { en: "Choose whether network sources appear mixed with regular input sources or after them." }
+      },
+      {
+        id: "networkInputMarker",
+        label: { en: "Mark network subsources" },
+        field: {
+          dropdown: {
+            value: values.networkInputMarkerValue,
+            items: NETWORK_INPUT_MARKERS.map((icon) => ({ id: icon, label: { en: icon === "none" ? "No (default)" : icon } }))
+          }
+        },
+        description: { en: "Add the selected visual marker to network sources in the input-source selector." }
       },
       {
         id: "tuneinPresetPosition",
@@ -188,18 +269,6 @@ export class SetupFormBuilder {
             ]
           }
         }
-      },
-      {
-        id: "listeningModeOptions",
-        label: { en: "Listening mode options (semicolon-separated, 'all' shows all, 'none' to disable)" },
-        field: { text: { value: values.listeningModeOptions } },
-        description: { en: "Optional — semicolon-separated list (e.g. stereo; straight-decode; neural-thx). Enter 'all' for dynamic options, enter 'none' to hide this entity." }
-      },
-      {
-        id: "inputSelectorOptions",
-        label: { en: "Input selector options (semicolon-separated, 'all' shows all, 'none' to disable)" },
-        field: { text: { value: values.inputSelectorOptions } },
-        description: { en: "Optional — semicolon-separated list (e.g. dvd; bd; net; bluetooth). Enter 'all' to show all inputs, enter 'none' to hide this entity." }
       },
       {
         id: "createRemoteEntity",
@@ -273,8 +342,84 @@ export class SetupFormBuilder {
           }
         },
         description: { en: "Lower levels log more, which costs slightly more CPU. Warn is recommended for normal use." }
-      }
+      },
+      ...getKnownListeningModes().map((mode) => ({
+        id: `lmd_${mode.code}`,
+        label: {
+          en:
+            values.listeningModeNames[mode.code] === "straight-decode"
+              ? "Straight Decode"
+              : (values.listeningModeNames[mode.code] ?? (mode.aliases[0] === "straight-decode" ? "Straight Decode" : mode.aliases[0]))
+        },
+        field: {
+          dropdown: {
+            value: (() => {
+              const defaultSetting = mode.aliases[0] === "straight-decode" ? INTEGRATION_PREFERRED_LISTENING_MODE : DISCOVER_LISTENING_MODE;
+              const setting = normalizeListeningModeSetting(values.listeningModePreferences[mode.code] ?? defaultSetting);
+              return (setting === DISCOVER_LISTENING_MODE || setting === DISCOVERED_LISTENING_MODE || setting === INTEGRATION_PREFERRED_LISTENING_MODE) &&
+                values.listeningModeNames[mode.code] &&
+                values.listeningModeNames[mode.code] !== mode.aliases[0]
+                ? DISCOVERED_LISTENING_MODE
+                : setting;
+            })(),
+            items: [
+              ...(values.listeningModeNames[mode.code] && values.listeningModeNames[mode.code] !== mode.aliases[0] ? [{ id: DISCOVERED_LISTENING_MODE, label: { en: "✅ AVR-discovered" } }] : []),
+              ...(mode.aliases[0] === "straight-decode" ? [{ id: INTEGRATION_PREFERRED_LISTENING_MODE, label: { en: "✅ Integration-preferred" } }] : []),
+              {
+                id: DISCOVER_LISTENING_MODE,
+                label: { en: "✨ Discover from AVR (default)" }
+              },
+              { id: DONT_INCLUDE_LISTENING_MODE, label: { en: "🚫 Don't include" } },
+              ...mode.aliases.map((alias) => ({ id: alias, label: { en: alias } }))
+            ]
+          }
+        }
+      })),
+      ...this.getInputSourceRows(values).map((source) => ({
+        id: `ids_${source.id}`,
+        label: { en: source.label },
+        field: {
+          dropdown: {
+            value: source.value,
+            items: source.items
+          }
+        }
+      }))
     ]);
+  }
+
+  private getInputSourceRows(values: ParsedManualConfig): Array<{ id: string; label: string; value: string; items: Array<{ id: string; label: { en: string } }> }> {
+    const known = getKnownInputSources();
+    const reported = new Map(values.inputSources.map((source) => [source.id.toUpperCase(), source]));
+    const hasUsableReport = values.inputSourceDiscoveryAvailable && values.inputSources.length > 0;
+    const ids = hasUsableReport ? values.inputSources.map((source) => source.id.toUpperCase()) : [...new Set(known.map((source) => source.id))];
+    return ids.map((id) => {
+      const knownSource = known.find((source) => source.id === id);
+      const avrSource = reported.get(id);
+      const configured = values.idInputSources[id];
+      const aliases = avrSource ? getAliasesForReportedInput(id, avrSource.name) : (knownSource?.aliases ?? []);
+      const learned = avrSource?.name ?? (configured?.setting === DISCOVERED_INPUT_SOURCE ? configured.name : undefined);
+      const items = [
+        ...(learned ? [{ id: DISCOVERED_INPUT_SOURCE, label: { en: "✅ AVR-discovered" } }] : []),
+        ...(learned ? [{ id: DISCOVER_INPUT_SOURCE, label: { en: "✨ Discover from AVR (default)" } }] : []),
+        { id: DONT_INCLUDE_INPUT_SOURCE, label: { en: "🚫 Don't include" } },
+        ...aliases.map((alias) => ({ id: alias, label: { en: alias } }))
+      ];
+      const value = hasUsableReport
+        ? configured?.setting === DONT_INCLUDE_INPUT_SOURCE
+          ? DONT_INCLUDE_INPUT_SOURCE
+          : configured?.setting === DISCOVERED_INPUT_SOURCE
+            ? DISCOVERED_INPUT_SOURCE
+            : configured?.setting === DISCOVER_INPUT_SOURCE
+              ? DISCOVER_INPUT_SOURCE
+              : configured?.setting && aliases.includes(configured.setting)
+                ? configured.setting
+                : learned
+                  ? DISCOVERED_INPUT_SOURCE
+                  : DONT_INCLUDE_INPUT_SOURCE
+        : configured?.setting || (learned ? DISCOVERED_INPUT_SOURCE : (aliases[0] ?? DONT_INCLUDE_INPUT_SOURCE));
+      return { id, label: learned ?? aliases[0] ?? `AVR input ${id}`, value, items };
+    });
   }
 
   buildReconfigureForm(): uc.RequestUserInput {
@@ -286,13 +431,32 @@ export class SetupFormBuilder {
           dropdown: {
             value: "configure",
             items: [
-              { id: "configure", label: { en: "Configure" } },
+              { id: "configure", label: { en: "Configure integration" } },
+              { id: "configure_input_sources", label: { en: "Configure input sources" } },
+              { id: "configure_listening_modes", label: { en: "Configure listening modes" } },
               { id: "backup", label: { en: "Create configuration backup" } },
               { id: "restore", label: { en: "Restore configuration from backup" } },
               { id: "delete_config", label: { en: "Delete config" } }
             ]
           }
         }
+      }
+    ]);
+  }
+
+  buildAvrSelectionForm(target: "integration" | "inputSources" | "listeningModes", avrs: Array<{ id: string; label: string }>): uc.RequestUserInput {
+    const label = target === "inputSources" ? "input sources" : target === "listeningModes" ? "listening modes" : "integration settings";
+    return new uc.RequestUserInput(`Select AVR for ${label}`, [
+      {
+        id: "selectedAvr",
+        label: { en: "AVR" },
+        field: {
+          dropdown: {
+            value: avrs[0]?.id ?? "",
+            items: avrs.map((avr) => ({ id: avr.id, label: { en: avr.label } }))
+          }
+        },
+        description: { en: `Choose which AVR's ${label} should be configured. The setting applies to all zones of that AVR.` }
       }
     ]);
   }
@@ -317,7 +481,7 @@ export class SetupFormBuilder {
           dropdown: {
             value: "false",
             items: [
-              { id: "false", label: { en: "Configure manually" } },
+              { id: "false", label: { en: "Configure" } },
               { id: "true", label: { en: "Restore from backup" } }
             ]
           }
@@ -376,7 +540,7 @@ export class SetupFormBuilder {
         field: {
           label: {
             value: {
-              en: "No Onkyo AVR found on the network during auto-discovery. Please enter the AVR model and IP address manually."
+              en: "No Onkyo/Pioneer/Integra AVR found on the network during auto-discovery. Please enter the AVR model and IP address manually."
             }
           }
         }

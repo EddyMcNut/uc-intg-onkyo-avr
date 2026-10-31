@@ -124,10 +124,6 @@ export function ingestMusicServerXmlEntries(entityId: string, xmlPayload: string
   musicServerBrowser.ingestXmlEntries(entityId, xmlPayload);
 }
 
-export function ingestMusicServerListEntry(entityId: string, entry: string): void {
-  musicServerBrowser.ingestListEntry(entityId, entry);
-}
-
 export function resolveMusicServerMenuOption(mediaId?: string, mediaType?: string) {
   return musicServerBrowser.resolveMenuOption(mediaId, mediaType);
 }

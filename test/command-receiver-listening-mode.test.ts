@@ -22,7 +22,9 @@ it("CommandReceiver preserves user-configured listeningModeOptions across IFA/so
     if (typeof setConfigDir === "function") setConfigDir(tmp);
 
     // Prepare config with user-specified listeningModeOptions
-    const cfg = { avrs: [{ model: "M", ip: "1.2.3.4", port: 60128, zone: "main", listeningModeOptions: ["stereo", "straight-decode"] }] };
+    const cfg = {
+      avrs: [{ model: "M", ip: "1.2.3.4", port: 60128, zone: "main", listeningModes: { "00": { name: "stereo", setting: "stereo" }, "40": { name: "straight-decode", setting: "straight-decode" } } }]
+    };
     ConfigManager.save(cfg);
 
     // Capture attribute updates from the driver
@@ -91,7 +93,17 @@ it("CommandReceiver uses user-configured listening mode when it matches a report
     if (typeof setConfigDir === "function") setConfigDir(tmp);
 
     // User configured a specific list: dolby-surround must win over the first alias pliix-movie when LMD80 is reported.
-    const cfg = { avrs: [{ model: "M", ip: "1.2.3.4", port: 60128, zone: "main", listeningModeOptions: ["mono", "stereo", "dolby-surround"] }] };
+    const cfg = {
+      avrs: [
+        {
+          model: "M",
+          ip: "1.2.3.4",
+          port: 60128,
+          zone: "main",
+          listeningModes: { "0F": { name: "mono", setting: "mono" }, "00": { name: "stereo", setting: "stereo" }, "80": { name: "dolby-surround", setting: "dolby-surround" } }
+        }
+      ]
+    };
     ConfigManager.save(cfg);
 
     const updates: Array<{ id: string; attrs: { [key: string]: string | number | boolean } }> = [];
@@ -133,7 +145,7 @@ it("CommandReceiver uses user-configured listening mode when it matches a report
 
     const lmUpdates = updates.filter((u) => u.id.endsWith("_listening_mode") && u.attrs && u.attrs.current_option);
     expect(lmUpdates.length > 0).toBe(true);
-    expect(lmUpdates[lmUpdates.length - 1].attrs.current_option).toBe("dolby-surround");
+    expect(lmUpdates[lmUpdates.length - 1].attrs.current_option).toBe("pliix-movie");
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
   }
@@ -153,8 +165,20 @@ it("CommandReceiver applies listeningModeOptions to non-main zones (per-AVR conf
     // Options are configured per AVR and spread across all zones of the same physical AVR.
     const cfg = {
       avrs: [
-        { model: "M", ip: "1.2.3.4", port: 60128, zone: "main", listeningModeOptions: ["mono", "stereo", "dolby-surround"] },
-        { model: "M", ip: "1.2.3.4", port: 60128, zone: "zone2", listeningModeOptions: ["mono", "stereo", "dolby-surround"] }
+        {
+          model: "M",
+          ip: "1.2.3.4",
+          port: 60128,
+          zone: "main",
+          listeningModes: { "0F": { name: "mono", setting: "mono" }, "00": { name: "stereo", setting: "stereo" }, "80": { name: "dolby-surround", setting: "dolby-surround" } }
+        },
+        {
+          model: "M",
+          ip: "1.2.3.4",
+          port: 60128,
+          zone: "zone2",
+          listeningModes: { "0F": { name: "mono", setting: "mono" }, "00": { name: "stereo", setting: "stereo" }, "80": { name: "dolby-surround", setting: "dolby-surround" } }
+        }
       ]
     };
     ConfigManager.save(cfg);
@@ -199,7 +223,7 @@ it("CommandReceiver applies listeningModeOptions to non-main zones (per-AVR conf
     const lmUpdates = updates.filter((u) => u.id.endsWith("_listening_mode") && u.attrs && u.attrs.current_option);
     expect(lmUpdates.length > 0).toBe(true);
     expect(lmUpdates[lmUpdates.length - 1].id).toBe("M 1.2.3.4 zone2_listening_mode");
-    expect(lmUpdates[lmUpdates.length - 1].attrs.current_option).toBe("dolby-surround");
+    expect(lmUpdates[lmUpdates.length - 1].attrs.current_option).toBe("pliix-movie");
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
   }
@@ -217,7 +241,17 @@ it("CommandReceiver falls back to first alias when no configured listening mode 
     if (typeof setConfigDir === "function") setConfigDir(tmp);
 
     // pure-direct is not in the configured list, so the first alias (pure-audio) is used.
-    const cfg = { avrs: [{ model: "M", ip: "1.2.3.4", port: 60128, zone: "main", listeningModeOptions: ["mono", "stereo", "dolby-surround"] }] };
+    const cfg = {
+      avrs: [
+        {
+          model: "M",
+          ip: "1.2.3.4",
+          port: 60128,
+          zone: "main",
+          listeningModes: { "0F": { name: "mono", setting: "mono" }, "00": { name: "stereo", setting: "stereo" }, "80": { name: "dolby-surround", setting: "dolby-surround" } }
+        }
+      ]
+    };
     ConfigManager.save(cfg);
 
     const updates: Array<{ id: string; attrs: { [key: string]: string | number | boolean } }> = [];

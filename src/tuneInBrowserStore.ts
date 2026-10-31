@@ -3,9 +3,9 @@ import { physicalAvrIdFromEntityId } from "./configManager.js";
 export type TuneInPreset = {
   presetIndex: number;
   title: string;
-  /** Part of the NLS label before the "|", matching the station name returned by NTI. Equals title when there is no pipe. */
+  // Part of the NLS label before the "|", matching the station name returned by NTI. Equals title when there is no pipe.
   stationKey: string;
-  /** Full raw NLS label before any normalization, used to match NTI values that themselves contain "|". */
+  // Full raw NLS label before any normalization, used to match NTI values that themselves contain "|".
   rawLabel: string;
   mediaId: string;
   thumbnail?: string;
@@ -18,7 +18,7 @@ export type TuneInBrowseState = {
   presetIndexByTitle: Map<string, number>;
   thumbnailByTitle: Map<string, string>;
   backgroundSignature: string;
-  /** Station name currently playing (from NTI), used to highlight it in the preset list. */
+  // Station name currently playing (from NTI), used to highlight it in the preset list.
   nowPlayingStation: string;
 };
 
@@ -125,6 +125,18 @@ export function resetTuneInBrowseState(entityId: string): void {
     return;
   }
   state.nowPlayingStation = "";
+}
+
+// Clear the cached preset list before a fresh TuneIn service entry. The cache is
+// intentionally retained during normal updates, but a new entry must re-harvest
+// the AVR's current My Presets list so newly added or removed stations appear.
+export function clearTuneInPresets(entityId: string): void {
+  const state = getTuneInBrowseState(entityId);
+  if (!state) {
+    return;
+  }
+  state.presetsByMenuIndex.clear();
+  state.presetIndexByTitle.clear();
 }
 
 export function listTuneInPresets(entityId: string): TuneInPreset[] {

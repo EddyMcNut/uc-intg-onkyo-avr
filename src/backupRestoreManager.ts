@@ -1,7 +1,10 @@
 // Focused responsibility: Backup and restore configuration data with file I/O
 import { readFileSync, existsSync } from "fs";
 import { resolve } from "path";
-import { ConfigManager, OnkyoConfig } from "./configManager.js";
+import { ConfigManager, IntegrationConfig } from "./configManager.js";
+import log from "./loggers.js";
+
+const logSource = "backupRestoreManager:";
 
 interface BackupPayload {
   meta: {
@@ -9,7 +12,7 @@ interface BackupPayload {
     version: string;
     timestamp: string;
   };
-  config: any;
+  config: unknown;
 }
 
 export class BackupRestoreManager {
@@ -42,7 +45,7 @@ export class BackupRestoreManager {
   }
 
   validateAndNormalizeRestorePayload(rawData: string): {
-    normalized: Partial<OnkyoConfig> | null;
+    normalized: Partial<IntegrationConfig> | null;
     isValid: boolean;
     errors: string[];
   } {
@@ -58,7 +61,7 @@ export class BackupRestoreManager {
       return { normalized: null, isValid: false, errors: validation.errors };
     }
 
-    return { normalized: validation.normalized as Partial<OnkyoConfig>, isValid: true, errors: [] };
+    return { normalized: validation.normalized as Partial<IntegrationConfig>, isValid: true, errors: [] };
   }
 
   private async readDriverMetadata(): Promise<{ driverId: string; driverVersion: string }> {
@@ -70,21 +73,29 @@ export class BackupRestoreManager {
         driverId: driverJson.driver_id || "unknown",
         driverVersion: driverJson.version || "unknown"
       };
-    } catch (_err) {
+    } catch (err) {
+      log.debug("%s Driver metadata unavailable, using fallback metadata: %s", logSource, err);
       return { driverId: "unknown", driverVersion: "unknown" };
     }
   }
 
-  private readConfigData(getConfigDirPath: () => string | undefined): any {
+  private readConfigData(getConfigDirPath: () => string | undefined): unknown {
     try {
       const cfgPath = resolve(getConfigDirPath() ?? process.cwd(), "config.json");
       if (existsSync(cfgPath)) {
         const rawCfg = readFileSync(cfgPath, "utf-8");
-        return JSON.parse(rawCfg);
+        return this.removeLegacyConfigVersion(JSON.parse(rawCfg));
       }
-      return ConfigManager.get();
-    } catch (_err) {
-      return ConfigManager.get();
+      return this.removeLegacyConfigVersion(ConfigManager.get());
+    } catch (err) {
+      log.debug("%s Config file unavailable, using in-memory configuration: %s", logSource, err);
+      return this.removeLegacyConfigVersion(ConfigManager.get());
     }
+  }
+
+  private removeLegacyConfigVersion(config: unknown): unknown {
+    if (!config || typeof config !== "object" || Array.isArray(config)) return config;
+    const { configVersion: _configVersion, ...withoutVersion } = config as Record<string, unknown>;
+    return withoutVersion;
   }
 }

@@ -98,6 +98,43 @@ describe("renderZoneMedia", () => {
     }
   });
 
+  it("coalesces concurrent album-art requests for the same AVR", async () => {
+    let releaseHead!: () => void;
+    const headReady = new Promise<void>((resolve) => {
+      releaseHead = resolve;
+    });
+    const fetchMock = vi.fn().mockImplementation(async (_url: string, options?: { method?: string }) => {
+      if (options?.method === "HEAD") {
+        await headReady;
+        return { headers: { get: () => '"tunein-art"' }, ok: true };
+      }
+      return { headers: { get: () => null }, ok: true, body: null };
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    try {
+      const mocks = await createRenderer({
+        config: makeConfig({ albumArtURL: "album_art.cgi" }),
+        avrStateApiMock: makeAvrStateApiMock({ getSource: vi.fn().mockReturnValue("net") }),
+        mediaStateStoreMock: makeMediaStateStoreMock({
+          getNowPlaying: vi.fn().mockReturnValue({ title: "TuneIn station", album: "", artist: "TuneIn" }),
+          getCurrentTrackId: vi.fn().mockReturnValue("old|track|id"),
+          getSharedAvrMediaState: vi.fn().mockReturnValue({ currentImageUrl: "", lastImageHash: "" })
+        })
+      });
+
+      const first = mocks.renderer.renderZoneMedia("M 1.2.3.4 main", false);
+      const second = mocks.renderer.renderZoneMedia("M 1.2.3.4 main", false);
+      await Promise.resolve();
+      releaseHead();
+      await Promise.all([first, second]);
+
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(fetchMock).toHaveBeenCalledWith("http://1.2.3.4/album_art.cgi", { method: "HEAD" });
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("does not update attributes for net source when track unchanged and not forced", async () => {
     const mocks = await createRenderer({
       avrStateApiMock: makeAvrStateApiMock({ getSource: vi.fn().mockReturnValue("net") }),
@@ -255,5 +292,25 @@ describe("maybeUpdateImage", () => {
     const mocks = await createRenderer({ config: makeConfig({ albumArtURL: "na" }) });
     await mocks.renderer.maybeUpdateImage("M 1.2.3.4 main");
     expect(mocks.driverMock.updateEntityAttributes).not.toHaveBeenCalled();
+  });
+
+  it("uses HTTP validators and falls back to streaming image hashes", async () => {
+    const mocks = await createRenderer({ config: makeConfig({ albumArtURL: "album_art.cgi" }) });
+    const fetchMock = vi.spyOn(globalThis, "fetch");
+
+    fetchMock.mockResolvedValueOnce(new Response(null, { headers: { etag: "etag-1" } }));
+    expect(await (mocks.renderer as any).getImageHash("http://avr/image")).toBe("etag-1");
+
+    fetchMock.mockResolvedValueOnce(new Response(null, { headers: { "last-modified": "yesterday" } }));
+    expect(await (mocks.renderer as any).getImageHash("http://avr/image")).toBe("yesterday");
+
+    fetchMock.mockRejectedValueOnce(new Error("HEAD unsupported"));
+    fetchMock.mockResolvedValueOnce(new Response(null, { status: 404 }));
+    expect(await (mocks.renderer as any).getImageHash("http://avr/image")).toBe("");
+
+    fetchMock.mockRejectedValueOnce(new Error("HEAD unsupported"));
+    fetchMock.mockResolvedValueOnce(new Response(null, { status: 200 }));
+    expect(await (mocks.renderer as any).getImageHash("http://avr/image")).toBe("");
+    fetchMock.mockRestore();
   });
 });

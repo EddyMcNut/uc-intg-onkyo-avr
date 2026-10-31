@@ -82,7 +82,7 @@ function createExcludedTitleChecker(excludedPrefixes: string[]): (title: string)
 }
 
 export function createMediaBrowser(cfg: MediaBrowserConfig, store: MenuBrowseStore): MediaBrowserApi {
-  const integrationName = `${cfg.providerLabel.toLowerCase().replace(/\s+/g, "")}MediaBrowser:`;
+  const logSource = `${cfg.providerLabel.toLowerCase().replace(/\s+/g, "")}MediaBrowser:`;
   const isExcludedTitle = createExcludedTitleChecker(cfg.excludedPrefixes);
 
   const { createBackdrop, getOrCreateThumbnail } = createServiceThumbnails(cfg.thumbnails.service);
@@ -91,14 +91,18 @@ export function createMediaBrowser(cfg: MediaBrowserConfig, store: MenuBrowseSto
 
   function ingestXmlEntries(entityId: string, xmlPayload: string): void {
     if (!xmlPayload) return;
+    const browseState = store.getBrowseState(entityId);
+    if (browseState) browseState.xmlResponseSequence += 1;
     const xmlOffset = getXmlOffset(xmlPayload);
     const xmlItems = parseXmlItems(xmlPayload);
     for (let i = 0; i < xmlItems.length; i++) {
       const item = xmlItems[i];
-      if (!item.title) continue;
+      if (!item.title || !item.selectable) continue;
       if (isExcludedTitle(item.title)) continue;
       const menuIndex = xmlOffset + i + 1;
-      store.addMenuOption(entityId, menuIndex, item.title, getOrCreateThumbnail);
+      // XML responses are explicit browse results. They must still populate
+      // later pages after playback has frozen the now-playing decoration.
+      store.addMenuOption(entityId, menuIndex, item.title, getOrCreateThumbnail, item.iconType === "M" ? false : undefined, true);
     }
   }
 
@@ -172,9 +176,15 @@ export function createMediaBrowser(cfg: MediaBrowserConfig, store: MenuBrowseSto
   async function browse(entityId: string, options: uc.BrowseOptions): Promise<uc.StatusCodes | uc.BrowseResult> {
     const menuOptions = store.listOptions(entityId);
     const browseState = store.getBrowseState(entityId);
-    const totalCount = menuOptions.length + ((browseState?.showMainMenuShortcut ?? false) ? 2 : 0);
+    // NLT reports the complete AVR list size before NLAL pages arrive. Expose
+    // that total to the remote so it requests subsequent pages instead of
+    // treating the currently-ingested first page as the end of the list.
+    const listedTotal = Math.max(menuOptions.length, browseState?.totalListItemCount ?? 0);
+    const showNavigationShortcuts = (browseState?.showMainMenuShortcut ?? false) || (browseState?.nowPlayingTitle ?? "").length > 0 || (browseState?.browseListFrozen ?? false);
+    const totalCount = listedTotal + (showNavigationShortcuts ? 2 : 0);
+    log.info("%s [%s] browse page=%d offset=%d limit=%d loaded=%d total=%d", logSource, entityId, options.paging.page, options.paging.offset, options.paging.limit, menuOptions.length, totalCount);
     if (!options.media_id || options.media_id === cfg.rootId || isMainMenuRequest(options.media_id, options.media_type) || isBackRequest(options.media_id, options.media_type)) {
-      log.info("%s [%s] browsable %s menu options: %d", integrationName, entityId, cfg.providerLabel, menuOptions.length);
+      log.info("%s [%s] browsable %s menu options: %d", logSource, entityId, cfg.providerLabel, menuOptions.length);
       return uc.BrowseResult.fromPaging(createRootItem(entityId, options.paging), options.paging, totalCount);
     }
 
@@ -221,10 +231,14 @@ export function createMediaBrowser(cfg: MediaBrowserConfig, store: MenuBrowseSto
     const options = store.listOptions(entityId);
     const browseState = store.getBrowseState(entityId);
     const nowPlayingTitle = browseState?.nowPlayingTitle ?? "";
-    const rootItems =
-      (browseState?.showMainMenuShortcut ?? false)
-        ? [createMainMenuItem(entityId), createBackItem(), ...options.map((option) => createMenuItem(option, nowPlayingTitle))]
-        : options.map((option) => createMenuItem(option, nowPlayingTitle));
+    // Returning to the browser after playback may recreate the browse context
+    // and clear the transient shortcut flag. An active now-playing title is
+    // enough evidence that this is a post-playback root, so restore the same
+    // Main Menu/Back navigation the user had before selecting the track.
+    const showNavigationShortcuts = (browseState?.showMainMenuShortcut ?? false) || nowPlayingTitle.length > 0 || (browseState?.browseListFrozen ?? false);
+    const rootItems = showNavigationShortcuts
+      ? [createMainMenuItem(entityId), createBackItem(), ...options.map((option) => createMenuItem(option, nowPlayingTitle))]
+      : options.map((option) => createMenuItem(option, nowPlayingTitle));
     const items = slicePagedItems(rootItems, paging);
 
     return new uc.BrowseMediaItem(cfg.rootId, cfg.rootLabel, {

@@ -35,14 +35,17 @@ describe("configPersistenceManager", () => {
       portNum: 60128,
       queueThresholdValue: undefined,
       albumArtURLValue: undefined,
-      listeningModeOptions: undefined,
-      inputSelectorOptions: undefined,
+      listeningModePreferences: {},
+      listeningModeNames: {},
       volumeScaleValue: undefined,
       useAvrReportedInputsValue: false,
-      volumeDisplayValue: undefined,
-      adjustVolumeDisplValue: undefined,
-      entityNameStyleValue: undefined,
-      createSensorsValue: undefined,
+      volumeDisplayValue: "absolute",
+      adjustVolumeDisplValue: true,
+      entityNameStyleValue: "short",
+      createSensorsValue: true,
+      createTunerPresetsValue: true,
+      createRemoteEntityValue: true,
+      createDiracSelectEntityValue: true,
       netMenuDelayValue: undefined,
       tuneinPresetPositionValue: undefined,
       tuneinMenuStyleValue: undefined
@@ -78,16 +81,36 @@ describe("configPersistenceManager", () => {
       expect(written.avrs[0].useAvrReportedInputs).toBe(false);
     });
 
+    it("excludes known inputs absent from a discovered AVR input list", async () => {
+      const mgr = new ConfigPersistenceManager(onConfigSaved);
+      await mgr.saveManualConfiguration({
+        ...baseParsedConfig,
+        ipVal: "9.8.7.6",
+        zoneCountValue: 1,
+        useAvrReportedInputsValue: true,
+        inputSources: [
+          { id: "10", name: "Blu-ray" },
+          { id: "12", name: "Television" }
+        ],
+        inputSourceDiscoveryAvailable: true
+      });
+
+      const written = JSON.parse(mockWriteFileSync.mock.calls[0][1] as string);
+      const avr = written.avrs.find((entry: any) => entry.ip === "9.8.7.6");
+      expect(avr.idInputSources["10"]).toEqual({ name: "Blu-ray", setting: "discovered" });
+      expect(avr.idInputSources["02"].setting).toBe("dont-include");
+    });
+
     it("persists an empty input selector filter as all", async () => {
       const mgr = new ConfigPersistenceManager(onConfigSaved);
       await mgr.saveManualConfiguration({
         ...baseParsedConfig,
         zoneCountValue: 1,
-        inputSelectorOptions: ""
+        listeningModePreferences: {}
       });
 
       const written = JSON.parse(mockWriteFileSync.mock.calls[0][1] as string);
-      expect(written.avrs[0].inputSelectorOptions).toBe("all");
+      expect(written.avrs[0].listeningModes).toBeDefined();
     });
 
     it("saves multi-zone config", async () => {
@@ -127,11 +150,15 @@ describe("configPersistenceManager", () => {
       await mgr.saveDiscoveredAvr(
         { model: "X", host: "1.2.3.4", port: 60128 },
         {
-          volumeDisplayValue: undefined,
-          entityNameStyleValue: undefined,
-          tuneinMenuStyleValue: undefined,
-          listeningModeOptions: undefined,
-          inputSelectorOptions: undefined,
+          volumeDisplayValue: "absolute",
+          entityNameStyleValue: "short",
+          tuneinMenuStyleValue: "mypresets",
+          listeningModePreferences: {},
+          listeningModeNames: {},
+          useAvrReportedInputsValue: true,
+          createTunerPresetsValue: true,
+          createRemoteEntityValue: true,
+          createDiracSelectEntityValue: true,
           logLevelValue: "info"
         }
       );
@@ -143,11 +170,15 @@ describe("configPersistenceManager", () => {
       await mgr.saveDiscoveredAvr(
         { model: "X", host: "1.2.3.4", port: 60128 },
         {
-          volumeDisplayValue: undefined,
-          entityNameStyleValue: undefined,
-          tuneinMenuStyleValue: undefined,
-          listeningModeOptions: "opt1",
-          inputSelectorOptions: "opt1,opt2",
+          volumeDisplayValue: "absolute",
+          entityNameStyleValue: "short",
+          tuneinMenuStyleValue: "mypresets",
+          listeningModePreferences: {},
+          listeningModeNames: {},
+          useAvrReportedInputsValue: true,
+          createTunerPresetsValue: true,
+          createRemoteEntityValue: true,
+          createDiracSelectEntityValue: true,
           logLevelValue: "info"
         }
       );

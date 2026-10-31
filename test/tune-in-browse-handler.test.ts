@@ -10,7 +10,8 @@ vi.mock("../src/mediaBrowser.js", () => ({
 
 vi.mock("../src/tuneInMenuStore.js", () => ({
   listTuneInMenuOptions: vi.fn(() => []),
-  getTuneInMenuBrowseState: vi.fn(() => null)
+  getTuneInMenuBrowseState: vi.fn(() => null),
+  resetTuneInMenuBrowseState: vi.fn()
 }));
 
 vi.mock("../src/tuneInFilters.js", () => ({
@@ -32,7 +33,8 @@ vi.mock("../src/configManager.js", () => ({
     }))
   },
   AVR_DEFAULTS: { netMenuDelay: 300 },
-  buildEntityId: vi.fn(() => "test-avr main")
+  buildEntityId: vi.fn(() => "test-avr main"),
+  physicalAvrIdFromEntityId: vi.fn(() => "test-avr 1.2.3.4")
 }));
 
 vi.mock("../src/loggers.js", () => ({
@@ -71,7 +73,7 @@ describe("TuneInBrowseHandler", () => {
     cmdHandler = vi.fn().mockResolvedValue(uc.StatusCodes.Ok);
     rawSend = vi.fn().mockResolvedValue(undefined);
     handler = new TuneInBrowseHandler(avrStateApi);
-    vi.spyOn(handler, "waitForMenuStable" as any).mockResolvedValue(undefined);
+    vi.spyOn(handler, "waitForListMetadata" as any).mockResolvedValue(undefined);
     vi.spyOn(handler, "harvestListItems" as any).mockResolvedValue(undefined);
   });
 
@@ -111,7 +113,7 @@ describe("TuneInBrowseHandler", () => {
         media_id: "tunein:menu-back",
         media_type: "tunein://menu"
       });
-      expect(handler.waitForMenuStable).toHaveBeenCalled();
+      expect(handler.waitForListMetadata).toHaveBeenCalled();
       expect(handler.harvestListItems).toHaveBeenCalledWith(entityId, rawSend);
       expect(mediaBrowser.browseMedia).toHaveBeenCalledWith(
         entityId,
@@ -171,7 +173,7 @@ describe("TuneInBrowseHandler", () => {
         media_id: "tunein:root",
         media_type: "tunein://menu"
       });
-      expect(handler.waitForMenuStable).toHaveBeenCalled();
+      expect(handler.waitForListMetadata).toHaveBeenCalled();
       expect(handler.harvestListItems).toHaveBeenCalledWith(entityId, rawSend);
     });
 
@@ -272,7 +274,7 @@ describe("TuneInBrowseHandler", () => {
         media_id: "tunein:menu:1:Test%20Item",
         media_type: "tunein://menu"
       });
-      expect(handler.waitForMenuStable).not.toHaveBeenCalled();
+      expect(handler.waitForListMetadata).not.toHaveBeenCalled();
       expect(handler.harvestListItems).not.toHaveBeenCalled();
       expect(mediaBrowser.browseMedia).toHaveBeenCalled();
     });
@@ -293,7 +295,7 @@ describe("TuneInBrowseHandler", () => {
       );
 
       expect(cmdHandler).toHaveBeenCalled();
-      expect(handler.waitForMenuStable).toHaveBeenCalled();
+      expect(handler.waitForListMetadata).toHaveBeenCalled();
       expect(handler.harvestListItems).toHaveBeenCalledWith(entityId, rawSend);
     });
 

@@ -2,7 +2,7 @@
 
 export const DEFAULT_QUEUE_THRESHOLD = 100;
 
-/** Security: Maximum input lengths for validation */
+// Security: Maximum input lengths for validation
 export const MAX_LENGTHS = {
   MODEL_NAME: 50,
   IP_ADDRESS: 15,
@@ -12,7 +12,7 @@ export const MAX_LENGTHS = {
   RAW_COMMAND: 20 // raw MVL20, etc.
 } as const;
 
-/** Security: Validation patterns */
+// Security: Validation patterns
 export const PATTERNS = {
   IP_ADDRESS: /^(\d{1,3}\.){3}\d{1,3}$/,
   MODEL_NAME: /^[a-zA-Z0-9\-_.() ]+$/,
@@ -28,6 +28,68 @@ export const ALL_OPTIONS = "all";
 
 // Parsed value of a select-entity options field: "all" = show all, null = 'none' (don't create entity), else trimmed non-empty items.
 export type SelectOptions = string[] | "all" | null;
+export type ListeningModePreferences = Record<string, string>;
+export type InputSourceEntry = { name: string; setting: string };
+export type InputSourceSettings = Record<string, InputSourceEntry>;
+export type ListeningModeContext = { source: string; audioFormat: string; inputChannels?: string; name: string };
+export type ListeningModeEntry = { name: string; setting: string; contexts?: ListeningModeContext[] };
+
+export function normalizeInputSourceSettings(raw: unknown): InputSourceSettings {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+  const result: InputSourceSettings = {};
+  for (const [rawId, rawEntry] of Object.entries(raw as Record<string, unknown>)) {
+    if (!rawEntry || typeof rawEntry !== "object" || Array.isArray(rawEntry)) continue;
+    const entry = rawEntry as Record<string, unknown>;
+    const id = rawId.trim().toUpperCase();
+    const name = String(entry.name ?? "").trim();
+    const rawSetting = String(entry.setting ?? "").trim();
+    const setting = rawSetting === "detected" ? "discovered" : rawSetting;
+    if (id && name && setting) result[id] = { name, setting };
+  }
+  return result;
+}
+
+// One listening mode name/code learned from an AVR response.
+export type LearnedListeningMode = {
+  code: string;
+  name: string;
+  source?: string;
+  audioFormat?: string;
+  inputChannels?: string;
+};
+
+// Normalize persisted learned listening modes and drop malformed entries.
+export function normalizeLearnedListeningModes(raw: unknown): LearnedListeningMode[] {
+  if (!Array.isArray(raw)) return [];
+  const modes: LearnedListeningMode[] = [];
+  const add = (item: LearnedListeningMode): void => {
+    const existing = modes.find(
+      (candidate) => candidate.code === item.code && candidate.source === item.source && candidate.audioFormat === item.audioFormat && candidate.inputChannels === item.inputChannels
+    );
+    if (existing) Object.assign(existing, item);
+    else modes.push(item);
+  };
+  for (const rawMode of raw) {
+    if (!rawMode || typeof rawMode !== "object") continue;
+    const mode = rawMode as Record<string, unknown>;
+    if (Array.isArray(mode.modes)) {
+      for (const nested of normalizeLearnedListeningModes(mode.modes)) {
+        add(nested);
+      }
+      continue;
+    }
+    const code = String(mode.code ?? "")
+      .trim()
+      .toUpperCase();
+    const name = String(mode.name ?? "").trim();
+    if (!code || !/^[0-9A-F]{2}$/i.test(code) || !name || name.length > MAX_LENGTHS.USER_COMMAND) continue;
+    const source = String(mode.source ?? "").trim();
+    const audioFormat = String(mode.audioFormat ?? "").trim();
+    const inputChannels = String(mode.inputChannels ?? "").trim();
+    add({ code, name, ...(source ? { source } : {}), ...(audioFormat ? { audioFormat } : {}), ...(inputChannels ? { inputChannels } : {}) });
+  }
+  return modes;
+}
 
 // Parse a select-entity options field: 'all'/empty/undefined = show all, 'none' = don't create entity, else trimmed non-empty items.
 export function parseSelectOptions(raw: unknown): SelectOptions {
@@ -54,7 +116,7 @@ export function parseSelectOptions(raw: unknown): SelectOptions {
   return [];
 }
 
-/** Parse a boolean-like value from string/boolean/undefined */
+// Parse a boolean-like value from string/boolean/undefined
 export function parseBoolean(value: unknown, defaultValue: boolean): boolean {
   if (value === undefined || value === null || value === "") {
     return defaultValue;
@@ -68,7 +130,7 @@ export function parseBoolean(value: unknown, defaultValue: boolean): boolean {
   return defaultValue;
 }
 
-/** Valid zone identifiers */
+// Valid zone identifiers
 export type AvrZone = "main" | "zone2" | "zone3" | "zone4";
 
 // Construct entity ID: "MODEL IP ZONE" (e.g. "TX-RZ50 192.168.2.103 main").
@@ -92,20 +154,14 @@ export function physicalAvrIdFromEntityId(entityId: string): string | null {
   return buildPhysicalAvrId(model, host);
 }
 
-/**
- * Volume scale setting.
- *
- * `VOLUME_SCALE_AUTO` is stored in the config until the AVR itself has reported its own maximum
- * display volume through NRI. From then on the resolved 0-80 or 0-100 is stored, exactly like a
- * manually chosen value, so it is never re-evaluated afterwards.
- */
+// Volume scale setting. `VOLUME_SCALE_AUTO` is stored in the config until the AVR itself has reported its own maximum display volume through NRI. From then on the resolved 0-80 or 0-100 is stored, exactly like a manually chosen value, so it is never re-evaluated afterwards.
 export const VOLUME_SCALE_AUTO = "auto";
 export type VolumeScale = 80 | 100 | typeof VOLUME_SCALE_AUTO;
 
-/** Used for volume arithmetic as long as the setting is still "auto" and no AVR report is available. */
+// Used for volume arithmetic as long as the setting is still "auto" and no AVR report is available.
 export const VOLUME_SCALE_FALLBACK = 100;
 
-/** Coerce any stored or user-supplied volume scale to "auto", 80 or 100. Anything unknown becomes the default ("auto"). */
+// Coerce any stored or user-supplied volume scale to "auto", 80 or 100. Anything unknown becomes the default ("auto").
 export function parseVolumeScale(raw: unknown): VolumeScale {
   if (typeof raw === "string" && raw.trim().toLowerCase() === VOLUME_SCALE_AUTO) {
     return VOLUME_SCALE_AUTO;
@@ -114,17 +170,13 @@ export function parseVolumeScale(raw: unknown): VolumeScale {
   return parsed === 80 || parsed === 100 ? parsed : VOLUME_SCALE_AUTO;
 }
 
-/**
- * Numeric volume scale for volume arithmetic.
- * An unresolved "auto" (or anything unusable) falls back to VOLUME_SCALE_FALLBACK, which is also the
- * documented default for AVRs that do not report their own maximum.
- */
+// Numeric volume scale for volume arithmetic. An unresolved "auto" (or anything unusable) falls back to VOLUME_SCALE_FALLBACK, which is also the documented default for AVRs that do not report their own maximum.
 export function resolveVolumeScale(raw: unknown): number {
   const parsed = typeof raw === "number" ? raw : parseInt(String(raw ?? "").trim(), 10);
   return isNaN(parsed) || parsed <= 0 ? VOLUME_SCALE_FALLBACK : parsed;
 }
 
-/** Default values for AVR configuration */
+// Default values for AVR configuration
 export const AVR_DEFAULTS = {
   queueThreshold: DEFAULT_QUEUE_THRESHOLD,
   albumArtURL: "album_art.cgi",
@@ -140,12 +192,18 @@ export const AVR_DEFAULTS = {
   netMenuDelay: 500,
   tuneinPresetPosition: 1,
   tuneinMenuStyle: "mypresets",
+  inputSourceLayout: "combined",
+  networkInputMarker: "none",
   port: 60128
 } as const;
 
 export type EntityNameStyle = "long" | "short";
 export type VolumeDisplay = "absolute" | "relative";
 export type TuneInMenuStyle = "mypresets" | "full";
+// `separate` is retained as a legacy persisted value and normalized to `network-last`.
+export type InputSourceLayout = "combined" | "network-first" | "network-last" | "separate";
+export type NetworkInputMarker = "none" | "🌐" | "📡" | "🔗" | "☁️" | "🛜" | "🎵" | "▶️";
+export const NETWORK_INPUT_MARKERS: readonly NetworkInputMarker[] = ["none", "🌐", "📡", "🔗", "☁️", "🛜", "🎵", "▶️"];
 export type LogLevel = "debug" | "info" | "warn" | "error";
 
 export interface AvrConfig {
@@ -156,6 +214,7 @@ export interface AvrConfig {
   queueThreshold?: number;
   albumArtURL?: string;
   volumeScale?: VolumeScale; // "auto" (resolve from the AVR), 80 or 100
+  volumeScaleDiscovered?: boolean; // true when the concrete scale was reported by the AVR
   useAvrReportedInputs?: boolean; // use AVR-reported names and IDs when available
   volumeDisplay?: VolumeDisplay; // absolute = 1-100 style, relative = dB style
   adjustVolumeDispl?: boolean; // true = use 0.5 dB steps (×2 / ÷2), false = direct EISCP value
@@ -167,17 +226,16 @@ export interface AvrConfig {
   netMenuDelay?: number; // delay in ms for NET menu to load (default 2500)
   tuneinPresetPosition?: number; // position of "My Presets" in TuneIn menu (1-10, default 1)
   tuneinMenuStyle?: TuneInMenuStyle; // choose TuneIn navigation mode: mypresets or full
+  inputSourceLayout?: InputSourceLayout;
+  networkInputMarker?: NetworkInputMarker;
   // undefined = all options, non-empty = exact options, null = don't create entity. Empty input is normalized to "all".
-  listeningModeOptions?: SelectOptions;
-  // undefined = all inputs, non-empty = exact options, null = don't create entity. Empty input is normalized to "all".
-  inputSelectorOptions?: SelectOptions;
+  listeningModes?: Record<string, ListeningModeEntry>;
+  idInputSources?: InputSourceSettings;
 }
 
-export interface OnkyoConfig {
+export interface IntegrationConfig {
   avrs?: AvrConfig[];
   logLevel?: LogLevel;
-  /** Version of the persisted configuration schema, not the driver package version. */
-  configVersion?: string;
   queueThreshold?: number;
   albumArtURL?: string;
   volumeScale?: VolumeScale; // "auto" (resolve from the AVR), 80 or 100
@@ -204,6 +262,7 @@ export interface NormalizedAvrConfig {
   queueThreshold: number;
   albumArtURL: string;
   volumeScale: VolumeScale;
+  volumeScaleDiscovered: boolean;
   useAvrReportedInputs: boolean;
   volumeDisplay: VolumeDisplay;
   adjustVolumeDispl: boolean;
@@ -215,8 +274,10 @@ export interface NormalizedAvrConfig {
   netMenuDelay: number;
   tuneinPresetPosition: number;
   tuneinMenuStyle: TuneInMenuStyle;
-  listeningModeOptions: SelectOptions | undefined;
-  inputSelectorOptions: SelectOptions | undefined;
+  inputSourceLayout: InputSourceLayout;
+  networkInputMarker: NetworkInputMarker;
+  listeningModes: Record<string, ListeningModeEntry>;
+  idInputSources: InputSourceSettings;
 }
 
 // Coerce and apply defaults to a raw AvrConfig. OCP: adding a field only requires touching this function and AvrConfig/NormalizedAvrConfig.
@@ -260,6 +321,11 @@ export function normalizeAvrConfig(raw: AvrConfig): NormalizedAvrConfig {
 
   const tuneinMenuStyle: TuneInMenuStyle = String(raw.tuneinMenuStyle ?? AVR_DEFAULTS.tuneinMenuStyle).toLowerCase() === "full" ? "full" : "mypresets";
 
+  const rawInputSourceLayout = String(raw.inputSourceLayout ?? "combined").toLowerCase();
+  const inputSourceLayout: InputSourceLayout =
+    rawInputSourceLayout === "network-first" ? "network-first" : rawInputSourceLayout === "network-last" || rawInputSourceLayout === "separate" ? "network-last" : "combined";
+  const networkInputMarker: NetworkInputMarker = NETWORK_INPUT_MARKERS.includes(raw.networkInputMarker as NetworkInputMarker) ? (raw.networkInputMarker as NetworkInputMarker) : "none";
+
   const port = (() => {
     const p = typeof raw.port === "number" ? raw.port : parseInt(String(raw.port ?? ""), 10);
     return isNaN(p) || p < 1 || p > 65535 ? AVR_DEFAULTS.port : p;
@@ -273,6 +339,7 @@ export function normalizeAvrConfig(raw: AvrConfig): NormalizedAvrConfig {
     queueThreshold,
     albumArtURL,
     volumeScale,
+    volumeScaleDiscovered: Boolean(raw.volumeScaleDiscovered),
     useAvrReportedInputs,
     volumeDisplay,
     adjustVolumeDispl,
@@ -284,7 +351,10 @@ export function normalizeAvrConfig(raw: AvrConfig): NormalizedAvrConfig {
     netMenuDelay,
     tuneinPresetPosition,
     tuneinMenuStyle,
-    listeningModeOptions: Array.isArray(raw.listeningModeOptions) ? raw.listeningModeOptions.map((s) => s.trim()) : raw.listeningModeOptions,
-    inputSelectorOptions: raw.inputSelectorOptions
+    inputSourceLayout,
+    networkInputMarker,
+    listeningModes:
+      raw.listeningModes && typeof raw.listeningModes === "object" && !Array.isArray(raw.listeningModes) ? { ...(raw.listeningModes as Record<string, { name: string; setting: string }>) } : {},
+    idInputSources: normalizeInputSourceSettings(raw.idInputSources)
   };
 }

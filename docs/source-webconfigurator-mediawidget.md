@@ -1,33 +1,19 @@
-## Input source, Web Configurator, MediaWidget
+## Input source, Web Configurator
 
-- as from v0.9.0 and higher, the integration collects a list of Input sources which are then available as dropdown in `Input source`. Note that `Input source` still allows for text input
-- since v0.8.1 you could already configure [Select Input Selector](./select-input-selector.md)
-- since v0.9.7 you can configure the integration to use the exact input source names used by your AVR
-- the Unfolded Circle MediaWidget allows for MediaBrowsing and Source select
+The integration collects the input sources reported by the AVR and makes the resulting list available in the Web Configurator and the MediaWidget.
 
-### Example behaviour
+Input sources are configured per physical AVR through **Configure input sources** in the integration setup. When more than one AVR is configured, setup first asks which AVR to configure. The settings apply to all configured zones of that AVR.
 
-The above items are related to each other, here are some examples to explain the behavior in case you have set `Input source names` to `Use integration names` during the setup of this integration.
+For each source, you can choose:
 
-1. Select Input Selector is set to `all`
+- **✨ Discover from AVR** — use the AVR-reported name when available.
+- **✅ AVR-discovered** — use a name already learned from the AVR.
+- An integration alias.
+- **🚫 Don't include** — exclude the source from the generated lists.
 
-- the `Input source` in Web Configurator shows all possible options (also accepts text commands)
-- the `Sources` button in MediaWidget shows all possible sources
+The resulting source list is used in both places:
 
-2. Select Input Selector is set to only show `spotify`, `tunein`, `stm`
+- The `Input source` field in the Web Configurator, which also continues to accept text commands.
+- The `Sources` button in the MediaWidget.
 
-- the `Input source` in Web Configurator shows only `spotify`, `tunein`, `stm` (also accepts text commands)
-- the `Sources` button in MediaWidget shows only `spotify`, `tunein`, `stm`
-
-3. Select Input Selector is set to `none` (**reboot of remote is needed**)
-
-- the `Input source` in Web Configurator does not show dropdown (still accepts text commands)
-- the `Sources` button in MediaWidget is not visible
-
-_note: when you reconfigure the [Select Input Selector](./select-input-selector.md) the changes are applied right away, except when you switch to `none`, then a reboot is needed. Also when you switch from `none` to something else a reboot is needed._
-
-### Manipulate MediaWidget
-
-Let's say you have [Select Input Selector](./select-input-selector.md) set to show a list of options. The options are available in Web Configurator and you have set all your Activities. Now when using MediaWidget you have the `Sources` button in it which you may not like.
-
-You could then decide to set [Select Input Selector](./select-input-selector.md) to `none` and reboot the remote. Your Activities will keep on working but the `Sources` button in MediaWidget is not showing anymore.
+AVR-reported sources that are not part of the integration's built-in mappings can still be shown and selected. If the AVR does not provide usable input information, the integration falls back to its built-in mappings.

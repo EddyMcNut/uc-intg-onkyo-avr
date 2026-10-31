@@ -5,7 +5,7 @@ it("MenuBrowseHandlerBase harvest contract populates contiguous items and clears
   const { MenuBrowseHandlerBase } = baseModule as { MenuBrowseHandlerBase: new () => any };
 
   class TestHandler extends MenuBrowseHandlerBase {
-    protected readonly integrationName = "test:handler";
+    protected readonly logSource = "test:handler";
     protected phase2HarvestEnabled = false;
     private sequence = 0;
     private readonly entityId = "TX-CONTRACT 10.0.0.81 main";
@@ -74,7 +74,7 @@ it("MenuBrowseHandlerBase harvest contract populates contiguous items and clears
   expect(handler.getHarvestMode()).toBe(false);
 });
 
-it("TuneIn adapter contract ingests NLS only for active TuneIn zones", async () => {
+it("TuneIn adapter contract ignores legacy NLS menu updates", async () => {
   const adaptersModule = await import("../src/zoneAgnosticServiceAdapters.js");
   const tuneInStoreModule = await import("../src/tuneInMenuStore.js");
 
@@ -109,7 +109,7 @@ it("TuneIn adapter contract ingests NLS only for active TuneIn zones", async () 
 
   adapter.handleNls(activeZone, "U0-Browse");
 
-  expect(listTuneInMenuOptions(activeZone).length).toBe(1);
+  expect(listTuneInMenuOptions(activeZone).length).toBe(0);
   expect(listTuneInMenuOptions(controlZone).length).toBe(0);
 });
 
@@ -124,9 +124,10 @@ it("TuneIn adapter contract clears stale now-playing marks on fresh entry (even 
     getTuneInMenuBrowseState: (entityId: string) => { nowPlayingTitle: string } | null;
     setTuneInMenuNowPlayingStation: (entityId: string, station: string) => void;
   };
-  const { addTuneInPreset, getTuneInBrowseState, updateNowPlayingStation } = tuneInBrowserStoreModule as {
+  const { addTuneInPreset, getTuneInBrowseState, listTuneInPresets, updateNowPlayingStation } = tuneInBrowserStoreModule as {
     addTuneInPreset: (entityId: string, title: string, stationKey: string, rawLabel: string, resolver: () => string) => void;
     getTuneInBrowseState: (entityId: string) => { nowPlayingStation: string } | null;
+    listTuneInPresets: (entityId: string) => unknown[];
     updateNowPlayingStation: (entityId: string, candidate: string) => void;
   };
 
@@ -165,6 +166,7 @@ it("TuneIn adapter contract clears stale now-playing marks on fresh entry (even 
 
   expect(getTuneInBrowseState(activeZone)?.nowPlayingStation).toBe("");
   expect(getTuneInMenuBrowseState(activeZone)?.nowPlayingTitle).toBe("");
+  expect(listTuneInPresets(activeZone)).toHaveLength(0);
 });
 
 it("Tidal adapter contract ingests NLA and metadata for active zones", async () => {

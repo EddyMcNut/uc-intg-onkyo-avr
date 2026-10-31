@@ -25,13 +25,13 @@ function makeHandler() {
   return { driver, connMgr, avrMgr, getOptions };
 }
 
-it("constructor derives integrationName from entitySuffix", async () => {
+it("constructor derives logSource from entitySuffix", async () => {
   const mod = await import("../src/selectEntityHandler.js");
   const { SelectEntityHandler } = mod as any;
 
   const handler = new SelectEntityHandler({}, {}, { get: () => undefined }, "_listening_mode", "listening-mode", "Listening Mode", () => ["stereo"]);
 
-  expect(handler.integrationName).toBe("listeningModeHandler:");
+  expect(handler.logSource).toBe("listeningModeHandler:");
 });
 
 it("handle returns NotFound when no AVR instance found", async () => {

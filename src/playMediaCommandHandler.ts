@@ -22,11 +22,12 @@ import {
   TUNEIN_MENU_BACK_ID,
   TUNEIN_MENU_ROOT_TYPE
 } from "./mediaBrowser.js";
-import { consumeTidalListModeActive, consumeTraceNextTidalSelectionAfterMainMenu, getTidalBrowseState, listTidalMenuOptions } from "./tidalBrowserStore.js";
-import { consumeDeezerListModeActive, consumeTraceNextDeezerSelectionAfterMainMenu, getDeezerBrowseState, listDeezerMenuOptions } from "./deezerBrowserStore.js";
-import { consumeMusicServerListModeActive, consumeTraceNextMusicServerSelectionAfterMainMenu, getMusicServerBrowseState, listMusicServerMenuOptions } from "./musicServerBrowserStore.js";
-import { consumeTuneInListModeActive, setTuneInMenuBrowseFrozen, setTuneInMenuNowPlayingStation } from "./tuneInMenuStore.js";
-import { DEFAULT_QUEUE_THRESHOLD } from "./configManager.js";
+import { consumeTraceNextTidalSelectionAfterMainMenu, getTidalBrowseState, listTidalMenuOptions } from "./tidalBrowserStore.js";
+import { consumeTraceNextDeezerSelectionAfterMainMenu, getDeezerBrowseState, listDeezerMenuOptions } from "./deezerBrowserStore.js";
+import { consumeTraceNextMusicServerSelectionAfterMainMenu, getMusicServerBrowseState, listMusicServerMenuOptions } from "./musicServerBrowserStore.js";
+import { consumeTuneInListModeActive, getTuneInMenuBrowseState, setTuneInMenuBrowseFrozen, setTuneInMenuNowPlayingStation } from "./tuneInMenuStore.js";
+import { getTuneInBrowseState } from "./tuneInBrowserStore.js";
+import { AVR_DEFAULTS, ConfigManager, DEFAULT_QUEUE_THRESHOLD, buildEntityId } from "./configManager.js";
 import {
   DEEZER_SERVICE_ID,
   getBrowseServiceSelectSourceCommand,
@@ -37,9 +38,44 @@ import {
   type BrowseServiceId
 } from "./browseServiceContract.js";
 
-const integrationName = "playMediaCommandHandler:";
+const logSource = "playMediaCommandHandler:";
+
+// The AVR's XML music-server browser uses NLAI to select an item.  The
+// older NLSI command selects an item in the ten-line display list and is not
+// equivalent: it can appear to work for the first page, but does not follow
+// the object/layer selected by the NLA/NLAL browser.  NLAI uses a zero-based
+// item index, while our media IDs and store use one-based menu indices.
+function musicServerSelectCommand(menuIndex: number, layerNumber: number | undefined): string {
+  const layer = Math.max(1, layerNumber ?? 1)
+    .toString(16)
+    .padStart(2, "0")
+    .toUpperCase();
+  const index = Math.max(0, menuIndex - 1)
+    .toString(16)
+    .padStart(4, "0")
+    .toUpperCase();
+  return `NLAI${layer}${index}----`;
+}
+
+function xmlBrowseSelectCommand(menuIndex: number, layerNumber: number | undefined): string {
+  const layer = Math.max(1, layerNumber ?? 1)
+    .toString(16)
+    .padStart(2, "0")
+    .toUpperCase();
+  const index = Math.max(0, menuIndex - 1)
+    .toString(16)
+    .padStart(4, "0")
+    .toUpperCase();
+  return `NLAI${layer}${index}----`;
+}
 
 type ZonePrefixFn = (cmd: string) => string;
+
+function getTuneInPresetPosition(entityId: string): number {
+  const cfg = ConfigManager.get();
+  const avr = cfg?.avrs?.find((candidate) => buildEntityId(candidate.model, candidate.ip, candidate.zone) === entityId);
+  return avr?.tuneinPresetPosition ?? AVR_DEFAULTS.tuneinPresetPosition;
+}
 
 export type PlayMediaCommandContext = {
   entityId: string;
@@ -107,7 +143,32 @@ export class PlayMediaCommandHandler {
       return;
     }
 
-    await this.eiscp.command(setZonePrefix(getBrowseServiceSelectSourceCommand(serviceId)));
+    // Do not wait for the AVR's asynchronous NLT notification before routing
+    // browse requests. A remote may ask for the root immediately after NSV;
+    // keep that request from being handled by the previous service.
+    const pendingSubSource =
+      serviceId === TUNEIN_SERVICE_ID
+        ? "tunein"
+        : serviceId === MUSIC_SERVER_SERVICE_ID
+          ? "music-server"
+          : serviceId === TIDAL_SERVICE_ID
+            ? "tidal"
+            : serviceId === DEEZER_SERVICE_ID
+              ? "deezer"
+              : undefined;
+    if (pendingSubSource) this.avrStateApi.setSubSource(entityId, pendingSubSource);
+
+    if (serviceId === TUNEIN_SERVICE_ID) {
+      await this.eiscp.raw("NSV0E0");
+    } else if (serviceId === MUSIC_SERVER_SERVICE_ID) {
+      await this.eiscp.raw("NSV000");
+    } else if (serviceId === TIDAL_SERVICE_ID) {
+      await this.eiscp.raw("NSV1B0");
+    } else if (serviceId === DEEZER_SERVICE_ID) {
+      await this.eiscp.raw("NSV120");
+    } else {
+      await this.eiscp.command(setZonePrefix(getBrowseServiceSelectSourceCommand(serviceId)));
+    }
     if (options?.delayAfterSelect) {
       await delay(netMenuDelay);
     }
@@ -168,6 +229,9 @@ export class PlayMediaCommandHandler {
 
     if (tuneInRootRequest) {
       await this.selectBrowseService(entityId, TUNEIN_SERVICE_ID, setZonePrefix, netMenuDelay, { force: true, delayAfterSelect: true });
+      await this.eiscp.raw("NTCTOP");
+      await delay(netMenuDelay);
+      await this.eiscp.raw("NTCSELECT");
       return uc.StatusCodes.Ok;
     }
 
@@ -189,7 +253,16 @@ export class PlayMediaCommandHandler {
         setTuneInMenuBrowseFrozen(entityId, false);
       }
 
-      await this.eiscp.raw(`NLSI${String(tuneInMenuOption.menuIndex).padStart(5, "0")}`);
+      if (tuneInMenuOption.title.trim().toLowerCase() === "my presets") {
+        await this.eiscp.raw(`NLSI${String(getTuneInPresetPosition(entityId)).padStart(5, "0")}`);
+      } else if (getTuneInBrowseState(entityId)?.contextTitle === "my presets") {
+        // TuneIn's My Presets NLSI positions are one-based, even though the
+        // XML browser's NLAI item indexes are zero-based.
+        await this.eiscp.raw(`NLSI${String(Math.max(1, tuneInMenuOption.menuIndex)).padStart(5, "0")}`);
+      } else {
+        const tuneInState = getTuneInMenuBrowseState(entityId);
+        await this.eiscp.raw(xmlBrowseSelectCommand(tuneInMenuOption.menuIndex, tuneInState?.nlsLayerNumber));
+      }
       return uc.StatusCodes.Ok;
     }
 
@@ -231,7 +304,7 @@ export class PlayMediaCommandHandler {
         .slice(0, 12)
         .map((item) => `${item.menuIndex}:${item.title}`)
         .join(", ");
-      log.info("%s [%s] TRACE cached %s menu before command: [%s] requestedTitle='%s'", integrationName, entityId, activeLabel, cached, requestedTitle ?? "");
+      log.info("%s [%s] TRACE cached %s menu before command: [%s] requestedTitle='%s'", logSource, entityId, activeLabel, cached, requestedTitle ?? "");
     }
 
     const cachedOption = activeOptions.find((item) => item.menuIndex === activeOption.menuIndex) ?? (requestedTitle ? activeOptions.find((item) => item.title === requestedTitle) : undefined);
@@ -242,33 +315,19 @@ export class PlayMediaCommandHandler {
     const currentSubSource = this.avrStateApi.getSubSource(entityId);
     if (!isBrowseServiceActive(currentSource, currentSubSource, activeServiceId)) {
       await this.selectBrowseService(entityId, activeServiceId, setZonePrefix, netMenuDelay, { delayAfterSelect: true });
-    } else if (!selectedIsBrowsable) {
-      const alreadyInListMode =
-        activeServiceId === TIDAL_SERVICE_ID
-          ? consumeTidalListModeActive(entityId)
-          : activeServiceId === DEEZER_SERVICE_ID
-            ? consumeDeezerListModeActive(entityId)
-            : consumeMusicServerListModeActive(entityId);
-      if (!alreadyInListMode) {
-        const playbackStatus = this.avrStateApi.getPlaybackStatus(entityId);
-        if (playbackStatus === "playing" || playbackStatus === "paused" || playbackStatus === "ff" || playbackStatus === "fr") {
-          await this.eiscp.command(setZonePrefix("network-usb list"));
-          await delay(netMenuDelay);
-        }
-      }
     }
 
     let menuIndexToSelect = activeOption.menuIndex;
     if (requestedTitle) {
       const remapped = activeOptions.find((item) => item.title === requestedTitle);
       if (remapped && remapped.menuIndex !== activeOption.menuIndex) {
-        log.debug("%s [%s] remapped %s selection '%s' from index %d to %d", integrationName, entityId, activeLabel, requestedTitle, activeOption.menuIndex, remapped.menuIndex);
+        log.debug("%s [%s] remapped %s selection '%s' from index %d to %d", logSource, entityId, activeLabel, requestedTitle, activeOption.menuIndex, remapped.menuIndex);
         menuIndexToSelect = remapped.menuIndex;
       }
     }
 
     if (shouldTraceSelection) {
-      log.info("%s [%s] TRACE final %s selection index=%d source=%s subsource=%s", integrationName, entityId, activeLabel, menuIndexToSelect, currentSource, currentSubSource);
+      log.info("%s [%s] TRACE final %s selection index=%d source=%s subsource=%s", logSource, entityId, activeLabel, menuIndexToSelect, currentSource, currentSubSource);
     }
 
     if (activeServiceId === TIDAL_SERVICE_ID) {
@@ -296,7 +355,21 @@ export class PlayMediaCommandHandler {
         }
       }
     }
-    await this.eiscp.raw(`NLSI${String(menuIndexToSelect).padStart(5, "0")}`);
+    if (activeServiceId === MUSIC_SERVER_SERVICE_ID) {
+      const musicServerState = getMusicServerBrowseState(entityId);
+      log.info("%s [%s] selecting %s menu index=%d layer=%s title='%s'", logSource, entityId, activeLabel, menuIndexToSelect, musicServerState?.nlsLayerNumber ?? 0, selectedTitle);
+      await this.eiscp.raw(musicServerSelectCommand(menuIndexToSelect, musicServerState?.nlsLayerNumber));
+    } else if (activeServiceId === TIDAL_SERVICE_ID) {
+      const tidalState = getTidalBrowseState(entityId);
+      log.info("%s [%s] selecting %s menu index=%d layer=%s title='%s'", logSource, entityId, activeLabel, menuIndexToSelect, tidalState?.nlsLayerNumber ?? 0, selectedTitle);
+      await this.eiscp.raw(xmlBrowseSelectCommand(menuIndexToSelect, tidalState?.nlsLayerNumber));
+    } else if (activeServiceId === DEEZER_SERVICE_ID) {
+      const deezerState = getDeezerBrowseState(entityId);
+      log.info("%s [%s] selecting %s menu index=%d layer=%s title='%s'", logSource, entityId, activeLabel, menuIndexToSelect, deezerState?.nlsLayerNumber ?? 0, selectedTitle);
+      await this.eiscp.raw(xmlBrowseSelectCommand(menuIndexToSelect, deezerState?.nlsLayerNumber));
+    } else {
+      await this.eiscp.raw(`NLSI${String(menuIndexToSelect).padStart(5, "0")}`);
+    }
     return uc.StatusCodes.Ok;
   }
 }

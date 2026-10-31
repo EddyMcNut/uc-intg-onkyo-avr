@@ -45,9 +45,25 @@ it("EntityRegistrar builds entities correctly", async () => {
     expect((select as any).id.endsWith("_listening_mode")).toBe(true);
     expect((select as any).name?.en).toBe("Model_192.168.1.2_main Listening Mode");
 
-    // When user config contains listeningModeOptions, the select entity should use it exactly
-    const userList = ["stereo", "straight-decode", "neural-thx", "full-mono"];
-    (cfgModule as any).ConfigManager.save({ avrs: [{ model: "Model", ip: "192.168.1.2", port: 60128, zone: "main", listeningModeOptions: userList, entityNameStyle: "long" }] });
+    // Current configuration stores one preference per AVR listening-mode code.
+    const userList = ["full-mono", "neural-thx", "stereo", "straight-decode"];
+    (cfgModule as any).ConfigManager.save({
+      avrs: [
+        {
+          model: "Model",
+          ip: "192.168.1.2",
+          port: 60128,
+          zone: "main",
+          listeningModes: {
+            "00": { name: "stereo", setting: "stereo" },
+            "40": { name: "straight-decode", setting: "straight-decode" },
+            "88": { name: "neural-thx", setting: "neural-thx" },
+            "13": { name: "full-mono", setting: "full-mono" }
+          },
+          entityNameStyle: "long"
+        }
+      ]
+    });
     const avrStateModule2 = await import("../src/avrState.js");
     const registrar2Module = await import("../src/entityRegistrar.js");
     const Registrar2 = registrar2Module.default as any;

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import * as uc from "@unfoldedcircle/integration-api";
 
-function makeOnkyoConfig(overrides: Record<string, any> = {}) {
+function makeIntegrationConfig(overrides: Record<string, any> = {}) {
   return {
     avrs: [{ model: "TX-RZ50", ip: "1.2.3.4", zone: "main", volumeScale: 100, adjustVolumeDispl: true, volumeDisplay: "absolute" }],
     volumeScale: 100,
@@ -35,7 +35,7 @@ async function makeReceiver(overrides: Record<string, any> = {}) {
   const mod = await import("../src/commandReceiver.js");
   const { CommandReceiver } = mod as any;
   const driverMock = overrides.driverMock ?? { updateEntityAttributes: vi.fn(), getConfigDirPath: vi.fn() };
-  const config = overrides.config ?? makeOnkyoConfig();
+  const config = overrides.config ?? makeIntegrationConfig();
   const eiscpMock = overrides.eiscpMock ?? makeEiscpMock();
   const avrStateApiMock = overrides.avrStateApiMock ?? makeAvrStateApiMock();
   const receiver = new CommandReceiver(driverMock, config, eiscpMock, avrStateApiMock);

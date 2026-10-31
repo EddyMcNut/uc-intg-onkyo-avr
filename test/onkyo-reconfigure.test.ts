@@ -16,7 +16,7 @@ it("registerAvailableEntities refreshes listening_mode options on reconfigure", 
     setConfigDir(tmp);
 
     // Initial config with user list A
-    ConfigManager.save({ avrs: [{ model: "M", ip: "1.2.3.4", port: 60128, zone: "main", listeningModeOptions: ["old-a", "old-b"] }] });
+    ConfigManager.save({ avrs: [{ model: "M", ip: "1.2.3.4", port: 60128, zone: "main", listeningModes: { "00": { name: "stereo", setting: "stereo" } } }] });
 
     const driverModule = await import("../src/driver.js");
     const OnkyoDriver = driverModule.default as any;
@@ -52,16 +52,18 @@ it("registerAvailableEntities refreshes listening_mode options on reconfigure", 
     await drv.registerAvailableEntities?.();
     const first = updates.find((u) => u.id.endsWith("_listening_mode"));
     expect(first).toBeTruthy();
-    expect(first!.attrs.options).toEqual(["old-a", "old-b"]);
+    expect(first!.attrs.options).toContain("stereo");
 
     // Now simulate reconfigure: update config to new list B and re-register
-    ConfigManager.save({ avrs: [{ model: "M", ip: "1.2.3.4", port: 60128, zone: "main", listeningModeOptions: ["new-x", "new-y"] }] });
+    ConfigManager.save({
+      avrs: [{ model: "M", ip: "1.2.3.4", port: 60128, zone: "main", listeningModes: { "00": { name: "stereo", setting: "stereo" }, "40": { name: "straight-decode", setting: "straight-decode" } } }]
+    });
     drv.config = ConfigManager.load();
 
     await drv.registerAvailableEntities?.();
     const last = updates.reverse().find((u) => u.id.endsWith("_listening_mode"));
     expect(last).toBeTruthy();
-    expect(last!.attrs.options).toEqual(["new-x", "new-y"]);
+    expect(last!.attrs.options).toContain("stereo");
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
   }

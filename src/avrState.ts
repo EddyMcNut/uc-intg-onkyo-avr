@@ -5,12 +5,9 @@ import log from "./loggers.js";
 import { delay } from "./utils.js";
 import { ALBUM_ART, SONG_INFO, QUERY_DEFAULT_DELAY } from "./constants.js";
 import type { ICommandReceiver } from "./types.js";
-import { resetDeezerBrowseState } from "./deezerBrowserStore.js";
-import { resetMusicServerBrowseState } from "./musicServerBrowserStore.js";
-import { resetTidalBrowseState } from "./tidalBrowserStore.js";
 import { REMOTE_SUFFIX } from "./sensorSuffixes.js";
 
-const integrationName = "avrState:";
+const logSource = "avrState:";
 
 // The AVR may report friendly input names instead of the short aliases used by the
 // integration internally. Keep the state vocabulary canonical so source-dependent
@@ -51,7 +48,7 @@ interface EntityState {
 export class AvrStateManager {
   private states: Map<string, EntityState> = new Map();
 
-  /** Get or create state for an entity */
+  // Get or create state for an entity
   private getState(entityId: string): EntityState {
     let state = this.states.get(entityId);
     if (!state) {
@@ -61,12 +58,12 @@ export class AvrStateManager {
     return state;
   }
 
-  /** Get current source for an entity */
+  // Get current source for an entity
   getSource(entityId: string): string {
     return this.getState(entityId).source;
   }
 
-  /** Get current sub-source for an entity */
+  // Get current sub-source for an entity
   getSubSource(entityId: string): string {
     return this.getState(entityId).subSource;
   }
@@ -75,41 +72,41 @@ export class AvrStateManager {
     return this.getState(entityId).volume;
   }
 
-  /** Get current audio format for an entity */
+  // Get current audio format for an entity
   getAudioFormat(entityId: string): string {
     return this.getState(entityId).audioFormat;
   }
 
-  /** Get current power state for an entity */
+  // Get current power state for an entity
   getPowerState(entityId: string): string {
     return this.getState(entityId).powerState;
   }
 
-  /** Get current playback status for an entity */
+  // Get current playback status for an entity
   getPlaybackStatus(entityId: string): string {
     return this.getState(entityId).playbackStatus;
   }
 
-  /** Set audio format for an entity, returns true if changed */
+  // Set audio format for an entity, returns true if changed
   setAudioFormat(entityId: string, audioFormat: string): boolean {
     const state = this.getState(entityId);
     const normalizedFormat = audioFormat.toLowerCase();
 
     if (state.audioFormat !== normalizedFormat) {
-      log.info("%s [%s] audio format changed from '%s' to '%s'", integrationName, entityId, state.audioFormat, audioFormat);
+      log.info("%s [%s] audio format changed from '%s' to '%s'", logSource, entityId, state.audioFormat, audioFormat);
       state.audioFormat = normalizedFormat;
       return true;
     }
     return false;
   }
 
-  /** Set power state for an entity, returns true if changed */
+  // Set power state for an entity, returns true if changed
   setPowerState(entityId: string, powerState: string, driver?: uc.IntegrationAPI): boolean {
     const state = this.getState(entityId);
     const normalizedPowerState = powerState.toLowerCase();
 
     if (state.powerState !== normalizedPowerState) {
-      log.info("%s [%s] power state changed from '%s' to '%s'", integrationName, entityId, state.powerState, powerState);
+      log.info("%s [%s] power state changed from '%s' to '%s'", logSource, entityId, state.powerState, powerState);
       state.powerState = normalizedPowerState;
       this.applyMediaPlayerState(entityId, driver);
       this.applyRemoteState(entityId, driver);
@@ -125,14 +122,14 @@ export class AvrStateManager {
   setVolume(entityId: string, volume: number): boolean {
     const state = this.getState(entityId);
     if (state.volume !== volume) {
-      log.info("%s [%s] volume changed from '%s' to '%s'", integrationName, entityId, state.volume, volume);
+      log.info("%s [%s] volume changed from '%s' to '%s'", logSource, entityId, state.volume, volume);
       state.volume = volume;
       return true;
     }
     return false;
   }
 
-  /** Check if entity is powered on */
+  // Check if entity is powered on
   isEntityOn(entityId: string): boolean {
     const powerState = this.getState(entityId).powerState;
     return powerState === "on";
@@ -181,13 +178,13 @@ export class AvrStateManager {
     return entities;
   }
 
-  /** Set source for an entity, returns true if changed */
+  // Set source for an entity, returns true if changed
   setSource(entityId: string, source: string, eiscpInstance?: EiscpDriver, zone?: string, _driver?: uc.IntegrationAPI): boolean {
     const state = this.getState(entityId);
     const normalizedSource = normalizeSource(source);
 
     if (state.source !== normalizedSource) {
-      log.info("%s [%s] source changed from '%s' to '%s'", integrationName, entityId, state.source, source);
+      log.info("%s [%s] source changed from '%s' to '%s'", logSource, entityId, state.source, source);
       state.source = normalizedSource;
       state.playbackStatus = "unknown";
       // A network sub-source (e.g. "tunein") is only meaningful while the zone is on the NET input.
@@ -206,13 +203,13 @@ export class AvrStateManager {
     return false;
   }
 
-  /** Set sub-source for an entity, returns true if changed */
+  // Set sub-source for an entity, returns true if changed
   setSubSource(entityId: string, subSource: string, eiscpInstance?: EiscpDriver, zone?: string, _driver?: uc.IntegrationAPI): boolean {
     const state = this.getState(entityId);
     const normalizedSubSource = subSource.toLowerCase().replace(/\s+/g, "-");
 
     if (state.subSource !== normalizedSubSource) {
-      log.info("%s [%s] sub-source changed from '%s' to '%s'", integrationName, entityId, state.subSource, subSource);
+      log.info("%s [%s] sub-source changed from '%s' to '%s'", logSource, entityId, state.subSource, subSource);
       state.subSource = normalizedSubSource;
       state.playbackStatus = "unknown";
       this.applyMediaPlayerState(entityId, _driver);
@@ -292,7 +289,7 @@ export class AvrStateManager {
     return uc.RemoteStates.Unknown;
   }
 
-  /** Push the AVR power state onto the remote entity (if registered). */
+  // Push the AVR power state onto the remote entity (if registered).
   public applyRemoteState(entityId: string, driver?: uc.IntegrationAPI): void {
     if (!driver) {
       return;
@@ -303,17 +300,17 @@ export class AvrStateManager {
     });
   }
 
-  /** Clear state for an entity (e.g., on disconnect) */
+  // Clear state for an entity (e.g., on disconnect)
   clearState(entityId: string): void {
     this.states.delete(entityId);
   }
 
-  /** Clear all state */
+  // Clear all state
   clearAllState(): void {
     this.states.clear();
   }
 
-  /** Query AVR state and clear media attributes on source change */
+  // Query AVR state and clear media attributes on source change
   async refreshAvrState(entityId: string, eiscpInstance?: EiscpDriver, zone?: string, driver?: uc.IntegrationAPI, queueThreshold?: number, commandReceiver?: ICommandReceiver): Promise<void> {
     if (!eiscpInstance || !zone || !driver || !entityId) {
       return;
@@ -322,7 +319,7 @@ export class AvrStateManager {
     // Use provided queueThreshold or fallback to default
     const threshold = queueThreshold ?? (typeof eiscpInstance.eiscpConfig?.sendDelay === "number" ? eiscpInstance.eiscpConfig.sendDelay : QUERY_DEFAULT_DELAY);
 
-    log.info("%s [%s] querying volume for zone '%s'", integrationName, entityId, zone);
+    log.info("%s [%s] querying volume for zone '%s'", logSource, entityId, zone);
     await eiscpInstance.command({ zone, command: "volume", args: "query" });
     await eiscpInstance.command({ zone, command: "audio-muting", args: "query" });
 
@@ -338,7 +335,7 @@ export class AvrStateManager {
     });
 
     // Reset Audio/Video sensors
-    log.info("%s [%s] querying AV-info for zone '%s'", integrationName, entityId, zone);
+    log.info("%s [%s] querying AV-info for zone '%s'", logSource, entityId, zone);
     await eiscpInstance.command({ zone, command: "audio-information", args: "query" });
     await eiscpInstance.command({ zone, command: "video-information", args: "query" });
 
@@ -363,35 +360,25 @@ export class AvrStateManager {
     const currentSubSource = this.getSubSource(entityId);
     const hasAlbumArt = currentSource === "net";
     if (hasAlbumArt && commandReceiver) {
-      log.info("%s [%s] forcing album art refresh for subsource '%s'", integrationName, entityId, currentSubSource);
+      log.info("%s [%s] forcing album art refresh for subsource '%s'", logSource, entityId, currentSubSource);
       await commandReceiver.maybeUpdateImage(entityId, true);
     }
 
     // Requery metadata for network services that support it
     const hasSongInfo = SONG_INFO.some((name) => currentSubSource.toLowerCase().includes(name));
     if (hasSongInfo) {
-      log.debug("%s [%s] requerying metadata for subsource '%s'", integrationName, entityId, currentSubSource);
+      log.debug("%s [%s] requerying metadata for subsource '%s'", logSource, entityId, currentSubSource);
       await eiscpInstance.raw("NATQSTN"); // Query artist
       await eiscpInstance.raw("NTIQSTN"); // Query title
       await eiscpInstance.raw("NALQSTN"); // Query album
       await eiscpInstance.raw("NSTQSTN"); // Query play/pause status
     }
 
-    // For Tidal/Deezer/Music Server, reset browse state and re-request the NLS list so the media browser stays fresh
-    if (currentSubSource === "tidal" || currentSubSource === "deezer" || currentSubSource === "music-server") {
-      log.info("%s [%s] refreshing %s browse state via NTCTOP + NTCSELECT", integrationName, entityId, currentSubSource);
-      if (currentSubSource === "tidal") {
-        resetTidalBrowseState(entityId);
-      } else if (currentSubSource === "deezer") {
-        resetDeezerBrowseState(entityId);
-      } else {
-        resetMusicServerBrowseState(entityId);
-      }
-      await eiscpInstance.raw("NTCTOP");
-      await eiscpInstance.raw("NTCSELECT");
-    }
+    // For Tidal and Deezer, reset browse state and re-request the NLS list so
+    // the media browser stays fresh. Music Server follows the app's direct
+    // NSV000 + NLA/NLAL flow and must not use the legacy NET menu commands.
   }
 }
 
-/** Singleton instance of the state manager */
+// Singleton instance of the state manager
 export const avrStateManager = new AvrStateManager();

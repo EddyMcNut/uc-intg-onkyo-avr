@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { getEffectiveInputSourceOptions, resolveInputSourceList } from "../src/inputSourceResolver.js";
+import { getEffectiveInputSourceOptions, resolveCanonicalInputSource, resolveInputSourceList } from "../src/inputSourceResolver.js";
 import { clearAllAvrInputs, setAvrInputs } from "../src/inputSourceStore.js";
 import { parseAvrInfo, setAvrInfo, resetAvrInfo } from "../src/avrInfoStore.js";
 import { readFileSync } from "node:fs";
@@ -36,6 +36,33 @@ describe("inputSourceResolver", () => {
       { id: "01", name: "CBL/SAT" }
     ]);
     expect(resolution?.reason).toContain("2 input(s)");
+  });
+
+  it("separates and marks configured network sources without changing command names", () => {
+    const config = {
+      ...AVR_CONFIG,
+      inputSourceLayout: "separate",
+      networkInputMarker: "🌐",
+      idInputSources: {
+        BD: { name: "BD/DVD", setting: "bd/dvd" },
+        SPOTIFY: { name: "Spotify", setting: "spotify" }
+      }
+    } as AvrConfig;
+
+    expect(getEffectiveInputSourceOptions(config, "TX-RZ50 192.168.2.103", ["BD/DVD", "Spotify"])).toEqual(["bd/dvd", "🌐 spotify"]);
+  });
+
+  it("puts network sources first when requested", () => {
+    const config = {
+      ...AVR_CONFIG,
+      inputSourceLayout: "network-first",
+      idInputSources: {
+        BD: { name: "BD/DVD", setting: "bd/dvd" },
+        SPOTIFY: { name: "Spotify", setting: "spotify" }
+      }
+    } as AvrConfig;
+
+    expect(getEffectiveInputSourceOptions(config, "TX-RZ50 192.168.2.103", ["BD/DVD", "Spotify"])).toEqual(["spotify", "bd/dvd"]);
   });
 
   it("falls back to integration mappings when the AVR reports no inputs", () => {
@@ -112,9 +139,9 @@ describe("inputSourceResolver", () => {
 
     expect(resolveInputSourceList(AVR_CONFIG, ENTITY_ID)?.inputs).toEqual([
       { id: "10", name: "BD/DVD" },
-      { id: "40", name: "Chromecast built-in" },
-      { id: "0a", name: "Spotify" },
-      { id: "0e", name: "TuneIn Radio" }
+      { id: "40", name: "Chromecast built-in", network: true },
+      { id: "0a", name: "Spotify", network: true },
+      { id: "0e", name: "TuneIn Radio", network: true }
     ]);
   });
 
@@ -126,6 +153,12 @@ describe("inputSourceResolver", () => {
     ]);
     const config = { ...AVR_CONFIG, inputSelectorOptions: ["bd", "tv", "cd"] };
 
-    expect(getEffectiveInputSourceOptions(config, "TX-RZ50 192.168.2.103", ["bd", "tv", "cd"])).toEqual(["Blu-ray", "Television", "cd"]);
+    expect(getEffectiveInputSourceOptions(config, "TX-RZ50 192.168.2.103", ["bd", "tv", "cd"])).toEqual(["Blu-ray", "Television"]);
+  });
+
+  it("keeps AVR-learned display names separate from canonical source state", () => {
+    setAvrInputs("TX-RZ50 192.168.2.103", [{ id: "2b", name: "Network" }]);
+
+    expect(resolveCanonicalInputSource("TX-RZ50 192.168.2.103", "Network")).toBe("net");
   });
 });

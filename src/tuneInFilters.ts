@@ -8,7 +8,7 @@ export function normalizeTuneInLabel(label: string): string {
   return label.substring(pipeIndex + 1).trim();
 }
 
-/** Returns the part before the first "|", or the full string if there is no pipe. Used to match NTI station names against preset entries. */
+// Returns the part before the first "|", or the full string if there is no pipe. Used to match NTI station names against preset entries.
 export function extractTuneInStationKey(label: string): string {
   const pipeIndex = label.indexOf("|");
   if (pipeIndex === -1) return label.trim();
@@ -71,19 +71,21 @@ export function unescapeXml(value: string): string {
     .replace(/&apos;/g, "'");
 }
 
-export function parseTuneInXmlItems(xmlPayload: string): Array<{ title: string; stationKey: string; rawLabel: string; iconId: string }> {
+export function parseTuneInXmlItems(xmlPayload: string): Array<{ title: string; stationKey: string; rawLabel: string; iconId: string; selectable: boolean }> {
   const itemMatches = [...xmlPayload.matchAll(/<item\b([^>]*)\/?>/gi)];
 
   return itemMatches.map((match) => {
     const attributes = match[1] || "";
     const rawTitle = unescapeXml((attributes.match(/\btitle="([^"]*)"/i)?.[1] || "").trim());
     const iconId = (attributes.match(/\biconid="([^"]*)"/i)?.[1] || "").trim();
+    const selectable = (attributes.match(/\bselectable="([^"]*)"/i)?.[1] || "1") !== "0";
 
     return {
       title: normalizeTuneInLabel(rawTitle),
       stationKey: extractTuneInStationKey(rawTitle),
       rawLabel: rawTitle,
-      iconId
+      iconId,
+      selectable
     };
   });
 }

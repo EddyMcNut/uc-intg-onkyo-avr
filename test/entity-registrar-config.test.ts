@@ -21,10 +21,12 @@ it("EntityRegistrar returns user-configured listeningModeOptions from config", a
     const { avrStateManager } = avrStateModule;
     const registrar = new EntityRegistrar(avrStateManager);
 
-    // Save a config with listeningModeOptions and reload
-    ConfigManager.save({ avrs: [{ model: "M", ip: "1.2.3.4", port: 60128, zone: "main", listeningModeOptions: ["stereo", "straight-decode"] }] });
+    // Save the current per-code listening-mode representation and reload.
+    ConfigManager.save({
+      avrs: [{ model: "M", ip: "1.2.3.4", port: 60128, zone: "main", listeningModes: { "00": { name: "stereo", setting: "stereo" }, "40": { name: "straight-decode", setting: "straight-decode" } } }]
+    });
     const cfg = ConfigManager.load();
-    expect(cfg.avrs && cfg.avrs[0].listeningModeOptions).toBeTruthy();
+    expect(cfg.avrs && cfg.avrs[0].listeningModes).toBeTruthy();
 
     const avrEntry = `${cfg.avrs[0].model} ${cfg.avrs[0].ip} ${cfg.avrs[0].zone}`;
     const opts = registrar.getListeningModeOptions(undefined, avrEntry);
@@ -34,7 +36,7 @@ it("EntityRegistrar returns user-configured listeningModeOptions from config", a
   }
 });
 
-it("EntityRegistrar treats 'all' sentinel and legacy empty array as showing all listening modes", async () => {
+it("EntityRegistrar returns the configured listening modes", async () => {
   const tmp = mkTmpDir();
   try {
     const module = (await import("../src/entityRegistrar.js")) as any;
@@ -48,14 +50,13 @@ it("EntityRegistrar treats 'all' sentinel and legacy empty array as showing all 
     const { avrStateManager } = avrStateModule;
     const registrar = new EntityRegistrar(avrStateManager);
 
-    for (const stored of ["all", []]) {
-      ConfigManager.save({ avrs: [{ model: "M", ip: "1.2.3.4", port: 60128, zone: "main", listeningModeOptions: stored }] });
+    for (const stored of [{}, { "00": { name: "stereo", setting: "stereo" } }]) {
+      ConfigManager.save({ avrs: [{ model: "M", ip: "1.2.3.4", port: 60128, zone: "main", listeningModes: stored }] });
       const cfg = ConfigManager.load();
       const avrEntry = `${cfg.avrs[0].model} ${cfg.avrs[0].ip} ${cfg.avrs[0].zone}`;
       const opts = registrar.getListeningModeOptions(undefined, avrEntry);
-      // "all" (and legacy []) means show all known modes, not a restricted list.
       expect(Array.isArray(opts)).toBe(true);
-      expect(opts.length).toBeGreaterThan(5);
+      expect(opts.length).toBe(stored["00"] ? 1 : 0);
     }
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
@@ -76,7 +77,7 @@ it("EntityRegistrar treats 'all' sentinel as showing all input sources", async (
     const { avrStateManager } = avrStateModule;
     const registrar = new EntityRegistrar(avrStateManager);
 
-    ConfigManager.save({ avrs: [{ model: "M", ip: "1.2.3.4", port: 60128, zone: "main", inputSelectorOptions: "all" }] });
+    ConfigManager.save({ avrs: [{ model: "M", ip: "1.2.3.4", port: 60128, zone: "main", useAvrReportedInputs: false }] });
     const cfg = ConfigManager.load();
     const avrEntry = `${cfg.avrs[0].model} ${cfg.avrs[0].ip} ${cfg.avrs[0].zone}`;
     const opts = registrar.getInputSelectorOptions(avrEntry);
@@ -139,10 +140,10 @@ it("EntityRegistrar applies AVR names to matching aliases and keeps unmatched op
     const { avrStateManager } = avrStateModule;
     const registrar = new EntityRegistrar(avrStateManager);
 
-    ConfigManager.save({ avrs: [{ model: "M", ip: "1.2.3.4", port: 60128, zone: "main", useAvrReportedInputs: true, inputSelectorOptions: ["bd", "tv"] }] });
+    ConfigManager.save({ avrs: [{ model: "M", ip: "1.2.3.4", port: 60128, zone: "main", useAvrReportedInputs: true }] });
     inputSourceStore.setAvrInputs("M 1.2.3.4", [{ id: "10", name: "BD/DVD" }]);
 
-    expect(registrar.getInputSelectorOptions("M 1.2.3.4 main")).toEqual(["BD/DVD", "tv"]);
+    expect(registrar.getInputSelectorOptions("M 1.2.3.4 main")).toEqual(["BD/DVD"]);
 
     inputSourceStore.clearAllAvrInputs();
   } finally {

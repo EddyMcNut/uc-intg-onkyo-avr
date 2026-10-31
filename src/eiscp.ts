@@ -18,19 +18,13 @@ import { getZonePrefix } from "./zoneMappings.js";
 import { WAIT_FOR_CONNECT_TIMEOUT, CONNECTION_TIMEOUT } from "./constants.js";
 import type { AvrStateReader } from "./eiscp-command-parser.js";
 import { findNetServiceByName } from "./avrInfoStore.js";
+import { findLearnedListeningModeCode } from "./learnedListeningModeStore.js";
+import { findConfiguredInputId } from "./inputSourcePreferences.js";
+import { stripInputSourceMarker } from "./inputSourceResolver.js";
+import { EiscpCommandWorkflow, NSS_SERVICE_NAMES, extractNetworkServiceCode, isTuneInPresetCommand } from "./eiscpCommandWorkflow.js";
+import type { EiscpConfig } from "./eiscpTypes.js";
 
-export interface EiscpConfig {
-  host?: string;
-  port?: number;
-  model?: string;
-  reconnect?: boolean;
-  reconnectSleep?: number;
-  sendDelay?: number;
-  receiveDelay?: number;
-  netMenuDelay?: number;
-  tuneinPresetPosition?: number;
-  configuredZones?: string[]; // Zones configured for this physical AVR (e.g., ["main", "zone2"])
-}
+export type { EiscpConfig } from "./eiscpTypes.js";
 
 const NOOP_STATE_READER: AvrStateReader = {
   getSource: () => "unknown",
@@ -39,30 +33,18 @@ const NOOP_STATE_READER: AvrStateReader = {
 
 const COMMAND_MAPPINGS = eiscpMappings.command_mappings;
 const VALUE_MAPPINGS = eiscpMappings.value_mappings;
-const integrationName = "eISCP:";
-const IGNORED_COMMANDS = new Set(["NMS", "NPB", "NJA", "EDV", "NFI", "NDN", "NTR", "NDS"]); // Commands to ignore from AVR (NMS=menu, NPB=playback info)
+const logSource = "eISCP:";
+const IGNORED_COMMANDS = new Set(["NMS", "NPB", "NJA", "EDV", "NFI", "NDN", "NTR", "NDS", "NLU"]); // Commands to ignore from AVR (NMS=menu, NPB=playback info, NLU=list URL info)
 const THROTTLED_COMMANDS = new Set(["IFA", "IFV", "FLD"]); // Commands to send to incoming queue for throttling
 const FLD_VOLUME_HEX_PREFIX = "566F6C756D65"; // "Volume" in hex - skip these FLD messages
-const NSS_SERVICE_NAMES: Record<string, string[]> = {
-  NSS01: ["tuneinradio", "tunein"],
-  NSS02: ["spotify"],
-  NSS03: ["deezer"],
-  NSS04: ["tidal"],
-  NSS05: ["amazonmusic"],
-  NSS06: ["chromecastbuiltin", "chromecast"],
-  NSS07: ["dtsplayfi", "playfi"],
-  NSS08: ["airplay", "airplay2"],
-  NSS09: ["alexa"],
-  NSS10: ["musicserver"]
-};
 
 // Re-export zone prefix lookup for backward compatibility — canonical definition is in zoneMappings.ts
 export { getZonePrefix, ZONE_COMMAND_MAP, ZONE_VOLUME_PREFIX, ZONE_VOLUME_UP_DOWN, ZONE_MUTE } from "./zoneMappings.js";
 
-/** Result from parsing an ISCP command — re-exported from eiscp-command-parser.ts */
+// Result from parsing an ISCP command — re-exported from eiscp-command-parser.ts
 export type { CommandResult };
 
-/** Data payload emitted on 'data' event */
+// Data payload emitted on 'data' event
 interface DataPayload {
   command: string | undefined;
   argument: string | number | string[] | Record<string, string> | undefined;
@@ -73,7 +55,7 @@ interface DataPayload {
   model: string | undefined;
 }
 
-/** Discovered AVR device info */
+// Discovered AVR device info
 interface DiscoveredDevice {
   host: string;
   port: string;
@@ -82,7 +64,7 @@ interface DiscoveredDevice {
   areacode: string;
 }
 
-/** Command input as object */
+// Command input as object
 interface CommandInput {
   zone?: string;
   command: string;
@@ -94,12 +76,12 @@ export class EiscpDriver extends EventEmitter {
     return this.isConnected;
   }
 
-  /** Read-only access to the current driver configuration. */
+  // Read-only access to the current driver configuration.
   public get eiscpConfig(): Readonly<EiscpConfig> {
     return this.config;
   }
 
-  /** Merge a partial config patch into the current configuration. */
+  // Merge a partial config patch into the current configuration.
   public updateConfig(patch: Partial<EiscpConfig>): void {
     this.config = { ...this.config, ...patch };
   }
@@ -107,12 +89,17 @@ export class EiscpDriver extends EventEmitter {
   private config: EiscpConfig;
   private eiscp: net.Socket | null = null;
   private isConnected = false;
+  private disconnectRequested = false;
+  private connectPromise: Promise<{ model: string; host: string; port: number } | null> | null = null;
   private sendQueue: Promise<void> = Promise.resolve();
+  private pendingSendCount = 0;
+  private lastSendTime = 0;
   private receiveQueue: Promise<void> = Promise.resolve();
   private readonly pendingIncoming = new Map<string, DataPayload>();
   private incomingDrainScheduled = false;
   private tcpBuffer: Buffer = Buffer.alloc(0);
   private readonly commandParser: IscpCommandParser;
+  private readonly commandWorkflow: EiscpCommandWorkflow;
 
   constructor(
     config?: EiscpConfig,
@@ -129,7 +116,8 @@ export class EiscpDriver extends EventEmitter {
       receiveDelay: config?.receiveDelay ?? DEFAULT_QUEUE_THRESHOLD,
       netMenuDelay: config?.netMenuDelay ?? 2500,
       tuneinPresetPosition: config?.tuneinPresetPosition ?? 1,
-      configuredZones: config?.configuredZones
+      configuredZones: config?.configuredZones,
+      idInputSources: config?.idInputSources
     };
     this.commandParser = new IscpCommandParser(
       (zone) => buildEntityId(this.config.model!, this.config.host!, zone),
@@ -147,9 +135,25 @@ export class EiscpDriver extends EventEmitter {
         getBrowseState: getMusicServerBrowseState
       }
     );
+    this.commandWorkflow = new EiscpCommandWorkflow({
+      getConfig: () => this.config,
+      raw: (command) => this.raw(command),
+      publishMetadata: (metadata, command) => {
+        this.commandParser.patchMetadata(metadata);
+        this.emit("data", {
+          command: "metadata",
+          argument: { ...this.commandParser.getMetadata() },
+          zone: "main",
+          iscpCommand: command,
+          host: this.config.host,
+          port: this.config.port,
+          model: this.config.model
+        });
+      }
+    });
     if (this.listenerCount("error") === 0) {
       this.on("error", (err: Error) => {
-        log.error("%s eiscp error (unhandled):", integrationName, err);
+        log.error("%s eiscp error (unhandled):", logSource, err);
       });
     }
   }
@@ -174,7 +178,7 @@ export class EiscpDriver extends EventEmitter {
       }
       client
         .on("error", (err: Error) => {
-          log.error("%s UDP error:", integrationName, err);
+          log.error("%s UDP error:", logSource, err);
           try {
             client.close();
           } catch {}
@@ -188,6 +192,10 @@ export class EiscpDriver extends EventEmitter {
           const command = message.slice(0, 3);
           if (command === "ECN") {
             const data = message.slice(3).split("/");
+            if (data.length < 4 || !data[0] || !data[1] || !data[2] || !data[3]) {
+              log.warn("%s Ignoring malformed ECN discovery response from %s", logSource, rinfo.address);
+              return;
+            }
             result.push({
               host: rinfo.address,
               port: data[1],
@@ -207,7 +215,7 @@ export class EiscpDriver extends EventEmitter {
           client.send(buffer, 0, buffer.length, opts.port, opts.address, (err) => {
             if (err) {
               // Log but don't fail - network might not be ready yet (ENETUNREACH)
-              log.error("%s UDP send error (network may not be ready):", integrationName, err);
+              log.error("%s UDP send error (network may not be ready):", logSource, err);
               // Close client and resolve with empty result - configured AVRs will still be tried
               clearTimeout(timeoutTimer);
               close();
@@ -216,15 +224,26 @@ export class EiscpDriver extends EventEmitter {
           timeoutTimer = setTimeout(close, opts.timeout * 1000);
         })
         .on("close", () => {
-          log.info("%s UDP socket closed", integrationName);
+          log.info("%s UDP socket closed", logSource);
         })
         .bind(0, undefined, (err?: Error) => {
-          if (err) log.error("%s UDP bind error:", integrationName, err);
+          if (err) log.error("%s UDP bind error:", logSource, err);
         });
     });
   }
 
   async connect(options?: EiscpConfig): Promise<{ model: string; host: string; port: number } | null> {
+    if (this.connectPromise) return this.connectPromise;
+    const attempt = this.connectInternal(options);
+    this.connectPromise = attempt;
+    try {
+      return await attempt;
+    } finally {
+      if (this.connectPromise === attempt) this.connectPromise = null;
+    }
+  }
+
+  private async connectInternal(options?: EiscpConfig): Promise<{ model: string; host: string; port: number } | null> {
     this.config = { ...this.config, ...options };
     // Discover host/model if missing
     if (!this.config.host || !this.config.model) {
@@ -236,7 +255,7 @@ export class EiscpDriver extends EventEmitter {
         this.config.port = Number(h.port);
         this.config.model = h.model;
       } else {
-        log.error("%s No AVR found during discovery.", integrationName);
+        log.error("%s No AVR found during discovery.", logSource);
         return null;
       }
     }
@@ -246,14 +265,14 @@ export class EiscpDriver extends EventEmitter {
     if (this.isConnected && this.eiscp) {
       return { model: this.config.model!, host: this.config.host!, port };
     }
-    // If socket exists, try to connect
+    // A connection attempt may already be in progress. Reuse its socket rather
+    // than calling socket.connect() a second time.
     if (this.eiscp) {
-      this.eiscp.setTimeout(CONNECTION_TIMEOUT);
-      this.eiscp.connect(port, this.config.host!);
       return { model: this.config.model!, host: this.config.host!, port };
     }
     // Create new socket and connect
-    this.eiscp = net.connect(port, this.config.host!);
+    const socket = net.connect(port, this.config.host!);
+    this.eiscp = socket;
     // Bound connection establishment so failed attempts fail fast instead of hanging on
     // the OS-level TCP timeout. Disabled once the connection is established.
     this.eiscp.setTimeout(CONNECTION_TIMEOUT);
@@ -269,19 +288,23 @@ export class EiscpDriver extends EventEmitter {
         this.emit("connect"); // Emit connect event for waitForConnect()
       })
       .on("close", () => {
+        const intentionalDisconnect = this.disconnectRequested;
+        this.disconnectRequested = false;
         this.tcpBuffer = Buffer.alloc(0);
         const wasConnected = this.isConnected;
         this.isConnected = false;
+        if (this.eiscp === socket) this.eiscp = null;
+        this.emit("close");
         if (wasConnected) {
-          log.warn("%s Connection closed for %s at %s:%d", integrationName, this.config.model, this.config.host, this.config.port || 60128);
+          log.warn("%s Connection closed for %s at %s:%d", logSource, this.config.model, this.config.host, this.config.port || 60128);
         }
-        if (this.config.reconnect) {
-          log.info("%s Scheduling reconnection in %ds", integrationName, this.config.reconnectSleep);
+        if (!intentionalDisconnect && this.config.reconnect) {
+          log.info("%s Scheduling reconnection in %ds", logSource, this.config.reconnectSleep);
           setTimeout(() => this.connect(), this.config.reconnectSleep! * 1000);
         }
       })
       .on("error", (err) => {
-        log.error("%s Socket error for %s at %s:%d - %s", integrationName, this.config.model, this.config.host, this.config.port || 60128, err.message);
+        log.error("%s Socket error for %s at %s:%d - %s", logSource, this.config.model, this.config.host, this.config.port || 60128, err.message);
         this.isConnected = false;
         this.eiscp?.destroy();
       })
@@ -318,7 +341,7 @@ export class EiscpDriver extends EventEmitter {
           let command = iscpMessage.slice(0, 3);
           let value = iscpMessage.slice(3);
 
-          // log.info("%s RAW (0) RECEIVE: [%s] %s %s", integrationName, command, value);
+          // log.info("%s RAW (0) RECEIVE: [%s] %s %s", logSource, command, value);
 
           if (IGNORED_COMMANDS.has(command)) {
             continue;
@@ -361,34 +384,44 @@ export class EiscpDriver extends EventEmitter {
   }
 
   disconnect() {
-    if (this.isConnected && this.eiscp) {
-      this.eiscp.destroy();
+    const socket = this.eiscp;
+    this.disconnectRequested = Boolean(socket);
+    this.isConnected = false;
+    this.eiscp = null;
+    if (socket) {
+      socket.destroy();
     }
   }
 
-  /** Enqueue a command to be sent with proper delay between commands */
+  // Enqueue a command to be sent with proper delay between commands
   private enqueueSend(data: string | string[]): Promise<void> {
     const prevQueue = this.sendQueue;
+    this.pendingSendCount++;
     const task = (async () => {
-      await prevQueue;
-      if (this.isConnected && this.eiscp) {
-        if (typeof data === "string") {
-          this.eiscp.write(createEiscpPacket(data));
-        } else {
-          for (const cmd of data) {
-            this.eiscp.write(createEiscpPacket(cmd));
+      try {
+        await prevQueue;
+        if (this.isConnected && this.eiscp) {
+          if (typeof data === "string") {
+            this.eiscp.write(createEiscpPacket(data));
+          } else {
+            for (const cmd of data) {
+              this.eiscp.write(createEiscpPacket(cmd));
+            }
           }
+          this.lastSendTime = Date.now();
+          await delay(this.config.sendDelay! ?? DEFAULT_QUEUE_THRESHOLD);
+        } else {
+          throw new Error("Send command while not connected");
         }
-        await delay(this.config.sendDelay! ?? DEFAULT_QUEUE_THRESHOLD);
-      } else {
-        throw new Error("Send command while not connected");
+      } finally {
+        this.pendingSendCount--;
       }
     })();
     this.sendQueue = task.catch(() => {});
     return task;
   }
 
-  /** Enqueue an incoming message to be emitted with throttle delay */
+  // Enqueue an incoming message to be emitted with throttle delay
   private enqueueIncoming(data: DataPayload): void {
     // Coalesce throttled stream commands: only the latest value per command matters,
     // so stale intermediate frames (e.g. FLD scroll text) are dropped. This reduces
@@ -411,12 +444,12 @@ export class EiscpDriver extends EventEmitter {
         }
       } catch (err) {
         this.incomingDrainScheduled = false;
-        log.error("%s Error processing queued incoming message:", integrationName, err);
+        log.error("%s Error processing queued incoming message:", logSource, err);
       }
     })();
   }
 
-  /** Send a raw ISCP command */
+  // Send a raw ISCP command
   async raw(data: string): Promise<void> {
     if (!data) {
       throw new Error("No data provided");
@@ -424,107 +457,30 @@ export class EiscpDriver extends EventEmitter {
     return this.enqueueSend(data);
   }
 
-  private async handleTIPsend(iscpCommand: string): Promise<void> {
-    // Assumes TuneIn is already the active source.
-    const presetHex = iscpCommand.slice(3);
-    const preset = parseInt(presetHex, 16);
-    const presetIndex = String(preset).padStart(5, "0");
-    const menuDelay = this.config.netMenuDelay ?? 2500;
-    const myPresetsPosition = String(this.config.tuneinPresetPosition ?? 1).padStart(5, "0");
-
-    log.info("%s TuneIn preset %d: navigating to My Presets (position %s), selecting index %s", integrationName, preset, myPresetsPosition, presetIndex);
-
-    this.commandParser.patchMetadata({ artist: `Selecting preset ${preset}...`, album: "please wait" });
-    this.emit("data", {
-      command: "metadata",
-      argument: { ...this.commandParser.getMetadata() },
-      zone: "main",
-      iscpCommand: iscpCommand,
-      host: this.config.host,
-      port: this.config.port,
-      model: this.config.model
-    });
-
-    await this.raw("NTCTOP"); // Go to TuneIn top menu
-    await delay(menuDelay);
-    await this.raw("NTCSELECT"); // Confirm / enter
-    await delay(menuDelay * 3);
-    await this.raw(`NLSI${myPresetsPosition}`); // Navigate down to My Presets (first position)
-    await delay(menuDelay * 2);
-    await this.raw(`NLSI${presetIndex}`); // Select preset by index
-  }
-
-  /** Fast TIP detector with validation only when prefix matches */
-  private isTIPCommand(iscpCommand: string): boolean {
-    if (!iscpCommand.startsWith("TIP")) {
+  // Drop a command when the transport is still pacing a previous send. This is
+  // used for repeat-style commands such as volume up/down, where queuing stale
+  // requests would continue changing the AVR after the button is released.
+  async rawIfAvailable(data: string): Promise<boolean> {
+    if (!data) {
+      throw new Error("No data provided");
+    }
+    const sendDelay = this.config.sendDelay ?? DEFAULT_QUEUE_THRESHOLD;
+    const elapsed = Date.now() - this.lastSendTime;
+    const reason =
+      !this.isConnected || !this.eiscp
+        ? "not connected"
+        : this.pendingSendCount > 0
+          ? `transport busy (${this.pendingSendCount} pending)`
+          : elapsed < sendDelay
+            ? `send pacing (${elapsed}ms/${sendDelay}ms)`
+            : undefined;
+    if (reason) {
+      log.debug("%s Dropping paced raw command %s: %s", logSource, data, reason);
       return false;
     }
-    const presetHex = iscpCommand.slice(3);
-    return presetHex.length > 0 && /^[0-9A-Fa-f]+$/.test(presetHex);
-  }
-
-  /** Fast NSS extractor supporting both direct NSSxx and embedded command forms */
-  private extractNSSCode(iscpCommand: string): string | undefined {
-    const nssIndex = iscpCommand.indexOf("NSS");
-    if (nssIndex === -1 || nssIndex + 5 > iscpCommand.length) {
-      return undefined;
-    }
-
-    const d1 = iscpCommand.charCodeAt(nssIndex + 3);
-    const d2 = iscpCommand.charCodeAt(nssIndex + 4);
-    const isDigit1 = d1 >= 48 && d1 <= 57;
-    const isDigit2 = d2 >= 48 && d2 <= 57;
-    if (!isDigit1 || !isDigit2) {
-      return undefined;
-    }
-
-    return iscpCommand.slice(nssIndex, nssIndex + 5);
-  }
-
-  private async handleNSSsend(nssCode: string, zone: string): Promise<void> {
-    const menuDelay = this.config.netMenuDelay ?? 2500;
-    const sliPrefix = getZonePrefix("SLI", zone);
-    const netCommand = `${sliPrefix}2B`; // 2B = NET input
-    const queryCommand = `${sliPrefix}QSTN`;
-    const newSubsource = String(nssCode.slice(-2)).padStart(5, "0");
-    const physicalAvrId = this.config.model && this.config.host ? buildPhysicalAvrId(this.config.model, this.config.host) : "";
-    const directService = physicalAvrId ? findNetServiceByName(physicalAvrId, NSS_SERVICE_NAMES[nssCode] ?? []) : undefined;
-
-    log.debug("%s Sending %s (NET input for zone %s) before %s", integrationName, netCommand, zone, nssCode);
-    await this.raw(netCommand); // Select NET input first
-    await delay(menuDelay); // Wait for AVR to switch/acknowledge NET input
-
-    if (directService) {
-      const serviceCommand = `NSV${directService.id.toUpperCase()}0`;
-      log.debug("%s Selecting reported network service %s (%s) directly: %s", integrationName, directService.name, directService.id, serviceCommand);
-      await this.raw(serviceCommand);
-      await delay(menuDelay);
-      await this.raw(queryCommand);
-      return;
-    }
-
-    // NTCTOP exits any active sub-service (e.g. Spotify) and returns to the NET root menu. Without this, if the AVR was already on NET/Spotify, SLI2B is a no-op and NLSI would select from Spotify's menu instead of the NET top-level service list.
-    await this.raw("NTCTOP");
-    await delay(menuDelay); // Wait for AVR to fully load NET menu
-
-    log.debug("%s Sending network service command: %s", integrationName, nssCode);
-    await this.raw(`NLSI${newSubsource}`);
-    await delay(menuDelay);
-    await this.raw(queryCommand); // Query input-selector to ensure source state updates
-  }
-
-  private async handleNSVsend(serviceId: string, zone: string): Promise<void> {
-    const menuDelay = this.config.netMenuDelay ?? 2500;
-    const sliPrefix = getZonePrefix("SLI", zone);
-    const netCommand = `${sliPrefix}2B`;
-    const queryCommand = `${sliPrefix}QSTN`;
-
-    log.debug("%s Sending %s (NET input for zone %s) before NSV%s", integrationName, netCommand, zone, serviceId);
-    await this.raw(netCommand);
-    await delay(menuDelay);
-    await this.raw(`NSV${serviceId.toUpperCase()}0`);
-    await delay(menuDelay);
-    await this.raw(queryCommand);
+    log.debug("%s Accepting paced raw command %s", logSource, data);
+    await this.enqueueSend(data);
+    return true;
   }
 
   private async sendIscp(iscpCommand: string, zone: string = "main"): Promise<void> {
@@ -535,23 +491,20 @@ export class EiscpDriver extends EventEmitter {
     }
 
     // Handle TuneIn preset navigation.
-    if (this.isTIPCommand(iscpCommand)) {
-      return this.handleTIPsend(iscpCommand);
-    }
-
-    // Handle network service selection (NSSxx), including embedded forms like "SLINSS01".
-    const nssCode = this.extractNSSCode(iscpCommand);
-    if (nssCode) {
-      return this.handleNSSsend(nssCode, zone);
-    }
-
-    const nsvMatch = iscpCommand.match(/^NSV([0-9A-Fa-f]{2})0$/);
-    if (nsvMatch) {
-      return this.handleNSVsend(nsvMatch[1], zone);
-    }
+    await this.commandWorkflow.send(iscpCommand, zone);
   }
 
-  /** Send a command to the AVR */
+  // Backward-compatible accessors retained for integrations and diagnostics that used these
+  // classifiers. The implementation is shared with EiscpCommandWorkflow.
+  isTIPCommand(iscpCommand: string): boolean {
+    return isTuneInPresetCommand(iscpCommand);
+  }
+
+  extractNSSCode(iscpCommand: string): string | undefined {
+    return extractNetworkServiceCode(iscpCommand);
+  }
+
+  // Send a command to the AVR
   async command(data: string | CommandInput): Promise<void> {
     let command: string, args: string | number, zone: string;
 
@@ -601,7 +554,7 @@ export class EiscpDriver extends EventEmitter {
       .filter((item) => item !== "");
 
     if (parts.length !== 2) {
-      log.warn("%s Invalid multi-zone-%s command format: %s", integrationName, commandType, data);
+      log.warn("%s Invalid multi-zone-%s command format: %s", logSource, commandType, data);
       return;
     }
 
@@ -610,46 +563,77 @@ export class EiscpDriver extends EventEmitter {
     const commands = commandType === "volume" ? buildMultiZoneVolumeCommands(action, configuredZones) : buildMultiZoneMuteCommands(action, configuredZones);
 
     if (commands.length === 0) {
-      log.warn("%s No zones configured for multi-zone-%s action: %s (configured zones: %s)", integrationName, commandType, action, configuredZones.join(", "));
+      log.warn("%s No zones configured for multi-zone-%s action: %s (configured zones: %s)", logSource, commandType, action, configuredZones.join(", "));
       return;
     }
 
-    log.info("%s Multi-zone %s command: %s -> sending %d zone commands (configured zones: %s)", integrationName, commandType, data, commands.length, configuredZones.join(", "));
+    log.info("%s Multi-zone %s command: %s -> sending %d zone commands (configured zones: %s)", logSource, commandType, data, commands.length, configuredZones.join(", "));
     this.enqueueSend(commands);
   }
 
   private commandToIscp(command: string, args: string | number | undefined, zone: string): string {
     const prefix = (COMMAND_MAPPINGS as Record<string, string>)[command];
     let value: string;
+    if (prefix === "SLI" && typeof args === "string" && stripInputSourceMarker(args).toLowerCase() === "music-server") {
+      return "NSV000";
+    }
+    if (prefix === "SLI" && typeof args === "string" && stripInputSourceMarker(args).toLowerCase() === "tidal") {
+      return "NSV1B0";
+    }
+    if (prefix === "SLI" && typeof args === "string" && stripInputSourceMarker(args).toLowerCase() === "deezer") {
+      return "NSV120";
+    }
     const valueMap = (VALUE_MAPPINGS as unknown as Record<string, Record<string, { value: string }>>)[prefix];
-    if (args !== undefined && valueMap && Object.prototype.hasOwnProperty.call(valueMap, args)) {
-      value = valueMap[String(args)].value;
+    const mappedKey =
+      args !== undefined && valueMap
+        ? Object.keys(valueMap).find(
+            (key) =>
+              key.toLowerCase() === String(args).toLowerCase() ||
+              key.toLowerCase().replace(/[\s_-]+/g, "") ===
+                String(args)
+                  .toLowerCase()
+                  .replace(/[\s_-]+/g, "")
+          )
+        : undefined;
+    if (args !== undefined && valueMap && mappedKey !== undefined) {
+      value = valueMap[mappedKey].value;
     } else if (prefix === "SLI" && typeof args === "string") {
+      args = stripInputSourceMarker(args);
       const physicalAvrId = buildPhysicalAvrId(this.config.model ?? "", this.config.host ?? "");
       const reportedService = findNetServiceByName(physicalAvrId, [args]);
       if (reportedService) {
         const logicalService = Object.entries(NSS_SERVICE_NAMES).find(([, names]) => names.includes(reportedService.name.toLowerCase().replace(/[^a-z0-9]/g, "")));
         if (logicalService) {
-          log.debug("%s Sending reported network service %s through %s", integrationName, args, logicalService[0]);
+          log.debug("%s Sending reported network service %s through %s", logSource, args, logicalService[0]);
           return logicalService[0];
         }
-        log.debug("%s Sending reported network service %s directly through NSV%s", integrationName, args, reportedService.id);
+        log.debug("%s Sending reported network service %s directly through NSV%s", logSource, args, reportedService.id);
         return `NSV${reportedService.id.toUpperCase()}0`;
       }
 
-      // An input name the AVR reported itself ("BD/DVD", "CBL/SAT") is not in the hardcoded SLI
-      // table: send the input id the AVR gave for it instead.
-      const inputId = findAvrInputId(buildPhysicalAvrId(this.config.model ?? "", this.config.host ?? ""), args);
+      // An input name the AVR reported itself ("BD/DVD", "CBL/SAT") is not in the hardcoded SLI table: send the input id the AVR gave for it instead.
+      const inputId = findAvrInputId(physicalAvrId, args) ?? findConfiguredInputId(this.config.idInputSources, args);
       if (inputId) {
-        log.debug("%s Sending input-selector %s as %s%s (id reported by the AVR)", integrationName, args, getZonePrefix(prefix, zone), inputId);
+        log.debug("%s Sending input-selector %s as %s%s (id reported by the AVR)", logSource, args, getZonePrefix(prefix, zone), inputId);
         return getZonePrefix(prefix, zone) + inputId;
       }
-      log.error("%s Input source alias is not mapped: %s %s", integrationName, command, args);
+      log.error("%s Input source alias is not mapped: %s %s", logSource, command, args);
       value = String(args ?? "");
+    } else if (prefix === "LMD" && typeof args === "string") {
+      const physicalAvrId = buildPhysicalAvrId(this.config.model ?? "", this.config.host ?? "");
+      const entityId = buildEntityId(this.config.model ?? "", this.config.host ?? "", zone);
+      const learnedCode = findLearnedListeningModeCode(physicalAvrId, args, this.stateReader.getSource(entityId), this.stateReader.getAudioFormat?.(entityId));
+      if (learnedCode) {
+        log.debug("%s Sending learned listening mode %s as LMD%s", logSource, args, learnedCode);
+        value = learnedCode;
+      } else {
+        log.warn("%s Listening mode is not mapped: %s", logSource, args);
+        value = String(args);
+      }
     } else if (valueMap && Object.prototype.hasOwnProperty.call(valueMap, "intgrRange")) {
       value = (+args!).toString(16).toUpperCase().padStart(2, "0");
     } else {
-      log.warn("%s not found in JSON: %s %s", integrationName, command, args);
+      log.warn("%s not found in JSON: %s %s", logSource, command, args);
       value = String(args ?? "");
     }
 
@@ -659,13 +643,13 @@ export class EiscpDriver extends EventEmitter {
     return zonePrefix + value;
   }
 
-  /** Get all available commands */
+  // Get all available commands
   getCommands(): string[] {
     const mappings = COMMAND_MAPPINGS as Record<string, string>;
     return Object.keys(mappings);
   }
 
-  /** Get all available values for a command */
+  // Get all available values for a command
   getCommandValues(command: string): string[] {
     const parts = command.split(".");
     const cmd = parts.length === 2 ? parts[1] : parts[0];
