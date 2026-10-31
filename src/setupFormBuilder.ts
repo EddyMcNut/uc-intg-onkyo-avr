@@ -434,6 +434,23 @@ export class SetupFormBuilder {
     ]);
   }
 
+  buildAvrSelectionForm(target: "inputSources" | "listeningModes", avrs: Array<{ id: string; label: string }>): uc.RequestUserInput {
+    const label = target === "inputSources" ? "input sources" : "listening modes";
+    return new uc.RequestUserInput(`Select AVR for ${label}`, [
+      {
+        id: "selectedAvr",
+        label: { en: "AVR" },
+        field: {
+          dropdown: {
+            value: avrs[0]?.id ?? "",
+            items: avrs.map((avr) => ({ id: avr.id, label: { en: avr.label } }))
+          }
+        },
+        description: { en: `Choose which AVR's ${label} should be configured. The setting applies to all zones of that AVR.` }
+      }
+    ]);
+  }
+
   buildInitialSetupForm(): uc.RequestUserInput {
     return new uc.RequestUserInput("Initial setup", [
       {

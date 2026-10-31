@@ -54,6 +54,36 @@ it("handleRestorePayload: applies valid payload and calls onConfigSaved", async 
   }
 });
 
+it("offers physical AVR selection for listening-mode reconfiguration and loads the selected AVR", async () => {
+  const tmp = mkTmpDir();
+  try {
+    const configModule = await import("../src/configManager.js");
+    const SetupHandlerModule = await import("../src/setupHandler.js");
+    configModule.setConfigDir(tmp);
+    configModule.ConfigManager.save({
+      avrs: [
+        { model: "TX-RZ50", ip: "192.168.1.20", port: 60128, zone: "main", listeningModes: { "01": { name: "A", setting: "dont-include" } } },
+        { model: "TX-RZ50", ip: "192.168.1.20", port: 60128, zone: "zone2", listeningModes: { "01": { name: "A", setting: "dont-include" } } },
+        { model: "TX-NR7100", ip: "192.168.1.21", port: 60128, zone: "main", listeningModes: { "01": { name: "B", setting: "discover" } } }
+      ]
+    });
+    const host: any = { driver: {}, getConfigDirPath: () => tmp, onConfigSaved: async () => {}, onConfigCleared: async () => {}, log: console };
+    const setup = new SetupHandlerModule.default(host);
+
+    const selection = await (setup as any).requestListeningModeConfiguration();
+    expect(selection.title).toContain("Select AVR");
+    const selected = (selection.settings as any[]).find((item) => item.id === "selectedAvr");
+    expect(selected.field.dropdown.items).toHaveLength(2);
+
+    const result = await (setup as any).handleUserDataResponse({ inputValues: { selectedAvr: "TX-NR7100 192.168.1.21" } });
+    expect(result.title).toContain("Listening Modes");
+    expect((setup as any).pendingManualConfig.model).toBe("TX-NR7100");
+    expect((setup as any).pendingManualConfig.ipAddress).toBe("192.168.1.21");
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
 it("handleRestorePayload: preserves AVR-reported input mode", async () => {
   const tmp = mkTmpDir();
   try {

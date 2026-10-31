@@ -34,6 +34,8 @@ export default class SetupHandler {
   private listeningModePageCount = 0;
   private inputSourcesOnlyConfiguration = false;
   private integrationOnlyConfiguration = false;
+  private initialConfiguration = false;
+  private selectedPhysicalAvr: string | undefined;
 
   constructor(host: SetupHost) {
     this.host = host;
@@ -92,6 +94,7 @@ export default class SetupHandler {
   }
 
   private async handleDriverSetupInitial(): Promise<uc.SetupAction | undefined> {
+    this.initialConfiguration = true;
     return this.formBuilder.buildInitialSetupForm();
   }
 
@@ -102,6 +105,17 @@ export default class SetupHandler {
     const hasRestoreData = typeof input.restore_data === "string" && input.restore_data.trim();
     const restoreData = hasRestoreData ? input.restore_data : input.backup_data;
     const restoreRequested = action === "restore" || restoreModeSelected || !!hasRestoreData;
+
+    if (this.setupPage.kind === "selectAvr") {
+      const selected = typeof input.selectedAvr === "string" ? input.selectedAvr : "";
+      const configured = new Set((ConfigManager.get().avrs ?? []).map((avr) => `${avr.model} ${avr.ip}`));
+      if (configured.has(selected)) {
+        this.selectedPhysicalAvr = selected;
+        if (this.setupPage.target === "listeningModes") return this.startListeningModeConfiguration(selected);
+        return this.startInputSourceConfiguration(selected);
+      }
+      return this.formBuilder.buildAvrSelectionForm(this.setupPage.target, this.getPhysicalAvrChoices());
+    }
 
     if (restoreRequested) {
       if (!restoreData) {
@@ -139,7 +153,7 @@ export default class SetupHandler {
       }
 
       if (this.setupPage.kind === "manual" && this.setupPage.page === 3) {
-        if (this.integrationOnlyConfiguration) {
+        if (this.integrationOnlyConfiguration || this.initialConfiguration) {
           return this.completePendingConfiguration("integration-only");
         }
         this.inputSourcePageCount = this.formBuilder.getInputSourcePageCount(parsed);
@@ -252,6 +266,7 @@ export default class SetupHandler {
     this.setupPage = IDLE_SETUP_PAGE;
     this.integrationOnlyConfiguration = false;
     this.inputSourcesOnlyConfiguration = false;
+    this.initialConfiguration = false;
     const completeConfig = this.pendingManualConfig;
     this.pendingManualConfig = {};
     try {
@@ -262,13 +277,18 @@ export default class SetupHandler {
     }
   }
 
-  private requestManualConfiguration(): uc.RequestUserInput {
+  private requestManualConfiguration(physicalAvrId?: string): uc.RequestUserInput {
     this.setupPage = { kind: "manual", page: 1 };
     this.inputSourcesOnlyConfiguration = false;
     this.integrationOnlyConfiguration = false;
     this.pendingManualConfig = {};
     const cfg = ConfigManager.load();
-    const currentAvr = cfg.avrs && cfg.avrs.length > 0 ? cfg.avrs[0] : undefined;
+    const currentAvr = physicalAvrId
+      ? cfg.avrs?.find((avr) => `${avr.model} ${avr.ip}` === physicalAvrId)
+      : cfg.avrs && cfg.avrs.length > 0
+        ? cfg.avrs[0]
+        : undefined;
+    this.selectedPhysicalAvr = currentAvr ? `${currentAvr.model} ${currentAvr.ip}` : physicalAvrId;
     const parsedConfig = this.configParser.parse(
       {
         model: currentAvr?.model ?? "",
@@ -340,9 +360,18 @@ export default class SetupHandler {
   }
 
   private requestListeningModeConfiguration(): uc.RequestUserInput {
+    const avrs = this.getPhysicalAvrChoices();
+    if (avrs.length > 1) {
+      this.setupPage = { kind: "selectAvr", target: "listeningModes" };
+      return this.formBuilder.buildAvrSelectionForm("listeningModes", avrs);
+    }
+    return this.startListeningModeConfiguration(avrs[0]?.id);
+  }
+
+  private startListeningModeConfiguration(physicalAvrId?: string): uc.RequestUserInput {
     // Reuse the normal loader to populate pendingManualConfig with every existing setting, then
     // start directly at the first listening-mode page so other configuration is preserved.
-    this.requestManualConfiguration();
+    this.requestManualConfiguration(physicalAvrId);
     const parsed = this.configParser.parse(this.pendingManualConfig, ConfigManager.get().logLevel ?? "warn");
     // Page 4 is the first listening-mode page; mark it as already displayed so the next
     // response advances to page 5 instead of showing page 4 again.
@@ -355,7 +384,16 @@ export default class SetupHandler {
   }
 
   private async requestInputSourceConfiguration(): Promise<uc.RequestUserInput> {
-    this.requestManualConfiguration();
+    const avrs = this.getPhysicalAvrChoices();
+    if (avrs.length > 1) {
+      this.setupPage = { kind: "selectAvr", target: "inputSources" };
+      return this.formBuilder.buildAvrSelectionForm("inputSources", avrs);
+    }
+    return this.startInputSourceConfiguration(avrs[0]?.id);
+  }
+
+  private async startInputSourceConfiguration(physicalAvrId?: string): Promise<uc.RequestUserInput> {
+    this.requestManualConfiguration(physicalAvrId);
     const discovery = this.host.queryInputSources
       ? await this.host.queryInputSources({
           model: String(this.pendingManualConfig.model ?? ""),
@@ -373,6 +411,15 @@ export default class SetupHandler {
     return this.formBuilder.buildInputSourcePage(parsed, 1, this.inputSourcePageCount);
   }
 
+  private getPhysicalAvrChoices(): Array<{ id: string; label: string }> {
+    const choices = new Map<string, { id: string; label: string }>();
+    for (const avr of ConfigManager.get().avrs ?? []) {
+      const id = `${avr.model} ${avr.ip}`;
+      if (!choices.has(id)) choices.set(id, { id, label: `${avr.model} — ${avr.ip}` });
+    }
+    return [...choices.values()];
+  }
+
   private applyInputSourceDiscovery(config: ManualConfigInput, inputs: AvrInput[], available: boolean): ManualConfigInput {
     if (!available || inputs.length === 0) return { ...config, inputSources: inputs, inputSourceDiscoveryAvailable: available };
     const reportedIds = new Set(inputs.map((input) => input.id.toUpperCase()));
@@ -380,7 +427,7 @@ export default class SetupHandler {
     for (const id of reportedIds) {
       const entry = idInputSources[id];
       if (entry?.setting === DISCOVER_INPUT_SOURCE) {
-          idInputSources[id] = { ...entry, setting: DETECTED_INPUT_SOURCE };
+        idInputSources[id] = { ...entry, setting: DETECTED_INPUT_SOURCE };
       }
     }
     return { ...config, idInputSources, inputSources: inputs, inputSourceDiscoveryAvailable: available };

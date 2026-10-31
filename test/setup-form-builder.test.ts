@@ -57,4 +57,16 @@ describe("SetupFormBuilder", () => {
     expect((firstInputPage.settings as any[]).find((setting) => setting.id.startsWith("ids_"))?.field.dropdown.value).toBe("detected");
     expect((builder.buildInputSourcePage(reportedValues, 3, 3).settings as unknown[]).length).toBe(6);
   });
+
+  it("builds a physical AVR selector with one option per AVR, not per zone", () => {
+    const builder = new SetupFormBuilder();
+    const form = builder.buildAvrSelectionForm("listeningModes", [
+      { id: "TX-RZ50 192.168.1.2", label: "TX-RZ50 — 192.168.1.2" },
+      { id: "TX-NR7100 192.168.1.3", label: "TX-NR7100 — 192.168.1.3" }
+    ]);
+    const setting = (form.settings as any[]).find((item) => item.id === "selectedAvr");
+    expect(setting.field.dropdown.items).toHaveLength(2);
+    expect(setting.field.dropdown.items[1].id).toBe("TX-NR7100 192.168.1.3");
+    expect(form.title).toContain("listening modes");
+  });
 });
