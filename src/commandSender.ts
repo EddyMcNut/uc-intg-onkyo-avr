@@ -259,6 +259,7 @@ export class CommandSender {
           mediaId: typeof params?.media_id === "string" ? params.media_id : undefined,
           mediaType: typeof params?.media_type === "string" ? params.media_type : undefined,
           netMenuDelay: targetAvr.netMenuDelay,
+          networkNavigationMode: targetAvr.networkNavigationMode,
           setZonePrefix: sz
         });
         return status;

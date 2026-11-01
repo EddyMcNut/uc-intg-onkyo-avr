@@ -1,7 +1,7 @@
 // Focused responsibility: Parse and validate manual configuration input
 import { LogLevel, AVR_DEFAULTS, parseBoolean, parseVolumeScale, type VolumeScale } from "./configManager.js";
 import type { AvrInput } from "./inputSourceStore.js";
-import { NETWORK_INPUT_MARKERS, type InputSourceLayout, type InputSourceSettings, type NetworkInputMarker } from "./configConstants.js";
+import { NETWORK_INPUT_MARKERS, type InputSourceLayout, type InputSourceSettings, type NetworkInputMarker, type NetworkNavigationMode } from "./configConstants.js";
 
 export interface ManualConfigInput {
   model?: unknown;
@@ -29,6 +29,7 @@ export interface ManualConfigInput {
   tuneinMenuStyle?: unknown;
   inputSourceLayout?: unknown;
   networkInputMarker?: unknown;
+  networkNavigationMode?: unknown;
   entityNameStyle?: unknown;
   logLevel?: unknown;
 }
@@ -60,6 +61,7 @@ export interface ParsedManualConfig {
   tuneinMenuStyleValue: "mypresets" | "full";
   inputSourceLayoutValue: InputSourceLayout;
   networkInputMarkerValue: NetworkInputMarker;
+  networkNavigationModeValue: NetworkNavigationMode;
   logLevelValue: LogLevel;
   errorMessage?: string;
 }
@@ -93,6 +95,7 @@ export class ManualConfigParser {
       tuneinMenuStyleValue: this.parseTuneInMenuStyle(input.tuneinMenuStyle),
       inputSourceLayoutValue: this.parseInputSourceLayout(input.inputSourceLayout),
       networkInputMarkerValue: this.parseNetworkInputMarker(input.networkInputMarker),
+      networkNavigationModeValue: this.parseNetworkNavigationMode(input.networkNavigationMode),
       logLevelValue: this.parseLogLevel(input.logLevel, fallbackLogLevel),
       zoneCountValue: this.parseZoneCount(input.zoneCount)
     };
@@ -182,6 +185,10 @@ export class ManualConfigParser {
 
   private parseNetworkInputMarker(marker: unknown): NetworkInputMarker {
     return NETWORK_INPUT_MARKERS.includes(marker as NetworkInputMarker) ? (marker as NetworkInputMarker) : "none";
+  }
+
+  private parseNetworkNavigationMode(mode: unknown): NetworkNavigationMode {
+    return String(mode ?? AVR_DEFAULTS.networkNavigationMode).toLowerCase() === "legacy" ? "legacy" : "modern";
   }
 
   private parseLogLevel(level: unknown, fallback: LogLevel): LogLevel {

@@ -194,6 +194,7 @@ export const AVR_DEFAULTS = {
   tuneinMenuStyle: "mypresets",
   inputSourceLayout: "combined",
   networkInputMarker: "none",
+  networkNavigationMode: "modern",
   port: 60128
 } as const;
 
@@ -204,6 +205,8 @@ export type TuneInMenuStyle = "mypresets" | "full";
 export type InputSourceLayout = "combined" | "network-first" | "network-last" | "separate";
 export type NetworkInputMarker = "none" | "🌐" | "📡" | "🔗" | "☁️" | "🛜" | "🎵" | "▶️";
 export const NETWORK_INPUT_MARKERS: readonly NetworkInputMarker[] = ["none", "🌐", "📡", "🔗", "☁️", "🛜", "🎵", "▶️"];
+export type NetworkNavigationMode = "modern" | "legacy";
+export const NETWORK_NAVIGATION_MODES: readonly NetworkNavigationMode[] = ["modern", "legacy"];
 export type LogLevel = "debug" | "info" | "warn" | "error";
 
 export interface AvrConfig {
@@ -228,6 +231,7 @@ export interface AvrConfig {
   tuneinMenuStyle?: TuneInMenuStyle; // choose TuneIn navigation mode: mypresets or full
   inputSourceLayout?: InputSourceLayout;
   networkInputMarker?: NetworkInputMarker;
+  networkNavigationMode?: NetworkNavigationMode;
   // undefined = all options, non-empty = exact options, null = don't create entity. Empty input is normalized to "all".
   listeningModes?: Record<string, ListeningModeEntry>;
   idInputSources?: InputSourceSettings;
@@ -276,6 +280,7 @@ export interface NormalizedAvrConfig {
   tuneinMenuStyle: TuneInMenuStyle;
   inputSourceLayout: InputSourceLayout;
   networkInputMarker: NetworkInputMarker;
+  networkNavigationMode: NetworkNavigationMode;
   listeningModes: Record<string, ListeningModeEntry>;
   idInputSources: InputSourceSettings;
 }
@@ -325,6 +330,7 @@ export function normalizeAvrConfig(raw: AvrConfig): NormalizedAvrConfig {
   const inputSourceLayout: InputSourceLayout =
     rawInputSourceLayout === "network-first" ? "network-first" : rawInputSourceLayout === "network-last" || rawInputSourceLayout === "separate" ? "network-last" : "combined";
   const networkInputMarker: NetworkInputMarker = NETWORK_INPUT_MARKERS.includes(raw.networkInputMarker as NetworkInputMarker) ? (raw.networkInputMarker as NetworkInputMarker) : "none";
+  const networkNavigationMode: NetworkNavigationMode = String(raw.networkNavigationMode ?? AVR_DEFAULTS.networkNavigationMode).toLowerCase() === "legacy" ? "legacy" : "modern";
 
   const port = (() => {
     const p = typeof raw.port === "number" ? raw.port : parseInt(String(raw.port ?? ""), 10);
@@ -353,6 +359,7 @@ export function normalizeAvrConfig(raw: AvrConfig): NormalizedAvrConfig {
     tuneinMenuStyle,
     inputSourceLayout,
     networkInputMarker,
+    networkNavigationMode,
     listeningModes:
       raw.listeningModes && typeof raw.listeningModes === "object" && !Array.isArray(raw.listeningModes) ? { ...(raw.listeningModes as Record<string, { name: string; setting: string }>) } : {},
     idInputSources: normalizeInputSourceSettings(raw.idInputSources)

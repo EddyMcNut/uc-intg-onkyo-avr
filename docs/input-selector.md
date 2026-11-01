@@ -25,8 +25,16 @@ As from v0.7.3 you can select the 'sub-sources'of `NET` directly, let's say you 
 
 ![](/screenshots/net-subsource-delay.png)
 
-For the following sources, the integration will first send the `input-selector net` command automatically _before_ sending the second command for switching to the sub-source:
+### Network service navigation
 
+The setup option **Network service navigation** controls how TuneIn, Music Server and other NET services are selected and browsed:
+
+- **Modern (default)** more reliable
+- **Legacy** can be required by older AVRs
+
+The setting is stored per physical device and is included in configuration backups.
+
+For the following sources, the integration will first send the `input-selector net` command automatically _before_ sending the second command for switching to the sub-source:
 - TuneIn
 - Spotify
 - Deezer

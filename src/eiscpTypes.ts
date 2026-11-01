@@ -11,4 +11,5 @@ export interface EiscpConfig {
   tuneinPresetPosition?: number;
   configuredZones?: string[];
   idInputSources?: import("./configConstants.js").InputSourceSettings;
+  networkNavigationMode?: import("./configConstants.js").NetworkNavigationMode;
 }
