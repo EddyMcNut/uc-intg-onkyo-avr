@@ -1123,6 +1123,50 @@ it("CommandSender play_media routes TuneIn main menu through NSV0E0", async () =
   expect(rawCalls).toEqual(["NSV0E0", "NTCTOP", "NTCSELECT"]);
 });
 
+it("CommandSender legacy TuneIn root relies on source selection without entering My Presets", async () => {
+  const senderModule = await import("../src/commandSender.js");
+  const avrStateModule = await import("../src/avrState.js");
+
+  const CommandSender = senderModule.CommandSender as any;
+  const { avrStateManager } = avrStateModule as any;
+  const commandCalls: string[] = [];
+  const rawCalls: string[] = [];
+
+  class MockEiscp {
+    public connected = true;
+    public eiscpConfig = { networkNavigationMode: "legacy" };
+    async connect() {}
+    async waitForConnect() {}
+    async command(cmd: string) {
+      commandCalls.push(cmd);
+    }
+    async raw(cmd: string) {
+      rawCalls.push(cmd);
+    }
+  }
+
+  const entityId = "M 1.2.3.7 main";
+  const mockDriver = { updateEntityAttributes: () => true } as any;
+  const sender = new CommandSender(
+    mockDriver,
+    { avrs: [{ model: "M", ip: "1.2.3.7", zone: "main", netMenuDelay: 0, networkNavigationMode: "legacy" }] } as any,
+    new MockEiscp(),
+    avrStateManager,
+    {} as any
+  );
+
+  avrStateManager.setSource(entityId, "net");
+  avrStateManager.setSubSource(entityId, "tunein");
+
+  const result = await sender.sharedCmdHandler({ id: entityId } as any, uc.MediaPlayerCommands.PlayMedia, {
+    media_id: "tunein:menu-root"
+  } as any);
+
+  expect(result).toBe(uc.StatusCodes.Ok);
+  expect(commandCalls).toEqual(["input-selector tunein"]);
+  expect(rawCalls).toEqual([]);
+});
+
 it("CommandSender play_media routes Tidal Back option to RETURN", async () => {
   const senderModule = await import("../src/commandSender.js");
   const avrStateModule = await import("../src/avrState.js");

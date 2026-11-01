@@ -12,6 +12,7 @@ import { ZoneAgnosticFrontPanelRouter } from "./zoneAgnosticFrontPanelRouter.js"
 import { TUNEIN_SERVICE_ID } from "./browseServiceContract.js";
 import type { AvrStateApi } from "./types.js";
 import { findTunerPresetByName } from "./tunerPresetStore.js";
+import type { NetworkNavigationMode } from "./configConstants.js";
 
 const logSource = "zoneAgnosticUpdateProcessor:";
 
@@ -39,20 +40,24 @@ export class ZoneAgnosticUpdateProcessor {
       new TuneInZoneAgnosticAdapter({
         state: this.state,
         getPhysicalAvrId: (entityId) => this.getPhysicalAvrId(entityId),
+        getNetworkNavigationMode: (entityId) => this.getNetworkNavigationMode(entityId),
         isTuneInFullMenu: (zoneEntityId) => this.isTuneInFullMenu(zoneEntityId),
         preloadTuneInPresets: (sourceEntityId) => this.preloadTuneInPresets(sourceEntityId)
       }),
       new TidalZoneAgnosticAdapter({
         state: this.state,
-        getPhysicalAvrId: (entityId) => this.getPhysicalAvrId(entityId)
+        getPhysicalAvrId: (entityId) => this.getPhysicalAvrId(entityId),
+        getNetworkNavigationMode: (entityId) => this.getNetworkNavigationMode(entityId)
       }),
       new DeezerZoneAgnosticAdapter({
         state: this.state,
-        getPhysicalAvrId: (entityId) => this.getPhysicalAvrId(entityId)
+        getPhysicalAvrId: (entityId) => this.getPhysicalAvrId(entityId),
+        getNetworkNavigationMode: (entityId) => this.getNetworkNavigationMode(entityId)
       }),
       new MusicServerZoneAgnosticAdapter({
         state: this.state,
-        getPhysicalAvrId: (entityId) => this.getPhysicalAvrId(entityId)
+        getPhysicalAvrId: (entityId) => this.getPhysicalAvrId(entityId),
+        getNetworkNavigationMode: (entityId) => this.getNetworkNavigationMode(entityId)
       })
     ];
     this.serviceCommandRouter = new ZoneAgnosticServiceCommandRouter(this.serviceAdapters);
@@ -138,7 +143,13 @@ export class ZoneAgnosticUpdateProcessor {
   private async isTuneInFullMenu(zoneEntityId: string): Promise<boolean> {
     const cfg = ConfigManager.get();
     const avr = cfg?.avrs?.find((a) => buildEntityId(a.model, a.ip, a.zone) === zoneEntityId);
-    return avr?.tuneinMenuStyle === "full";
+    return String(avr?.tuneinMenuStyle ?? "").toLowerCase() === "full";
+  }
+
+  private getNetworkNavigationMode(zoneEntityId: string): NetworkNavigationMode {
+    const cfg = ConfigManager.get();
+    const avr = cfg?.avrs?.find((a) => buildEntityId(a.model, a.ip, a.zone) === zoneEntityId);
+    return avr?.networkNavigationMode ?? "modern";
   }
 
   private async preloadTuneInPresets(entityId: string): Promise<void> {

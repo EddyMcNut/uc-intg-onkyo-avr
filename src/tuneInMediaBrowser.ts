@@ -3,7 +3,7 @@ import * as uc from "@unfoldedcircle/integration-api";
 import log from "./loggers.js";
 import { looksLikeTuneInDirectory, normalizeTuneInLabel, extractTuneInStationKey, parseTuneInXmlItems } from "./tuneInFilters.js";
 import { addTuneInPreset, getTuneInBrowseState, listTuneInPresets, type TuneInPreset, setTuneInBrowseContextState } from "./tuneInBrowserStore.js";
-import { addTuneInMenuOption, listTuneInMenuOptions, getTuneInMenuBrowseState, type TuneInMenuOption } from "./tuneInMenuStore.js";
+import { addTuneInMenuOption, listTuneInMenuOptions, getTuneInMenuBrowseState, setTuneInMenuBrowseContextState, type TuneInMenuOption } from "./tuneInMenuStore.js";
 import { createServiceThumbnails } from "./serviceThumbnails.js";
 import { parseIndexedMenuEntry, getXmlOffset } from "./menuEntryParser.js";
 
@@ -60,6 +60,7 @@ const TUNEIN_EXCLUDED_MENU_TITLES = new Set(["search", "login", "logout", "log o
 export class TuneInMediaBrowser {
   setBrowseContext(entityId: string, title: string): void {
     setTuneInBrowseContextState(entityId, title);
+    setTuneInMenuBrowseContextState(entityId, title);
   }
 
   ingestListEntry(entityId: string, entry: string): void {
@@ -99,6 +100,12 @@ export class TuneInMediaBrowser {
       return;
     }
 
+    // Selecting TuneIn through the legacy NET menu can emit the intermediate
+    // NET service list before the actual TuneIn menu. Do not let those rows
+    // replace the TuneIn full-menu entries.
+    const netRootEntries = new Set(["tunein", "spotify", "deezer", "tidal", "amazonmusic", "chromecast built-in", "dts play-fi", "airplay", "alexa", "music server", "usb", "play queue"]);
+    if (netRootEntries.has(title.toLowerCase())) return;
+
     const cursorOffset = getTuneInMenuBrowseState(entityId)?.nlsCursorOffset ?? 0;
     const windowStart = Math.max(0, cursorOffset - 9);
     const absoluteMenuIndex = windowStart + parsed.menuIndex + 1;
@@ -113,6 +120,8 @@ export class TuneInMediaBrowser {
       return;
     }
 
+    const state = getTuneInMenuBrowseState(entityId);
+    if (state) state.xmlResponseSequence += 1;
     const xmlOffset = getXmlOffset(xmlPayload);
     const xmlItems = parseTuneInXmlItems(xmlPayload);
     for (let i = 0; i < xmlItems.length; i++) {

@@ -30,7 +30,7 @@ export type MenuBrowseHandlerConfig = {
   afterHarvest?: (entityId: string, rawSend: RawSendFn) => Promise<void>;
   // XML-only services (such as Music Server) must request NLAL before waiting
   // for a list signature; the list does not exist until that request is made.
-  waitForMenuStableBeforeHarvest?: boolean;
+  waitForMenuStableBeforeHarvest?: boolean | ((entityId: string) => boolean);
   // Some XML-only services leave the browse context entirely on Back.
   harvestAfterBack?: boolean;
   isServiceActive?: (entityId: string) => boolean;
@@ -49,7 +49,8 @@ export type MenuBrowseHandlerApi = MenuBrowseHandlerBase & {
 
 export function createMenuBrowseHandler(cfg: MenuBrowseHandlerConfig): MenuBrowseHandlerApi {
   const logSource = cfg.logSource;
-  const waitForMenuStableBeforeHarvest = cfg.waitForMenuStableBeforeHarvest ?? true;
+  const waitForMenuStableBeforeHarvest = (entityId: string): boolean =>
+    typeof cfg.waitForMenuStableBeforeHarvest === "function" ? cfg.waitForMenuStableBeforeHarvest(entityId) : (cfg.waitForMenuStableBeforeHarvest ?? true);
   const harvestAfterBack = cfg.harvestAfterBack ?? true;
 
   class Handler extends MenuBrowseHandlerBase {
@@ -110,7 +111,7 @@ export function createMenuBrowseHandler(cfg: MenuBrowseHandlerConfig): MenuBrows
       const selection = cfg.resolveMenuOption(options.media_id, options.media_type);
 
       const rootRequest = !options.media_id || options.media_id === cfg.rootId;
-      if (rootRequest && !waitForMenuStableBeforeHarvest && rawSend) {
+      if (rootRequest && !waitForMenuStableBeforeHarvest(entityId) && rawSend) {
         const browseState = cfg.getBrowseState(entityId);
         if (!mainMenu && browseState?.browseListFrozen && cmdHandler) {
           const nowPlayingTitle = browseState.nowPlayingTitle;
@@ -179,7 +180,7 @@ export function createMenuBrowseHandler(cfg: MenuBrowseHandlerConfig): MenuBrows
             media_type: cfg.rootType
           });
         }
-        if (waitForMenuStableBeforeHarvest) await this.waitForMenuStable(entityId, beforeSignature, menuDelay);
+        if (waitForMenuStableBeforeHarvest(entityId)) await this.waitForMenuStable(entityId, beforeSignature, menuDelay);
         else await this.waitForListMetadata(entityId, menuDelay);
         if (rawSend) {
           const browseState = cfg.getBrowseState(entityId);
@@ -213,7 +214,7 @@ export function createMenuBrowseHandler(cfg: MenuBrowseHandlerConfig): MenuBrows
         const beforeSignature = this.buildMenuSignature(entityId);
         const menuDelay = this.getMenuDelay(entityId);
 
-        if (waitForMenuStableBeforeHarvest) await this.waitForMenuStable(entityId, beforeSignature, menuDelay);
+        if (waitForMenuStableBeforeHarvest(entityId)) await this.waitForMenuStable(entityId, beforeSignature, menuDelay);
         else await this.waitForListMetadata(entityId, menuDelay);
         if (browseState) browseState.listModeActive = true;
         if (rawSend) {
@@ -251,9 +252,9 @@ export function createMenuBrowseHandler(cfg: MenuBrowseHandlerConfig): MenuBrows
             const beforeSignature = this.buildMenuSignature(entityId);
             const menuDelay = this.getMenuDelay(entityId);
 
-            if (waitForMenuStableBeforeHarvest) await this.waitForMenuStable(entityId, beforeSignature, menuDelay);
+            if (waitForMenuStableBeforeHarvest(entityId)) await this.waitForMenuStable(entityId, beforeSignature, menuDelay);
             else await this.waitForListMetadata(entityId, menuDelay);
-            if (!waitForMenuStableBeforeHarvest && rawSend && browseState && browseState.totalListItemCount === 0 && cfg.listMenuItems(entityId).length === 0) {
+            if (!waitForMenuStableBeforeHarvest(entityId) && rawSend && browseState && browseState.totalListItemCount === 0 && cfg.listMenuItems(entityId).length === 0) {
               // Some AVRs emit NLS/NLT only after NLAI. The app immediately
               // probes the next XML layer in that case.
               const layer = Math.max(1, browseState.nlsLayerNumber + 1)

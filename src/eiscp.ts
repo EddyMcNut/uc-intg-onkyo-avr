@@ -576,14 +576,30 @@ export class EiscpDriver extends EventEmitter {
     const prefix = (COMMAND_MAPPINGS as Record<string, string>)[command];
     let value: string;
     const modernNavigation = this.config.networkNavigationMode !== "legacy";
-    if (modernNavigation && prefix === "SLI" && typeof args === "string" && stripInputSourceMarker(args).toLowerCase() === "music-server") {
-      return "NSV000";
-    }
-    if (modernNavigation && prefix === "SLI" && typeof args === "string" && stripInputSourceMarker(args).toLowerCase() === "tidal") {
-      return "NSV1B0";
-    }
-    if (modernNavigation && prefix === "SLI" && typeof args === "string" && stripInputSourceMarker(args).toLowerCase() === "deezer") {
-      return "NSV120";
+    if (prefix === "SLI" && typeof args === "string") {
+      const normalizedSource = stripInputSourceMarker(args)
+        .toLowerCase()
+        .replace(/[\s_-]+/g, "-");
+      const physicalAvrId = buildPhysicalAvrId(this.config.model ?? "", this.config.host ?? "");
+      const reportedService = findNetServiceByName(physicalAvrId, [args]);
+      if (reportedService) {
+        const logicalService = Object.entries(NSS_SERVICE_NAMES).find(([, names]) => names.includes(reportedService.name.toLowerCase().replace(/[^a-z0-9]/g, "")));
+        if (logicalService) {
+          log.debug("%s Sending reported network service %s through %s", logSource, args, logicalService[0]);
+          return logicalService[0];
+        }
+        log.debug("%s Sending reported network service %s directly through NSV%s", logSource, args, reportedService.id);
+        return `NSV${reportedService.id.toUpperCase()}0`;
+      }
+
+      // Music Server has both the legacy SLI27 alias and the network-service
+      // NSS10 alias. Display names such as "Music Server" must resolve to the
+      // latter; otherwise separator-insensitive matching picks SLI27 first.
+      if (normalizedSource === "music-server") {
+        return modernNavigation ? "NSV000" : "NSS10";
+      }
+      if (modernNavigation && normalizedSource === "tidal") return "NSV1B0";
+      if (modernNavigation && normalizedSource === "deezer") return "NSV120";
     }
     const valueMap = (VALUE_MAPPINGS as unknown as Record<string, Record<string, { value: string }>>)[prefix];
     const mappedKey =
@@ -602,17 +618,6 @@ export class EiscpDriver extends EventEmitter {
     } else if (prefix === "SLI" && typeof args === "string") {
       args = stripInputSourceMarker(args);
       const physicalAvrId = buildPhysicalAvrId(this.config.model ?? "", this.config.host ?? "");
-      const reportedService = findNetServiceByName(physicalAvrId, [args]);
-      if (reportedService) {
-        const logicalService = Object.entries(NSS_SERVICE_NAMES).find(([, names]) => names.includes(reportedService.name.toLowerCase().replace(/[^a-z0-9]/g, "")));
-        if (logicalService) {
-          log.debug("%s Sending reported network service %s through %s", logSource, args, logicalService[0]);
-          return logicalService[0];
-        }
-        log.debug("%s Sending reported network service %s directly through NSV%s", logSource, args, reportedService.id);
-        return `NSV${reportedService.id.toUpperCase()}0`;
-      }
-
       // An input name the AVR reported itself ("BD/DVD", "CBL/SAT") is not in the hardcoded SLI table: send the input id the AVR gave for it instead.
       const inputId = findAvrInputId(physicalAvrId, args) ?? findConfiguredInputId(this.config.idInputSources, args);
       if (inputId) {

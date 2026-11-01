@@ -25,7 +25,7 @@ import {
 import { consumeTidalListModeActive, consumeTraceNextTidalSelectionAfterMainMenu, getTidalBrowseState, listTidalMenuOptions } from "./tidalBrowserStore.js";
 import { consumeDeezerListModeActive, consumeTraceNextDeezerSelectionAfterMainMenu, getDeezerBrowseState, listDeezerMenuOptions } from "./deezerBrowserStore.js";
 import { consumeMusicServerListModeActive, consumeTraceNextMusicServerSelectionAfterMainMenu, getMusicServerBrowseState, listMusicServerMenuOptions } from "./musicServerBrowserStore.js";
-import { consumeTuneInListModeActive, getTuneInMenuBrowseState, setTuneInMenuBrowseFrozen, setTuneInMenuNowPlayingStation } from "./tuneInMenuStore.js";
+import { consumeTuneInListModeActive, getTuneInMenuBrowseState, resetTuneInMenuBrowseState, setTuneInMenuBrowseFrozen, setTuneInMenuNowPlayingStation } from "./tuneInMenuStore.js";
 import { getTuneInBrowseState } from "./tuneInBrowserStore.js";
 import { AVR_DEFAULTS, ConfigManager, DEFAULT_QUEUE_THRESHOLD, buildEntityId } from "./configManager.js";
 import {
@@ -233,9 +233,16 @@ export class PlayMediaCommandHandler {
 
     if (tuneInRootRequest) {
       await this.selectBrowseService(entityId, TUNEIN_SERVICE_ID, setZonePrefix, netMenuDelay, { force: true, delayAfterSelect: true });
-      await this.eiscp.raw("NTCTOP");
-      await delay(netMenuDelay);
-      await this.eiscp.raw("NTCSELECT");
+      // The legacy NSS workflow already enters TuneIn's root (v0.8.10).
+      // Only the modern direct-service path needs these additional steps.
+      if (modern) {
+        await this.eiscp.raw("NTCTOP");
+        await delay(netMenuDelay);
+        // NTCTOP reports the NET list. Wait for fresh TuneIn metadata after
+        // SELECT instead of harvesting with that intermediate count/layer.
+        resetTuneInMenuBrowseState(entityId);
+        await this.eiscp.raw("NTCSELECT");
+      }
       return uc.StatusCodes.Ok;
     }
 
@@ -254,20 +261,28 @@ export class PlayMediaCommandHandler {
           }
         }
       } else {
+        if (!modern) {
+          // Resolve the selected row before clearing the old list: arbitrary
+          // folders such as country names cannot be classified by name alone.
+          resetTuneInMenuBrowseState(entityId);
+          const state = getTuneInMenuBrowseState(entityId);
+          if (state) state.showMainMenuShortcut = true;
+        }
         setTuneInMenuBrowseFrozen(entityId, false);
       }
 
-      if (tuneInMenuOption.title.trim().toLowerCase() === "my presets") {
+      if (!modern) {
+        log.info("%s [%s] legacy TuneIn selection '%s': NLSI%s", logSource, entityId, tuneInMenuOption.title, String(tuneInMenuOption.menuIndex).padStart(5, "0"));
+        await this.eiscp.raw(`NLSI${String(tuneInMenuOption.menuIndex).padStart(5, "0")}`);
+      } else if (tuneInMenuOption.title.trim().toLowerCase() === "my presets") {
         await this.eiscp.raw(`NLSI${String(getTuneInPresetPosition(entityId)).padStart(5, "0")}`);
       } else if (getTuneInBrowseState(entityId)?.contextTitle === "my presets") {
         // TuneIn's My Presets NLSI positions are one-based, even though the
         // XML browser's NLAI item indexes are zero-based.
         await this.eiscp.raw(`NLSI${String(Math.max(1, tuneInMenuOption.menuIndex)).padStart(5, "0")}`);
-      } else if (modern) {
+      } else {
         const tuneInState = getTuneInMenuBrowseState(entityId);
         await this.eiscp.raw(xmlBrowseSelectCommand(tuneInMenuOption.menuIndex, tuneInState?.nlsLayerNumber));
-      } else {
-        await this.eiscp.raw(`NLSI${String(tuneInMenuOption.menuIndex).padStart(5, "0")}`);
       }
       return uc.StatusCodes.Ok;
     }

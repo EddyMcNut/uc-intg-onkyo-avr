@@ -23,7 +23,8 @@ export type MenuBrowseStore = {
     title: string,
     thumbnailResolver?: (state: MenuBrowseState<MenuBrowseOption>, title: string) => string,
     isBrowsable?: boolean,
-    allowWhenFrozen?: boolean
+    allowWhenFrozen?: boolean,
+    clearOnLowIndex?: boolean
   ): void;
   listOptions(entityId: string): MenuBrowseOption[];
   getContiguousItemCount(entityId: string): number;
@@ -62,7 +63,8 @@ export function createMenuBrowseStore(cfg: MenuBrowseStoreConfig): MenuBrowseSto
     title: string,
     thumbnailResolver?: (state: MenuBrowseState<MenuBrowseOption>, title: string) => string,
     isBrowsableOverride?: boolean,
-    allowWhenFrozen = false
+    allowWhenFrozen = false,
+    clearOnLowIndex = true
   ): void {
     const state = getBrowseState(entityId);
     if (!state) {
@@ -81,7 +83,8 @@ export function createMenuBrowseStore(cfg: MenuBrowseStoreConfig): MenuBrowseSto
         thumbnail: thumbnailResolver ? thumbnailResolver(state, title) : undefined,
         isBrowsable
       }),
-      allowWhenFrozen
+      allowWhenFrozen,
+      clearOnLowIndex
     );
   }
 
