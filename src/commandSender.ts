@@ -16,6 +16,7 @@ import { isNetworkInputSource } from "./inputSourcePreferences.js";
 import { resetDeezerBrowseState } from "./deezerBrowserStore.js";
 import { resetMusicServerBrowseState } from "./musicServerBrowserStore.js";
 import { resetTidalBrowseState } from "./tidalBrowserStore.js";
+import { resetTuneInMenuBrowseState } from "./tuneInMenuStore.js";
 
 const logSource = "commandSender:";
 
@@ -351,6 +352,15 @@ export class CommandSender {
 
   private resetBrowseStateBeforeSourceSelection(entityId: string, source: string): void {
     const normalized = stripInputSourceMarker(source).toLowerCase().replace(/\s+/g, "-");
+    const avr = this.config.avrs?.find((candidate) => buildEntityId(candidate.model, candidate.ip, candidate.zone) === entityId);
+    if ((normalized === "tunein" || normalized === "tunein-radio") && avr?.tuneinMenuStyle === "full") {
+      // Full Menu can be opened before the AVR sends its service notification.
+      // Keep the learned display name out of routing and discard stale menus.
+      // My Presets retains its service-entry notification/preload lifecycle.
+      resetTuneInMenuBrowseState(entityId);
+      this.avrStateApi.setSubSource(entityId, "tunein");
+      return;
+    }
     if (normalized === "tidal") resetTidalBrowseState(entityId);
     else if (normalized === "deezer") resetDeezerBrowseState(entityId);
     else if (normalized === "music-server" || normalized === "musicserver") resetMusicServerBrowseState(entityId);

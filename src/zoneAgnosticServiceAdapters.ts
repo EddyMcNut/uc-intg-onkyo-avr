@@ -1,19 +1,24 @@
 import {
   hasTuneInPresets,
   ingestDeezerXmlEntries,
+  ingestDeezerListEntry,
+  ingestMusicServerListEntry,
   ingestMusicServerXmlEntries,
+  ingestTidalListEntry,
   ingestTidalXmlEntries,
   ingestTuneInListEntry,
+  ingestTuneInMenuListEntry,
   ingestTuneInMenuXmlEntries,
   ingestTuneInXmlEntries,
   setTuneInBrowseContext
 } from "./mediaBrowser.js";
-import { getDeezerBrowseState } from "./deezerBrowserStore.js";
-import { getMusicServerBrowseState } from "./musicServerBrowserStore.js";
-import { getTidalBrowseState } from "./tidalBrowserStore.js";
+import { getDeezerBrowseState, resetDeezerBrowseState } from "./deezerBrowserStore.js";
+import { getMusicServerBrowseState, resetMusicServerBrowseState } from "./musicServerBrowserStore.js";
+import { getTidalBrowseState, resetTidalBrowseState } from "./tidalBrowserStore.js";
 import { clearTuneInPresets, resetTuneInBrowseState, updateNowPlayingStation } from "./tuneInBrowserStore.js";
 import { resetTuneInMenuBrowseState, setTuneInMenuNowPlayingStation, updateTuneInMenuNowPlayingStation } from "./tuneInMenuStore.js";
 import { DEEZER_SERVICE_ID, MUSIC_SERVER_SERVICE_ID, TIDAL_SERVICE_ID, TUNEIN_SERVICE_ID } from "./browseServiceContract.js";
+import type { NetworkNavigationMode } from "./configConstants.js";
 
 type SubSourceStateApi = {
   getSubSource(entityId: string): string;
@@ -37,12 +42,17 @@ export type ZoneAgnosticServiceAdapter = {
 type AdapterDeps = {
   state: SubSourceStateApi;
   getPhysicalAvrId: (entityId: string) => string;
+  getNetworkNavigationMode?: (entityId: string) => NetworkNavigationMode;
 };
 
 type TuneInAdapterDeps = AdapterDeps & {
   isTuneInFullMenu: (zoneEntityId: string) => Promise<boolean>;
   preloadTuneInPresets: (sourceEntityId: string) => Promise<void>;
 };
+
+function isLegacyNavigation(entityId: string, deps: AdapterDeps): boolean {
+  return deps.getNetworkNavigationMode?.(entityId) === "legacy";
+}
 
 function getServiceZones(sourceEntityId: string, service: string, deps: AdapterDeps): string[] {
   const netZones = deps.state.getEntitiesByPhysicalAvrAndSource(deps.getPhysicalAvrId(sourceEntityId), "net").filter((zoneEntityId) => deps.state.getSubSource(zoneEntityId) === service);
@@ -96,9 +106,15 @@ export class TuneInZoneAgnosticAdapter implements ZoneAgnosticServiceAdapter {
 
   handleNls(sourceEntityId: string, entry: string): void {
     for (const zoneEntityId of this.getActiveZones(sourceEntityId)) {
-      // Full Menu is XML-backed. NLS is retained only for the configured
-      // My Presets station list, where the AVR still reports preset rows.
+      // Modern Full Menu is XML-backed; legacy Full Menu consumes NLS too,
+      // including stations when the user opens its My Presets folder.
       ingestTuneInListEntry(zoneEntityId, entry);
+      if (isLegacyNavigation(zoneEntityId, this.deps)) {
+        // Some receivers repeat the TuneIn context header without producing
+        // a new NLT context event. The full menu's first row is unambiguous.
+        if (/^U\d+-My Presets\s*$/i.test(entry.trim())) setTuneInBrowseContext(zoneEntityId, "TuneIn Radio");
+        ingestTuneInMenuListEntry(zoneEntityId, entry);
+      }
     }
   }
 
@@ -135,6 +151,17 @@ export class TidalZoneAgnosticAdapter implements ZoneAgnosticServiceAdapter {
     return getServiceZones(sourceEntityId, this.service, this.deps);
   }
 
+  handleNltContext(sourceEntityId: string, title: string): void {
+    const activeZones = this.getActiveZones(sourceEntityId);
+    if (!activeZones.some((zoneEntityId) => isLegacyNavigation(zoneEntityId, this.deps))) return;
+    if (!title.toLowerCase().replace(/[^a-z0-9]/g, "").includes("tidal")) return;
+    for (const zoneEntityId of activeZones) {
+      resetTidalBrowseState(zoneEntityId);
+      const state = getTidalBrowseState(zoneEntityId);
+      if (state) state.legacyServiceMenuActive = true;
+    }
+  }
+
   async onServiceEntered(_sourceEntityId: string, _affectedZones: string[], enteringZones: string[]): Promise<void> {
     for (const zoneEntityId of enteringZones) {
       const state = getTidalBrowseState(zoneEntityId);
@@ -145,9 +172,11 @@ export class TidalZoneAgnosticAdapter implements ZoneAgnosticServiceAdapter {
     }
   }
 
-  // Tidal browsing is XML-only. Ignore legacy NLS ten-line updates so they
-  // cannot overwrite an active NLA/NLAL browse context.
-  handleNls(_sourceEntityId: string, _entry: string): void {}
+  handleNls(sourceEntityId: string, entry: string): void {
+    for (const zoneEntityId of this.getActiveZones(sourceEntityId)) {
+      if (isLegacyNavigation(zoneEntityId, this.deps) && getTidalBrowseState(zoneEntityId)?.legacyServiceMenuActive) ingestTidalListEntry(zoneEntityId, entry);
+    }
+  }
 
   handleNla(sourceEntityId: string, xmlPayload: string): void {
     for (const zoneEntityId of this.getActiveZones(sourceEntityId)) {
@@ -170,6 +199,17 @@ export class DeezerZoneAgnosticAdapter implements ZoneAgnosticServiceAdapter {
     return getServiceZones(sourceEntityId, this.service, this.deps);
   }
 
+  handleNltContext(sourceEntityId: string, title: string): void {
+    const activeZones = this.getActiveZones(sourceEntityId);
+    if (!activeZones.some((zoneEntityId) => isLegacyNavigation(zoneEntityId, this.deps))) return;
+    if (!title.toLowerCase().replace(/[^a-z0-9]/g, "").includes("deezer")) return;
+    for (const zoneEntityId of activeZones) {
+      resetDeezerBrowseState(zoneEntityId);
+      const state = getDeezerBrowseState(zoneEntityId);
+      if (state) state.legacyServiceMenuActive = true;
+    }
+  }
+
   async onServiceEntered(_sourceEntityId: string, _affectedZones: string[], enteringZones: string[]): Promise<void> {
     for (const zoneEntityId of enteringZones) {
       const state = getDeezerBrowseState(zoneEntityId);
@@ -180,8 +220,11 @@ export class DeezerZoneAgnosticAdapter implements ZoneAgnosticServiceAdapter {
     }
   }
 
-  // Deezer browsing is XML-only; ignore legacy NLS list updates.
-  handleNls(_sourceEntityId: string, _entry: string): void {}
+  handleNls(sourceEntityId: string, entry: string): void {
+    for (const zoneEntityId of this.getActiveZones(sourceEntityId)) {
+      if (isLegacyNavigation(zoneEntityId, this.deps) && getDeezerBrowseState(zoneEntityId)?.legacyServiceMenuActive) ingestDeezerListEntry(zoneEntityId, entry);
+    }
+  }
 
   handleNla(sourceEntityId: string, xmlPayload: string): void {
     for (const zoneEntityId of this.getActiveZones(sourceEntityId)) {
@@ -241,7 +284,45 @@ export class MusicServerZoneAgnosticAdapter implements ZoneAgnosticServiceAdapte
     }
   }
 
-  handleNls(_sourceEntityId: string, _entry: string): void {}
+  handleNltContext(sourceEntityId: string, title: string): void {
+    const activeZones = this.getActiveZones(sourceEntityId);
+    if (!activeZones.some((zoneEntityId) => isLegacyNavigation(zoneEntityId, this.deps))) return;
+    const normalizedTitle = title.toLowerCase().replace(/[^a-z0-9]/g, "");
+    if (normalizedTitle === "net") {
+      for (const zoneEntityId of activeZones) resetMusicServerBrowseState(zoneEntityId);
+      return;
+    }
+    if (!normalizedTitle.includes("musicserver")) return;
+    for (const zoneEntityId of activeZones) {
+      const state = getMusicServerBrowseState(zoneEntityId);
+      if (!state?.legacyServiceMenuActive) resetMusicServerBrowseState(zoneEntityId);
+      const refreshedState = getMusicServerBrowseState(zoneEntityId);
+      if (refreshedState) refreshedState.legacyServiceMenuActive = true;
+    }
+  }
+
+  handleNls(sourceEntityId: string, entry: string): void {
+    for (const zoneEntityId of this.getActiveZones(sourceEntityId)) {
+      if (!isLegacyNavigation(zoneEntityId, this.deps)) continue;
+      const title = entry.match(/^U\d+-(.*)$/)?.[1]?.trim().toLowerCase();
+      const netRootEntries = new Set([
+        "tunein",
+        "spotify",
+        "deezer",
+        "tidal",
+        "amazonmusic",
+        "chromecast built-in",
+        "dts play-fi",
+        "airplay",
+        "alexa",
+        "music server",
+        "usb",
+        "play queue"
+      ]);
+      if (title && netRootEntries.has(title)) continue;
+      ingestMusicServerListEntry(zoneEntityId, entry);
+    }
+  }
 
   handleNla(sourceEntityId: string, xmlPayload: string): void {
     for (const zoneEntityId of this.getActiveZones(sourceEntityId)) {

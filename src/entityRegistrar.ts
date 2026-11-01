@@ -109,11 +109,17 @@ export default class EntityRegistrar {
         resetState: resetMusicServerBrowseState,
         getBrowseState: getMusicServerBrowseState,
         listMenuItems: listMusicServerMenuOptions,
-        waitForMenuStableBeforeHarvest: false,
-        waitForXmlResponse: true,
+         waitForMenuStableBeforeHarvest: (entityId) => this.isLegacyNetworkNavigation(entityId),
+         waitForXmlResponse: true,
         isServiceActive: (entityId) => !this.avrStateApi || this.avrStateApi.getSubSource(entityId) === "music-server"
       })
     ];
+  }
+
+  private isLegacyNetworkNavigation(entityId: string): boolean {
+    const cfg = ConfigManager.get();
+    const avr = cfg?.avrs?.find((candidate) => buildEntityId(candidate.model, candidate.ip, candidate.zone) === entityId);
+    return avr?.networkNavigationMode === "legacy";
   }
 
   // Build a user-facing base name from an AVR entry id. Input format is typically: "MODEL HOST ZONE". Long style keeps the full entry, short style omits HOST (IP/hostname).

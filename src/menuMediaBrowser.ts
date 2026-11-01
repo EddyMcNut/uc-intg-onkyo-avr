@@ -125,7 +125,9 @@ export function createMediaBrowser(cfg: MediaBrowserConfig, store: MenuBrowseSto
     const cursorOffset = browseState?.nlsCursorOffset ?? 0;
     const windowStart = Math.max(0, cursorOffset - 9);
     const absoluteMenuIndex = windowStart + parsed.menuIndex + 1;
-    store.addMenuOption(entityId, absoluteMenuIndex, title, getOrCreateThumbnail);
+    // Legacy NLS can arrive as several ten-line windows, each restarting at
+    // U0. Do not clear the accumulated list when a later window starts.
+    store.addMenuOption(entityId, absoluteMenuIndex, title, getOrCreateThumbnail, undefined, false, false);
   }
 
   function resolveMenuOption(mediaId?: string, mediaType?: string): MenuBrowseOption | undefined {

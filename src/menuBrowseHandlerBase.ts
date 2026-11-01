@@ -128,10 +128,25 @@ export abstract class MenuBrowseHandlerBase {
           log.info("%s [%s] %s NLAL harvest phase 2: total updated to %d, have %d", this.logSource, entityId, this.getServiceLabel(), state.totalListItemCount, collectedAfterPhase1);
           await this.harvestNlalChunks(entityId, layersToTry, scanDelay, rawSend, harvestGeneration);
         }
+        if ((state.harvestGeneration ?? 0) === harvestGeneration) {
+          log.info("%s [%s] %s NLAL harvest complete: %d/%d items", this.logSource, entityId, this.getServiceLabel(), this.listMenuItems(entityId).length, state.totalListItemCount);
+        }
+      } catch (error) {
+        // Phase 2 outlives the browse request, so there is no caller to catch
+        // a rejected send after the AVR disconnects. Stop here and retain the
+        // cached rows so a subsequent harvest can resume at that offset.
+        log.warn(
+          "%s [%s] %s background NLAL harvest stopped at %d/%d items: %s",
+          this.logSource,
+          entityId,
+          this.getServiceLabel(),
+          this.listMenuItems(entityId).length,
+          state.totalListItemCount,
+          error
+        );
       } finally {
         if ((state.harvestGeneration ?? 0) === harvestGeneration) {
           state.harvestMode = false;
-          log.info("%s [%s] %s NLAL harvest complete: %d/%d items", this.logSource, entityId, this.getServiceLabel(), this.listMenuItems(entityId).length, state.totalListItemCount);
         }
       }
     })();

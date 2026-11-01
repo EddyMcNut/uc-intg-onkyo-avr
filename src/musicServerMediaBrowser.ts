@@ -83,6 +83,10 @@ const browser: MediaBrowserApi = createMediaBrowser(
 );
 
 export class MusicServerMediaBrowser {
+  ingestListEntry(entityId: string, entry: string): void {
+    browser.ingestListEntry(entityId, entry);
+  }
+
   ingestXmlEntries(entityId: string, xmlPayload: string): void {
     const totalItems = xmlPayload.match(/<items\b[^>]*\btotalitems="(\d+)"/i)?.[1];
     if (totalItems !== undefined) {

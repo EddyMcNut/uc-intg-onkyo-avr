@@ -39,6 +39,11 @@ export function getTuneInMenuBrowseState(entityId: string): TuneInMenuBrowseStat
   return created;
 }
 
+export function setTuneInMenuBrowseContextState(entityId: string, title: string): void {
+  const state = getTuneInMenuBrowseState(entityId);
+  if (state) state.contextTitle = title.trim().toLowerCase();
+}
+
 export function addTuneInMenuOption(
   entityId: string,
   menuIndex: number,

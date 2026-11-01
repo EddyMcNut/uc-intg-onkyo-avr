@@ -65,6 +65,20 @@ describe("commandToIscp", () => {
     const driver = await makeDriver();
     expect(driver.commandToIscp("system-power", "bogus", "main")).toBe("PWRbogus");
   });
+
+  it("keeps a displayed Music Server name on the network-service path in legacy mode", async () => {
+    const mod = await import("../src/eiscp.js");
+    const { EiscpDriver } = mod as any;
+    const driver = new EiscpDriver({ model: "TX-RZ50", host: "1.2.3.4", networkNavigationMode: "legacy" });
+    expect(driver.commandToIscp("input-selector", "Music Server", "main")).toBe("NSS10");
+  });
+
+  it("normalizes a displayed Music Server name for modern direct selection", async () => {
+    const mod = await import("../src/eiscp.js");
+    const { EiscpDriver } = mod as any;
+    const driver = new EiscpDriver({ model: "TX-RZ50", host: "1.2.3.4" });
+    expect(driver.commandToIscp("input-selector", "Music Server", "main")).toBe("NSV000");
+  });
 });
 
 describe("command string parsing", () => {

@@ -8,6 +8,7 @@ import { ConfigManager, AVR_DEFAULTS, buildEntityId } from "./configManager.js";
 import type { AvrStateApi } from "./types.js";
 import log from "./loggers.js";
 import { MenuBrowseHandlerBase } from "./menuBrowseHandlerBase.js";
+import { delay, toHex } from "./utils.js";
 
 const logSource = "tuneInBrowseHandler:";
 
@@ -24,7 +25,7 @@ type TuneInMenuSelection = {
 function isTuneInFullMenuEntity(entityId: string): boolean {
   const cfg = ConfigManager.get();
   const avr = cfg?.avrs?.find((a) => buildEntityId(a.model, a.ip, a.zone) === entityId);
-  return avr?.tuneinMenuStyle === "full";
+  return String(avr?.tuneinMenuStyle ?? "").toLowerCase() === "full";
 }
 
 function getMenuDelay(entityId: string): number {
@@ -63,11 +64,61 @@ function resolveTuneInMenuSelection(entityId: string, mediaId?: string, mediaTyp
 
 export class TuneInBrowseHandler extends MenuBrowseHandlerBase {
   protected readonly logSource = logSource;
+  // Modern Full Menu has no NLS fallback: wait for the XML response rather
+  // than returning an empty list after the short transport pacing delay.
+  protected waitForXmlResponse = true;
   protected getServiceLabel(): string {
     return "TuneIn";
   }
 
   private tuneInListSequence = 0;
+
+  private isLegacyNavigation(entityId: string): boolean {
+    const cfg = ConfigManager.get();
+    const avr = cfg?.avrs?.find((candidate) => buildEntityId(candidate.model, candidate.ip, candidate.zone) === entityId);
+    return avr?.networkNavigationMode === "legacy";
+  }
+
+  private async waitForTuneInMenu(entityId: string, menuDelay: number): Promise<void> {
+    if (this.isLegacyNavigation(entityId)) {
+      await this.waitForMenuStable(entityId, "", menuDelay);
+    } else {
+      await this.waitForListMetadata(entityId, menuDelay);
+    }
+  }
+
+  protected async harvestListItems(entityId: string, rawSend: RawSendFn): Promise<void> {
+    if (!this.isLegacyNavigation(entityId)) return super.harvestListItems(entityId, rawSend);
+
+    // v0.8.10: NLS supplies the first display window, then NLAL fills the
+    // remaining rows, probing adjacent layers on older receivers.
+    const state = getTuneInMenuBrowseState(entityId);
+    if (!state || state.harvestMode || state.totalListItemCount <= this.getContiguousItemCount(entityId)) return;
+    const menuDelay = getMenuDelay(entityId);
+    const scanDelay = Math.max(150, Math.min(Math.floor(menuDelay / 3), 400));
+    const knownLayer = state.nlsLayerNumber;
+    const layers = knownLayer > 0 ? [knownLayer, knownLayer - 1, knownLayer + 1].filter((layer) => layer > 0).map((layer) => toHex(layer, 2)) : ["02", "01", "03"];
+    const generation = state.harvestGeneration;
+    state.harvestMode = true;
+    try {
+      let lastContiguous = -1;
+      while (state.harvestGeneration === generation) {
+        const contiguous = this.getContiguousItemCount(entityId);
+        if (contiguous >= state.totalListItemCount || contiguous === lastContiguous) break;
+        lastContiguous = contiguous;
+        for (const layer of layers) {
+          if (state.harvestGeneration !== generation) return;
+          await rawSend(`NLAL${this.nextListSequence()}${layer}${toHex(this.getContiguousItemCount(entityId), 4)}03E7`);
+          await delay(scanDelay);
+          if (this.getContiguousItemCount(entityId) >= state.totalListItemCount) return;
+        }
+        await delay(scanDelay);
+      }
+    } finally {
+      if (state.harvestGeneration === generation) state.harvestMode = false;
+      log.info("%s [%s] legacy TuneIn NLAL harvest complete: %d/%d items", logSource, entityId, this.getContiguousItemCount(entityId), state.totalListItemCount);
+    }
+  }
 
   constructor(private readonly avrStateApi: AvrStateApi) {
     super();
@@ -136,7 +187,7 @@ export class TuneInBrowseHandler extends MenuBrowseHandlerBase {
         media_id: TUNEIN_MENU_BACK_ID,
         media_type: TUNEIN_MENU_ROOT_TYPE
       });
-      await this.waitForListMetadata(entityId, menuDelay);
+      await this.waitForTuneInMenu(entityId, menuDelay);
       if (rawSend) {
         await this.harvestListItems(entityId, rawSend);
       }
@@ -166,7 +217,7 @@ export class TuneInBrowseHandler extends MenuBrowseHandlerBase {
           media_type: TUNEIN_MENU_ROOT_TYPE
         });
 
-        await this.waitForListMetadata(entityId, menuDelay);
+        await this.waitForTuneInMenu(entityId, menuDelay);
         if (rawSend) {
           await this.harvestListItems(entityId, rawSend);
         }
@@ -179,7 +230,7 @@ export class TuneInBrowseHandler extends MenuBrowseHandlerBase {
     }
 
     if (selection) {
-      if (selection.isBrowsable && (options.paging?.offset ?? 0) === 0) {
+      if (!this.isLegacyNavigation(entityId) && selection.isBrowsable && (options.paging?.offset ?? 0) === 0) {
         // A new TuneIn folder is a new XML context. Clear the previous
         // folder before harvesting so NLAL starts at offset 0 instead of
         // appending to the old menu.
@@ -195,7 +246,7 @@ export class TuneInBrowseHandler extends MenuBrowseHandlerBase {
         });
 
         if (selection.isBrowsable) {
-          await this.waitForListMetadata(entityId, menuDelay);
+          await this.waitForTuneInMenu(entityId, menuDelay);
           if (browseState) browseState.listModeActive = true;
           if (rawSend) {
             await this.harvestListItems(entityId, rawSend);

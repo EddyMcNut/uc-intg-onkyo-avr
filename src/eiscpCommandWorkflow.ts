@@ -3,6 +3,7 @@ import { findNetServiceByName } from "./avrInfoStore.js";
 import { delay } from "./utils.js";
 import type { EiscpConfig } from "./eiscpTypes.js";
 import { getZonePrefix } from "./zoneMappings.js";
+import log from "./loggers.js";
 
 export const NSS_SERVICE_NAMES: Readonly<Record<string, string[]>> = {
   NSS01: ["tuneinradio", "tunein"],
@@ -87,13 +88,17 @@ export class EiscpCommandWorkflow {
 
     await this.dependencies.raw(`${zonePrefix}2B`);
     await delay(menuDelay);
-    if (directService) {
+    // A learned TuneIn name still resolves to NSS01, but must not bypass
+    // the configured legacy NET-menu navigation with direct NSV selection.
+    const legacyTuneIn = code === "NSS01" && config.networkNavigationMode === "legacy";
+    if (directService && !legacyTuneIn) {
       await this.dependencies.raw(`NSV${directService.id.toUpperCase()}0`);
       await delay(menuDelay);
       await this.dependencies.raw(queryCommand);
       return;
     }
 
+    if (legacyTuneIn) log.info("eiscpCommandWorkflow: legacy TuneIn selection: %s2B -> NTCTOP -> NLSI00001 -> %s", zonePrefix, queryCommand);
     await this.dependencies.raw("NTCTOP");
     await delay(menuDelay);
     await this.dependencies.raw(`NLSI${String(code.slice(-2)).padStart(5, "0")}`);

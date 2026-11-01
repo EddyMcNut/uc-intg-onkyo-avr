@@ -25,6 +25,8 @@ export type MenuBrowseState<TOption extends MenuBrowseOption> = {
   harvestGeneration: number;
   xmlResponseSequence: number;
   browseListFrozen: boolean;
+  legacyServiceMenuActive: boolean;
+  contextTitle: string;
 };
 
 export function createMenuBrowseState<TOption extends MenuBrowseOption>(): MenuBrowseState<TOption> {
@@ -43,15 +45,23 @@ export function createMenuBrowseState<TOption extends MenuBrowseOption>(): MenuB
     harvestGeneration: 0,
     xmlResponseSequence: 0,
     browseListFrozen: false
+    , legacyServiceMenuActive: false
+    , contextTitle: ""
   };
 }
 
-export function upsertMenuOption<TOption extends MenuBrowseOption>(state: MenuBrowseState<TOption>, menuIndex: number, createOption: () => TOption, allowWhenFrozen = false): void {
+export function upsertMenuOption<TOption extends MenuBrowseOption>(
+  state: MenuBrowseState<TOption>,
+  menuIndex: number,
+  createOption: () => TOption,
+  allowWhenFrozen = false,
+  clearOnLowIndex = true
+): void {
   if (state.browseListFrozen && !allowWhenFrozen) {
     return;
   }
 
-  if (!state.harvestMode && menuIndex <= 1) {
+  if (clearOnLowIndex && !state.harvestMode && menuIndex <= 1) {
     state.optionsByMenuIndex.clear();
   }
 
@@ -91,6 +101,8 @@ export function resetMenuBrowseState<TOption extends MenuBrowseOption>(state: Me
   state.harvestMode = false;
   state.harvestGeneration += 1;
   state.browseListFrozen = false;
+  state.legacyServiceMenuActive = false;
+  state.contextTitle = "";
 }
 
 export function consumeListModeActive<TOption extends MenuBrowseOption>(state: MenuBrowseState<TOption>): boolean {
