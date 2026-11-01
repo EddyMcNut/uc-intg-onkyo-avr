@@ -117,7 +117,8 @@ export class EiscpDriver extends EventEmitter {
       netMenuDelay: config?.netMenuDelay ?? 2500,
       tuneinPresetPosition: config?.tuneinPresetPosition ?? 1,
       configuredZones: config?.configuredZones,
-      idInputSources: config?.idInputSources
+      idInputSources: config?.idInputSources,
+      networkNavigationMode: config?.networkNavigationMode
     };
     this.commandParser = new IscpCommandParser(
       (zone) => buildEntityId(this.config.model!, this.config.host!, zone),
@@ -574,13 +575,14 @@ export class EiscpDriver extends EventEmitter {
   private commandToIscp(command: string, args: string | number | undefined, zone: string): string {
     const prefix = (COMMAND_MAPPINGS as Record<string, string>)[command];
     let value: string;
-    if (prefix === "SLI" && typeof args === "string" && stripInputSourceMarker(args).toLowerCase() === "music-server") {
+    const modernNavigation = this.config.networkNavigationMode !== "legacy";
+    if (modernNavigation && prefix === "SLI" && typeof args === "string" && stripInputSourceMarker(args).toLowerCase() === "music-server") {
       return "NSV000";
     }
-    if (prefix === "SLI" && typeof args === "string" && stripInputSourceMarker(args).toLowerCase() === "tidal") {
+    if (modernNavigation && prefix === "SLI" && typeof args === "string" && stripInputSourceMarker(args).toLowerCase() === "tidal") {
       return "NSV1B0";
     }
-    if (prefix === "SLI" && typeof args === "string" && stripInputSourceMarker(args).toLowerCase() === "deezer") {
+    if (modernNavigation && prefix === "SLI" && typeof args === "string" && stripInputSourceMarker(args).toLowerCase() === "deezer") {
       return "NSV120";
     }
     const valueMap = (VALUE_MAPPINGS as unknown as Record<string, Record<string, { value: string }>>)[prefix];

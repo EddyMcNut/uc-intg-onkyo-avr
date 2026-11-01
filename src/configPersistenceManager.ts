@@ -49,6 +49,7 @@ export class ConfigPersistenceManager {
       createTunerPresets: parsedConfig.createTunerPresetsValue,
       createDiracSelectEntity: parsedConfig.createDiracSelectEntityValue,
       tuneinMenuStyle: parsedConfig.tuneinMenuStyleValue,
+      networkNavigationMode: parsedConfig.networkNavigationModeValue,
       useAvrReportedInputs: parsedConfig.useAvrReportedInputsValue,
       inputSourceLayout: parsedConfig.inputSourceLayoutValue,
       networkInputMarker: parsedConfig.networkInputMarkerValue,
@@ -87,6 +88,7 @@ export class ConfigPersistenceManager {
       createRemoteEntity: parsedConfig.createRemoteEntityValue,
       createDiracSelectEntity: parsedConfig.createDiracSelectEntityValue,
       netMenuDelay: parsedConfig.netMenuDelayValue,
+      networkNavigationMode: parsedConfig.networkNavigationModeValue,
       tuneinPresetPosition: parsedConfig.tuneinPresetPositionValue,
       tuneinMenuStyle: parsedConfig.tuneinMenuStyleValue
     };

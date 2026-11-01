@@ -254,6 +254,7 @@ export default class SetupHandler {
       input.createTunerPresets ||
       input.createRemoteEntity ||
       input.netMenuDelay ||
+      input.networkNavigationMode ||
       input.tuneinPresetPosition ||
       input.tuneinMenuStyle ||
       input.inputSourceLayout ||
@@ -313,6 +314,7 @@ export default class SetupHandler {
         createRemoteEntity: currentAvr?.createRemoteEntity,
         createDiracSelectEntity: currentAvr?.createDiracSelectEntity,
         netMenuDelay: currentAvr?.netMenuDelay,
+        networkNavigationMode: currentAvr?.networkNavigationMode,
         tuneinPresetPosition: currentAvr?.tuneinPresetPosition,
         tuneinMenuStyle: currentAvr?.tuneinMenuStyle,
         inputSourceLayout: currentAvr?.inputSourceLayout,
@@ -346,6 +348,7 @@ export default class SetupHandler {
       createRemoteEntity: parsedConfig.createRemoteEntityValue,
       createDiracSelectEntity: parsedConfig.createDiracSelectEntityValue,
       netMenuDelay: parsedConfig.netMenuDelayValue,
+      networkNavigationMode: parsedConfig.networkNavigationModeValue,
       tuneinPresetPosition: parsedConfig.tuneinPresetPositionValue,
       tuneinMenuStyle: parsedConfig.tuneinMenuStyleValue,
       inputSourceLayout: parsedConfig.inputSourceLayoutValue,

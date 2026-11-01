@@ -72,6 +72,7 @@ export class ConfigManager {
       tuneinMenuStyle: avr.tuneinMenuStyle ?? AVR_DEFAULTS.tuneinMenuStyle,
       inputSourceLayout: avr.inputSourceLayout ?? AVR_DEFAULTS.inputSourceLayout,
       networkInputMarker: avr.networkInputMarker ?? AVR_DEFAULTS.networkInputMarker,
+      networkNavigationMode: String(avr.networkNavigationMode ?? AVR_DEFAULTS.networkNavigationMode).toLowerCase() === "legacy" ? "legacy" : "modern",
       listeningModes: normalizeListeningModes(avr.listeningModes),
       idInputSources: normalizeInputSourceSettings(avr.idInputSources)
     };
@@ -392,6 +393,9 @@ export class ConfigManager {
     if (value.networkInputMarker !== undefined && !(NETWORK_INPUT_MARKERS as readonly string[]).includes(String(value.networkInputMarker))) {
       errors.push("networkInputMarker is not supported");
     }
+    if (value.networkNavigationMode !== undefined && !["modern", "legacy"].includes(String(value.networkNavigationMode).toLowerCase())) {
+      errors.push('networkNavigationMode must be "modern" or "legacy"');
+    }
 
     if (errors.length > 0) {
       return { errors };
@@ -423,6 +427,7 @@ export class ConfigManager {
         return layout === "network-first" ? "network-first" : layout === "network-last" || layout === "separate" ? "network-last" : "combined";
       })(),
       networkInputMarker: (value.networkInputMarker ?? AVR_DEFAULTS.networkInputMarker) as AvrConfig["networkInputMarker"],
+      networkNavigationMode: String(value.networkNavigationMode ?? AVR_DEFAULTS.networkNavigationMode).toLowerCase() === "legacy" ? "legacy" : "modern",
       listeningModes: normalizeListeningModes(value.listeningModes),
       idInputSources: normalizeInputSourceSettings(value.idInputSources)
     });

@@ -40,6 +40,7 @@ export class SetupFormBuilder {
       "volumeScale",
       "volumeDisplay",
       "adjustVolumeDispl",
+      "networkNavigationMode",
       "tuneinPresetPosition",
       "tuneinMenuStyle",
       "inputSourceLayout",
@@ -234,6 +235,20 @@ export class SetupFormBuilder {
           }
         },
         description: { en: "Add the selected visual marker to network sources in the input-source selector." }
+      },
+      {
+        id: "networkNavigationMode",
+        label: { en: "Network service navigation" },
+        field: {
+          dropdown: {
+            value: values.networkNavigationModeValue,
+            items: [
+              { id: "modern", label: { en: "Modern (default)" } },
+              { id: "legacy", label: { en: "Legacy" } }
+            ]
+          }
+        },
+        description: { en: "Modern uses the current XML/NSV network-service navigation. Legacy uses the pre-v0.9.9 menu/list navigation for older or incompatible devices." }
       },
       {
         id: "tuneinPresetPosition",
