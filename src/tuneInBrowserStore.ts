@@ -139,11 +139,12 @@ export function clearTuneInPresets(entityId: string): void {
   state.presetIndexByTitle.clear();
 }
 
-export function listTuneInPresets(entityId: string): TuneInPreset[] {
+export function listTuneInPresets(entityId: string, sort: "alphabetical" | "preset-order" = "alphabetical"): TuneInPreset[] {
   const state = getTuneInBrowseState(entityId);
   if (!state) {
     return [];
   }
 
-  return [...state.presetsByMenuIndex.values()].sort((a, b) => a.title.localeCompare(b.title, undefined, { sensitivity: "base" }));
+  const presets = [...state.presetsByMenuIndex.values()];
+  return sort === "preset-order" ? presets.sort((a, b) => a.presetIndex - b.presetIndex) : presets.sort((a, b) => a.title.localeCompare(b.title, undefined, { sensitivity: "base" }));
 }

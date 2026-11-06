@@ -9,6 +9,7 @@ import {
   PATTERNS,
   parseBoolean,
   parseTunerPresetMode,
+  parseTuneInMenuStyle,
   parseVolumeScale,
   AvrZone,
   AvrConfig,
@@ -72,7 +73,7 @@ export class ConfigManager {
       createDiracSelectEntity: avr.createDiracSelectEntity ?? AVR_DEFAULTS.createDiracSelectEntity,
       netMenuDelay: avr.netMenuDelay ?? AVR_DEFAULTS.netMenuDelay,
       tuneinPresetPosition: avr.tuneinPresetPosition ?? AVR_DEFAULTS.tuneinPresetPosition,
-      tuneinMenuStyle: avr.tuneinMenuStyle ?? AVR_DEFAULTS.tuneinMenuStyle,
+      tuneinMenuStyle: parseTuneInMenuStyle(avr.tuneinMenuStyle ?? AVR_DEFAULTS.tuneinMenuStyle),
       inputSourceLayout: avr.inputSourceLayout ?? AVR_DEFAULTS.inputSourceLayout,
       networkInputMarker: avr.networkInputMarker ?? AVR_DEFAULTS.networkInputMarker,
       networkNavigationMode: String(avr.networkNavigationMode ?? AVR_DEFAULTS.networkNavigationMode).toLowerCase() === "legacy" ? "legacy" : "modern",
@@ -388,8 +389,8 @@ export class ConfigManager {
     // tuneinMenuStyle
     if (value.tuneinMenuStyle !== undefined) {
       const style = String(value.tuneinMenuStyle).toLowerCase();
-      if (style !== "mypresets" && style !== "full") {
-        errors.push('tuneinMenuStyle must be "mypresets" or "full"');
+      if (!["mypresets", "mypresets-alphabetical", "mypresets-preset-order", "preset-order", "full"].includes(style)) {
+        errors.push('tuneinMenuStyle must be "mypresets-alphabetical", "mypresets-preset-order", or "full"');
       }
     }
 
@@ -427,7 +428,7 @@ export class ConfigManager {
       createDiracSelectEntity: parseBoolean(value.createDiracSelectEntity, AVR_DEFAULTS.createDiracSelectEntity),
       netMenuDelay,
       tuneinPresetPosition,
-      tuneinMenuStyle: String(value.tuneinMenuStyle ?? AVR_DEFAULTS.tuneinMenuStyle).toLowerCase() === "full" ? "full" : "mypresets",
+      tuneinMenuStyle: parseTuneInMenuStyle(value.tuneinMenuStyle ?? AVR_DEFAULTS.tuneinMenuStyle),
       inputSourceLayout: (() => {
         const layout = String(value.inputSourceLayout ?? AVR_DEFAULTS.inputSourceLayout).toLowerCase();
         return layout === "network-first" ? "network-first" : layout === "network-last" || layout === "separate" ? "network-last" : "combined";

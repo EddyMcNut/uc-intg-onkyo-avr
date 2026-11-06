@@ -128,9 +128,9 @@ describe("configConstants", () => {
       expect(result.tuneinPresetPosition).toBe(7);
     });
 
-    it("normalizes tuneinMenuStyle to mypresets by default", () => {
+    it("normalizes tuneinMenuStyle to alphabetically sorted My Presets by default", () => {
       const result = normalizeAvrConfig({ model: "TX", ip: "1.2.3.4" });
-      expect(result.tuneinMenuStyle).toBe("mypresets");
+      expect(result.tuneinMenuStyle).toBe("mypresets-alphabetical");
     });
 
     it("normalizes port from string", () => {

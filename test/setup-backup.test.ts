@@ -207,7 +207,7 @@ it("restore flow defaults missing TuneIn menu setting to mypresets", async () =>
     expect(reloaded.avrs?.[0].model).toBe(targetConfig.avrs![0].model);
     expect(reloaded.avrs?.[0].ip).toBe(targetConfig.avrs![0].ip);
     expect(reloaded.avrs?.[0].entityNameStyle).toBe(targetConfig.avrs![0].entityNameStyle);
-    expect(reloaded.avrs?.[0].tuneinMenuStyle).toBe("mypresets");
+    expect(reloaded.avrs?.[0].tuneinMenuStyle).toBe("mypresets-alphabetical");
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
   }

@@ -6,6 +6,7 @@ import { addTuneInPreset, getTuneInBrowseState, listTuneInPresets, type TuneInPr
 import { addTuneInMenuOption, listTuneInMenuOptions, getTuneInMenuBrowseState, setTuneInMenuBrowseContextState, type TuneInMenuOption } from "./tuneInMenuStore.js";
 import { createServiceThumbnails } from "./serviceThumbnails.js";
 import { parseIndexedMenuEntry, getXmlOffset } from "./menuEntryParser.js";
+import { ConfigManager, buildEntityId } from "./configManager.js";
 
 const logSource = "tuneInMediaBrowser:";
 const NOW_PLAYING_LABEL = "▶ Now Playing";
@@ -58,6 +59,12 @@ export const TUNEIN_MENU_BACK_ID = "tunein:menu-back";
 const TUNEIN_EXCLUDED_MENU_TITLES = new Set(["search", "login", "logout", "log out", "all stations"]);
 
 export class TuneInMediaBrowser {
+  private getPresetSortOrder(entityId: string): "alphabetical" | "preset-order" {
+    const avr = ConfigManager.get()?.avrs?.find((candidate) => buildEntityId(candidate.model, candidate.ip, candidate.zone) === entityId);
+    const style = String(avr?.tuneinMenuStyle ?? "mypresets-alphabetical").toLowerCase();
+    return style === "full" || style === "mypresets-preset-order" || style === "preset-order" ? "preset-order" : "alphabetical";
+  }
+
   setBrowseContext(entityId: string, title: string): void {
     setTuneInBrowseContextState(entityId, title);
     setTuneInMenuBrowseContextState(entityId, title);
@@ -194,7 +201,7 @@ export class TuneInMediaBrowser {
   }
 
   async browse(entityId: string, options: uc.BrowseOptions): Promise<uc.StatusCodes | uc.BrowseResult> {
-    const tuneInPresets = listTuneInPresets(entityId);
+    const tuneInPresets = listTuneInPresets(entityId, this.getPresetSortOrder(entityId));
     if (!options.media_id || options.media_id === TUNEIN_ROOT_ID) {
       log.info("%s [%s] browsable TuneIn presets: %d", logSource, entityId, tuneInPresets.length);
       return uc.BrowseResult.fromPaging(this.createRootItem(entityId, options.paging), options.paging, tuneInPresets.length);
@@ -272,7 +279,7 @@ export class TuneInMediaBrowser {
   }
 
   private createRootItem(entityId: string, paging: uc.Paging): uc.BrowseMediaItem {
-    const presets = listTuneInPresets(entityId);
+    const presets = listTuneInPresets(entityId, this.getPresetSortOrder(entityId));
     const nowPlayingStation = getTuneInBrowseState(entityId)?.nowPlayingStation ?? "";
     const items = this.slicePagedItems(
       presets.map((preset) => this.createPresetItem(preset, nowPlayingStation)),

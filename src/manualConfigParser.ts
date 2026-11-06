@@ -1,7 +1,7 @@
 // Focused responsibility: Parse and validate manual configuration input
 import { LogLevel, AVR_DEFAULTS, parseBoolean, parseVolumeScale, type VolumeScale } from "./configManager.js";
 import type { AvrInput } from "./inputSourceStore.js";
-import { NETWORK_INPUT_MARKERS, parseTunerPresetMode, type InputSourceLayout, type InputSourceSettings, type NetworkInputMarker, type NetworkNavigationMode, type TunerPresetMode } from "./configConstants.js";
+import { NETWORK_INPUT_MARKERS, parseTunerPresetMode, parseTuneInMenuStyle, type InputSourceLayout, type InputSourceSettings, type NetworkInputMarker, type NetworkNavigationMode, type TunerPresetMode, type TuneInMenuStyle } from "./configConstants.js";
 
 export interface ManualConfigInput {
   model?: unknown;
@@ -58,7 +58,7 @@ export interface ParsedManualConfig {
   createDiracSelectEntityValue: boolean;
   netMenuDelayValue: number;
   tuneinPresetPositionValue: number;
-  tuneinMenuStyleValue: "mypresets" | "full";
+  tuneinMenuStyleValue: TuneInMenuStyle;
   inputSourceLayoutValue: InputSourceLayout;
   networkInputMarkerValue: NetworkInputMarker;
   networkNavigationModeValue: NetworkNavigationMode;
@@ -179,8 +179,8 @@ export class ManualConfigParser {
     return parsed >= 1 && parsed <= 10 ? parsed : AVR_DEFAULTS.tuneinPresetPosition;
   }
 
-  private parseTuneInMenuStyle(style: unknown): "mypresets" | "full" {
-    return String(style ?? AVR_DEFAULTS.tuneinMenuStyle).toLowerCase() === "full" ? "full" : "mypresets";
+  private parseTuneInMenuStyle(style: unknown): TuneInMenuStyle {
+    return parseTuneInMenuStyle(style ?? AVR_DEFAULTS.tuneinMenuStyle);
   }
 
   private parseNetworkInputMarker(marker: unknown): NetworkInputMarker {

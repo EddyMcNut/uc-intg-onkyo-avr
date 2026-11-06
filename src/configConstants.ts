@@ -191,7 +191,7 @@ export const AVR_DEFAULTS = {
   createDiracSelectEntity: true,
   netMenuDelay: 500,
   tuneinPresetPosition: 1,
-  tuneinMenuStyle: "mypresets",
+  tuneinMenuStyle: "mypresets-alphabetical",
   inputSourceLayout: "combined",
   networkInputMarker: "none",
   networkNavigationMode: "modern",
@@ -216,7 +216,14 @@ export function isTunerPresetModeEnabled(raw: unknown): boolean {
   return parseTunerPresetMode(raw) !== "none";
 }
 export type VolumeDisplay = "absolute" | "relative";
-export type TuneInMenuStyle = "mypresets" | "full";
+export type TuneInMenuStyle = "mypresets-alphabetical" | "mypresets-preset-order" | "full";
+
+export function parseTuneInMenuStyle(raw: unknown): TuneInMenuStyle {
+  const value = String(raw ?? "").trim().toLowerCase();
+  if (value === "full") return "full";
+  if (value === "mypresets-preset-order" || value === "mypresets_preset_order" || value === "preset-order") return "mypresets-preset-order";
+  return "mypresets-alphabetical";
+}
 // `separate` is retained as a legacy persisted value and normalized to `network-last`.
 export type InputSourceLayout = "combined" | "network-first" | "network-last" | "separate";
 export type NetworkInputMarker = "none" | "🌐" | "📡" | "🔗" | "☁️" | "🛜" | "🎵" | "▶️";
@@ -244,7 +251,7 @@ export interface AvrConfig {
   createDiracSelectEntity?: boolean; // true (default) = create the Dirac select entity (fixed options)
   netMenuDelay?: number; // delay in ms for NET menu to load (default 2500)
   tuneinPresetPosition?: number; // position of "My Presets" in TuneIn menu (1-10, default 1)
-  tuneinMenuStyle?: TuneInMenuStyle; // choose TuneIn navigation mode: mypresets or full
+  tuneinMenuStyle?: TuneInMenuStyle; // choose TuneIn navigation and My Presets sorting mode
   inputSourceLayout?: InputSourceLayout;
   networkInputMarker?: NetworkInputMarker;
   networkNavigationMode?: NetworkNavigationMode;
@@ -340,7 +347,7 @@ export function normalizeAvrConfig(raw: AvrConfig): NormalizedAvrConfig {
     return v;
   })();
 
-  const tuneinMenuStyle: TuneInMenuStyle = String(raw.tuneinMenuStyle ?? AVR_DEFAULTS.tuneinMenuStyle).toLowerCase() === "full" ? "full" : "mypresets";
+  const tuneinMenuStyle = parseTuneInMenuStyle(raw.tuneinMenuStyle ?? AVR_DEFAULTS.tuneinMenuStyle);
 
   const rawInputSourceLayout = String(raw.inputSourceLayout ?? "combined").toLowerCase();
   const inputSourceLayout: InputSourceLayout =

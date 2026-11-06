@@ -263,7 +263,8 @@ export class SetupFormBuilder {
           dropdown: {
             value: String(values.tuneinMenuStyleValue),
             items: [
-              { id: "mypresets", label: { en: "My Presets (default)" } },
+              { id: "mypresets-alphabetical", label: { en: "My Presets, sort A–Z (default)" } },
+              { id: "mypresets-preset-order", label: { en: "My Presets, preset order" } },
               { id: "full", label: { en: "Full menu" } }
             ]
           }
