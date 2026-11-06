@@ -7,6 +7,7 @@ The integration can discover AVR-specific listening-mode names and codes. Use **
 After upgrading to version 0.9.9, configure the listening modes once for each AVR if you want to change the defaults.
 
 ## AVR specific names
+
 Since v0.9.9, the integration is able to learn the exact names that your specific AVR is using. It can however only learn that name once it has been reported by your AVR. So, with inital install of v0.9.9. all listening modes known by this integration are set to `✨ Discover from AVR`. When your AVR reports its own dialect of that specific listening mode, this integration will learn it, and status changes to `✅ AVR-discovered` and from now on use that name instead of on of the aliases. You can change this behavior by selecting the alias you prefer. You can also `🚫 Don't include` a listening mode if you never use it anyway. Then the list of listening modes in the select-entity will be shorter.
 
 For most AVRs, `Straight Decode` triggers the AVR to select a setting, which does not send out a specific name for Straight Decode. So a name will probably never be learned, thats why for Straight Decome de default setting is `Integration-preferred`. Basically to not be the only name shown as the known alias straight-decode.

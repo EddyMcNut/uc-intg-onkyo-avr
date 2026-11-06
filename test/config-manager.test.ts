@@ -163,7 +163,7 @@ describe("ConfigManager static methods", () => {
 
     it("rejects invalid tuneinMenuStyle", () => {
       const result = ConfigManager.validateAvrPayload({ model: "TX-RZ50", ip: "1.2.3.4", port: 60128, tuneinMenuStyle: "compact" });
-      expect(result.errors).toContain('tuneinMenuStyle must be "mypresets" or "full"');
+      expect(result.errors).toContain('tuneinMenuStyle must be "mypresets-alphabetical", "mypresets-preset-order", or "full"');
     });
 
     it("normalizes persisted listening modes", () => {

@@ -9,6 +9,7 @@ import { ConfigManager, buildEntityId, buildPhysicalAvrId } from "./configManage
 import { getAvrSourceCatalog } from "./avrSourceCatalog.js";
 import { getEffectiveInputSourceOptions } from "./inputSourceResolver.js";
 import { getTunerPresetNames } from "./tunerPresetStore.js";
+import { parseTunerPresetMode } from "./configConstants.js";
 import { getLearnedListeningModes } from "./learnedListeningModeStore.js";
 import { displayListeningModeName, resolveListeningModes } from "./listeningModePreferences.js";
 import { getKnownListeningModes } from "./listeningModePreferences.js";
@@ -109,8 +110,8 @@ export default class EntityRegistrar {
         resetState: resetMusicServerBrowseState,
         getBrowseState: getMusicServerBrowseState,
         listMenuItems: listMusicServerMenuOptions,
-         waitForMenuStableBeforeHarvest: (entityId) => this.isLegacyNetworkNavigation(entityId),
-         waitForXmlResponse: true,
+        waitForMenuStableBeforeHarvest: (entityId) => this.isLegacyNetworkNavigation(entityId),
+        waitForXmlResponse: true,
         isServiceActive: (entityId) => !this.avrStateApi || this.avrStateApi.getSubSource(entityId) === "music-server"
       })
     ];
@@ -361,7 +362,8 @@ export default class EntityRegistrar {
       const cfg = ConfigManager.get();
       const match = cfg?.avrs?.find((a) => buildEntityId(a.model, a.ip, a.zone) === avrEntry);
       if (match) {
-        return getTunerPresetNames(buildPhysicalAvrId(match.model, match.ip));
+        const mode = parseTunerPresetMode(match.createTunerPresets) === "preset-order" ? "preset-order" : "alphabetical";
+        return getTunerPresetNames(buildPhysicalAvrId(match.model, match.ip), mode);
       }
     } catch {
       // ignore and show no options

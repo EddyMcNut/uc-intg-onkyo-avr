@@ -18,6 +18,10 @@ export type TuneInBrowseState = {
   presetIndexByTitle: Map<string, number>;
   thumbnailByTitle: Map<string, string>;
   backgroundSignature: string;
+  // True after selecting a station. Legacy receivers send a spontaneous NLS
+  // update for the ten visible rows after playback starts; it must not replace
+  // the complete harvested My Presets list.
+  browseListFrozen: boolean;
   // Station name currently playing (from NTI), used to highlight it in the preset list.
   nowPlayingStation: string;
 };
@@ -42,6 +46,7 @@ export function getTuneInBrowseState(entityId: string): TuneInBrowseState | null
     presetIndexByTitle: new Map<string, number>(),
     thumbnailByTitle: new Map<string, string>(),
     backgroundSignature: "",
+    browseListFrozen: false,
     nowPlayingStation: ""
   };
   tuneInBrowseStateByPhysicalAvr.set(physicalAvrId, created);
@@ -59,7 +64,7 @@ export function setTuneInBrowseContextState(entityId: string, title: string): vo
   state.contextTitle = normalized;
   state.captureMyPresets = normalized === "my presets";
 
-  if (enteringMyPresets) {
+  if (enteringMyPresets && !state.browseListFrozen) {
     state.presetsByMenuIndex.clear();
     state.presetIndexByTitle.clear();
   }
@@ -77,6 +82,7 @@ export function addTuneInPreset(
   if (!state) {
     return;
   }
+  if (state.browseListFrozen) return;
 
   const existingPresetIndex =
     state.presetIndexByTitle.get(title) ??
@@ -137,13 +143,20 @@ export function clearTuneInPresets(entityId: string): void {
   }
   state.presetsByMenuIndex.clear();
   state.presetIndexByTitle.clear();
+  state.browseListFrozen = false;
 }
 
-export function listTuneInPresets(entityId: string): TuneInPreset[] {
+export function setTuneInBrowseFrozen(entityId: string, frozen: boolean): void {
+  const state = getTuneInBrowseState(entityId);
+  if (state) state.browseListFrozen = frozen;
+}
+
+export function listTuneInPresets(entityId: string, sort: "alphabetical" | "preset-order" = "alphabetical"): TuneInPreset[] {
   const state = getTuneInBrowseState(entityId);
   if (!state) {
     return [];
   }
 
-  return [...state.presetsByMenuIndex.values()].sort((a, b) => a.title.localeCompare(b.title, undefined, { sensitivity: "base" }));
+  const presets = [...state.presetsByMenuIndex.values()];
+  return sort === "preset-order" ? presets.sort((a, b) => a.presetIndex - b.presetIndex) : presets.sort((a, b) => a.title.localeCompare(b.title, undefined, { sensitivity: "base" }));
 }

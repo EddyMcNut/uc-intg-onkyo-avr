@@ -26,7 +26,7 @@ import { consumeTidalListModeActive, consumeTraceNextTidalSelectionAfterMainMenu
 import { consumeDeezerListModeActive, consumeTraceNextDeezerSelectionAfterMainMenu, getDeezerBrowseState, listDeezerMenuOptions } from "./deezerBrowserStore.js";
 import { consumeMusicServerListModeActive, consumeTraceNextMusicServerSelectionAfterMainMenu, getMusicServerBrowseState, listMusicServerMenuOptions } from "./musicServerBrowserStore.js";
 import { consumeTuneInListModeActive, getTuneInMenuBrowseState, resetTuneInMenuBrowseState, setTuneInMenuBrowseFrozen, setTuneInMenuNowPlayingStation } from "./tuneInMenuStore.js";
-import { getTuneInBrowseState } from "./tuneInBrowserStore.js";
+import { getTuneInBrowseState, setTuneInBrowseFrozen } from "./tuneInBrowserStore.js";
 import { AVR_DEFAULTS, ConfigManager, DEFAULT_QUEUE_THRESHOLD, buildEntityId } from "./configManager.js";
 import {
   DEEZER_SERVICE_ID,
@@ -222,6 +222,7 @@ export class PlayMediaCommandHandler {
     }
 
     if (preset) {
+      if (!modern) setTuneInBrowseFrozen(entityId, true);
       const wasPreloading = this.commandReceiver?.abortTuneInPreload?.(entityId) ?? false;
       // Only force select if preload was interrupted; wasPreloading || undefined ensures false becomes undefined
       // so default logic (based on current state) applies when preload was not running
@@ -250,6 +251,7 @@ export class PlayMediaCommandHandler {
       await this.selectBrowseService(entityId, TUNEIN_SERVICE_ID, setZonePrefix, netMenuDelay, { delayAfterSelect: true });
 
       if (!tuneInMenuOption.isBrowsable) {
+        if (!modern) setTuneInBrowseFrozen(entityId, true);
         setTuneInMenuBrowseFrozen(entityId, true);
         setTuneInMenuNowPlayingStation(entityId, tuneInMenuOption.title);
         const alreadyInListMode = consumeTuneInListModeActive(entityId);
@@ -261,6 +263,7 @@ export class PlayMediaCommandHandler {
           }
         }
       } else {
+        if (!modern) setTuneInBrowseFrozen(entityId, false);
         if (!modern) {
           // Resolve the selected row before clearing the old list: arbitrary
           // folders such as country names cannot be classified by name alone.

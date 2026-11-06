@@ -8,6 +8,8 @@ import {
   MAX_LENGTHS,
   PATTERNS,
   parseBoolean,
+  parseTunerPresetMode,
+  parseTuneInMenuStyle,
   parseVolumeScale,
   AvrZone,
   AvrConfig,
@@ -64,12 +66,14 @@ export class ConfigManager {
       adjustVolumeDispl: avr.adjustVolumeDispl ?? AVR_DEFAULTS.adjustVolumeDispl,
       entityNameStyle: avr.entityNameStyle ?? AVR_DEFAULTS.entityNameStyle,
       createSensors: avr.createSensors ?? AVR_DEFAULTS.createSensors,
-      createTunerPresets: avr.createTunerPresets ?? AVR_DEFAULTS.createTunerPresets,
+      // Keep legacy booleans in already-loaded config files; all new setup
+      // values are normalized by validateAvrPayload/normalizeAvrConfig.
+      createTunerPresets: avr.createTunerPresets ?? true,
       createRemoteEntity: avr.createRemoteEntity ?? AVR_DEFAULTS.createRemoteEntity,
       createDiracSelectEntity: avr.createDiracSelectEntity ?? AVR_DEFAULTS.createDiracSelectEntity,
       netMenuDelay: avr.netMenuDelay ?? AVR_DEFAULTS.netMenuDelay,
       tuneinPresetPosition: avr.tuneinPresetPosition ?? AVR_DEFAULTS.tuneinPresetPosition,
-      tuneinMenuStyle: avr.tuneinMenuStyle ?? AVR_DEFAULTS.tuneinMenuStyle,
+      tuneinMenuStyle: parseTuneInMenuStyle(avr.tuneinMenuStyle ?? AVR_DEFAULTS.tuneinMenuStyle),
       inputSourceLayout: avr.inputSourceLayout ?? AVR_DEFAULTS.inputSourceLayout,
       networkInputMarker: avr.networkInputMarker ?? AVR_DEFAULTS.networkInputMarker,
       networkNavigationMode: String(avr.networkNavigationMode ?? AVR_DEFAULTS.networkNavigationMode).toLowerCase() === "legacy" ? "legacy" : "modern",
@@ -349,8 +353,11 @@ export class ConfigManager {
     }
 
     // createTunerPresets
-    if (value.createTunerPresets !== undefined && typeof value.createTunerPresets !== "boolean" && !(typeof value.createTunerPresets === "string")) {
-      errors.push("createTunerPresets must be boolean");
+    if (value.createTunerPresets !== undefined) {
+      const mode = String(value.createTunerPresets).toLowerCase();
+      if (typeof value.createTunerPresets !== "boolean" && !["true", "false", "yes", "no", "alphabetical", "preset-order", "preset_order", "presetorder", "none"].includes(mode)) {
+        errors.push('createTunerPresets must be "alphabetical", "preset-order", or "none"');
+      }
     }
 
     // createRemoteEntity
@@ -382,8 +389,8 @@ export class ConfigManager {
     // tuneinMenuStyle
     if (value.tuneinMenuStyle !== undefined) {
       const style = String(value.tuneinMenuStyle).toLowerCase();
-      if (style !== "mypresets" && style !== "full") {
-        errors.push('tuneinMenuStyle must be "mypresets" or "full"');
+      if (!["mypresets", "mypresets-alphabetical", "mypresets-preset-order", "preset-order", "full"].includes(style)) {
+        errors.push('tuneinMenuStyle must be "mypresets-alphabetical", "mypresets-preset-order", or "full"');
       }
     }
 
@@ -416,12 +423,12 @@ export class ConfigManager {
       adjustVolumeDispl: parseBoolean(value.adjustVolumeDispl, AVR_DEFAULTS.adjustVolumeDispl),
       entityNameStyle: (String(value.entityNameStyle ?? AVR_DEFAULTS.entityNameStyle).toLowerCase() === "short" ? "short" : "long") as EntityNameStyle,
       createSensors: parseBoolean(value.createSensors, AVR_DEFAULTS.createSensors),
-      createTunerPresets: parseBoolean(value.createTunerPresets, AVR_DEFAULTS.createTunerPresets),
+      createTunerPresets: parseTunerPresetMode(value.createTunerPresets ?? AVR_DEFAULTS.createTunerPresets),
       createRemoteEntity: parseBoolean(value.createRemoteEntity, AVR_DEFAULTS.createRemoteEntity),
       createDiracSelectEntity: parseBoolean(value.createDiracSelectEntity, AVR_DEFAULTS.createDiracSelectEntity),
       netMenuDelay,
       tuneinPresetPosition,
-      tuneinMenuStyle: String(value.tuneinMenuStyle ?? AVR_DEFAULTS.tuneinMenuStyle).toLowerCase() === "full" ? "full" : "mypresets",
+      tuneinMenuStyle: parseTuneInMenuStyle(value.tuneinMenuStyle ?? AVR_DEFAULTS.tuneinMenuStyle),
       inputSourceLayout: (() => {
         const layout = String(value.inputSourceLayout ?? AVR_DEFAULTS.inputSourceLayout).toLowerCase();
         return layout === "network-first" ? "network-first" : layout === "network-last" || layout === "separate" ? "network-last" : "combined";

@@ -198,7 +198,10 @@ describe("v0.8.10 legacy TuneIn navigation", () => {
     const avr = setup("legacy", "mypresets", 3);
     await finish(avr.driver.command({ zone: "main", command: "input-selector", args: "🌐 TuneIn Radio" }));
     await finish(avr.adapter.onServiceEntered(entityId, [entityId], [entityId]));
-    expect(avr.commands.slice(0, 7)).toEqual(["SLI2B", "NTCTOP", "NLSI00001", "SLIQSTN", "NTCTOP", "NTCSELECT", "NLSI00003"]);
+    expect(avr.commands.slice(0, 4)).toEqual(["SLI2B", "NTCTOP", "NLSI00001", "SLIQSTN"]);
+    expect(avr.commands).toContain("NLSI00003");
+    expect(avr.commands).not.toContain("NTCSELECT");
+    expect(avr.commands.some((command) => command.startsWith("NLAL"))).toBe(true);
     expect(listTuneInPresets(entityId)).toHaveLength(2);
     avr.commands.length = 0;
     await finish(avr.handle("tunein:preset:2", uc.KnownMediaContentType.Radio));

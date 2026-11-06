@@ -97,8 +97,10 @@ export class ZoneMediaRenderer {
 
         if (trackChanged || forceUpdate) {
           this.mediaStateStore.setCurrentTrackId(entityId, trackId);
+          const subSource = typeof (this.avrStateApi as AvrStateApi & { getSubSource?: (id: string) => string }).getSubSource === "function" ? this.avrStateApi.getSubSource(entityId) : "";
+          const mediaArtist = subSource === "tunein" ? zoneNowPlaying.artist || zoneNowPlaying.title || "unknown" : `${zoneNowPlaying.artist || "unknown"} (${zoneNowPlaying.album || "unknown"})`;
           this.driver.updateEntityAttributes(entityId, {
-            [uc.MediaPlayerAttributes.MediaArtist]: `${zoneNowPlaying.artist || "unknown"} (${zoneNowPlaying.album || "unknown"})`,
+            [uc.MediaPlayerAttributes.MediaArtist]: mediaArtist,
             [uc.MediaPlayerAttributes.MediaTitle]: zoneNowPlaying.title || "unknown",
             [uc.MediaPlayerAttributes.MediaAlbum]: zoneNowPlaying.album || "unknown"
           });

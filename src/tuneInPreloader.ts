@@ -2,6 +2,7 @@ import { EiscpDriver } from "./eiscp.js";
 import log from "./loggers.js";
 import { delay, toHex } from "./utils.js";
 import { getTuneInPresetCount, hasTuneInPresets, setTuneInBrowseContext } from "./mediaBrowser.js";
+import { getTuneInMenuBrowseState } from "./tuneInMenuStore.js";
 
 const logSource = "tuneInPreloader:";
 
@@ -29,6 +30,30 @@ export class TuneInPreloader {
     }
   }
 
+  private async requestLegacyTuneInPresetXml(entityId: string, scanDelay: number): Promise<void> {
+    const state = getTuneInMenuBrowseState(entityId);
+    if (!state) return;
+
+    const knownLayer = state.nlsLayerNumber;
+    const layers = knownLayer > 0 ? [knownLayer, knownLayer - 1, knownLayer + 1].filter((layer) => layer > 0).map((layer) => toHex(layer, 2)) : ["02", "01", "03"];
+    let previousCount = -1;
+
+    // Legacy NLS only contains the ten visible rows. Continue with NLAL from
+    // the number already collected, just like the legacy full-menu browser.
+    for (let attempt = 0; attempt < 10; attempt++) {
+      const count = getTuneInPresetCount(entityId);
+      if (count === previousCount) break;
+      previousCount = count;
+
+      for (const layer of layers) {
+        await this.eiscpInstance.raw(`NLAL${this.nextTuneInListSequence()}${layer}${toHex(count, 4)}03E7`);
+        await delay(scanDelay);
+        const updatedCount = getTuneInPresetCount(entityId);
+        if (updatedCount > count) break;
+      }
+    }
+  }
+
   async preloadTuneInPresets(entityId: string): Promise<void> {
     const physicalAvrId = this.resolvePhysicalAvrId(entityId);
     if (this.tuneInPreloadInFlight.has(physicalAvrId) || hasTuneInPresets(entityId)) {
@@ -43,13 +68,22 @@ export class TuneInPreloader {
     try {
       log.info("%s [%s] preloading TuneIn My Presets for media browsing (position %s)", logSource, entityId, myPresetsPosition);
       setTuneInBrowseContext(entityId, "My Presets");
-      await this.eiscpInstance.raw("NTCTOP");
-      await delay(menuDelay);
-      await this.eiscpInstance.raw("NTCSELECT");
-      await delay(menuDelay * 3);
-      await this.eiscpInstance.raw(`NLSI${myPresetsPosition}`);
-      await delay(scanDelay);
-      await this.requestTuneInPresetXml();
+       const legacy = this.eiscpInstance.eiscpConfig?.networkNavigationMode === "legacy";
+       if (!legacy) {
+         await this.eiscpInstance.raw("NTCTOP");
+         await delay(menuDelay);
+         await this.eiscpInstance.raw("NTCSELECT");
+         await delay(menuDelay * 3);
+       } else {
+         // Legacy receivers need time to finish entering the NET/TuneIn menu
+         // after source selection. The modern TOP/SELECT sequence used to
+         // provide this delay implicitly.
+         await delay(Math.max(scanDelay, menuDelay * 3));
+       }
+       await this.eiscpInstance.raw(`NLSI${myPresetsPosition}`);
+       await delay(legacy ? Math.max(scanDelay, menuDelay * 3) : scanDelay);
+       if (legacy) await this.requestLegacyTuneInPresetXml(entityId, scanDelay);
+       else await this.requestTuneInPresetXml();
       await delay(scanDelay);
 
       const lastCount = getTuneInPresetCount(entityId);
