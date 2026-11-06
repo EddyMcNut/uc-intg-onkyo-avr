@@ -154,7 +154,13 @@ export class TidalZoneAgnosticAdapter implements ZoneAgnosticServiceAdapter {
   handleNltContext(sourceEntityId: string, title: string): void {
     const activeZones = this.getActiveZones(sourceEntityId);
     if (!activeZones.some((zoneEntityId) => isLegacyNavigation(zoneEntityId, this.deps))) return;
-    if (!title.toLowerCase().replace(/[^a-z0-9]/g, "").includes("tidal")) return;
+    if (
+      !title
+        .toLowerCase()
+        .replace(/[^a-z0-9]/g, "")
+        .includes("tidal")
+    )
+      return;
     for (const zoneEntityId of activeZones) {
       resetTidalBrowseState(zoneEntityId);
       const state = getTidalBrowseState(zoneEntityId);
@@ -202,7 +208,13 @@ export class DeezerZoneAgnosticAdapter implements ZoneAgnosticServiceAdapter {
   handleNltContext(sourceEntityId: string, title: string): void {
     const activeZones = this.getActiveZones(sourceEntityId);
     if (!activeZones.some((zoneEntityId) => isLegacyNavigation(zoneEntityId, this.deps))) return;
-    if (!title.toLowerCase().replace(/[^a-z0-9]/g, "").includes("deezer")) return;
+    if (
+      !title
+        .toLowerCase()
+        .replace(/[^a-z0-9]/g, "")
+        .includes("deezer")
+    )
+      return;
     for (const zoneEntityId of activeZones) {
       resetDeezerBrowseState(zoneEntityId);
       const state = getDeezerBrowseState(zoneEntityId);
@@ -304,21 +316,11 @@ export class MusicServerZoneAgnosticAdapter implements ZoneAgnosticServiceAdapte
   handleNls(sourceEntityId: string, entry: string): void {
     for (const zoneEntityId of this.getActiveZones(sourceEntityId)) {
       if (!isLegacyNavigation(zoneEntityId, this.deps)) continue;
-      const title = entry.match(/^U\d+-(.*)$/)?.[1]?.trim().toLowerCase();
-      const netRootEntries = new Set([
-        "tunein",
-        "spotify",
-        "deezer",
-        "tidal",
-        "amazonmusic",
-        "chromecast built-in",
-        "dts play-fi",
-        "airplay",
-        "alexa",
-        "music server",
-        "usb",
-        "play queue"
-      ]);
+      const title = entry
+        .match(/^U\d+-(.*)$/)?.[1]
+        ?.trim()
+        .toLowerCase();
+      const netRootEntries = new Set(["tunein", "spotify", "deezer", "tidal", "amazonmusic", "chromecast built-in", "dts play-fi", "airplay", "alexa", "music server", "usb", "play queue"]);
       if (title && netRootEntries.has(title)) continue;
       ingestMusicServerListEntry(zoneEntityId, entry);
     }

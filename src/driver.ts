@@ -15,6 +15,7 @@ import {
   normalizeAvrConfig,
   getConfigPath
 } from "./configManager.js";
+import { isTunerPresetModeEnabled, parseTunerPresetMode } from "./configConstants.js";
 import { CommandSender } from "./commandSender.js";
 import { CommandReceiver } from "./commandReceiver.js";
 import { ReconnectionManager } from "./reconnectionManager.js";
@@ -396,16 +397,16 @@ export default class Driver {
         this.updateInputSourceOptions(avrConfig);
       }
 
-      if (avrConfig.createTunerPresets !== false && !presetsCollected) {
+      if (isTunerPresetModeEnabled(avrConfig.createTunerPresets) && !presetsCollected) {
         presetsCollected = true;
         presetsChanged = setTunerPresets(physicalAVR, listNamedPresets(entityId));
         if (presetsChanged) {
-          const names = getTunerPresetNames(physicalAVR);
+          const names = getTunerPresetNames(physicalAVR, parseTunerPresetMode(avrConfig.createTunerPresets) === "preset-order" ? "preset-order" : "alphabetical");
           log.debug("%s [%s] Tuner presets collected from the AVR: %d station(s): %s", logSource, zoneEntry, names.length, names.join(", "));
         }
       }
 
-      if (avrConfig.createTunerPresets !== false) {
+      if (isTunerPresetModeEnabled(avrConfig.createTunerPresets)) {
         this.registerTunerPresetsEntity(avrConfig);
         this.updateTunerPresetsOptions(avrConfig, presetsChanged);
       }
@@ -465,7 +466,7 @@ export default class Driver {
   // Rebuild tuner preset entities after setup connection handling, which may race the first NRI reply.
   private refreshTunerPresetEntities(): void {
     for (const avrConfig of this.config.avrs ?? []) {
-      if (avrConfig.createTunerPresets === false) {
+      if (!isTunerPresetModeEnabled(avrConfig.createTunerPresets)) {
         continue;
       }
 

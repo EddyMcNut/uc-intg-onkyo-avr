@@ -4,6 +4,7 @@ import { AvrConfig, buildEntityId, resolveVolumeScale } from "./configManager.js
 import EntityRegistrar from "./entityRegistrar.js";
 import { SelectEntityHandler } from "./selectEntityHandler.js";
 import { remoteEntityCommandHandler } from "./remoteEntityCommandHandler.js";
+import { isTunerPresetModeEnabled } from "./configConstants.js";
 
 export interface EntityRegistration {
   enabled: (config: AvrConfig) => boolean;
@@ -77,7 +78,7 @@ export class EntityRegistrationCoordinator {
         afterRegister: () => d.updateEntityAttributes(`${entityId}_input_selector`, { [SelectAttributes.Options]: d.entityRegistrar.getInputSelectorOptions(entityId) })
       },
       {
-        enabled: (c) => c.createTunerPresets !== false,
+        enabled: (c) => isTunerPresetModeEnabled(c.createTunerPresets),
         create: () => d.entityRegistrar.createTunerPresetsSelectEntity(entityId, d.tunerPresetsHandler?.handle.bind(d.tunerPresetsHandler) ?? (async () => uc.StatusCodes.Ok)),
         disabledMessage: `[${entityId}] Tuner presets select entity disabled by user preference`,
         afterRegister: () => d.updateEntityAttributes(`${entityId}_tuner_presets`, { [SelectAttributes.Options]: d.entityRegistrar.getTunerPresetOptions(entityId) })

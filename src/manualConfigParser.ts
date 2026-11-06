@@ -1,7 +1,7 @@
 // Focused responsibility: Parse and validate manual configuration input
 import { LogLevel, AVR_DEFAULTS, parseBoolean, parseVolumeScale, type VolumeScale } from "./configManager.js";
 import type { AvrInput } from "./inputSourceStore.js";
-import { NETWORK_INPUT_MARKERS, type InputSourceLayout, type InputSourceSettings, type NetworkInputMarker, type NetworkNavigationMode } from "./configConstants.js";
+import { NETWORK_INPUT_MARKERS, parseTunerPresetMode, type InputSourceLayout, type InputSourceSettings, type NetworkInputMarker, type NetworkNavigationMode, type TunerPresetMode } from "./configConstants.js";
 
 export interface ManualConfigInput {
   model?: unknown;
@@ -53,7 +53,7 @@ export interface ParsedManualConfig {
   entityNameStyleValue: "long" | "short";
   zoneCountValue: number;
   createSensorsValue: boolean;
-  createTunerPresetsValue: boolean;
+  createTunerPresetsValue: TunerPresetMode;
   createRemoteEntityValue: boolean;
   createDiracSelectEntityValue: boolean;
   netMenuDelayValue: number;
@@ -87,7 +87,7 @@ export class ManualConfigParser {
       adjustVolumeDisplValue: parseBoolean(input.adjustVolumeDispl, true),
       entityNameStyleValue: this.parseEntityNameStyle(input.entityNameStyle),
       createSensorsValue: parseBoolean(input.createSensors, AVR_DEFAULTS.createSensors),
-      createTunerPresetsValue: parseBoolean(input.createTunerPresets, AVR_DEFAULTS.createTunerPresets),
+      createTunerPresetsValue: parseTunerPresetMode(input.createTunerPresets ?? AVR_DEFAULTS.createTunerPresets),
       createRemoteEntityValue: parseBoolean(input.createRemoteEntity, AVR_DEFAULTS.createRemoteEntity),
       createDiracSelectEntityValue: parseBoolean(input.createDiracSelectEntity, AVR_DEFAULTS.createDiracSelectEntity),
       netMenuDelayValue: this.parseNetMenuDelay(input.netMenuDelay),

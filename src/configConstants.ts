@@ -186,7 +186,7 @@ export const AVR_DEFAULTS = {
   adjustVolumeDispl: true,
   entityNameStyle: "short",
   createSensors: true,
-  createTunerPresets: true,
+  createTunerPresets: "alphabetical",
   createRemoteEntity: true,
   createDiracSelectEntity: true,
   netMenuDelay: 500,
@@ -199,6 +199,22 @@ export const AVR_DEFAULTS = {
 } as const;
 
 export type EntityNameStyle = "long" | "short";
+export type TunerPresetMode = "alphabetical" | "preset-order" | "none";
+
+// Accept the old boolean values while normalizing the setting to its three
+// explicit modes. This keeps existing config files working.
+export function parseTunerPresetMode(raw: unknown): TunerPresetMode {
+  if (raw === true || String(raw ?? "").toLowerCase() === "true" || String(raw ?? "").toLowerCase() === "yes") return "alphabetical";
+  if (raw === false || String(raw ?? "").toLowerCase() === "false" || String(raw ?? "").toLowerCase() === "no") return "none";
+  const value = String(raw ?? "").trim().toLowerCase();
+  if (value === "preset-order" || value === "preset_order" || value === "presetorder") return "preset-order";
+  if (value === "none") return "none";
+  return "alphabetical";
+}
+
+export function isTunerPresetModeEnabled(raw: unknown): boolean {
+  return parseTunerPresetMode(raw) !== "none";
+}
 export type VolumeDisplay = "absolute" | "relative";
 export type TuneInMenuStyle = "mypresets" | "full";
 // `separate` is retained as a legacy persisted value and normalized to `network-last`.
@@ -223,7 +239,7 @@ export interface AvrConfig {
   adjustVolumeDispl?: boolean; // true = use 0.5 dB steps (×2 / ÷2), false = direct EISCP value
   entityNameStyle?: EntityNameStyle; // long = include host/ip in visible names, short = omit host/ip
   createSensors?: boolean; // true = create sensor entities for this AVR
-  createTunerPresets?: boolean; // true (default) = create the select entity listing the AVR's tuner presets
+  createTunerPresets?: TunerPresetMode | boolean; // alphabetical (default), preset-order, or none; booleans are legacy values
   createRemoteEntity?: boolean; // true = create a remote entity for this AVR
   createDiracSelectEntity?: boolean; // true (default) = create the Dirac select entity (fixed options)
   netMenuDelay?: number; // delay in ms for NET menu to load (default 2500)
@@ -248,7 +264,7 @@ export interface IntegrationConfig {
   adjustVolumeDispl?: boolean; // true = use 0.5 dB steps (×2 / ÷2), false = direct EISCP value
   entityNameStyle?: EntityNameStyle;
   createSensors?: boolean; // true = create sensor entities
-  createTunerPresets?: boolean; // true = create the tuner presets select entity
+  createTunerPresets?: TunerPresetMode | boolean;
   createRemoteEntity?: boolean; // true = create a remote entity
   // Legacy fields for backward compatibility
   model?: string;
@@ -272,7 +288,7 @@ export interface NormalizedAvrConfig {
   adjustVolumeDispl: boolean;
   entityNameStyle: EntityNameStyle;
   createSensors: boolean;
-  createTunerPresets: boolean;
+  createTunerPresets: TunerPresetMode;
   createRemoteEntity: boolean;
   createDiracSelectEntity: boolean;
   netMenuDelay: number;
@@ -307,7 +323,7 @@ export function normalizeAvrConfig(raw: AvrConfig): NormalizedAvrConfig {
 
   const createSensors = parseBoolean(raw.createSensors, AVR_DEFAULTS.createSensors);
 
-  const createTunerPresets = parseBoolean(raw.createTunerPresets, AVR_DEFAULTS.createTunerPresets);
+  const createTunerPresets = parseTunerPresetMode(raw.createTunerPresets ?? AVR_DEFAULTS.createTunerPresets);
 
   const createRemoteEntity = parseBoolean(raw.createRemoteEntity, AVR_DEFAULTS.createRemoteEntity);
 

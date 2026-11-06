@@ -44,9 +44,9 @@ export function createMenuBrowseState<TOption extends MenuBrowseOption>(): MenuB
     harvestMode: false,
     harvestGeneration: 0,
     xmlResponseSequence: 0,
-    browseListFrozen: false
-    , legacyServiceMenuActive: false
-    , contextTitle: ""
+    browseListFrozen: false,
+    legacyServiceMenuActive: false,
+    contextTitle: ""
   };
 }
 

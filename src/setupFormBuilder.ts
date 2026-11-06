@@ -319,8 +319,9 @@ export class SetupFormBuilder {
           dropdown: {
             value: String(values.createTunerPresetsValue),
             items: [
-              { id: "true", label: { en: "Yes (default)" } },
-              { id: "false", label: { en: "No" } }
+              { id: "alphabetical", label: { en: "Yes, alphabetically (default)" } },
+              { id: "preset-order", label: { en: "Yes, preset order" } },
+              { id: "none", label: { en: "No" } }
             ]
           }
         },
