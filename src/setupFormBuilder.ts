@@ -319,7 +319,7 @@ export class SetupFormBuilder {
           dropdown: {
             value: String(values.createTunerPresetsValue),
             items: [
-              { id: "alphabetical", label: { en: "Yes, alphabetically (default)" } },
+              { id: "alphabetical", label: { en: "Yes, sort A–Z (default)" } },
               { id: "preset-order", label: { en: "Yes, preset order" } },
               { id: "none", label: { en: "No" } }
             ]
