@@ -66,7 +66,8 @@ export class TuneInPreloader {
     const scanDelay = Math.max(200, Math.min(menuDelay || 0, 1000));
 
     try {
-      log.info("%s [%s] preloading TuneIn My Presets for media browsing (position %s)", logSource, entityId, myPresetsPosition);
+      const navigationMode = this.eiscpInstance.eiscpConfig?.networkNavigationMode ?? "modern";
+      log.info("%s [%s] preloading TuneIn My Presets (mode=%s, position %s)", logSource, entityId, navigationMode, myPresetsPosition);
       setTuneInBrowseContext(entityId, "My Presets");
        const legacy = this.eiscpInstance.eiscpConfig?.networkNavigationMode === "legacy";
        if (!legacy) {

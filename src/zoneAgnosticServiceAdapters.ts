@@ -19,6 +19,7 @@ import { clearTuneInPresets, resetTuneInBrowseState, updateNowPlayingStation } f
 import { resetTuneInMenuBrowseState, setTuneInMenuNowPlayingStation, updateTuneInMenuNowPlayingStation } from "./tuneInMenuStore.js";
 import { DEEZER_SERVICE_ID, MUSIC_SERVER_SERVICE_ID, TIDAL_SERVICE_ID, TUNEIN_SERVICE_ID } from "./browseServiceContract.js";
 import type { NetworkNavigationMode } from "./configConstants.js";
+import log from "./loggers.js";
 
 type SubSourceStateApi = {
   getSubSource(entityId: string): string;
@@ -126,7 +127,12 @@ export class TuneInZoneAgnosticAdapter implements ZoneAgnosticServiceAdapter {
   }
 
   handleMetadata(zoneEntityId: string, artist: string): void {
-    updateNowPlayingStation(zoneEntityId, artist);
+    const matchedPreset = updateNowPlayingStation(zoneEntityId, artist);
+    if (matchedPreset) {
+      log.info("tuneInAdapter: [%s] TuneIn station started: '%s' (matched a known preset)", zoneEntityId, artist);
+    } else if (artist) {
+      log.debug("tuneInAdapter: [%s] TuneIn metadata station candidate: '%s' (not matched to a known preset)", zoneEntityId, artist);
+    }
     updateTuneInMenuNowPlayingStation(zoneEntityId, artist);
   }
 

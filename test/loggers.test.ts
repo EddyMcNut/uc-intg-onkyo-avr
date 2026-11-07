@@ -84,6 +84,14 @@ describe("loggers", () => {
     spy.mockRestore();
   });
 
+  it("removes empty lines from multiline log messages", () => {
+    mod.setLogLevel("debug");
+    const spy = vi.spyOn(console, "log").mockImplementation(() => {});
+    mod.default.debug("first\n\n  \nsecond");
+    expect(spy).toHaveBeenCalledWith("[DEBUG]", "first\nsecond");
+    spy.mockRestore();
+  });
+
   it("warn is suppressed when level is error", () => {
     mod.setLogLevel("error");
     const spy = vi.spyOn(console, "log").mockImplementation(() => {});
