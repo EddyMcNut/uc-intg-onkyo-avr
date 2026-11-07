@@ -6,6 +6,16 @@ const LEVEL_RANK: Record<LogLevel, number> = { debug: 0, info: 1, warn: 2, error
 
 let currentLevel: LogLevel = "warn";
 
+function formatLogMessage(args: unknown[]): string {
+  // Multiline payloads (notably NRI XML) are prefixed by the host logger once
+  // per line. Do not emit empty payload lines as separate, useless log records.
+  return util
+    .format(...args)
+    .split(/\r?\n/)
+    .filter((line) => line.trim().length > 0)
+    .join("\n");
+}
+
 export function setLogLevel(level: LogLevel): void {
   const previous = currentLevel;
   currentLevel = level;
@@ -20,16 +30,16 @@ export function getLogLevel(): LogLevel {
 
 const log = {
   debug: (...args: unknown[]) => {
-    if (LEVEL_RANK["debug"] >= LEVEL_RANK[currentLevel]) console.log("[DEBUG]", util.format(...args));
+    if (LEVEL_RANK["debug"] >= LEVEL_RANK[currentLevel]) console.log("[DEBUG]", formatLogMessage(args));
   },
   info: (...args: unknown[]) => {
-    if (LEVEL_RANK["info"] >= LEVEL_RANK[currentLevel]) console.log("[INFO]", util.format(...args));
+    if (LEVEL_RANK["info"] >= LEVEL_RANK[currentLevel]) console.log("[INFO]", formatLogMessage(args));
   },
   warn: (...args: unknown[]) => {
-    if (LEVEL_RANK["warn"] >= LEVEL_RANK[currentLevel]) console.log("[WARN]", util.format(...args));
+    if (LEVEL_RANK["warn"] >= LEVEL_RANK[currentLevel]) console.log("[WARN]", formatLogMessage(args));
   },
   error: (...args: unknown[]) => {
-    console.log("[ERROR]", util.format(...args));
+    console.log("[ERROR]", formatLogMessage(args));
   }
 };
 

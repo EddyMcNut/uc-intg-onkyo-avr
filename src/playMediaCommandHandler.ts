@@ -26,7 +26,7 @@ import { consumeTidalListModeActive, consumeTraceNextTidalSelectionAfterMainMenu
 import { consumeDeezerListModeActive, consumeTraceNextDeezerSelectionAfterMainMenu, getDeezerBrowseState, listDeezerMenuOptions } from "./deezerBrowserStore.js";
 import { consumeMusicServerListModeActive, consumeTraceNextMusicServerSelectionAfterMainMenu, getMusicServerBrowseState, listMusicServerMenuOptions } from "./musicServerBrowserStore.js";
 import { consumeTuneInListModeActive, getTuneInMenuBrowseState, resetTuneInMenuBrowseState, setTuneInMenuBrowseFrozen, setTuneInMenuNowPlayingStation } from "./tuneInMenuStore.js";
-import { getTuneInBrowseState, setTuneInBrowseFrozen } from "./tuneInBrowserStore.js";
+import { getTuneInBrowseState, getTuneInPreset, listTuneInPresets, setTuneInBrowseFrozen } from "./tuneInBrowserStore.js";
 import { AVR_DEFAULTS, ConfigManager, DEFAULT_QUEUE_THRESHOLD, buildEntityId } from "./configManager.js";
 import {
   DEEZER_SERVICE_ID,
@@ -222,6 +222,22 @@ export class PlayMediaCommandHandler {
     }
 
     if (preset) {
+      const configuredMode = this.eiscp.eiscpConfig?.networkNavigationMode ?? "modern";
+      const cachedPreset = getTuneInPreset(entityId, preset.presetIndex);
+      const presetMap = listTuneInPresets(entityId, "preset-order")
+        .map((item) => `${item.presetIndex}='${item.title}'`)
+        .join(", ");
+      log.debug(
+        "%s [%s] TuneIn preset selection: mode=%s requested=%s index=%d station='%s' rawLabel='%s' presetMap=[%s]",
+        logSource,
+        entityId,
+        configuredMode,
+        mediaId ?? "",
+        preset.presetIndex,
+        cachedPreset?.title ?? "unknown",
+        cachedPreset?.rawLabel ?? "unknown",
+        presetMap
+      );
       if (!modern) setTuneInBrowseFrozen(entityId, true);
       const wasPreloading = this.commandReceiver?.abortTuneInPreload?.(entityId) ?? false;
       // Only force select if preload was interrupted; wasPreloading || undefined ensures false becomes undefined

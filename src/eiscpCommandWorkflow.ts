@@ -69,6 +69,13 @@ export class EiscpCommandWorkflow {
     const menuDelay = config.netMenuDelay ?? 2500;
     const menuPosition = String(config.tuneinPresetPosition ?? 1).padStart(5, "0");
 
+    log.debug(
+      "eiscpCommandWorkflow: TuneIn preset command=%s mode=%s sequence=NTCTOP -> NTCSELECT -> NLSI%s -> NLSI%s",
+      command,
+      config.networkNavigationMode ?? "modern",
+      menuPosition,
+      presetIndex
+    );
     this.dependencies.publishMetadata({ artist: `Selecting preset ${preset}...`, album: "please wait" }, command);
     await this.dependencies.raw("NTCTOP");
     await delay(menuDelay);
