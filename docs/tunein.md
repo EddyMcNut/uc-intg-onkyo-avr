@@ -58,6 +58,11 @@ This integration (v0.8.10+) can be configured to browse the TuneIn menu, instead
 
 **When you want to go back in menu options, it's best to use `TuneIn Main Menu` or `Back` at the top of the options, the back button in the Media Browser itself does not yet set the AVR state one step back in menu navigation so you could get into unexpected behavior using the back option of the Media Browser.**
 
+### Service mode
+In case browsing/selecting is not working reliably for you, in WebConfigurator select `Configure integration`, find `Network service navigation` and set that to `Legacy` instead of the default value. Make sure you complete the configuration by clicking next a few times so reconfigure completes and closes itself.
+
+![](../screenshots/network-service-navigation.png)
+
 ### Note
 
 If selecting `tunein` as Input source does not work, check the manual of your AVR to see if TuneIn is even available as selectable input on the AVR:
