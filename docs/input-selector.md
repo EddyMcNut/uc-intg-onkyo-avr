@@ -14,7 +14,7 @@ After upgrading to version 0.9.9, configure the input sources once for each AVR 
 
 The integration is now able to collect the exact names that your specific AVR is using. It can however only learn that name that kind of reporting is supported by your AVR. So, with inital install of v0.9.9. all input sources known by this integration are set to `✨ Discover from AVR`. When your AVR reports its own dialect of that specific input source, this integration will learn it, and status changes to `✅ AVR-discovered` and from now on use that name instead of one of the aliases. You can change this behavior by selecting the alias you prefer. You can also `🚫 Don't include` aan input source if you never use it anyway. Then the list of linput sources in the select-entity will be shorter.
 
-![](../screenshots/setup-inputsources.png)
+![](../screenshots/configure-input1.png)
 
 ### NET
 
