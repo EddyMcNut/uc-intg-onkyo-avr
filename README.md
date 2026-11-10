@@ -40,6 +40,8 @@ Users report it to work with several Onkyo, Pioneer and Integra models.
 
 [Backup and Restore](./docs/backup-restore.md)
 
+[Reconfigure](./docs/configuration.md)
+
 Example activities:
 
 - [Spotify](./docs/spotify.md)

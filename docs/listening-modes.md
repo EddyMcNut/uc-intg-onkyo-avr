@@ -12,11 +12,11 @@ Since v0.9.9, the integration is able to learn the exact names that your specifi
 
 For most AVRs, `Straight Decode` triggers the AVR to select a setting, which does not send out a specific name for Straight Decode. So a name will probably never be learned, thats why for Straight Decome de default setting is `Integration-preferred`. Basically to not be the only name shown as the known alias straight-decode.
 
-![](../screenshots/setup-listeningmodes.png)
+![](../screenshots/configure-listeningmodes1.png)
 
 For some codes used by the AVR, it depends on source and audio format which name is used. The integration stores all that info and can like that use the specific name used for a specific situation. So now, even when for example `Dolby Atmos` is not known by this integration default listening modes, after your AVR has been playing Dolby Atmos, you can select that listening mode later directly again when the AVR is playing that audio format.
 
-![](../screenshots/setup-listeningmodes-multiname.png)
+![](../screenshots/configure-listeningmodes-multiname.png)
 
 ## Select from list
 
@@ -45,7 +45,7 @@ As from version 0.8.0, the integration offers a `select` widget for listening mo
 
 Different models sometimes use different names for a single listening mode.
 
-## Example of known Pioneer listening modes
+## Example of known Pioneer listening mode aliases
 
 | Listening modes known to be accepted by Pioneer |
 | ----------------------------------------------- |
