@@ -6,7 +6,7 @@ The `Input source` command offers a dropdown list [based on your config](./sourc
 
 Input sources are configured per physical AVR and apply to all of that AVR's configured zones. During setup, choose **Configure input sources**. If more than one AVR is configured, setup first asks which AVR to configure.
 
-After upgrading to version 0.9.9, configure the input sources once for each AVR so you can choose which sources to include and which names to display.
+After upgrading to version 1.0.0, configure the input sources once for each AVR so you can choose which sources to include and which names to display.
 
 ![](/screenshots/input-source2.png)
 
