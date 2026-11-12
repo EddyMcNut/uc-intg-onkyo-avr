@@ -2,7 +2,7 @@
 
 Listening modes are configured per physical AVR and apply to all configured zones of that AVR. If more than one AVR is configured, setup asks which AVR should be configured.
 
-The integration can discover AVR-specific listening-mode names and codes. Use **Discover from AVR** to obtain a name when the relevant input and audio format are active. Once the AVR-specific name has been learned, it is shown as **AVR-discovered**. This also allows listening modes that are not part of the integration's built-in command mappings to be configured and selected.
+This also allows listening modes that are not part of the integration's built-in command mappings to be configured and selected.
 
 After upgrading to version 1.0.0, configure the listening modes once for each AVR if you want to change the defaults.
 
