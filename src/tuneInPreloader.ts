@@ -69,22 +69,22 @@ export class TuneInPreloader {
       const navigationMode = this.eiscpInstance.eiscpConfig?.networkNavigationMode ?? "modern";
       log.info("%s [%s] preloading TuneIn My Presets (mode=%s, position %s)", logSource, entityId, navigationMode, myPresetsPosition);
       setTuneInBrowseContext(entityId, "My Presets");
-       const legacy = this.eiscpInstance.eiscpConfig?.networkNavigationMode === "legacy";
-       if (!legacy) {
-         await this.eiscpInstance.raw("NTCTOP");
-         await delay(menuDelay);
-         await this.eiscpInstance.raw("NTCSELECT");
-         await delay(menuDelay * 3);
-       } else {
-         // Legacy receivers need time to finish entering the NET/TuneIn menu
-         // after source selection. The modern TOP/SELECT sequence used to
-         // provide this delay implicitly.
-         await delay(Math.max(scanDelay, menuDelay * 3));
-       }
-       await this.eiscpInstance.raw(`NLSI${myPresetsPosition}`);
-       await delay(legacy ? Math.max(scanDelay, menuDelay * 3) : scanDelay);
-       if (legacy) await this.requestLegacyTuneInPresetXml(entityId, scanDelay);
-       else await this.requestTuneInPresetXml();
+      const legacy = this.eiscpInstance.eiscpConfig?.networkNavigationMode === "legacy";
+      if (!legacy) {
+        await this.eiscpInstance.raw("NTCTOP");
+        await delay(menuDelay);
+        await this.eiscpInstance.raw("NTCSELECT");
+        await delay(menuDelay * 3);
+      } else {
+        // Legacy receivers need time to finish entering the NET/TuneIn menu
+        // after source selection. The modern TOP/SELECT sequence used to
+        // provide this delay implicitly.
+        await delay(Math.max(scanDelay, menuDelay * 3));
+      }
+      await this.eiscpInstance.raw(`NLSI${myPresetsPosition}`);
+      await delay(legacy ? Math.max(scanDelay, menuDelay * 3) : scanDelay);
+      if (legacy) await this.requestLegacyTuneInPresetXml(entityId, scanDelay);
+      else await this.requestTuneInPresetXml();
       await delay(scanDelay);
 
       const lastCount = getTuneInPresetCount(entityId);

@@ -1,7 +1,17 @@
 // Focused responsibility: Parse and validate manual configuration input
 import { LogLevel, AVR_DEFAULTS, parseBoolean, parseVolumeScale, type VolumeScale } from "./configManager.js";
 import type { AvrInput } from "./inputSourceStore.js";
-import { NETWORK_INPUT_MARKERS, parseTunerPresetMode, parseTuneInMenuStyle, type InputSourceLayout, type InputSourceSettings, type NetworkInputMarker, type NetworkNavigationMode, type TunerPresetMode, type TuneInMenuStyle } from "./configConstants.js";
+import {
+  NETWORK_INPUT_MARKERS,
+  parseTunerPresetMode,
+  parseTuneInMenuStyle,
+  type InputSourceLayout,
+  type InputSourceSettings,
+  type NetworkInputMarker,
+  type NetworkNavigationMode,
+  type TunerPresetMode,
+  type TuneInMenuStyle
+} from "./configConstants.js";
 
 export interface ManualConfigInput {
   model?: unknown;

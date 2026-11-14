@@ -206,7 +206,9 @@ export type TunerPresetMode = "alphabetical" | "preset-order" | "none";
 export function parseTunerPresetMode(raw: unknown): TunerPresetMode {
   if (raw === true || String(raw ?? "").toLowerCase() === "true" || String(raw ?? "").toLowerCase() === "yes") return "alphabetical";
   if (raw === false || String(raw ?? "").toLowerCase() === "false" || String(raw ?? "").toLowerCase() === "no") return "none";
-  const value = String(raw ?? "").trim().toLowerCase();
+  const value = String(raw ?? "")
+    .trim()
+    .toLowerCase();
   if (value === "preset-order" || value === "preset_order" || value === "presetorder") return "preset-order";
   if (value === "none") return "none";
   return "alphabetical";
@@ -219,7 +221,9 @@ export type VolumeDisplay = "absolute" | "relative";
 export type TuneInMenuStyle = "mypresets-alphabetical" | "mypresets-preset-order" | "full";
 
 export function parseTuneInMenuStyle(raw: unknown): TuneInMenuStyle {
-  const value = String(raw ?? "").trim().toLowerCase();
+  const value = String(raw ?? "")
+    .trim()
+    .toLowerCase();
   if (value === "full") return "full";
   if (value === "mypresets-preset-order" || value === "mypresets_preset_order" || value === "preset-order") return "mypresets-preset-order";
   return "mypresets-alphabetical";

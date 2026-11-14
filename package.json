@@ -15,6 +15,7 @@
     "lint": "eslint --fix",
     "build": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\" && tsc",
     "test": "npm run build && vitest run",
+    "test:ci": "npm run build && vitest run --reporter=verbose --reporter=junit --outputFile=test-results.xml",
     "test:watch": "vitest",
     "coverage": "npm run build && vitest run --coverage",
     "start": "npm run build && node scripts/generate-simplecommands-doc.mjs && node dist/driver.js"
@@ -41,19 +42,20 @@
   },
   "homepage": "https://github.com/EddyMcNut/uc-intg-onkyo-avr",
   "overrides": {
-    "js-yaml": "3.14.2"
+    "js-yaml": "3.14.2",
+    "minimatch": "11.0.8"
   },
   "devDependencies": {
     "@types/node": "26.6.6",
     "@types/node-fetch": "^2.6.13",
     "@types/ws": "^8.18.2",
-    "@typescript-eslint/eslint-plugin": "8.72.1",
-    "@typescript-eslint/parser": "8.72.1",
+    "@typescript-eslint/eslint-plugin": "8.72.2",
+    "@typescript-eslint/parser": "8.72.2",
     "@vitest/coverage-v8": "5.1.0",
-    "eslint": "10.14.0",
+    "eslint": "10.15.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-prettier": "^5.5.7",
-    "prettier": "3.9.10",
+    "prettier": "3.10.1",
     "ts-node": "10.9.2",
     "typescript": "6.0.x",
     "vitest": "5.1.0"

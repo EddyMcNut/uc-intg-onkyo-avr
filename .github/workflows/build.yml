@@ -51,12 +51,20 @@ jobs:
 
       - name: Build
         run: |
-          npm install
+          npm ci
           npm run build
 
       - name: Run tests
         run: |
-          npm test
+          npm run test:ci
+
+      - name: Upload test report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-results
+          path: test-results.xml
+          if-no-files-found: ignore
 
       - name: Remove config.json
         run: rm -f config.json
@@ -64,7 +72,7 @@ jobs:
       - name: Get production modules
         run: |
           rm -Rf node_modules
-          npm install --production
+          npm ci --omit=dev
 
       - name: Add version
         run: |
