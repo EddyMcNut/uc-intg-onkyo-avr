@@ -248,7 +248,7 @@ export class SetupFormBuilder {
             ]
           }
         },
-        description: { en: "Modern uses the current XML/NSV network-service navigation. Legacy uses the pre-v0.9.9 menu/list navigation for older or incompatible devices." }
+        description: { en: "Modern uses the current XML/NSV network-service navigation. Legacy uses the pre-v1.0.0 menu/list navigation for older or incompatible devices." }
       },
       {
         id: "tuneinPresetPosition",

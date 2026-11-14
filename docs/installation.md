@@ -29,7 +29,7 @@
 - Click `Next`.
 - Click `Add all`, click `Done`.
 
-When upgrading to version 0.9.9, configure listening modes and input sources once for each AVR if you want to change the defaults.
+When upgrading to version 1.0.0, configure listening modes and input sources once for each AVR if you want to change the defaults.
 
 ![](../screenshots/setup-int-lmd-sli.png)
 
