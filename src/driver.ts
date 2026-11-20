@@ -20,7 +20,7 @@ import { CommandSender } from "./commandSender.js";
 import { CommandReceiver } from "./commandReceiver.js";
 import { ReconnectionManager } from "./reconnectionManager.js";
 import { AvrStateManager } from "./avrState.js";
-import { avrStateQueryService } from "./avrStateQuery.js";
+import { AvrStateQueryService } from "./avrStateQuery.js";
 import { initMediaBrowser } from "./mediaBrowser.js";
 import log, { setLogLevel } from "./loggers.js";
 import { logGeneratedCount } from "./simpleCommands.js";
@@ -57,6 +57,8 @@ export default class Driver {
   private readonly avrStateApi: AvrStateApi = new AvrStateManager();
   // Per-AVR runtime state. TRANSITIONAL: the shared registry until every component receives it explicitly (item 10).
   private readonly avrContexts: AvrContextRegistry = sharedAvrContexts;
+  // Debounces state queries per zone entity; shared by the driver and the subscription handler.
+  private readonly avrStateQuery = new AvrStateQueryService();
   private driverVersion: string = "unknown";
 
   // Handler extracted to separate module for clarity/testing
@@ -131,7 +133,7 @@ export default class Driver {
     );
     this.diracHandler = new SelectEntityHandler(this.driver, this.connectionManager, this.avrInstances, "_dirac", "dirac", "Dirac", () => [...DIRAC_OPTION_LABELS], diracOptionToServiceKey);
     this.remoteEntityCommandHandler = new remoteEntityCommandHandler(this.driver, this.connectionManager, this.avrInstances, this.avrStateApi, this.avrContexts);
-    this.subscriptionHandler = new SubscriptionHandler(this.connectionManager, this.avrInstances);
+    this.subscriptionHandler = new SubscriptionHandler(this.connectionManager, this.avrInstances, this.avrStateQuery);
     this.entityRegistrationCoordinator = this.createEntityRegistrationCoordinator();
 
     // Create connect coordinator — orchestrates physical connections, zone instances, and initial queries
@@ -529,7 +531,7 @@ export default class Driver {
     const queueThreshold = instance?.config.queueThreshold ?? DEFAULT_QUEUE_THRESHOLD;
 
     // Delegate to query service (includes its own debounce guard)
-    await avrStateQueryService.queryAvrState(avrEntry, eiscp, zone, context, queueThreshold);
+    await this.avrStateQuery.queryAvrState(avrEntry, eiscp, zone, context, queueThreshold);
   }
 
   // Query state for all zones of a physical AVR
@@ -559,7 +561,7 @@ export default class Driver {
       }
     }
     if (queried.length > 0) {
-      avrStateQueryService.recordQueries(queried);
+      this.avrStateQuery.recordQueries(queried);
     }
   }
 

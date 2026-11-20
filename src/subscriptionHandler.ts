@@ -1,6 +1,6 @@
 import { AvrInstance } from "./types.js";
 import ConnectionManager from "./connectionManager.js";
-import { avrStateQueryService } from "./avrStateQuery.js";
+import type { AvrStateQueryService } from "./avrStateQuery.js";
 import { buildPhysicalAvrId } from "./configManager.js";
 import { ALL_SUFFIXES } from "./sensorSuffixes.js";
 import { CONNECTION_TIMEOUT } from "./constants.js";
@@ -14,7 +14,8 @@ const SUFFIX_PATTERN = new RegExp(`(${ALL_SUFFIXES.map((s) => s.replace(/^_/, ""
 export default class SubscriptionHandler {
   constructor(
     private connectionManager: ConnectionManager,
-    private avrInstances: ReadonlyMap<string, AvrInstance>
+    private avrInstances: ReadonlyMap<string, AvrInstance>,
+    private readonly avrStateQuery: AvrStateQueryService
   ) {}
 
   public async handle(entityId: string): Promise<void> {
@@ -27,7 +28,7 @@ export default class SubscriptionHandler {
       return;
     }
 
-    if (!avrStateQueryService.shouldQuery(baseEntityId)) {
+    if (!this.avrStateQuery.shouldQuery(baseEntityId)) {
       log.debug("%s [%s] Subscription received shortly after recent query, skipping", logSource, baseEntityId);
       return;
     }
@@ -43,7 +44,7 @@ export default class SubscriptionHandler {
     if (physicalConnection.eiscp.connected) {
       const queueThreshold = instance.config.queueThreshold ?? 0;
       log.info("%s [%s] Subscribed entity connected, querying state (threshold: %dms)", logSource, entityId, queueThreshold);
-      await avrStateQueryService.queryAvrState(baseEntityId, physicalConnection.eiscp, instance.config.zone, "on subscribe", queueThreshold);
+      await this.avrStateQuery.queryAvrState(baseEntityId, physicalConnection.eiscp, instance.config.zone, "on subscribe", queueThreshold);
       return;
     }
 
@@ -57,7 +58,7 @@ export default class SubscriptionHandler {
       await physicalConnection.eiscp.waitForConnect(CONNECTION_TIMEOUT);
       log.info("%s [%s] Reconnected on subscription", logSource, physicalAVR);
 
-      await avrStateQueryService.queryAvrState(baseEntityId, physicalConnection.eiscp, instance.config.zone, "after subscription reconnection", instance.config.queueThreshold ?? 0);
+      await this.avrStateQuery.queryAvrState(baseEntityId, physicalConnection.eiscp, instance.config.zone, "after subscription reconnection", instance.config.queueThreshold ?? 0);
     } catch (err) {
       log.warn("%s [%s] Failed to reconnect on subscription: %s", logSource, physicalAVR, err);
       this.connectionManager.scheduleReconnect(physicalAVR, physicalConnection, instance.config);

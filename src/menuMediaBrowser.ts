@@ -1,3 +1,4 @@
+import { sharedAvrContexts, type AvrContextRegistry } from "./avrContext.js";
 import * as uc from "@unfoldedcircle/integration-api";
 import log from "./loggers.js";
 import { createServiceThumbnails } from "./serviceThumbnails.js";
@@ -81,7 +82,7 @@ function createExcludedTitleChecker(excludedPrefixes: string[]): (title: string)
   };
 }
 
-export function createMediaBrowser(cfg: MediaBrowserConfig, store: MenuBrowseStore): MediaBrowserApi {
+export function createMediaBrowser(cfg: MediaBrowserConfig, store: MenuBrowseStore, contexts: AvrContextRegistry = sharedAvrContexts): MediaBrowserApi {
   const logSource = `${cfg.providerLabel.toLowerCase().replace(/\s+/g, "")}MediaBrowser:`;
   const isExcludedTitle = createExcludedTitleChecker(cfg.excludedPrefixes);
 
@@ -91,7 +92,7 @@ export function createMediaBrowser(cfg: MediaBrowserConfig, store: MenuBrowseSto
 
   function ingestXmlEntries(entityId: string, xmlPayload: string): void {
     if (!xmlPayload) return;
-    const browseState = store.getBrowseState(entityId);
+    const browseState = store.getBrowseState(entityId, contexts);
     if (browseState) browseState.xmlResponseSequence += 1;
     const xmlOffset = getXmlOffset(xmlPayload);
     const xmlItems = parseXmlItems(xmlPayload);
@@ -102,7 +103,7 @@ export function createMediaBrowser(cfg: MediaBrowserConfig, store: MenuBrowseSto
       const menuIndex = xmlOffset + i + 1;
       // XML responses are explicit browse results. They must still populate
       // later pages after playback has frozen the now-playing decoration.
-      store.addMenuOption(entityId, menuIndex, item.title, getOrCreateThumbnail, item.iconType === "M" ? false : undefined, true);
+      store.addMenuOption(entityId, menuIndex, item.title, getOrCreateThumbnail, item.iconType === "M" ? false : undefined, true, true, contexts);
     }
   }
 
@@ -121,13 +122,13 @@ export function createMediaBrowser(cfg: MediaBrowserConfig, store: MenuBrowseSto
       return;
     }
 
-    const browseState = store.getBrowseState(entityId);
+    const browseState = store.getBrowseState(entityId, contexts);
     const cursorOffset = browseState?.nlsCursorOffset ?? 0;
     const windowStart = Math.max(0, cursorOffset - 9);
     const absoluteMenuIndex = windowStart + parsed.menuIndex + 1;
     // Legacy NLS can arrive as several ten-line windows, each restarting at
     // U0. Do not clear the accumulated list when a later window starts.
-    store.addMenuOption(entityId, absoluteMenuIndex, title, getOrCreateThumbnail, undefined, false, false);
+    store.addMenuOption(entityId, absoluteMenuIndex, title, getOrCreateThumbnail, undefined, false, false, contexts);
   }
 
   function resolveMenuOption(mediaId?: string, mediaType?: string): MenuBrowseOption | undefined {
@@ -176,8 +177,8 @@ export function createMediaBrowser(cfg: MediaBrowserConfig, store: MenuBrowseSto
   }
 
   async function browse(entityId: string, options: uc.BrowseOptions): Promise<uc.StatusCodes | uc.BrowseResult> {
-    const menuOptions = store.listOptions(entityId);
-    const browseState = store.getBrowseState(entityId);
+    const menuOptions = store.listOptions(entityId, contexts);
+    const browseState = store.getBrowseState(entityId, contexts);
     // NLT reports the complete AVR list size before NLAL pages arrive. Expose
     // that total to the remote so it requests subsequent pages instead of
     // treating the currently-ingested first page as the end of the list.
@@ -230,8 +231,8 @@ export function createMediaBrowser(cfg: MediaBrowserConfig, store: MenuBrowseSto
   }
 
   function createRootItem(entityId: string, paging: uc.Paging): uc.BrowseMediaItem {
-    const options = store.listOptions(entityId);
-    const browseState = store.getBrowseState(entityId);
+    const options = store.listOptions(entityId, contexts);
+    const browseState = store.getBrowseState(entityId, contexts);
     const nowPlayingTitle = browseState?.nowPlayingTitle ?? "";
     // Returning to the browser after playback may recreate the browse context
     // and clear the transient shortcut flag. An active now-playing title is

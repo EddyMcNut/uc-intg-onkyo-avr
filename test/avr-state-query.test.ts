@@ -9,13 +9,13 @@ function makeMockEiscp() {
 
 it("shouldQuery returns true when no query has been recorded", async () => {
   const mod = await import("../src/avrStateQuery.js");
-  const { avrStateQueryService } = mod as any;
+  const avrStateQueryService = new (mod as any).AvrStateQueryService();
   expect(avrStateQueryService.shouldQuery("sq-empty-" + Date.now())).toBe(true);
 });
 
 it("shouldQuery returns false shortly after recordQuery", async () => {
   const mod = await import("../src/avrStateQuery.js");
-  const { avrStateQueryService } = mod as any;
+  const avrStateQueryService = new (mod as any).AvrStateQueryService();
   const eid = "sq-recent-" + Date.now();
   avrStateQueryService.recordQuery(eid);
   expect(avrStateQueryService.shouldQuery(eid)).toBe(false);
@@ -23,7 +23,7 @@ it("shouldQuery returns false shortly after recordQuery", async () => {
 
 it("recordQueries batch records timestamps", async () => {
   const mod = await import("../src/avrStateQuery.js");
-  const { avrStateQueryService } = mod as any;
+  const avrStateQueryService = new (mod as any).AvrStateQueryService();
   const eid1 = "rq-a-" + Date.now();
   const eid2 = "rq-b-" + Date.now();
   avrStateQueryService.recordQueries([eid1, eid2]);
@@ -33,13 +33,13 @@ it("recordQueries batch records timestamps", async () => {
 
 it("queryAvrState returns early when no eiscpInstance", async () => {
   const mod = await import("../src/avrStateQuery.js");
-  const { avrStateQueryService } = mod as any;
+  const avrStateQueryService = new (mod as any).AvrStateQueryService();
   await expect(avrStateQueryService.queryAvrState("entity", null, "main", "test")).resolves.toBeUndefined();
 });
 
 it("queryAvrState returns early when no zone", async () => {
   const mod = await import("../src/avrStateQuery.js");
-  const { avrStateQueryService } = mod as any;
+  const avrStateQueryService = new (mod as any).AvrStateQueryService();
   const mock = makeMockEiscp();
   await avrStateQueryService.queryAvrState("entity", mock, "", "test");
   expect(mock.command).not.toHaveBeenCalled();
@@ -47,7 +47,7 @@ it("queryAvrState returns early when no zone", async () => {
 
 it("queryAvrState returns early when no entityId", async () => {
   const mod = await import("../src/avrStateQuery.js");
-  const { avrStateQueryService } = mod as any;
+  const avrStateQueryService = new (mod as any).AvrStateQueryService();
   const mock = makeMockEiscp();
   await avrStateQueryService.queryAvrState("", mock, "main", "test");
   expect(mock.command).not.toHaveBeenCalled();
@@ -55,7 +55,7 @@ it("queryAvrState returns early when no entityId", async () => {
 
 it("queryAvrState sends all query commands in order", async () => {
   const mod = await import("../src/avrStateQuery.js");
-  const { avrStateQueryService } = mod as any;
+  const avrStateQueryService = new (mod as any).AvrStateQueryService();
   const eid = "qa-order-" + Date.now();
   const commands: Array<{ zone: string; command: string; args: string }> = [];
   const mock = {
@@ -83,7 +83,7 @@ it("queryAvrState sends all query commands in order", async () => {
 
 it("queryAvrState does not query avr-info", async () => {
   const queryMod = await import("../src/avrStateQuery.js");
-  const { avrStateQueryService } = queryMod as any;
+  const avrStateQueryService = new (queryMod as any).AvrStateQueryService();
 
   const eid = `TX-RZ50 10.0.0.${Math.floor(Math.random() * 250) + 1} main`;
 
@@ -102,7 +102,7 @@ it("queryAvrState does not query avr-info", async () => {
 
 it("queryAvrState skips redundant query", async () => {
   const mod = await import("../src/avrStateQuery.js");
-  const { avrStateQueryService } = mod as any;
+  const avrStateQueryService = new (mod as any).AvrStateQueryService();
   const eid = "qa-skip-" + Date.now();
   const mock = { command: vi.fn(), eiscpConfig: { sendDelay: 10 } };
 
@@ -116,7 +116,7 @@ it("queryAvrState skips redundant query", async () => {
 
 it("queryAvrState uses custom queueThreshold when provided", async () => {
   const mod = await import("../src/avrStateQuery.js");
-  const { avrStateQueryService } = mod as any;
+  const avrStateQueryService = new (mod as any).AvrStateQueryService();
   const eid = "qa-qt-" + Date.now();
   const mock = { command: vi.fn(), eiscpConfig: { sendDelay: 500 } };
 
@@ -126,7 +126,7 @@ it("queryAvrState uses custom queueThreshold when provided", async () => {
 
 it("queryAvrState handles command errors gracefully", async () => {
   const mod = await import("../src/avrStateQuery.js");
-  const { avrStateQueryService } = mod as any;
+  const avrStateQueryService = new (mod as any).AvrStateQueryService();
   const eid = "qa-err-" + Date.now();
   const mock = { command: vi.fn().mockRejectedValue(new Error("connection lost")), eiscpConfig: { sendDelay: 10 } };
 

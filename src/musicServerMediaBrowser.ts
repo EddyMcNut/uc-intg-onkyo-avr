@@ -1,6 +1,7 @@
 import type { MenuBrowseOption } from "./menuBrowseState.js";
-import { getMusicServerBrowseState, musicServerStore } from "./musicServerBrowserStore.js";
-import { createMediaBrowser, type MediaBrowserApi } from "./menuMediaBrowser.js";
+import { musicServerStore } from "./musicServerBrowserStore.js";
+import { createMediaBrowser, type MediaBrowserApi, type MediaBrowserConfig } from "./menuMediaBrowser.js";
+import { sharedAvrContexts, type AvrContextRegistry } from "./avrContext.js";
 import type * as uc from "@unfoldedcircle/integration-api";
 
 export const MUSIC_SERVER_ROOT_ID = "music-server:root";
@@ -26,89 +27,92 @@ function isMusicServerTrackTitle(title: string): boolean {
   return title.includes(" - ");
 }
 
-const browser: MediaBrowserApi = createMediaBrowser(
-  {
-    providerLabel: "Music Server",
-    mediaIdPrefix: "music-server",
-    mediaIdPrefixRegex: "music-server",
-    rootId: MUSIC_SERVER_ROOT_ID,
-    rootType: MUSIC_SERVER_ROOT_TYPE,
-    menuRootId: MUSIC_SERVER_MENU_ROOT_ID,
-    backId: MUSIC_SERVER_BACK_ID,
-    mainMenuLabel: "Music Server Main Menu",
-    rootLabel: "Music Server",
-    excludedPrefixes: ["search", "login", "logout", "log out"],
-    isTrackTitle: isMusicServerTrackTitle,
-    titlesMatch: titlesMatchFuzzy,
-    thumbnails: {
-      service: {
-        svgFileName: "music-server.svg",
-        logoTransform: "translate(180 240) scale(5)",
-        logoPathAttrs: 'fill="#ffffff"',
-        backgroundColor: "#00bfff",
-        fallbackLabel: "MUSIC SERVER",
-        fallbackLabelColor: "#ffffff",
-        fallbackBgOpacity: ".15",
-        textColor: "#ffffff",
-        fallbackIcon: "icon://uc:music",
-        logName: "MusicServer"
-      },
-      menu: {
-        svgFileName: "menu.svg",
-        logoTransform: "translate(180 40) scale(5)",
-        logoPathAttrs: 'fill="#ffffff"',
-        backgroundColor: "#00bfff",
-        fallbackLabel: "MENU",
-        fallbackLabelColor: "#ffffff",
-        fallbackBgOpacity: ".15",
-        textColor: "#ffffff",
-        fallbackIcon: "icon://uc:music",
-        logName: "MusicServerMainMenu"
-      },
-      back: {
-        svgFileName: "back.svg",
-        logoTransform: "translate(140 1) scale(0.7)",
-        logoPathAttrs: 'fill="#ffffff"',
-        backgroundColor: "#00bfff",
-        fallbackLabel: "BACK",
-        fallbackLabelColor: "#ffffff",
-        fallbackBgOpacity: ".15",
-        textColor: "#ffffff",
-        fallbackIcon: "icon://uc:music",
-        logName: "MusicServerMenuBack"
-      }
+const BROWSER_CONFIG: MediaBrowserConfig = {
+  providerLabel: "Music Server",
+  mediaIdPrefix: "music-server",
+  mediaIdPrefixRegex: "music-server",
+  rootId: MUSIC_SERVER_ROOT_ID,
+  rootType: MUSIC_SERVER_ROOT_TYPE,
+  menuRootId: MUSIC_SERVER_MENU_ROOT_ID,
+  backId: MUSIC_SERVER_BACK_ID,
+  mainMenuLabel: "Music Server Main Menu",
+  rootLabel: "Music Server",
+  excludedPrefixes: ["search", "login", "logout", "log out"],
+  isTrackTitle: isMusicServerTrackTitle,
+  titlesMatch: titlesMatchFuzzy,
+  thumbnails: {
+    service: {
+      svgFileName: "music-server.svg",
+      logoTransform: "translate(180 240) scale(5)",
+      logoPathAttrs: 'fill="#ffffff"',
+      backgroundColor: "#00bfff",
+      fallbackLabel: "MUSIC SERVER",
+      fallbackLabelColor: "#ffffff",
+      fallbackBgOpacity: ".15",
+      textColor: "#ffffff",
+      fallbackIcon: "icon://uc:music",
+      logName: "MusicServer"
+    },
+    menu: {
+      svgFileName: "menu.svg",
+      logoTransform: "translate(180 40) scale(5)",
+      logoPathAttrs: 'fill="#ffffff"',
+      backgroundColor: "#00bfff",
+      fallbackLabel: "MENU",
+      fallbackLabelColor: "#ffffff",
+      fallbackBgOpacity: ".15",
+      textColor: "#ffffff",
+      fallbackIcon: "icon://uc:music",
+      logName: "MusicServerMainMenu"
+    },
+    back: {
+      svgFileName: "back.svg",
+      logoTransform: "translate(140 1) scale(0.7)",
+      logoPathAttrs: 'fill="#ffffff"',
+      backgroundColor: "#00bfff",
+      fallbackLabel: "BACK",
+      fallbackLabelColor: "#ffffff",
+      fallbackBgOpacity: ".15",
+      textColor: "#ffffff",
+      fallbackIcon: "icon://uc:music",
+      logName: "MusicServerMenuBack"
     }
-  },
-  musicServerStore
-);
+  }
+};
 
 export class MusicServerMediaBrowser {
+  private readonly browser: MediaBrowserApi;
+
+  constructor(private readonly avrContexts: AvrContextRegistry = sharedAvrContexts) {
+    this.browser = createMediaBrowser(BROWSER_CONFIG, musicServerStore, avrContexts);
+  }
+
   ingestListEntry(entityId: string, entry: string): void {
-    browser.ingestListEntry(entityId, entry);
+    this.browser.ingestListEntry(entityId, entry);
   }
 
   ingestXmlEntries(entityId: string, xmlPayload: string): void {
     const totalItems = xmlPayload.match(/<items\b[^>]*\btotalitems="(\d+)"/i)?.[1];
     if (totalItems !== undefined) {
-      const state = getMusicServerBrowseState(entityId);
+      const state = musicServerStore.getBrowseState(entityId, this.avrContexts);
       if (state) state.totalListItemCount = Math.max(state.totalListItemCount, parseInt(totalItems, 10));
     }
-    browser.ingestXmlEntries(entityId, xmlPayload);
+    this.browser.ingestXmlEntries(entityId, xmlPayload);
   }
 
   resolveMenuOption(mediaId?: string, mediaType?: string): MenuBrowseOption | undefined {
-    return browser.resolveMenuOption(mediaId, mediaType);
+    return this.browser.resolveMenuOption(mediaId, mediaType);
   }
 
   isMainMenuRequest(mediaId?: string, mediaType?: string): boolean {
-    return browser.isMainMenuRequest(mediaId, mediaType);
+    return this.browser.isMainMenuRequest(mediaId, mediaType);
   }
 
   isBackRequest(mediaId?: string, mediaType?: string): boolean {
-    return browser.isBackRequest(mediaId, mediaType);
+    return this.browser.isBackRequest(mediaId, mediaType);
   }
 
   async browse(entityId: string, options: uc.BrowseOptions): Promise<uc.StatusCodes | uc.BrowseResult> {
-    return browser.browse(entityId, options);
+    return this.browser.browse(entityId, options);
   }
 }

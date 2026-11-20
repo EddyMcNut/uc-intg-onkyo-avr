@@ -193,7 +193,16 @@ vi.mock("../src/avrState.js", () => ({
     return mockAvrStateApi;
   }
 }));
-vi.mock("../src/avrStateQuery.js", () => ({ avrStateQueryService: { queryAvrState: vi.fn(), recordQueries: vi.fn() } }));
+// The driver creates its own AvrStateQueryService; every instance is this one shared mock.
+vi.mock("../src/avrStateQuery.js", () => {
+  const avrStateQueryService = { queryAvrState: vi.fn(), recordQueries: vi.fn(), shouldQuery: vi.fn(() => true), recordQuery: vi.fn() };
+  return {
+    avrStateQueryService,
+    AvrStateQueryService: function () {
+      return avrStateQueryService;
+    }
+  };
+});
 vi.mock("../src/mediaBrowser.js", () => ({ initMediaBrowser: vi.fn() }));
 vi.mock("../src/setupHandler.js", () => ({
   default: function (host: any) {

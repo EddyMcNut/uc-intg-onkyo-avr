@@ -12,7 +12,7 @@ function makeMockEiscp(connected = true) {
 }
 
 const avrQMod = await import("../src/avrStateQuery.js");
-const { avrStateQueryService } = avrQMod as any;
+const avrStateQueryService = new (avrQMod as any).AvrStateQueryService();
 const querySpy = vi.spyOn(avrStateQueryService, "queryAvrState");
 
 beforeEach(() => {
@@ -26,7 +26,7 @@ it("handle returns early when no instance found for entity", async () => {
   const connectionManager = { getPhysicalConnection: vi.fn(), scheduleReconnect: vi.fn() };
   const avrInstances = new Map();
 
-  const handler = new SubHandler(connectionManager, avrInstances);
+  const handler = new SubHandler(connectionManager, avrInstances, avrStateQueryService);
 
   await handler.handle("nonexistent_main");
 
@@ -43,7 +43,7 @@ it("handle returns early when shouldQuery returns false", async () => {
   const connectionManager = { getPhysicalConnection: vi.fn(), scheduleReconnect: vi.fn() };
   const avrInstances = new Map([[eid, { config: { model: "M", ip: "1.2.3.4", port: 60128, zone: "main" } }]]);
 
-  const handler = new SubHandler(connectionManager, avrInstances);
+  const handler = new SubHandler(connectionManager, avrInstances, avrStateQueryService);
 
   await handler.handle(eid);
 
@@ -63,7 +63,7 @@ it("handle returns early when no physical connection found", async () => {
   const connectionManager = { getPhysicalConnection: vi.fn().mockReturnValue(undefined), scheduleReconnect: vi.fn() };
   const avrInstances = new Map([[eid, { config: { model, ip, port: 60128, zone: "main" } }]]);
 
-  const handler = new SubHandler(connectionManager, avrInstances);
+  const handler = new SubHandler(connectionManager, avrInstances, avrStateQueryService);
 
   await handler.handle(eid);
 
@@ -86,7 +86,7 @@ it("handle queries AVR state when connected", async () => {
   };
   const avrInstances = new Map([[eid, { config: { model, ip, port: 60128, zone: "main", queueThreshold: 100 } }]]);
 
-  const handler = new SubHandler(connectionManager, avrInstances);
+  const handler = new SubHandler(connectionManager, avrInstances, avrStateQueryService);
 
   await handler.handle(eid);
 
@@ -108,7 +108,7 @@ it("attempts reconnection when not connected", async () => {
   };
   const avrInstances = new Map([[eid, { config: { model, ip, port: 60128, zone: "main", queueThreshold: 50 } }]]);
 
-  const handler = new SubHandler(connectionManager, avrInstances);
+  const handler = new SubHandler(connectionManager, avrInstances, avrStateQueryService);
 
   await handler.handle(eid);
 
@@ -140,7 +140,7 @@ it("schedules reconnect when reconnection fails", async () => {
   };
   const avrInstances = new Map([[eid, { config: { model, ip, port: 60128, zone: "main" } }]]);
 
-  const handler = new SubHandler(connectionManager, avrInstances);
+  const handler = new SubHandler(connectionManager, avrInstances, avrStateQueryService);
 
   await handler.handle(eid);
 

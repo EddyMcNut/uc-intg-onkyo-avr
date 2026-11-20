@@ -9,7 +9,8 @@ const logSource = "avrStateQuery:";
 // ms — minimum time between queries for the same entity
 const QUERY_TTL = WAIT_FOR_CONNECT_TIMEOUT;
 
-class AvrStateQueryService {
+// One instance per driver (owned by Driver and passed to SubscriptionHandler), so the debounce state is not global.
+export class AvrStateQueryService {
   private readonly lastQueries: Map<string, number> = new Map();
 
   // Returns true when enough time has passed since the last query for this entity.
@@ -77,6 +78,3 @@ class AvrStateQueryService {
     }
   }
 }
-
-// Singleton instance shared by all callers.
-export const avrStateQueryService = new AvrStateQueryService();

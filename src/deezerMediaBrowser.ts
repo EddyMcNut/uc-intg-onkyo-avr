@@ -1,7 +1,7 @@
 import type { MenuBrowseOption } from "./menuBrowseState.js";
 import { deezerStore } from "./deezerBrowserStore.js";
-import { getDeezerBrowseState } from "./deezerBrowserStore.js";
-import { createMediaBrowser, type MediaBrowserApi } from "./menuMediaBrowser.js";
+import { createMediaBrowser, type MediaBrowserApi, type MediaBrowserConfig } from "./menuMediaBrowser.js";
+import { sharedAvrContexts, type AvrContextRegistry } from "./avrContext.js";
 import type * as uc from "@unfoldedcircle/integration-api";
 
 export const DEEZER_ROOT_ID = "deezer:root";
@@ -17,89 +17,92 @@ function titlesMatchExact(a: string, b: string): boolean {
   return a.toLowerCase() === b.toLowerCase();
 }
 
-const browser: MediaBrowserApi = createMediaBrowser(
-  {
-    providerLabel: "Deezer",
-    mediaIdPrefix: "deezer",
-    mediaIdPrefixRegex: "deezer",
-    rootId: DEEZER_ROOT_ID,
-    rootType: DEEZER_ROOT_TYPE,
-    menuRootId: DEEZER_MENU_ROOT_ID,
-    backId: DEEZER_BACK_ID,
-    mainMenuLabel: "Deezer Main Menu",
-    rootLabel: "Deezer",
-    excludedPrefixes: ["search", "login", "logout", "log out", "all stations"],
-    isTrackTitle: isDeezerTrackTitle,
-    titlesMatch: titlesMatchExact,
-    thumbnails: {
-      service: {
-        svgFileName: "deezer.svg",
-        logoTransform: "translate(245 248) scale(1)",
-        logoPathAttrs: 'fill="#A238FF"',
-        backgroundColor: "#000000",
-        fallbackLabel: "DEEZER",
-        fallbackLabelColor: "#A238FF",
-        fallbackBgOpacity: ".15",
-        textColor: "#A238FF",
-        fallbackIcon: "icon://uc:music",
-        logName: "Deezer"
-      },
-      menu: {
-        svgFileName: "menu.svg",
-        logoTransform: "translate(180 40) scale(5)",
-        logoPathAttrs: 'fill="#A238FF"',
-        backgroundColor: "#000000",
-        fallbackLabel: "MENU",
-        fallbackLabelColor: "#A238FF",
-        fallbackBgOpacity: ".15",
-        textColor: "#A238FF",
-        fallbackIcon: "icon://uc:music",
-        logName: "DeezerMainMenu"
-      },
-      back: {
-        svgFileName: "back.svg",
-        logoTransform: "translate(140 1) scale(0.7)",
-        logoPathAttrs: 'fill="#A238FF"',
-        backgroundColor: "#000000",
-        fallbackLabel: "BACK",
-        fallbackLabelColor: "#A238FF",
-        fallbackBgOpacity: ".15",
-        textColor: "#A238FF",
-        fallbackIcon: "icon://uc:music",
-        logName: "DeezerMenuBack"
-      }
+const BROWSER_CONFIG: MediaBrowserConfig = {
+  providerLabel: "Deezer",
+  mediaIdPrefix: "deezer",
+  mediaIdPrefixRegex: "deezer",
+  rootId: DEEZER_ROOT_ID,
+  rootType: DEEZER_ROOT_TYPE,
+  menuRootId: DEEZER_MENU_ROOT_ID,
+  backId: DEEZER_BACK_ID,
+  mainMenuLabel: "Deezer Main Menu",
+  rootLabel: "Deezer",
+  excludedPrefixes: ["search", "login", "logout", "log out", "all stations"],
+  isTrackTitle: isDeezerTrackTitle,
+  titlesMatch: titlesMatchExact,
+  thumbnails: {
+    service: {
+      svgFileName: "deezer.svg",
+      logoTransform: "translate(245 248) scale(1)",
+      logoPathAttrs: 'fill="#A238FF"',
+      backgroundColor: "#000000",
+      fallbackLabel: "DEEZER",
+      fallbackLabelColor: "#A238FF",
+      fallbackBgOpacity: ".15",
+      textColor: "#A238FF",
+      fallbackIcon: "icon://uc:music",
+      logName: "Deezer"
+    },
+    menu: {
+      svgFileName: "menu.svg",
+      logoTransform: "translate(180 40) scale(5)",
+      logoPathAttrs: 'fill="#A238FF"',
+      backgroundColor: "#000000",
+      fallbackLabel: "MENU",
+      fallbackLabelColor: "#A238FF",
+      fallbackBgOpacity: ".15",
+      textColor: "#A238FF",
+      fallbackIcon: "icon://uc:music",
+      logName: "DeezerMainMenu"
+    },
+    back: {
+      svgFileName: "back.svg",
+      logoTransform: "translate(140 1) scale(0.7)",
+      logoPathAttrs: 'fill="#A238FF"',
+      backgroundColor: "#000000",
+      fallbackLabel: "BACK",
+      fallbackLabelColor: "#A238FF",
+      fallbackBgOpacity: ".15",
+      textColor: "#A238FF",
+      fallbackIcon: "icon://uc:music",
+      logName: "DeezerMenuBack"
     }
-  },
-  deezerStore
-);
+  }
+};
 
 export class DeezerMediaBrowser {
+  private readonly browser: MediaBrowserApi;
+
+  constructor(private readonly avrContexts: AvrContextRegistry = sharedAvrContexts) {
+    this.browser = createMediaBrowser(BROWSER_CONFIG, deezerStore, avrContexts);
+  }
+
   ingestXmlEntries(entityId: string, xmlPayload: string): void {
     const totalItems = xmlPayload.match(/<items\b[^>]*\btotalitems="(\d+)"/i)?.[1];
     if (totalItems !== undefined) {
-      const state = getDeezerBrowseState(entityId);
+      const state = deezerStore.getBrowseState(entityId, this.avrContexts);
       if (state) state.totalListItemCount = Math.max(state.totalListItemCount, parseInt(totalItems, 10));
     }
-    browser.ingestXmlEntries(entityId, xmlPayload);
+    this.browser.ingestXmlEntries(entityId, xmlPayload);
   }
 
   ingestListEntry(entityId: string, entry: string): void {
-    browser.ingestListEntry(entityId, entry);
+    this.browser.ingestListEntry(entityId, entry);
   }
 
   resolveMenuOption(mediaId?: string, mediaType?: string): MenuBrowseOption | undefined {
-    return browser.resolveMenuOption(mediaId, mediaType);
+    return this.browser.resolveMenuOption(mediaId, mediaType);
   }
 
   isMainMenuRequest(mediaId?: string, mediaType?: string): boolean {
-    return browser.isMainMenuRequest(mediaId, mediaType);
+    return this.browser.isMainMenuRequest(mediaId, mediaType);
   }
 
   isBackRequest(mediaId?: string, mediaType?: string): boolean {
-    return browser.isBackRequest(mediaId, mediaType);
+    return this.browser.isBackRequest(mediaId, mediaType);
   }
 
   async browse(entityId: string, options: uc.BrowseOptions): Promise<uc.StatusCodes | uc.BrowseResult> {
-    return browser.browse(entityId, options);
+    return this.browser.browse(entityId, options);
   }
 }

@@ -4,11 +4,8 @@ import * as uc from "@unfoldedcircle/integration-api";
 import log from "./loggers.js";
 import { looksLikeTuneInDirectory, normalizeTuneInLabel, extractTuneInStationKey, parseTuneInXmlItems } from "./tuneInFilters.js";
 import type { TuneInPreset } from "./tuneInBrowserStore.js";
-import { sharedAvrContexts } from "./avrContext.js";
+import { sharedAvrContexts, type AvrContextRegistry } from "./avrContext.js";
 
-// TRANSITIONAL (item 10): the TuneIn browser is created by the module-level media browser and uses the shared registry
-// until the mediaBrowser step hands it the driver's registry.
-const tuneInPresetsOf = (entityId: string) => sharedAvrContexts.forEntity(entityId)?.tuneInPresets;
 import { addTuneInMenuOption, listTuneInMenuOptions, getTuneInMenuBrowseState, setTuneInMenuBrowseContextState, type TuneInMenuOption } from "./tuneInMenuStore.js";
 import { createServiceThumbnails } from "./serviceThumbnails.js";
 import { parseIndexedMenuEntry, getXmlOffset } from "./menuEntryParser.js";
@@ -65,6 +62,12 @@ export const TUNEIN_MENU_BACK_ID = "tunein:menu-back";
 const TUNEIN_EXCLUDED_MENU_TITLES = new Set(["search", "login", "logout", "log out", "all stations"]);
 
 export class TuneInMediaBrowser {
+  constructor(private readonly avrContexts: AvrContextRegistry = sharedAvrContexts) {}
+
+  private tuneInPresetsOf(entityId: string) {
+    return this.avrContexts.forEntity(entityId)?.tuneInPresets;
+  }
+
   private getPresetSortOrder(entityId: string): "alphabetical" | "preset-order" {
     const avr = ConfigManager.get()?.avrs?.find((candidate) => buildEntityId(candidate.model, candidate.ip, candidate.zone) === entityId);
     const style = String(avr?.tuneinMenuStyle ?? "mypresets-alphabetical").toLowerCase();
@@ -72,12 +75,12 @@ export class TuneInMediaBrowser {
   }
 
   setBrowseContext(entityId: string, title: string): void {
-    tuneInPresetsOf(entityId)?.setContext(title);
-    setTuneInMenuBrowseContextState(entityId, title);
+    this.tuneInPresetsOf(entityId)?.setContext(title);
+    setTuneInMenuBrowseContextState(entityId, title, this.avrContexts);
   }
 
   ingestListEntry(entityId: string, entry: string): void {
-    const state = tuneInPresetsOf(entityId)?.state() ?? null;
+    const state = this.tuneInPresetsOf(entityId)?.state() ?? null;
     if (!state) {
       return;
     }
@@ -98,7 +101,7 @@ export class TuneInMediaBrowser {
     }
 
     // NLS indices are relative to the current window; use the XML list index when it arrives.
-    tuneInPresetsOf(entityId)?.add(title, extractTuneInStationKey(rawTitle), rawTitle, getOrCreateTuneInThumbnail);
+    this.tuneInPresetsOf(entityId)?.add(title, extractTuneInStationKey(rawTitle), rawTitle, getOrCreateTuneInThumbnail);
   }
 
   ingestMenuListEntry(entityId: string, entry: string): void {
@@ -118,13 +121,13 @@ export class TuneInMediaBrowser {
     // replace the TuneIn full-menu entries.
     if (isNetworkServiceDisplayName(title)) return;
 
-    const cursorOffset = getTuneInMenuBrowseState(entityId)?.nlsCursorOffset ?? 0;
+    const cursorOffset = getTuneInMenuBrowseState(entityId, this.avrContexts)?.nlsCursorOffset ?? 0;
     const windowStart = Math.max(0, cursorOffset - 9);
     const absoluteMenuIndex = windowStart + parsed.menuIndex + 1;
 
     const isStationLike = title.includes("|") || /\(.+\)/.test(title);
     const isBrowsable = looksLikeTuneInDirectory(title) || !isStationLike;
-    addTuneInMenuOption(entityId, absoluteMenuIndex, title, isBrowsable, getOrCreateTuneInThumbnail);
+    addTuneInMenuOption(entityId, absoluteMenuIndex, title, isBrowsable, getOrCreateTuneInThumbnail, false, false, this.avrContexts);
   }
 
   ingestMenuXmlEntries(entityId: string, xmlPayload: string): void {
@@ -132,7 +135,7 @@ export class TuneInMediaBrowser {
       return;
     }
 
-    const state = getTuneInMenuBrowseState(entityId);
+    const state = getTuneInMenuBrowseState(entityId, this.avrContexts);
     if (state) state.xmlResponseSequence += 1;
     const xmlOffset = getXmlOffset(xmlPayload);
     const xmlItems = parseTuneInXmlItems(xmlPayload);
@@ -144,12 +147,12 @@ export class TuneInMediaBrowser {
       const isStationLike = item.title.includes("|") || /\(.+\)/.test(item.title);
       const isBrowsable = looksLikeTuneInDirectory(item.title, item.iconId) || !isStationLike;
       const hidden = !item.selectable || TUNEIN_EXCLUDED_MENU_TITLES.has(item.title.toLowerCase());
-      addTuneInMenuOption(entityId, menuIndex, item.title, isBrowsable, getOrCreateTuneInThumbnail, hidden, true);
+      addTuneInMenuOption(entityId, menuIndex, item.title, isBrowsable, getOrCreateTuneInThumbnail, hidden, true, this.avrContexts);
     }
   }
 
   ingestXmlEntries(entityId: string, xmlPayload: string): void {
-    const state = tuneInPresetsOf(entityId)?.state() ?? null;
+    const state = this.tuneInPresetsOf(entityId)?.state() ?? null;
     if (!state || !xmlPayload) {
       return;
     }
@@ -164,16 +167,16 @@ export class TuneInMediaBrowser {
         continue;
       }
 
-      tuneInPresetsOf(entityId)?.add(item.title, item.stationKey, item.rawLabel, getOrCreateTuneInThumbnail, xmlOffset + i + 1);
+      this.tuneInPresetsOf(entityId)?.add(item.title, item.stationKey, item.rawLabel, getOrCreateTuneInThumbnail, xmlOffset + i + 1);
     }
   }
 
   getPresetCount(entityId: string): number {
-    return (tuneInPresetsOf(entityId)?.list() ?? []).length;
+    return (this.tuneInPresetsOf(entityId)?.list() ?? []).length;
   }
 
   hasPresets(entityId: string): boolean {
-    return (tuneInPresetsOf(entityId)?.list() ?? []).length > 0;
+    return (this.tuneInPresetsOf(entityId)?.list() ?? []).length > 0;
   }
 
   resolvePreset(mediaId?: string, mediaType?: string): TuneInPreset | undefined {
@@ -206,7 +209,7 @@ export class TuneInMediaBrowser {
   }
 
   async browse(entityId: string, options: uc.BrowseOptions): Promise<uc.StatusCodes | uc.BrowseResult> {
-    const tuneInPresets = tuneInPresetsOf(entityId)?.list(this.getPresetSortOrder(entityId)) ?? [];
+    const tuneInPresets = this.tuneInPresetsOf(entityId)?.list(this.getPresetSortOrder(entityId)) ?? [];
     if (!options.media_id || options.media_id === TUNEIN_ROOT_ID) {
       log.info("%s [%s] browsable TuneIn presets: %d", logSource, entityId, tuneInPresets.length);
       return uc.BrowseResult.fromPaging(this.createRootItem(entityId, options.paging), options.paging, tuneInPresets.length);
@@ -221,8 +224,8 @@ export class TuneInMediaBrowser {
   }
 
   async browseMenu(entityId: string, options: uc.BrowseOptions): Promise<uc.StatusCodes | uc.BrowseResult> {
-    const menuOptions = listTuneInMenuOptions(entityId);
-    const showMainMenuShortcut = getTuneInMenuBrowseState(entityId)?.showMainMenuShortcut ?? false;
+    const menuOptions = listTuneInMenuOptions(entityId, this.avrContexts);
+    const showMainMenuShortcut = getTuneInMenuBrowseState(entityId, this.avrContexts)?.showMainMenuShortcut ?? false;
     const totalCount = menuOptions.length + (showMainMenuShortcut ? 2 : 0);
     log.info("%s [%s] browsable TuneIn full menu options: %d", logSource, entityId, menuOptions.length);
     return uc.BrowseResult.fromPaging(this.createMenuRootItem(entityId, options.paging), options.paging, totalCount);
@@ -247,7 +250,7 @@ export class TuneInMediaBrowser {
     if (isNaN(menuIndex) || menuIndex < 1) return undefined;
 
     const title = decodeURIComponent(match[2]);
-    const option = listTuneInMenuOptions(entityId).find((item) => item.menuIndex === menuIndex);
+    const option = listTuneInMenuOptions(entityId, this.avrContexts).find((item) => item.menuIndex === menuIndex);
     return {
       menuIndex,
       title,
@@ -284,8 +287,8 @@ export class TuneInMediaBrowser {
   }
 
   private createRootItem(entityId: string, paging: uc.Paging): uc.BrowseMediaItem {
-    const presets = tuneInPresetsOf(entityId)?.list(this.getPresetSortOrder(entityId)) ?? [];
-    const nowPlayingStation = (tuneInPresetsOf(entityId)?.state() ?? null)?.nowPlayingStation ?? "";
+    const presets = this.tuneInPresetsOf(entityId)?.list(this.getPresetSortOrder(entityId)) ?? [];
+    const nowPlayingStation = (this.tuneInPresetsOf(entityId)?.state() ?? null)?.nowPlayingStation ?? "";
     const items = this.slicePagedItems(
       presets.map((preset) => this.createPresetItem(preset, nowPlayingStation)),
       paging
@@ -301,9 +304,9 @@ export class TuneInMediaBrowser {
   }
 
   private createMenuRootItem(entityId: string, paging: uc.Paging): uc.BrowseMediaItem {
-    const options = listTuneInMenuOptions(entityId);
-    const nowPlayingTitle = getTuneInMenuBrowseState(entityId)?.nowPlayingTitle ?? "";
-    const showMainMenuShortcut = getTuneInMenuBrowseState(entityId)?.showMainMenuShortcut ?? false;
+    const options = listTuneInMenuOptions(entityId, this.avrContexts);
+    const nowPlayingTitle = getTuneInMenuBrowseState(entityId, this.avrContexts)?.nowPlayingTitle ?? "";
+    const showMainMenuShortcut = getTuneInMenuBrowseState(entityId, this.avrContexts)?.showMainMenuShortcut ?? false;
     const rootItems = showMainMenuShortcut
       ? [
           new uc.BrowseMediaItem(TUNEIN_MENU_ROOT_ID, "TuneIn Main Menu", {
