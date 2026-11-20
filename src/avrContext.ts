@@ -4,14 +4,30 @@
 import { TunerPresetStore } from "./tunerPresetStore.js";
 import { InputSourceStore } from "./inputSourceStore.js";
 import { AvrInfoStore } from "./avrInfoStore.js";
+import { TuneInPresetStore } from "./tuneInBrowserStore.js";
+import { createMenuBrowseState, type MenuBrowseOption, type MenuBrowseState } from "./menuBrowseState.js";
 import { physicalAvrIdFromEntityId } from "./configManager.js";
 
 export class AvrContext {
   readonly tunerPresets = new TunerPresetStore();
   readonly inputs = new InputSourceStore();
   readonly avrInfo = new AvrInfoStore();
+  readonly tuneInPresets = new TuneInPresetStore();
+  // TuneIn Full Menu browse state (see tuneInMenuStore.ts).
+  readonly tuneInMenu: MenuBrowseState<MenuBrowseOption> = createMenuBrowseState<MenuBrowseOption>();
+  private readonly menuBrowseStates = new Map<string, MenuBrowseState<MenuBrowseOption>>();
 
   constructor(readonly physicalAvrId: string) {}
+
+  // Browse state of a menu-browse service (Tidal, Deezer, Music Server; see menuBrowseStore.ts), created on first use.
+  menuBrowseState(serviceId: string): MenuBrowseState<MenuBrowseOption> {
+    let state = this.menuBrowseStates.get(serviceId);
+    if (!state) {
+      state = createMenuBrowseState<MenuBrowseOption>();
+      this.menuBrowseStates.set(serviceId, state);
+    }
+    return state;
+  }
 }
 
 export class AvrContextRegistry {

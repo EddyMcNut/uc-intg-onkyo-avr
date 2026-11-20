@@ -24,7 +24,8 @@ import {
 } from "./mediaBrowser.js";
 import { getMenuBrowseService, xmlBrowseSelectCommand } from "./menuBrowseServices.js";
 import { consumeTuneInListModeActive, getTuneInMenuBrowseState, resetTuneInMenuBrowseState, setTuneInMenuBrowseFrozen, setTuneInMenuNowPlayingStation } from "./tuneInMenuStore.js";
-import { getTuneInBrowseState, getTuneInPreset, listTuneInPresets, setTuneInBrowseFrozen } from "./tuneInBrowserStore.js";
+import type { TuneInPresetStore } from "./tuneInBrowserStore.js";
+import { sharedAvrContexts, type AvrContextRegistry } from "./avrContext.js";
 import { AVR_DEFAULTS, ConfigManager, DEFAULT_QUEUE_THRESHOLD, buildEntityId } from "./configManager.js";
 import {
   DEEZER_SERVICE_ID,
@@ -99,8 +100,13 @@ export class PlayMediaCommandHandler {
   constructor(
     private readonly eiscp: EiscpDriver,
     private readonly avrStateApi: AvrStateApi,
-    private readonly commandReceiver: ICommandReceiver | undefined
+    private readonly commandReceiver: ICommandReceiver | undefined,
+    private readonly avrContexts: AvrContextRegistry = sharedAvrContexts
   ) {}
+
+  private tuneInPresetsOf(entityId: string): TuneInPresetStore | undefined {
+    return this.avrContexts.forEntity(entityId)?.tuneInPresets;
+  }
 
   private async selectBrowseService(
     entityId: string,
@@ -182,10 +188,8 @@ export class PlayMediaCommandHandler {
 
     if (preset) {
       const configuredMode = this.eiscp.eiscpConfig?.networkNavigationMode ?? "modern";
-      const cachedPreset = getTuneInPreset(entityId, preset.presetIndex);
-      const presetMap = listTuneInPresets(entityId, "preset-order")
-        .map((item) => `${item.presetIndex}='${item.title}'`)
-        .join(", ");
+      const cachedPreset = this.tuneInPresetsOf(entityId)?.get(preset.presetIndex);
+      const presetMap = (this.tuneInPresetsOf(entityId)?.list("preset-order") ?? []).map((item) => `${item.presetIndex}='${item.title}'`).join(", ");
       log.debug(
         "%s [%s] TuneIn preset selection: mode=%s requested=%s index=%d station='%s' rawLabel='%s' presetMap=[%s]",
         logSource,
@@ -197,7 +201,7 @@ export class PlayMediaCommandHandler {
         cachedPreset?.rawLabel ?? "unknown",
         presetMap
       );
-      if (!modern) setTuneInBrowseFrozen(entityId, true);
+      if (!modern) this.tuneInPresetsOf(entityId)?.setFrozen(true);
       const wasPreloading = this.commandReceiver?.abortTuneInPreload?.(entityId) ?? false;
       // Only force select if preload was interrupted; wasPreloading || undefined ensures false becomes undefined
       // so default logic (based on current state) applies when preload was not running
@@ -216,7 +220,7 @@ export class PlayMediaCommandHandler {
         await delay(netMenuDelay);
         // NTCTOP reports the NET list. Wait for fresh TuneIn metadata after
         // SELECT instead of harvesting with that intermediate count/layer.
-        resetTuneInMenuBrowseState(entityId);
+        resetTuneInMenuBrowseState(entityId, this.avrContexts);
         await this.eiscp.raw("NTCSELECT");
       }
       return uc.StatusCodes.Ok;
@@ -226,10 +230,10 @@ export class PlayMediaCommandHandler {
       await this.selectBrowseService(entityId, TUNEIN_SERVICE_ID, setZonePrefix, netMenuDelay, { delayAfterSelect: true });
 
       if (!tuneInMenuOption.isBrowsable) {
-        if (!modern) setTuneInBrowseFrozen(entityId, true);
-        setTuneInMenuBrowseFrozen(entityId, true);
-        setTuneInMenuNowPlayingStation(entityId, tuneInMenuOption.title);
-        const alreadyInListMode = consumeTuneInListModeActive(entityId);
+        if (!modern) this.tuneInPresetsOf(entityId)?.setFrozen(true);
+        setTuneInMenuBrowseFrozen(entityId, true, this.avrContexts);
+        setTuneInMenuNowPlayingStation(entityId, tuneInMenuOption.title, this.avrContexts);
+        const alreadyInListMode = consumeTuneInListModeActive(entityId, this.avrContexts);
         if (!alreadyInListMode) {
           const playbackStatus = this.avrStateApi.getPlaybackStatus(entityId);
           if (playbackStatus === "playing" || playbackStatus === "paused" || playbackStatus === "ff" || playbackStatus === "fr") {
@@ -238,15 +242,15 @@ export class PlayMediaCommandHandler {
           }
         }
       } else {
-        if (!modern) setTuneInBrowseFrozen(entityId, false);
+        if (!modern) this.tuneInPresetsOf(entityId)?.setFrozen(false);
         if (!modern) {
           // Resolve the selected row before clearing the old list: arbitrary
           // folders such as country names cannot be classified by name alone.
-          resetTuneInMenuBrowseState(entityId);
-          const state = getTuneInMenuBrowseState(entityId);
+          resetTuneInMenuBrowseState(entityId, this.avrContexts);
+          const state = getTuneInMenuBrowseState(entityId, this.avrContexts);
           if (state) state.showMainMenuShortcut = true;
         }
-        setTuneInMenuBrowseFrozen(entityId, false);
+        setTuneInMenuBrowseFrozen(entityId, false, this.avrContexts);
       }
 
       if (!modern) {
@@ -254,12 +258,12 @@ export class PlayMediaCommandHandler {
         await this.eiscp.raw(`NLSI${String(tuneInMenuOption.menuIndex).padStart(5, "0")}`);
       } else if (tuneInMenuOption.title.trim().toLowerCase() === "my presets") {
         await this.eiscp.raw(`NLSI${String(getTuneInPresetPosition(entityId)).padStart(5, "0")}`);
-      } else if (getTuneInBrowseState(entityId)?.contextTitle === "my presets") {
+      } else if (this.tuneInPresetsOf(entityId)?.state().contextTitle === "my presets") {
         // TuneIn's My Presets NLSI positions are one-based, even though the
         // XML browser's NLAI item indexes are zero-based.
         await this.eiscp.raw(`NLSI${String(Math.max(1, tuneInMenuOption.menuIndex)).padStart(5, "0")}`);
       } else {
-        const tuneInState = getTuneInMenuBrowseState(entityId);
+        const tuneInState = getTuneInMenuBrowseState(entityId, this.avrContexts);
         await this.eiscp.raw(xmlBrowseSelectCommand(tuneInMenuOption.menuIndex, tuneInState?.nlsLayerNumber));
       }
       return uc.StatusCodes.Ok;
@@ -290,8 +294,8 @@ export class PlayMediaCommandHandler {
     const activeLabel = activeService.label;
     const activeStore = activeService.store;
 
-    const shouldTraceSelection = activeStore.consumeTraceNextSelectionAfterMainMenu(entityId);
-    const activeOptions = activeStore.listOptions(entityId);
+    const shouldTraceSelection = activeStore.consumeTraceNextSelectionAfterMainMenu(entityId, this.avrContexts);
+    const activeOptions = activeStore.listOptions(entityId, this.avrContexts);
 
     const requestedTitle = /^Menu \d+$/.test(activeOption.title) ? activeOptions.find((item) => item.menuIndex === activeOption.menuIndex)?.title : activeOption.title;
     if (shouldTraceSelection) {
@@ -311,7 +315,7 @@ export class PlayMediaCommandHandler {
     if (!isBrowseServiceActive(currentSource, currentSubSource, activeServiceId)) {
       await this.selectBrowseService(entityId, activeServiceId, setZonePrefix, netMenuDelay, { delayAfterSelect: true });
     } else if (!modern && !selectedIsBrowsable) {
-      const alreadyInListMode = activeStore.consumeListModeActive(entityId);
+      const alreadyInListMode = activeStore.consumeListModeActive(entityId, this.avrContexts);
       if (!alreadyInListMode) {
         const playbackStatus = this.avrStateApi.getPlaybackStatus(entityId);
         if (["playing", "paused", "ff", "fr"].includes(playbackStatus)) {
@@ -334,7 +338,7 @@ export class PlayMediaCommandHandler {
       log.info("%s [%s] TRACE final %s selection index=%d source=%s subsource=%s", logSource, entityId, activeLabel, menuIndexToSelect, currentSource, currentSubSource);
     }
 
-    const activeState = activeStore.getBrowseState(entityId);
+    const activeState = activeStore.getBrowseState(entityId, this.avrContexts);
     if (activeState) {
       activeState.browseListFrozen = !selectedIsBrowsable;
       if (!selectedIsBrowsable) {

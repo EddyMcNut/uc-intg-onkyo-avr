@@ -90,14 +90,20 @@ export function createParserEffects(stores: ParserEffectStores, storeAvrInfo: (e
   };
 }
 
+// Read access to a menu-browse service's state in the given registry.
+function menuStoreIn(serviceId: string, avrContexts: AvrContextRegistry): MenuBrowseStoreApi | undefined {
+  const store = getMenuBrowseService(serviceId)?.store;
+  return store ? { getBrowseState: (entityId) => store.getBrowseState(entityId, avrContexts) } : undefined;
+}
+
 // The effects used by the running driver: the real browse stores, and the AVR info store of the AVR's context.
 export function createDefaultParserEffects(avrContexts: AvrContextRegistry = sharedAvrContexts): ParserEffects {
   return createParserEffects(
     {
-      deezer: getMenuBrowseService(DEEZER_SERVICE_ID)?.store,
-      tidal: getMenuBrowseService(TIDAL_SERVICE_ID)?.store,
-      musicServer: getMenuBrowseService(MUSIC_SERVER_SERVICE_ID)?.store,
-      tuneInMenu: { getBrowseState: getTuneInMenuBrowseState }
+      deezer: menuStoreIn(DEEZER_SERVICE_ID, avrContexts),
+      tidal: menuStoreIn(TIDAL_SERVICE_ID, avrContexts),
+      musicServer: menuStoreIn(MUSIC_SERVER_SERVICE_ID, avrContexts),
+      tuneInMenu: { getBrowseState: (entityId) => getTuneInMenuBrowseState(entityId, avrContexts) }
     },
     storeAndLogAvrInfo(avrContexts)
   );

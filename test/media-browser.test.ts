@@ -515,7 +515,7 @@ it("TuneIn service selection preloads My Presets for browsing", async () => {
 it("clears the stale TuneIn now-playing mark after switching to DAB and back to TuneIn", async () => {
   const avrStateModule = await import("../src/avrState.js");
   const processorModule = await import("../src/zoneAgnosticUpdateProcessor.js");
-  const tuneInBrowserStoreModule = await import("../src/tuneInBrowserStore.js");
+  const tuneInBrowserStoreModule = { ...(await import("../src/tuneInBrowserStore.js")), ...(await import("./helpers/tuneInPresets.js")) };
   const tuneInMenuStoreModule = await import("../src/tuneInMenuStore.js");
 
   const { avrStateManager } = avrStateModule as any;

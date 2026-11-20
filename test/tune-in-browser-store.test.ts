@@ -6,7 +6,7 @@ describe("tuneInBrowserStore", () => {
 
   beforeEach(async () => {
     vi.resetModules();
-    store = await import("../src/tuneInBrowserStore.js");
+    store = { ...(await import("../src/tuneInBrowserStore.js")), ...(await import("./helpers/tuneInPresets.js")) };
   });
 
   it("getTuneInBrowseState returns null for invalid entityId", () => {

@@ -44,7 +44,7 @@ export class CommandSender {
     this.eiscp = eiscp;
     this.avrStateApi = avrStateApi;
     this.commandReceiver = commandReceiver;
-    this.playMediaCommandHandler = new PlayMediaCommandHandler(this.eiscp, this.avrStateApi, this.commandReceiver);
+    this.playMediaCommandHandler = new PlayMediaCommandHandler(this.eiscp, this.avrStateApi, this.commandReceiver, this.avrContexts);
   }
 
   public updateConfig(config: IntegrationConfig): void {
@@ -368,11 +368,11 @@ export class CommandSender {
       // Full Menu can be opened before the AVR sends its service notification.
       // Keep the learned display name out of routing and discard stale menus.
       // My Presets retains its service-entry notification/preload lifecycle.
-      resetTuneInMenuBrowseState(entityId);
+      resetTuneInMenuBrowseState(entityId, this.avrContexts);
       this.avrStateApi.setSubSource(entityId, TUNEIN_SERVICE_ID);
       return;
     }
-    getMenuBrowseService(serviceId)?.store.resetState(entityId);
+    getMenuBrowseService(serviceId)?.store.resetState(entityId, this.avrContexts);
 
     // The AVR reports the new NLT service entry shortly after accepting the
     // source command. Mark the requested service active immediately so a

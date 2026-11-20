@@ -16,7 +16,8 @@ import {
 import { getDeezerBrowseState, resetDeezerBrowseState } from "./deezerBrowserStore.js";
 import { getMusicServerBrowseState, resetMusicServerBrowseState } from "./musicServerBrowserStore.js";
 import { getTidalBrowseState, resetTidalBrowseState } from "./tidalBrowserStore.js";
-import { clearTuneInPresets, resetTuneInBrowseState, updateNowPlayingStation } from "./tuneInBrowserStore.js";
+import { sharedAvrContexts, type AvrContextRegistry } from "./avrContext.js";
+import type { TuneInPresetStore } from "./tuneInBrowserStore.js";
 import { resetTuneInMenuBrowseState, setTuneInMenuNowPlayingStation, updateTuneInMenuNowPlayingStation } from "./tuneInMenuStore.js";
 import { DEEZER_SERVICE_ID, MUSIC_SERVER_SERVICE_ID, TIDAL_SERVICE_ID, TUNEIN_SERVICE_ID } from "./browseServiceContract.js";
 import type { NetworkNavigationMode } from "./configConstants.js";
@@ -43,6 +44,8 @@ export type ZoneAgnosticServiceAdapter = {
 
 type AdapterDeps = {
   state: SubSourceStateApi;
+  // Per-AVR state; defaults to the shared registry during the item-10 migration (see avrContext.ts).
+  avrContexts?: AvrContextRegistry;
   getPhysicalAvrId: (entityId: string) => string;
   getNetworkNavigationMode?: (entityId: string) => NetworkNavigationMode;
 };
@@ -66,6 +69,14 @@ function getServiceZones(sourceEntityId: string, service: string, deps: AdapterD
 }
 
 export class TuneInZoneAgnosticAdapter implements ZoneAgnosticServiceAdapter {
+  private get avrContexts(): AvrContextRegistry {
+    return this.deps.avrContexts ?? sharedAvrContexts;
+  }
+
+  private tuneInPresetsOf(zoneEntityId: string): TuneInPresetStore | undefined {
+    return this.avrContexts.forEntity(zoneEntityId)?.tuneInPresets;
+  }
+
   readonly service = TUNEIN_SERVICE_ID;
 
   constructor(private readonly deps: TuneInAdapterDeps) {}
@@ -82,7 +93,7 @@ export class TuneInZoneAgnosticAdapter implements ZoneAgnosticServiceAdapter {
     const refreshedZones = affectedZones.length > 0 ? affectedZones : enteringZones;
     this.clearNowPlayingForZones(refreshedZones);
     for (const zoneEntityId of refreshedZones) {
-      clearTuneInPresets(zoneEntityId);
+      this.tuneInPresetsOf(zoneEntityId)?.clearPresets();
     }
 
     await this.maybePreloadTuneIn(sourceEntityId, affectedZones);
@@ -90,9 +101,9 @@ export class TuneInZoneAgnosticAdapter implements ZoneAgnosticServiceAdapter {
 
   clearNowPlayingForZones(zoneEntityIds: string[]): void {
     for (const zoneEntityId of zoneEntityIds) {
-      resetTuneInMenuBrowseState(zoneEntityId);
-      setTuneInMenuNowPlayingStation(zoneEntityId, "");
-      resetTuneInBrowseState(zoneEntityId);
+      resetTuneInMenuBrowseState(zoneEntityId, this.avrContexts);
+      setTuneInMenuNowPlayingStation(zoneEntityId, "", this.avrContexts);
+      this.tuneInPresetsOf(zoneEntityId)?.resetNowPlaying();
     }
   }
 
@@ -128,13 +139,13 @@ export class TuneInZoneAgnosticAdapter implements ZoneAgnosticServiceAdapter {
   }
 
   handleMetadata(zoneEntityId: string, artist: string): void {
-    const matchedPreset = updateNowPlayingStation(zoneEntityId, artist);
+    const matchedPreset = this.tuneInPresetsOf(zoneEntityId)?.updateNowPlayingStation(artist) ?? false;
     if (matchedPreset) {
       log.info("tuneInAdapter: [%s] TuneIn station started: '%s' (matched a known preset)", zoneEntityId, artist);
     } else if (artist) {
       log.debug("tuneInAdapter: [%s] TuneIn metadata station candidate: '%s' (not matched to a known preset)", zoneEntityId, artist);
     }
-    updateTuneInMenuNowPlayingStation(zoneEntityId, artist);
+    updateTuneInMenuNowPlayingStation(zoneEntityId, artist, this.avrContexts);
   }
 
   private async maybePreloadTuneIn(sourceEntityId: string, zoneEntityIds: string[]): Promise<void> {

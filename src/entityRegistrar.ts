@@ -65,7 +65,7 @@ export default class EntityRegistrar {
     private readonly avrContexts: AvrContextRegistry = sharedAvrContexts
   ) {
     this.browseHandlers = [
-      new TuneInBrowseHandler(avrStateApi),
+      new TuneInBrowseHandler(avrStateApi, avrContexts),
       createMenuBrowseHandler({
         providerLabel: "Tidal",
         logSource: "tidalBrowseHandler:",

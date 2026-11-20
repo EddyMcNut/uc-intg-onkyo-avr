@@ -116,7 +116,7 @@ it("TuneIn adapter contract ignores legacy NLS menu updates", async () => {
 it("TuneIn adapter contract clears stale now-playing marks on fresh entry (even when enteringZones is empty)", async () => {
   const adaptersModule = await import("../src/zoneAgnosticServiceAdapters.js");
   const tuneInMenuStoreModule = await import("../src/tuneInMenuStore.js");
-  const tuneInBrowserStoreModule = await import("../src/tuneInBrowserStore.js");
+  const tuneInBrowserStoreModule = { ...(await import("../src/tuneInBrowserStore.js")), ...(await import("./helpers/tuneInPresets.js")) };
 
   const { TuneInZoneAgnosticAdapter } = adaptersModule as { TuneInZoneAgnosticAdapter: new (deps: any) => any };
   const { addTuneInMenuOption, getTuneInMenuBrowseState, setTuneInMenuNowPlayingStation } = tuneInMenuStoreModule as {

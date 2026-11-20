@@ -37,10 +37,11 @@ export class ZoneAgnosticUpdateProcessor {
     private readonly avrContexts: AvrContextRegistry = sharedAvrContexts
   ) {
     this.config = config;
-    this.tuneInPreloader = new TuneInPreloader(eiscpInstance, (entityId) => this.mediaStateStore.getPhysicalAvrId(entityId));
+    this.tuneInPreloader = new TuneInPreloader(eiscpInstance, (entityId) => this.mediaStateStore.getPhysicalAvrId(entityId), this.avrContexts);
     this.mediaRenderer = new ZoneMediaRenderer(driver, config, this.mediaStateStore, this.state);
     this.serviceAdapters = [
       new TuneInZoneAgnosticAdapter({
+        avrContexts: this.avrContexts,
         state: this.state,
         getPhysicalAvrId: (entityId) => this.getPhysicalAvrId(entityId),
         getNetworkNavigationMode: (entityId) => this.getNetworkNavigationMode(entityId),

@@ -1,5 +1,6 @@
 /*jslint node:true nomen:true*/
 "use strict";
+import { sharedAvrContexts, type AvrContextRegistry } from "./avrContext.js";
 import * as uc from "@unfoldedcircle/integration-api";
 import { browseMedia, TUNEIN_MENU_BACK_ID, TUNEIN_MENU_ROOT_ID, TUNEIN_MENU_ROOT_TYPE } from "./mediaBrowser.js";
 import { listTuneInMenuOptions, getTuneInMenuBrowseState, resetTuneInMenuBrowseState } from "./tuneInMenuStore.js";
@@ -34,7 +35,7 @@ function getMenuDelay(entityId: string): number {
   return avr?.netMenuDelay ?? AVR_DEFAULTS.netMenuDelay;
 }
 
-function resolveTuneInMenuSelection(entityId: string, mediaId?: string, mediaType?: string): TuneInMenuSelection | undefined {
+function resolveTuneInMenuSelection(entityId: string, mediaId: string | undefined, mediaType: string | undefined, contexts: AvrContextRegistry): TuneInMenuSelection | undefined {
   if (!mediaId) {
     return undefined;
   }
@@ -53,7 +54,7 @@ function resolveTuneInMenuSelection(entityId: string, mediaId?: string, mediaTyp
   }
 
   const decodedTitle = decodeURIComponent(match[2]);
-  const option = listTuneInMenuOptions(entityId).find((item) => item.menuIndex === menuIndex);
+  const option = listTuneInMenuOptions(entityId, contexts).find((item) => item.menuIndex === menuIndex);
   return {
     menuIndex,
     title: decodedTitle,
@@ -92,7 +93,7 @@ export class TuneInBrowseHandler extends MenuBrowseHandlerBase {
 
     // v0.8.10: NLS supplies the first display window, then NLAL fills the
     // remaining rows, probing adjacent layers on older receivers.
-    const state = getTuneInMenuBrowseState(entityId);
+    const state = getTuneInMenuBrowseState(entityId, this.avrContexts);
     if (!state || state.harvestMode || state.totalListItemCount <= this.getContiguousItemCount(entityId)) return;
     const menuDelay = getMenuDelay(entityId);
     const scanDelay = Math.max(150, Math.min(Math.floor(menuDelay / 3), 400));
@@ -120,7 +121,10 @@ export class TuneInBrowseHandler extends MenuBrowseHandlerBase {
     }
   }
 
-  constructor(private readonly avrStateApi: AvrStateApi) {
+  constructor(
+    private readonly avrStateApi: AvrStateApi,
+    private readonly avrContexts: AvrContextRegistry = sharedAvrContexts
+  ) {
     super();
   }
 
@@ -131,11 +135,11 @@ export class TuneInBrowseHandler extends MenuBrowseHandlerBase {
   }
 
   protected getMenuState(entityId: string) {
-    return getTuneInMenuBrowseState(entityId);
+    return getTuneInMenuBrowseState(entityId, this.avrContexts);
   }
 
   protected listMenuItems(entityId: string) {
-    return listTuneInMenuOptions(entityId);
+    return listTuneInMenuOptions(entityId, this.avrContexts);
   }
 
   protected getMenuDelay(entityId: string): number {
@@ -143,7 +147,7 @@ export class TuneInBrowseHandler extends MenuBrowseHandlerBase {
   }
 
   protected getContiguousItemCount(entityId: string): number {
-    const state = getTuneInMenuBrowseState(entityId);
+    const state = getTuneInMenuBrowseState(entityId, this.avrContexts);
     if (!state || state.optionsByMenuIndex.size === 0) return 0;
 
     const keys = [...state.optionsByMenuIndex.keys()].sort((a, b) => a - b);
@@ -168,7 +172,7 @@ export class TuneInBrowseHandler extends MenuBrowseHandlerBase {
       return undefined;
     }
 
-    const selection = resolveTuneInMenuSelection(entityId, options.media_id, options.media_type);
+    const selection = resolveTuneInMenuSelection(entityId, options.media_id, options.media_type, this.avrContexts);
     const isBackRequest = options.media_id === TUNEIN_MENU_BACK_ID && (options.media_type === undefined || options.media_type === TUNEIN_MENU_ROOT_TYPE);
     const isExplicitMainMenuSelection = options.media_id === TUNEIN_MENU_ROOT_ID && options.media_type === TUNEIN_MENU_ROOT_TYPE;
     const isRootRequest = !options.media_id || isExplicitMainMenuSelection;
@@ -177,8 +181,8 @@ export class TuneInBrowseHandler extends MenuBrowseHandlerBase {
     if (isBackRequest && cmdHandler) {
       const menuDelay = getMenuDelay(entityId);
       log.info("%s [%s] sending TuneIn Back command to AVR", logSource, entityId);
-      resetTuneInMenuBrowseState(entityId);
-      const backBrowseState = getTuneInMenuBrowseState(entityId);
+      resetTuneInMenuBrowseState(entityId, this.avrContexts);
+      const backBrowseState = getTuneInMenuBrowseState(entityId, this.avrContexts);
       if (backBrowseState) {
         backBrowseState.showMainMenuShortcut = true;
         backBrowseState.listModeActive = true;
@@ -200,9 +204,9 @@ export class TuneInBrowseHandler extends MenuBrowseHandlerBase {
 
     if (isRootRequest) {
       if (isExplicitMainMenuSelection) {
-        resetTuneInMenuBrowseState(entityId);
+        resetTuneInMenuBrowseState(entityId, this.avrContexts);
       }
-      const state = getTuneInMenuBrowseState(entityId);
+      const state = getTuneInMenuBrowseState(entityId, this.avrContexts);
       if (state) {
         state.browseListFrozen = false;
         if (isExplicitMainMenuSelection) {
@@ -234,9 +238,9 @@ export class TuneInBrowseHandler extends MenuBrowseHandlerBase {
         // A new TuneIn folder is a new XML context. Clear the previous
         // folder before harvesting so NLAL starts at offset 0 instead of
         // appending to the old menu.
-        resetTuneInMenuBrowseState(entityId);
+        resetTuneInMenuBrowseState(entityId, this.avrContexts);
       }
-      const browseState = getTuneInMenuBrowseState(entityId);
+      const browseState = getTuneInMenuBrowseState(entityId, this.avrContexts);
       if (browseState) browseState.showMainMenuShortcut = true;
 
       if ((options.paging?.offset ?? 0) === 0) {

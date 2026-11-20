@@ -1,5 +1,3 @@
-import { physicalAvrIdFromEntityId } from "./configManager.js";
-
 export type TuneInPreset = {
   presetIndex: number;
   title: string;
@@ -26,20 +24,8 @@ export type TuneInBrowseState = {
   nowPlayingStation: string;
 };
 
-const tuneInBrowseStateByPhysicalAvr = new Map<string, TuneInBrowseState>();
-
-export function getTuneInBrowseState(entityId: string): TuneInBrowseState | null {
-  const physicalAvrId = physicalAvrIdFromEntityId(entityId);
-  if (!physicalAvrId) {
-    return null;
-  }
-
-  const existing = tuneInBrowseStateByPhysicalAvr.get(physicalAvrId);
-  if (existing) {
-    return existing;
-  }
-
-  const created: TuneInBrowseState = {
+function createTuneInBrowseState(): TuneInBrowseState {
+  return {
     contextTitle: "",
     captureMyPresets: false,
     presetsByMenuIndex: new Map<number, TuneInPreset>(),
@@ -49,120 +35,90 @@ export function getTuneInBrowseState(entityId: string): TuneInBrowseState | null
     browseListFrozen: false,
     nowPlayingStation: ""
   };
-  tuneInBrowseStateByPhysicalAvr.set(physicalAvrId, created);
-  return created;
 }
 
-export function setTuneInBrowseContextState(entityId: string, title: string): void {
-  const state = getTuneInBrowseState(entityId);
-  if (!state) {
-    return;
+// TuneIn "My Presets" of one physical AVR. One instance lives in that AVR's AvrContext (see avrContext.ts).
+export class TuneInPresetStore {
+  private readonly browseState: TuneInBrowseState = createTuneInBrowseState();
+
+  state(): TuneInBrowseState {
+    return this.browseState;
   }
 
-  const normalized = title.trim().toLowerCase();
-  const enteringMyPresets = normalized === "my presets" && state.contextTitle !== normalized;
-  state.contextTitle = normalized;
-  state.captureMyPresets = normalized === "my presets";
+  setContext(title: string): void {
+    const state = this.browseState;
+    const normalized = title.trim().toLowerCase();
+    const enteringMyPresets = normalized === "my presets" && state.contextTitle !== normalized;
+    state.contextTitle = normalized;
+    state.captureMyPresets = normalized === "my presets";
 
-  if (enteringMyPresets && !state.browseListFrozen) {
-    state.presetsByMenuIndex.clear();
-    state.presetIndexByTitle.clear();
-  }
-}
-
-export function addTuneInPreset(
-  entityId: string,
-  title: string,
-  stationKey: string,
-  rawLabel: string,
-  thumbnailResolver: (state: TuneInBrowseState, title: string) => string,
-  reportedIndex?: number
-): void {
-  const state = getTuneInBrowseState(entityId);
-  if (!state) {
-    return;
-  }
-  if (state.browseListFrozen) return;
-
-  const existingPresetIndex =
-    state.presetIndexByTitle.get(title) ??
-    [...state.presetsByMenuIndex.values()].find((preset) => preset.stationKey.toLowerCase() === stationKey.toLowerCase() || preset.rawLabel.toLowerCase() === rawLabel.toLowerCase())?.presetIndex;
-  const presetIndex = existingPresetIndex ?? reportedIndex ?? state.presetIndexByTitle.size + 1;
-
-  if (existingPresetIndex === undefined) {
-    state.presetIndexByTitle.set(title, presetIndex);
-  }
-
-  state.presetsByMenuIndex.set(presetIndex, {
-    presetIndex,
-    title,
-    stationKey,
-    rawLabel,
-    mediaId: `tunein:preset:${presetIndex}`,
-    thumbnail: thumbnailResolver(state, title)
-  });
-}
-
-function matchesAnyPreset(state: TuneInBrowseState, candidate: string): boolean {
-  const lower = candidate.toLowerCase();
-  for (const preset of state.presetsByMenuIndex.values()) {
-    if (preset.rawLabel.toLowerCase() === lower || preset.stationKey.toLowerCase() === lower || preset.title.toLowerCase() === lower) {
-      return true;
+    if (enteringMyPresets && !state.browseListFrozen) {
+      state.presetsByMenuIndex.clear();
+      state.presetIndexByTitle.clear();
     }
   }
-  return false;
-}
 
-// Update the nowPlayingStation only when the candidate matches a known preset.
-// This prevents track/show titles (which NTI also sends) from overwriting the station name.
-export function updateNowPlayingStation(entityId: string, candidate: string): boolean {
-  const state = getTuneInBrowseState(entityId);
-  if (!state) return false;
-  if (matchesAnyPreset(state, candidate)) {
-    state.nowPlayingStation = candidate;
-    return true;
-  }
-  return false;
-}
+  add(title: string, stationKey: string, rawLabel: string, thumbnailResolver: (state: TuneInBrowseState, title: string) => string, reportedIndex?: number): void {
+    const state = this.browseState;
+    if (state.browseListFrozen) return;
 
-export function getTuneInPreset(entityId: string, presetIndex: number): TuneInPreset | undefined {
-  return getTuneInBrowseState(entityId)?.presetsByMenuIndex.get(presetIndex);
-}
+    const existingPresetIndex =
+      state.presetIndexByTitle.get(title) ??
+      [...state.presetsByMenuIndex.values()].find((preset) => preset.stationKey.toLowerCase() === stationKey.toLowerCase() || preset.rawLabel.toLowerCase() === rawLabel.toLowerCase())?.presetIndex;
+    const presetIndex = existingPresetIndex ?? reportedIndex ?? state.presetIndexByTitle.size + 1;
 
-// Clear the now-playing station marker on a fresh service entry so the browser starts clean.
-// Presets are intentionally kept: they are the cached "My Presets" list and are only re-harvested lazily.
-export function resetTuneInBrowseState(entityId: string): void {
-  const state = getTuneInBrowseState(entityId);
-  if (!state) {
-    return;
-  }
-  state.nowPlayingStation = "";
-}
+    if (existingPresetIndex === undefined) {
+      state.presetIndexByTitle.set(title, presetIndex);
+    }
 
-// Clear the cached preset list before a fresh TuneIn service entry. The cache is
-// intentionally retained during normal updates, but a new entry must re-harvest
-// the AVR's current My Presets list so newly added or removed stations appear.
-export function clearTuneInPresets(entityId: string): void {
-  const state = getTuneInBrowseState(entityId);
-  if (!state) {
-    return;
-  }
-  state.presetsByMenuIndex.clear();
-  state.presetIndexByTitle.clear();
-  state.browseListFrozen = false;
-}
-
-export function setTuneInBrowseFrozen(entityId: string, frozen: boolean): void {
-  const state = getTuneInBrowseState(entityId);
-  if (state) state.browseListFrozen = frozen;
-}
-
-export function listTuneInPresets(entityId: string, sort: "alphabetical" | "preset-order" = "alphabetical"): TuneInPreset[] {
-  const state = getTuneInBrowseState(entityId);
-  if (!state) {
-    return [];
+    state.presetsByMenuIndex.set(presetIndex, {
+      presetIndex,
+      title,
+      stationKey,
+      rawLabel,
+      mediaId: `tunein:preset:${presetIndex}`,
+      thumbnail: thumbnailResolver(state, title)
+    });
   }
 
-  const presets = [...state.presetsByMenuIndex.values()];
-  return sort === "preset-order" ? presets.sort((a, b) => a.presetIndex - b.presetIndex) : presets.sort((a, b) => a.title.localeCompare(b.title, undefined, { sensitivity: "base" }));
+  // Update the nowPlayingStation only when the candidate matches a known preset.
+  // This prevents track/show titles (which NTI also sends) from overwriting the station name.
+  updateNowPlayingStation(candidate: string): boolean {
+    const lower = candidate.toLowerCase();
+    for (const preset of this.browseState.presetsByMenuIndex.values()) {
+      if (preset.rawLabel.toLowerCase() === lower || preset.stationKey.toLowerCase() === lower || preset.title.toLowerCase() === lower) {
+        this.browseState.nowPlayingStation = candidate;
+        return true;
+      }
+    }
+    return false;
+  }
+
+  get(presetIndex: number): TuneInPreset | undefined {
+    return this.browseState.presetsByMenuIndex.get(presetIndex);
+  }
+
+  // Clear the now-playing station marker on a fresh service entry so the browser starts clean.
+  // Presets are intentionally kept: they are the cached "My Presets" list and are only re-harvested lazily.
+  resetNowPlaying(): void {
+    this.browseState.nowPlayingStation = "";
+  }
+
+  // Clear the cached preset list before a fresh TuneIn service entry. The cache is intentionally retained during
+  // normal updates, but a new entry must re-harvest the AVR's current My Presets list so newly added or removed
+  // stations appear.
+  clearPresets(): void {
+    this.browseState.presetsByMenuIndex.clear();
+    this.browseState.presetIndexByTitle.clear();
+    this.browseState.browseListFrozen = false;
+  }
+
+  setFrozen(frozen: boolean): void {
+    this.browseState.browseListFrozen = frozen;
+  }
+
+  list(sort: "alphabetical" | "preset-order" = "alphabetical"): TuneInPreset[] {
+    const presets = [...this.browseState.presetsByMenuIndex.values()];
+    return sort === "preset-order" ? presets.sort((a, b) => a.presetIndex - b.presetIndex) : presets.sort((a, b) => a.title.localeCompare(b.title, undefined, { sensitivity: "base" }));
+  }
 }

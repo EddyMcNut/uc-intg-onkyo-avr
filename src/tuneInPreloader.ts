@@ -1,3 +1,4 @@
+import { sharedAvrContexts, type AvrContextRegistry } from "./avrContext.js";
 import { EiscpDriver } from "./eiscp.js";
 import log from "./loggers.js";
 import { delay, toHex } from "./utils.js";
@@ -14,7 +15,8 @@ export class TuneInPreloader {
 
   constructor(
     private readonly eiscpInstance: EiscpDriver,
-    private readonly resolvePhysicalAvrId: PhysicalAvrIdResolver
+    private readonly resolvePhysicalAvrId: PhysicalAvrIdResolver,
+    private readonly avrContexts: AvrContextRegistry = sharedAvrContexts
   ) {}
 
   private nextTuneInListSequence(): string {
@@ -31,7 +33,7 @@ export class TuneInPreloader {
   }
 
   private async requestLegacyTuneInPresetXml(entityId: string, scanDelay: number): Promise<void> {
-    const state = getTuneInMenuBrowseState(entityId);
+    const state = getTuneInMenuBrowseState(entityId, this.avrContexts);
     if (!state) return;
 
     const knownLayer = state.nlsLayerNumber;

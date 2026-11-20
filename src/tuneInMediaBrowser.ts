@@ -3,7 +3,12 @@ import { isNetworkServiceDisplayName } from "./networkServices.js";
 import * as uc from "@unfoldedcircle/integration-api";
 import log from "./loggers.js";
 import { looksLikeTuneInDirectory, normalizeTuneInLabel, extractTuneInStationKey, parseTuneInXmlItems } from "./tuneInFilters.js";
-import { addTuneInPreset, getTuneInBrowseState, listTuneInPresets, type TuneInPreset, setTuneInBrowseContextState } from "./tuneInBrowserStore.js";
+import type { TuneInPreset } from "./tuneInBrowserStore.js";
+import { sharedAvrContexts } from "./avrContext.js";
+
+// TRANSITIONAL (item 10): the TuneIn browser is created by the module-level media browser and uses the shared registry
+// until the mediaBrowser step hands it the driver's registry.
+const tuneInPresetsOf = (entityId: string) => sharedAvrContexts.forEntity(entityId)?.tuneInPresets;
 import { addTuneInMenuOption, listTuneInMenuOptions, getTuneInMenuBrowseState, setTuneInMenuBrowseContextState, type TuneInMenuOption } from "./tuneInMenuStore.js";
 import { createServiceThumbnails } from "./serviceThumbnails.js";
 import { parseIndexedMenuEntry, getXmlOffset } from "./menuEntryParser.js";
@@ -67,12 +72,12 @@ export class TuneInMediaBrowser {
   }
 
   setBrowseContext(entityId: string, title: string): void {
-    setTuneInBrowseContextState(entityId, title);
+    tuneInPresetsOf(entityId)?.setContext(title);
     setTuneInMenuBrowseContextState(entityId, title);
   }
 
   ingestListEntry(entityId: string, entry: string): void {
-    const state = getTuneInBrowseState(entityId);
+    const state = tuneInPresetsOf(entityId)?.state() ?? null;
     if (!state) {
       return;
     }
@@ -93,7 +98,7 @@ export class TuneInMediaBrowser {
     }
 
     // NLS indices are relative to the current window; use the XML list index when it arrives.
-    addTuneInPreset(entityId, title, extractTuneInStationKey(rawTitle), rawTitle, getOrCreateTuneInThumbnail);
+    tuneInPresetsOf(entityId)?.add(title, extractTuneInStationKey(rawTitle), rawTitle, getOrCreateTuneInThumbnail);
   }
 
   ingestMenuListEntry(entityId: string, entry: string): void {
@@ -144,7 +149,7 @@ export class TuneInMediaBrowser {
   }
 
   ingestXmlEntries(entityId: string, xmlPayload: string): void {
-    const state = getTuneInBrowseState(entityId);
+    const state = tuneInPresetsOf(entityId)?.state() ?? null;
     if (!state || !xmlPayload) {
       return;
     }
@@ -159,16 +164,16 @@ export class TuneInMediaBrowser {
         continue;
       }
 
-      addTuneInPreset(entityId, item.title, item.stationKey, item.rawLabel, getOrCreateTuneInThumbnail, xmlOffset + i + 1);
+      tuneInPresetsOf(entityId)?.add(item.title, item.stationKey, item.rawLabel, getOrCreateTuneInThumbnail, xmlOffset + i + 1);
     }
   }
 
   getPresetCount(entityId: string): number {
-    return listTuneInPresets(entityId).length;
+    return (tuneInPresetsOf(entityId)?.list() ?? []).length;
   }
 
   hasPresets(entityId: string): boolean {
-    return listTuneInPresets(entityId).length > 0;
+    return (tuneInPresetsOf(entityId)?.list() ?? []).length > 0;
   }
 
   resolvePreset(mediaId?: string, mediaType?: string): TuneInPreset | undefined {
@@ -201,7 +206,7 @@ export class TuneInMediaBrowser {
   }
 
   async browse(entityId: string, options: uc.BrowseOptions): Promise<uc.StatusCodes | uc.BrowseResult> {
-    const tuneInPresets = listTuneInPresets(entityId, this.getPresetSortOrder(entityId));
+    const tuneInPresets = tuneInPresetsOf(entityId)?.list(this.getPresetSortOrder(entityId)) ?? [];
     if (!options.media_id || options.media_id === TUNEIN_ROOT_ID) {
       log.info("%s [%s] browsable TuneIn presets: %d", logSource, entityId, tuneInPresets.length);
       return uc.BrowseResult.fromPaging(this.createRootItem(entityId, options.paging), options.paging, tuneInPresets.length);
@@ -279,8 +284,8 @@ export class TuneInMediaBrowser {
   }
 
   private createRootItem(entityId: string, paging: uc.Paging): uc.BrowseMediaItem {
-    const presets = listTuneInPresets(entityId, this.getPresetSortOrder(entityId));
-    const nowPlayingStation = getTuneInBrowseState(entityId)?.nowPlayingStation ?? "";
+    const presets = tuneInPresetsOf(entityId)?.list(this.getPresetSortOrder(entityId)) ?? [];
+    const nowPlayingStation = (tuneInPresetsOf(entityId)?.state() ?? null)?.nowPlayingStation ?? "";
     const items = this.slicePagedItems(
       presets.map((preset) => this.createPresetItem(preset, nowPlayingStation)),
       paging
