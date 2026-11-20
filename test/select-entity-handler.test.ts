@@ -95,22 +95,44 @@ it("handle returns BadRequest for unknown command", async () => {
   expect(mockEiscp.command).not.toHaveBeenCalled();
 });
 
-it("handle returns BadRequest when SelectNext reaches end without cycle", async () => {
-  const mod = await import("../src/selectEntityHandler.js");
-  const { SelectEntityHandler } = mod as any;
+function makeCycleHandler() {
+  return import("../src/selectEntityHandler.js").then((mod) => {
+    const { SelectEntityHandler } = mod as any;
+    const mockEiscp = makeMockEiscp(true);
+    const driver = { updateEntityAttributes: vi.fn() };
+    const connMgr = { getPhysicalConnection: vi.fn().mockReturnValue({ eiscp: mockEiscp }) };
+    const avrMgr = { get: vi.fn().mockReturnValue({ config: { model: "M", ip: "1.2.3.4", port: 60128, zone: "main" } }) };
+    const handler = new SelectEntityHandler(driver, connMgr, avrMgr, "_listening_mode", "listening-mode", "Listening Mode", () => ["stereo", "direct"]);
+    return { handler, mockEiscp };
+  });
+}
 
-  const mockEiscp = makeMockEiscp(true);
-  const driver = { updateEntityAttributes: vi.fn() };
-  const connMgr = { getPhysicalConnection: vi.fn().mockReturnValue({ eiscp: mockEiscp }) };
-  const avrMgr = { get: vi.fn().mockReturnValue({ config: { model: "M", ip: "1.2.3.4", port: 60128, zone: "main" } }) };
-
-  const handler = new SelectEntityHandler(driver, connMgr, avrMgr, "_listening_mode", "listening-mode", "Listening Mode", () => ["stereo", "direct"]);
-
+it("handle returns BadRequest when SelectNext reaches end with cycle=false", async () => {
+  const { handler, mockEiscp } = await makeCycleHandler();
   const entity = { id: "M_1.2.3.4_main_listening_mode", attributes: { [uc.SelectAttributes.CurrentOption]: "direct" } };
-  const result = await handler.handle(entity, uc.SelectCommands.SelectNext, {});
+  const result = await handler.handle(entity, uc.SelectCommands.SelectNext, { cycle: false });
 
   expect(result).toBe(uc.StatusCodes.BadRequest);
   expect(mockEiscp.command).not.toHaveBeenCalled();
+});
+
+// UC select spec: `cycle` defaults to true when the parameter is omitted.
+it("handle wraps SelectNext to the first option when cycle is omitted", async () => {
+  const { handler, mockEiscp } = await makeCycleHandler();
+  const entity = { id: "M_1.2.3.4_main_listening_mode", attributes: { [uc.SelectAttributes.CurrentOption]: "direct" } };
+  const result = await handler.handle(entity, uc.SelectCommands.SelectNext, {});
+
+  expect(result).toBe(uc.StatusCodes.Ok);
+  expect(mockEiscp.command).toHaveBeenCalledWith({ zone: "main", command: "listening-mode", args: "stereo" });
+});
+
+it("handle wraps SelectPrevious to the last option when cycle is omitted", async () => {
+  const { handler, mockEiscp } = await makeCycleHandler();
+  const entity = { id: "M_1.2.3.4_main_listening_mode", attributes: { [uc.SelectAttributes.CurrentOption]: "stereo" } };
+  const result = await handler.handle(entity, uc.SelectCommands.SelectPrevious);
+
+  expect(result).toBe(uc.StatusCodes.Ok);
+  expect(mockEiscp.command).toHaveBeenCalledWith({ zone: "main", command: "listening-mode", args: "direct" });
 });
 
 it("handle returns Ok for SelectOption (stereo)", async () => {

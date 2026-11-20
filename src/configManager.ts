@@ -7,23 +7,26 @@ export * from "./configConstants.js";
 import {
   MAX_LENGTHS,
   PATTERNS,
-  parseBoolean,
   parseTunerPresetMode,
-  parseTuneInMenuStyle,
-  parseVolumeScale,
+  normalizeAvrConfig,
   AvrZone,
   AvrConfig,
   IntegrationConfig,
   AVR_DEFAULTS,
-  EntityNameStyle,
   LogLevel,
   VOLUME_SCALE_AUTO,
-  normalizeInputSourceSettings,
-  NETWORK_INPUT_MARKERS
+  NETWORK_INPUT_MARKERS,
+  TUNEIN_PRESET_POSITION_MIN,
+  TUNEIN_PRESET_POSITION_MAX
 } from "./configConstants.js";
 import { normalizeListeningModes } from "./listeningModePreferences.js";
 
 const logSource = "configManager:";
+
+// An empty form field or a null in a payload means "not set": the field then gets its default.
+function isUnset(value: unknown): boolean {
+  return value === undefined || value === null || value === "";
+}
 
 function parseStrictInteger(value: unknown): number | undefined {
   if (typeof value === "number") return Number.isSafeInteger(value) ? value : undefined;
@@ -50,35 +53,16 @@ export function getConfigPath(): string {
 export class ConfigManager {
   private static config: IntegrationConfig = {};
 
-  // Apply default values to an AVR config
+  // Apply defaults and coerce every field through the shared parsers (see normalizeAvrConfig), so the in-memory
+  // config only ever holds valid values. Used on load, for setup saves and for restored payloads.
   private static applyDefaults(avr: Partial<AvrConfig>): AvrConfig {
+    const normalized = normalizeAvrConfig({ ...avr, model: avr.model ?? "", ip: avr.ip ?? "", zone: avr.zone ?? "main" } as AvrConfig);
     return {
-      model: avr.model ?? "",
-      ip: avr.ip ?? "",
-      port: avr.port ?? 60128,
-      zone: avr.zone ?? "main",
-      queueThreshold: avr.queueThreshold ?? AVR_DEFAULTS.queueThreshold,
-      albumArtURL: avr.albumArtURL ?? AVR_DEFAULTS.albumArtURL,
-      volumeScale: parseVolumeScale(avr.volumeScale),
-      volumeScaleDiscovered: Boolean(avr.volumeScaleDiscovered),
-      useAvrReportedInputs: parseBoolean(avr.useAvrReportedInputs, AVR_DEFAULTS.useAvrReportedInputs),
-      volumeDisplay: avr.volumeDisplay ?? AVR_DEFAULTS.volumeDisplay,
-      adjustVolumeDispl: avr.adjustVolumeDispl ?? AVR_DEFAULTS.adjustVolumeDispl,
-      entityNameStyle: avr.entityNameStyle ?? AVR_DEFAULTS.entityNameStyle,
-      createSensors: avr.createSensors ?? AVR_DEFAULTS.createSensors,
-      // Keep legacy booleans in already-loaded config files; all new setup
-      // values are normalized by validateAvrPayload/normalizeAvrConfig.
-      createTunerPresets: avr.createTunerPresets ?? true,
-      createRemoteEntity: avr.createRemoteEntity ?? AVR_DEFAULTS.createRemoteEntity,
-      createDiracSelectEntity: avr.createDiracSelectEntity ?? AVR_DEFAULTS.createDiracSelectEntity,
-      netMenuDelay: avr.netMenuDelay ?? AVR_DEFAULTS.netMenuDelay,
-      tuneinPresetPosition: avr.tuneinPresetPosition ?? AVR_DEFAULTS.tuneinPresetPosition,
-      tuneinMenuStyle: parseTuneInMenuStyle(avr.tuneinMenuStyle ?? AVR_DEFAULTS.tuneinMenuStyle),
-      inputSourceLayout: avr.inputSourceLayout ?? AVR_DEFAULTS.inputSourceLayout,
-      networkInputMarker: avr.networkInputMarker ?? AVR_DEFAULTS.networkInputMarker,
-      networkNavigationMode: String(avr.networkNavigationMode ?? AVR_DEFAULTS.networkNavigationMode).toLowerCase() === "legacy" ? "legacy" : "modern",
-      listeningModes: normalizeListeningModes(avr.listeningModes),
-      idInputSources: normalizeInputSourceSettings(avr.idInputSources)
+      ...normalized,
+      // Legacy boolean values are kept as stored (true = alphabetical, false = none); every reader goes through
+      // parseTunerPresetMode / isTunerPresetModeEnabled, so they behave exactly like the explicit modes.
+      createTunerPresets: typeof avr.createTunerPresets === "boolean" ? avr.createTunerPresets : normalized.createTunerPresets,
+      listeningModes: normalizeListeningModes(avr.listeningModes)
     };
   }
 
@@ -297,17 +281,19 @@ export class ConfigManager {
     }
 
     // albumArtURL
-    if (value.albumArtURL && typeof value.albumArtURL === "string") {
-      if (value.albumArtURL.length > MAX_LENGTHS.ALBUM_ART_URL) {
+    // Surrounding whitespace is ignored and an empty value means "use the default", like everywhere else.
+    const albumArtURL = typeof value.albumArtURL === "string" ? value.albumArtURL.trim() : "";
+    if (albumArtURL) {
+      if (albumArtURL.length > MAX_LENGTHS.ALBUM_ART_URL) {
         errors.push(`albumArtURL too long (max ${MAX_LENGTHS.ALBUM_ART_URL})`);
-      } else if (!PATTERNS.ALBUM_ART_URL.test(value.albumArtURL)) {
+      } else if (!PATTERNS.ALBUM_ART_URL.test(albumArtURL)) {
         errors.push("albumArtURL contains invalid characters");
       }
     }
 
     // queueThreshold
     const queueThreshold = parseStrictInteger(value.queueThreshold);
-    if (value.queueThreshold !== undefined) {
+    if (!isUnset(value.queueThreshold)) {
       if (queueThreshold === undefined || queueThreshold < 0) {
         errors.push("queueThreshold must be a non-negative integer");
       }
@@ -372,7 +358,7 @@ export class ConfigManager {
 
     // netMenuDelay
     const netMenuDelay = parseStrictInteger(value.netMenuDelay);
-    if (value.netMenuDelay !== undefined) {
+    if (!isUnset(value.netMenuDelay)) {
       if (netMenuDelay === undefined || netMenuDelay < 0) {
         errors.push("netMenuDelay must be a non-negative integer");
       }
@@ -380,9 +366,9 @@ export class ConfigManager {
 
     // tuneinPresetPosition
     const tuneinPresetPosition = parseStrictInteger(value.tuneinPresetPosition);
-    if (value.tuneinPresetPosition !== undefined) {
-      if (tuneinPresetPosition === undefined || tuneinPresetPosition < 1 || tuneinPresetPosition > 10) {
-        errors.push("tuneinPresetPosition must be an integer between 1 and 10");
+    if (!isUnset(value.tuneinPresetPosition)) {
+      if (tuneinPresetPosition === undefined || tuneinPresetPosition < TUNEIN_PRESET_POSITION_MIN || tuneinPresetPosition > TUNEIN_PRESET_POSITION_MAX) {
+        errors.push(`tuneinPresetPosition must be an integer between ${TUNEIN_PRESET_POSITION_MIN} and ${TUNEIN_PRESET_POSITION_MAX}`);
       }
     }
 
@@ -408,35 +394,15 @@ export class ConfigManager {
       return { errors };
     }
 
-    // Build normalized AVR with defaults
-    const useAvrReportedInputs = parseBoolean(value.useAvrReportedInputs, AVR_DEFAULTS.useAvrReportedInputs);
+    // Build the normalized AVR: every field goes through the shared parsers in applyDefaults / normalizeAvrConfig.
     const normalized: AvrConfig = this.applyDefaults({
+      ...(value as Partial<AvrConfig>),
       model: String(value.model).trim(),
       ip: String(value.ip).trim(),
       port: portNum!,
       zone: this.validateZone(zone),
-      queueThreshold,
-      albumArtURL: typeof value.albumArtURL === "string" ? value.albumArtURL : undefined,
-      volumeScale: parseVolumeScale(value.volumeScale),
-      useAvrReportedInputs,
-      volumeDisplay: String(value.volumeDisplay ?? AVR_DEFAULTS.volumeDisplay).toLowerCase() === "relative" ? "relative" : "absolute",
-      adjustVolumeDispl: parseBoolean(value.adjustVolumeDispl, AVR_DEFAULTS.adjustVolumeDispl),
-      entityNameStyle: (String(value.entityNameStyle ?? AVR_DEFAULTS.entityNameStyle).toLowerCase() === "short" ? "short" : "long") as EntityNameStyle,
-      createSensors: parseBoolean(value.createSensors, AVR_DEFAULTS.createSensors),
-      createTunerPresets: parseTunerPresetMode(value.createTunerPresets ?? AVR_DEFAULTS.createTunerPresets),
-      createRemoteEntity: parseBoolean(value.createRemoteEntity, AVR_DEFAULTS.createRemoteEntity),
-      createDiracSelectEntity: parseBoolean(value.createDiracSelectEntity, AVR_DEFAULTS.createDiracSelectEntity),
-      netMenuDelay,
-      tuneinPresetPosition,
-      tuneinMenuStyle: parseTuneInMenuStyle(value.tuneinMenuStyle ?? AVR_DEFAULTS.tuneinMenuStyle),
-      inputSourceLayout: (() => {
-        const layout = String(value.inputSourceLayout ?? AVR_DEFAULTS.inputSourceLayout).toLowerCase();
-        return layout === "network-first" ? "network-first" : layout === "network-last" || layout === "separate" ? "network-last" : "combined";
-      })(),
-      networkInputMarker: (value.networkInputMarker ?? AVR_DEFAULTS.networkInputMarker) as AvrConfig["networkInputMarker"],
-      networkNavigationMode: String(value.networkNavigationMode ?? AVR_DEFAULTS.networkNavigationMode).toLowerCase() === "legacy" ? "legacy" : "modern",
-      listeningModes: normalizeListeningModes(value.listeningModes),
-      idInputSources: normalizeInputSourceSettings(value.idInputSources)
+      // Setup and restored payloads are always stored as an explicit mode, never as a legacy boolean.
+      createTunerPresets: parseTunerPresetMode(value.createTunerPresets ?? AVR_DEFAULTS.createTunerPresets)
     });
 
     return { errors: [], normalized };

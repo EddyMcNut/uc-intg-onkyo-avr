@@ -1,3 +1,4 @@
+import { createParserEffects } from "../src/parserEffects.js";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import * as uc from "@unfoldedcircle/integration-api";
 import { ConfigManager } from "../src/configManager.js";
@@ -9,8 +10,8 @@ import { TuneInBrowseHandler } from "../src/tuneInBrowseHandler.js";
 import { TuneInZoneAgnosticAdapter } from "../src/zoneAgnosticServiceAdapters.js";
 import { initMediaBrowser, TUNEIN_MENU_ROOT_ID, TUNEIN_MENU_ROOT_TYPE } from "../src/mediaBrowser.js";
 import { getTuneInMenuBrowseState, resetTuneInMenuBrowseState } from "../src/tuneInMenuStore.js";
-import { resetAvrInfo, setAvrInfo } from "../src/avrInfoStore.js";
-import { clearAvrInputs, setAvrInputs } from "../src/inputSourceStore.js";
+import { resetAvrInfo, setAvrInfo } from "./helpers/avrInfo.js";
+import { sharedAvrContexts } from "../src/avrContext.js";
 import { NETWORK_INPUT_MARKERS } from "../src/configConstants.js";
 
 const entityId = "TX-RZ50 192.0.2.104 main";
@@ -40,7 +41,7 @@ function setup(delayedMenu = false, xmlDelay = 0) {
     tunerBands: [],
     netServices: [{ id: "0e", name: "TuneIn Radio", enabled: true, hasAccount: true }]
   });
-  setAvrInputs("TX-RZ50 192.0.2.104", [{ id: "0e", name: "TuneIn Radio", network: true }]);
+  sharedAvrContexts.get("TX-RZ50 192.0.2.104").inputs.set([{ id: "0e", name: "TuneIn Radio", network: true }]);
   avrStateManager.setSource(entityId, "net");
   avrStateManager.setSubSource(entityId, "spotify");
   initMediaBrowser(avrStateManager);
@@ -56,7 +57,11 @@ function setup(delayedMenu = false, xmlDelay = 0) {
     isTuneInFullMenu: async () => true,
     preloadTuneInPresets: vi.fn()
   });
-  const parser = new IscpCommandParser(() => entityId, avrStateManager, { getBrowseState: () => null }, { getBrowseState: () => null }, { getBrowseState: getTuneInMenuBrowseState });
+  const parser = new IscpCommandParser(
+    () => entityId,
+    avrStateManager,
+    createParserEffects({ deezer: { getBrowseState: () => null }, tidal: { getBrowseState: () => null }, tuneInMenu: { getBrowseState: getTuneInMenuBrowseState } })
+  );
   const commands: string[] = [];
   let menuReady = false;
   let prematureXmlRequests = 0;
@@ -113,7 +118,7 @@ afterEach(() => {
   vi.restoreAllMocks();
   vi.useRealTimers();
   resetAvrInfo(entityId);
-  clearAvrInputs("TX-RZ50 192.0.2.104");
+  sharedAvrContexts.get("TX-RZ50 192.0.2.104").inputs.clear();
   avrStateManager.clearState(entityId);
 });
 

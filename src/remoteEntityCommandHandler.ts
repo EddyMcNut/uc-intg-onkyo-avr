@@ -8,8 +8,9 @@ import { ensureEiscpConnected, delay, toHex } from "./utils.js";
 import { ZONE_VOLUME_PREFIX, ZONE_VOLUME_UP_DOWN } from "./zoneMappings.js";
 import { SIMPLE_COMMANDS_MAP, ALL_INPUT_SELECTOR_NAMES } from "./simpleCommands.js";
 import { MAX_LENGTHS, PATTERNS } from "./configConstants.js";
-import { REPORTED_INPUT_COMMAND_PREFIX } from "./remoteEntity.js";
+import { REPORTED_INPUT_COMMAND_PREFIX, UC_REMOTE_COMMANDS } from "./remoteEntity.js";
 import { findAvrSourceId } from "./avrSourceCatalog.js";
+import { sharedAvrContexts, type AvrContextRegistry } from "./avrContext.js";
 import { REMOTE_SUFFIX } from "./sensorSuffixes.js";
 import log from "./loggers.js";
 import { EiscpDriver } from "./eiscp.js";
@@ -31,7 +32,8 @@ export class remoteEntityCommandHandler {
     private readonly driver: uc.IntegrationAPI,
     private readonly connectionManager: IPhysicalConnectionLookup,
     private readonly avrInstanceManager: IAvrInstanceLookup,
-    private readonly avrStateApi: AvrStateApi
+    private readonly avrStateApi: AvrStateApi,
+    private readonly avrContexts: AvrContextRegistry = sharedAvrContexts
   ) {}
 
   public async handle(entity: uc.Entity, cmdId: string, params?: { [key: string]: string | number | boolean }): Promise<uc.StatusCodes> {
@@ -88,9 +90,31 @@ export class remoteEntityCommandHandler {
       return uc.StatusCodes.BadRequest;
     }
 
-    const repeat = params && "repeat" in params ? Math.max(1, Number(params.repeat) || 1) : 1;
-    const delayMs = params && "delay" in params ? Math.max(0, Number(params.delay) || 0) : 0;
+    return this.sendRepeated(entity, eiscp, commandReceiver, cfg, avrEntry, command, params, this.parseRepeat(params), this.parseDelay(params));
+  }
 
+  // `repeat` defaults to 1. Without an explicit `delay`, no extra wait is added: the EiscpDriver send queue already
+  // waits `sendDelay` (the queue threshold) after every command, which paces repeats for the AVR.
+  // `hold` is accepted but has no meaning for ISCP commands.
+  private parseRepeat(params: RemoteParams): number {
+    return params && "repeat" in params ? Math.max(1, Number(params.repeat) || 1) : 1;
+  }
+
+  private parseDelay(params: RemoteParams): number {
+    return params && "delay" in params ? Math.max(0, Number(params.delay) || 0) : 0;
+  }
+
+  private async sendRepeated(
+    entity: uc.Entity,
+    eiscp: EiscpDriver,
+    commandReceiver: ICommandReceiver | undefined,
+    cfg: AvrConfig,
+    avrEntry: string,
+    command: string,
+    params: RemoteParams,
+    repeat: number,
+    delayMs: number
+  ): Promise<uc.StatusCodes> {
     for (let i = 0; i < repeat; i++) {
       const status = await this.handleCommand(entity, eiscp, commandReceiver, cfg, avrEntry, command, params);
       if (status !== uc.StatusCodes.Ok) return status;
@@ -113,10 +137,12 @@ export class remoteEntityCommandHandler {
       return uc.StatusCodes.BadRequest;
     }
 
-    const delayMs = params && "delay" in params ? Math.max(0, Number(params.delay) || 0) : 0;
+    // UC spec: `repeat` applies to each command in the sequence, `delay` is used between all commands.
+    const repeat = this.parseRepeat(params);
+    const delayMs = this.parseDelay(params);
 
     for (const command of sequence) {
-      const status = await this.handleCommand(entity, eiscp, commandReceiver, cfg, avrEntry, command, params);
+      const status = await this.sendRepeated(entity, eiscp, commandReceiver, cfg, avrEntry, command, params, repeat, delayMs);
       if (status !== uc.StatusCodes.Ok) return status;
       if (delayMs > 0) await delay(delayMs);
     }
@@ -146,12 +172,15 @@ export class remoteEntityCommandHandler {
   ): Promise<uc.StatusCodes> {
     const zone = cfg.zone;
     const zonePrefix = (cmd: string): string => this.zonePrefixed(zone, cmd);
+    // UC-named simple commands (CURSOR_UP, VOLUME_UP, ...) map onto the media-player command they perform.
+    // Lowercase media-player ids from older button mappings and UI pages still work unchanged.
+    cmdId = UC_REMOTE_COMMANDS[cmdId] ?? cmdId;
 
     if (cmdId.startsWith(REPORTED_INPUT_COMMAND_PREFIX)) {
       try {
         const source = decodeURIComponent(cmdId.substring(REPORTED_INPUT_COMMAND_PREFIX.length));
         const physicalAvrId = buildPhysicalAvrId(cfg.model, cfg.ip);
-        if (!findAvrSourceId(physicalAvrId, source)) return uc.StatusCodes.BadRequest;
+        if (!findAvrSourceId(physicalAvrId, source, this.avrContexts)) return uc.StatusCodes.BadRequest;
         return this.selectSource(eiscp, zone, zonePrefix, { source }, physicalAvrId);
       } catch {
         return uc.StatusCodes.BadRequest;
@@ -278,7 +307,7 @@ export class remoteEntityCommandHandler {
       return uc.StatusCodes.BadRequest;
     }
 
-    const reportedInputId = physicalAvrId ? findAvrSourceId(physicalAvrId, request) : undefined;
+    const reportedInputId = physicalAvrId ? findAvrSourceId(physicalAvrId, request, this.avrContexts) : undefined;
     if (request.startsWith("multi-zone")) {
       await eiscp.command(request);
     } else if (reportedInputId) {

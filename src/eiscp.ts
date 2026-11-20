@@ -4,24 +4,17 @@ import log from "./loggers.js";
 
 import EventEmitter from "events";
 import { eiscpMappings } from "./eiscp-mappings.js";
-import { DEFAULT_QUEUE_THRESHOLD, buildEntityId, buildPhysicalAvrId } from "./configManager.js";
-import { findAvrInputId } from "./inputSourceStore.js";
+import { DEFAULT_QUEUE_THRESHOLD, buildEntityId } from "./configManager.js";
 import { delay } from "./utils.js";
 import { IscpCommandParser, type CommandResult } from "./eiscp-command-parser.js";
+import { createDefaultParserEffects } from "./parserEffects.js";
+import { resolveIscpCommand } from "./iscpCommandResolver.js";
+import { sharedAvrContexts, type AvrContextRegistry } from "./avrContext.js";
 import { createEiscpPacket, extractIscpMessage, extractAllIscpMessages } from "./eiscp-packet.js";
 import { buildMultiZoneVolumeCommands, buildMultiZoneMuteCommands } from "./eiscp-multi-zone.js";
-import { getDeezerBrowseState } from "./deezerBrowserStore.js";
-import { getMusicServerBrowseState } from "./musicServerBrowserStore.js";
-import { getTidalBrowseState } from "./tidalBrowserStore.js";
-import { getTuneInMenuBrowseState } from "./tuneInMenuStore.js";
-import { getZonePrefix } from "./zoneMappings.js";
 import { WAIT_FOR_CONNECT_TIMEOUT, CONNECTION_TIMEOUT } from "./constants.js";
 import type { AvrStateReader } from "./eiscp-command-parser.js";
-import { findNetServiceByName } from "./avrInfoStore.js";
-import { findLearnedListeningModeCode } from "./learnedListeningModeStore.js";
-import { findConfiguredInputId } from "./inputSourcePreferences.js";
-import { stripInputSourceMarker } from "./inputSourceResolver.js";
-import { EiscpCommandWorkflow, NSS_SERVICE_NAMES, extractNetworkServiceCode, isTuneInPresetCommand } from "./eiscpCommandWorkflow.js";
+import { EiscpCommandWorkflow, extractNetworkServiceCode, isTuneInPresetCommand } from "./eiscpCommandWorkflow.js";
 import type { EiscpConfig } from "./eiscpTypes.js";
 
 export type { EiscpConfig } from "./eiscpTypes.js";
@@ -103,7 +96,8 @@ export class EiscpDriver extends EventEmitter {
 
   constructor(
     config?: EiscpConfig,
-    private readonly stateReader: AvrStateReader = NOOP_STATE_READER
+    private readonly stateReader: AvrStateReader = NOOP_STATE_READER,
+    private readonly avrContexts: AvrContextRegistry = sharedAvrContexts
   ) {
     super();
     this.config = {
@@ -120,23 +114,9 @@ export class EiscpDriver extends EventEmitter {
       idInputSources: config?.idInputSources,
       networkNavigationMode: config?.networkNavigationMode
     };
-    this.commandParser = new IscpCommandParser(
-      (zone) => buildEntityId(this.config.model!, this.config.host!, zone),
-      this.stateReader,
-      {
-        getBrowseState: getDeezerBrowseState
-      },
-      {
-        getBrowseState: getTidalBrowseState
-      },
-      {
-        getBrowseState: getTuneInMenuBrowseState
-      },
-      {
-        getBrowseState: getMusicServerBrowseState
-      }
-    );
+    this.commandParser = new IscpCommandParser((zone) => buildEntityId(this.config.model!, this.config.host!, zone), this.stateReader, createDefaultParserEffects(this.avrContexts), this.avrContexts);
     this.commandWorkflow = new EiscpCommandWorkflow({
+      avrContexts: this.avrContexts,
       getConfig: () => this.config,
       raw: (command) => this.raw(command),
       publishMetadata: (metadata, command) => {
@@ -573,81 +553,7 @@ export class EiscpDriver extends EventEmitter {
   }
 
   private commandToIscp(command: string, args: string | number | undefined, zone: string): string {
-    const prefix = (COMMAND_MAPPINGS as Record<string, string>)[command];
-    let value: string;
-    const modernNavigation = this.config.networkNavigationMode !== "legacy";
-    if (prefix === "SLI" && typeof args === "string") {
-      const normalizedSource = stripInputSourceMarker(args)
-        .toLowerCase()
-        .replace(/[\s_-]+/g, "-");
-      const physicalAvrId = buildPhysicalAvrId(this.config.model ?? "", this.config.host ?? "");
-      const reportedService = findNetServiceByName(physicalAvrId, [args]);
-      if (reportedService) {
-        const logicalService = Object.entries(NSS_SERVICE_NAMES).find(([, names]) => names.includes(reportedService.name.toLowerCase().replace(/[^a-z0-9]/g, "")));
-        if (logicalService) {
-          log.debug("%s Sending reported network service %s through %s", logSource, args, logicalService[0]);
-          return logicalService[0];
-        }
-        log.debug("%s Sending reported network service %s directly through NSV%s", logSource, args, reportedService.id);
-        return `NSV${reportedService.id.toUpperCase()}0`;
-      }
-
-      // Music Server has both the legacy SLI27 alias and the network-service
-      // NSS10 alias. Display names such as "Music Server" must resolve to the
-      // latter; otherwise separator-insensitive matching picks SLI27 first.
-      if (normalizedSource === "music-server") {
-        return modernNavigation ? "NSV000" : "NSS10";
-      }
-      if (modernNavigation && normalizedSource === "tidal") return "NSV1B0";
-      if (modernNavigation && normalizedSource === "deezer") return "NSV120";
-    }
-    const valueMap = (VALUE_MAPPINGS as unknown as Record<string, Record<string, { value: string }>>)[prefix];
-    const mappedKey =
-      args !== undefined && valueMap
-        ? Object.keys(valueMap).find(
-            (key) =>
-              key.toLowerCase() === String(args).toLowerCase() ||
-              key.toLowerCase().replace(/[\s_-]+/g, "") ===
-                String(args)
-                  .toLowerCase()
-                  .replace(/[\s_-]+/g, "")
-          )
-        : undefined;
-    if (args !== undefined && valueMap && mappedKey !== undefined) {
-      value = valueMap[mappedKey].value;
-    } else if (prefix === "SLI" && typeof args === "string") {
-      args = stripInputSourceMarker(args);
-      const physicalAvrId = buildPhysicalAvrId(this.config.model ?? "", this.config.host ?? "");
-      // An input name the AVR reported itself ("BD/DVD", "CBL/SAT") is not in the hardcoded SLI table: send the input id the AVR gave for it instead.
-      const inputId = findAvrInputId(physicalAvrId, args) ?? findConfiguredInputId(this.config.idInputSources, args);
-      if (inputId) {
-        log.debug("%s Sending input-selector %s as %s%s (id reported by the AVR)", logSource, args, getZonePrefix(prefix, zone), inputId);
-        return getZonePrefix(prefix, zone) + inputId;
-      }
-      log.error("%s Input source alias is not mapped: %s %s", logSource, command, args);
-      value = String(args ?? "");
-    } else if (prefix === "LMD" && typeof args === "string") {
-      const physicalAvrId = buildPhysicalAvrId(this.config.model ?? "", this.config.host ?? "");
-      const entityId = buildEntityId(this.config.model ?? "", this.config.host ?? "", zone);
-      const learnedCode = findLearnedListeningModeCode(physicalAvrId, args, this.stateReader.getSource(entityId), this.stateReader.getAudioFormat?.(entityId));
-      if (learnedCode) {
-        log.debug("%s Sending learned listening mode %s as LMD%s", logSource, args, learnedCode);
-        value = learnedCode;
-      } else {
-        log.warn("%s Listening mode is not mapped: %s", logSource, args);
-        value = String(args);
-      }
-    } else if (valueMap && Object.prototype.hasOwnProperty.call(valueMap, "intgrRange")) {
-      value = (+args!).toString(16).toUpperCase().padStart(2, "0");
-    } else {
-      log.warn("%s not found in JSON: %s %s", logSource, command, args);
-      value = String(args ?? "");
-    }
-
-    // Translate main zone command prefixes to zone-specific prefixes
-    const zonePrefix = getZonePrefix(prefix, zone);
-
-    return zonePrefix + value;
+    return resolveIscpCommand(command, args, zone, { config: this.config, stateReader: this.stateReader, avrContexts: this.avrContexts });
   }
 
   // Get all available commands

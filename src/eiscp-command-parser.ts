@@ -1,16 +1,13 @@
 import { eiscpCommands } from "./eiscp-commands.js";
 import { eiscpMappings } from "./eiscp-mappings.js";
 import { diracResponseToCommandValue } from "./diracSelect.js";
-import { NO_TITLE } from "./constants.js";
 import { detectServiceFromText, detectServiceFromAsciiPrefix, getCanonicalServiceName } from "./serviceDetector.js";
-import { parseAvrInfo, setAvrInfo, listDabPresets, listFmPresets, PRESET_BAND_EMPTY } from "./avrInfoStore.js";
-import { findAvrInputName } from "./inputSourceStore.js";
+import { hasServiceCapability, toServiceId } from "./networkServices.js";
+import { parseAvrInfo } from "./avrInfoStore.js";
+import { sharedAvrContexts, type AvrContextRegistry } from "./avrContext.js";
 import { physicalAvrIdFromEntityId } from "./configManager.js";
 import log, { getLogLevel } from "./loggers.js";
-import type { DeezerBrowseState } from "./deezerBrowserStore.js";
-import type { MusicServerBrowseState } from "./musicServerBrowserStore.js";
-import type { TidalBrowseState } from "./tidalBrowserStore.js";
-import type { TuneInMenuBrowseState } from "./tuneInMenuStore.js";
+import type { ListHeader, ParserEffects } from "./parserEffects.js";
 
 const COMMANDS = eiscpCommands.commands;
 const VALUE_MAPPINGS = eiscpMappings.value_mappings;
@@ -25,22 +22,6 @@ export interface AvrStateReader {
   getSource(entityId: string): string;
   getAudioFormat?(entityId: string): string;
   getSubSource(entityId: string): string;
-}
-
-export interface DeezerStoreApi {
-  getBrowseState(entityId: string): DeezerBrowseState | null;
-}
-
-export interface TidalStoreApi {
-  getBrowseState(entityId: string): TidalBrowseState | null;
-}
-
-export interface MusicServerStoreApi {
-  getBrowseState(entityId: string): MusicServerBrowseState | null;
-}
-
-export interface TuneInMenuStoreApi {
-  getBrowseState(entityId: string): TuneInMenuBrowseState | null;
 }
 
 export interface Metadata {
@@ -62,14 +43,14 @@ export class IscpCommandParser {
   private currentMetadata: Metadata = {};
   private readonly commandHandlers: Record<string, CommandHandler>;
 
-  // getEntityId: returns UC entity ID for a zone (called at parse time). stateReader/tidalStore: injected for testability.
+  // getEntityId: returns the UC entity id for a zone (called at parse time). stateReader: read-only zone state, used to
+  // suppress repeated events. effects: applies the state updates that follow from a message (see parserEffects.ts);
+  // the parser itself does not write to any store.
   constructor(
     private readonly getEntityId: (zone: string) => string,
     private readonly stateReader: AvrStateReader,
-    private readonly deezerStore: DeezerStoreApi,
-    private readonly tidalStore: TidalStoreApi,
-    private readonly tuneInMenuStore: TuneInMenuStoreApi,
-    private readonly musicServerStore: MusicServerStoreApi
+    private readonly effects: ParserEffects,
+    private readonly avrContexts: AvrContextRegistry = sharedAvrContexts
   ) {
     this.commandHandlers = {
       NTM: (value, _cmd, result) => this.handleNTM(value, result),
@@ -157,7 +138,7 @@ export class IscpCommandParser {
     result.command = cmdObj.name;
     const valuesObj = cmdObj.values;
 
-    const avrInputName = lookupCommand === "SLI" ? findAvrInputName(physicalAvrIdFromEntityId(this.getEntityId(result.zone)) ?? "", lookupValue) : undefined;
+    const avrInputName = lookupCommand === "SLI" ? this.avrContexts.get(physicalAvrIdFromEntityId(this.getEntityId(result.zone)) ?? "").inputs.findName(lookupValue) : undefined;
 
     if (avrInputName) {
       // An input the AVR reported itself: use the name the AVR shows for it, so the integration
@@ -323,7 +304,7 @@ export class IscpCommandParser {
         let val = match[2].trim();
         if (type === "NAT") {
           // Override artist with service name for configured streaming services
-          if (NO_TITLE.map((s) => s.toLowerCase()).includes(currentSubSource)) {
+          if (hasServiceCapability(currentSubSource, "noTitle")) {
             // Find matching service name (e.g., "Spotify" for "spotify")
             const serviceName = getCanonicalServiceName(currentSubSource);
             this.currentMetadata.title = serviceName || val;
@@ -339,7 +320,7 @@ export class IscpCommandParser {
     if (!foundMatch) {
       if (command === "NAT") {
         // Override artist with service name for configured streaming services
-        if (NO_TITLE.map((s) => s.toLowerCase()).includes(currentSubSource)) {
+        if (hasServiceCapability(currentSubSource, "noTitle")) {
           // Find matching service name (e.g., "Spotify" for "spotify")
           const serviceName = getCanonicalServiceName(currentSubSource);
           this.currentMetadata.title = serviceName || originalValue;
@@ -408,45 +389,7 @@ export class IscpCommandParser {
         const cursorOffset = parseInt(cursorHex, 16);
         const totalCount = parseInt(countHex, 16);
         const layerNumber = /^[0-9A-Fa-f]{2}$/.test(layerHex) ? parseInt(layerHex, 16) : 0;
-        if (this.stateReader.getSubSource(entityId) === "deezer") {
-          const deezerState = this.deezerStore.getBrowseState(entityId);
-          if (deezerState) {
-            if (!deezerState.harvestMode) deezerState.nlsCursorOffset = cursorOffset;
-            deezerState.totalListItemCount = totalCount;
-            // Once a track is selected, NLT describes the playback context,
-            // not the XML browse list. Keep the browse layer for subsequent
-            // selections from the still-visible frozen list.
-            if (layerNumber > 0 && !deezerState.browseListFrozen) deezerState.nlsLayerNumber = layerNumber;
-          }
-        }
-
-        if (this.stateReader.getSubSource(entityId) === "tidal") {
-          const tidalState = this.tidalStore.getBrowseState(entityId);
-          if (tidalState) {
-            // Don't overwrite the cursor during harvest — the loop manages it locally.
-            if (!tidalState.harvestMode) tidalState.nlsCursorOffset = cursorOffset;
-            tidalState.totalListItemCount = totalCount;
-            if (layerNumber > 0 && !tidalState.browseListFrozen) tidalState.nlsLayerNumber = layerNumber;
-          }
-        }
-
-        if (this.stateReader.getSubSource(entityId) === "tunein") {
-          const tuneInMenuState = this.tuneInMenuStore.getBrowseState(entityId);
-          if (tuneInMenuState) {
-            if (!tuneInMenuState.harvestMode) tuneInMenuState.nlsCursorOffset = cursorOffset;
-            tuneInMenuState.totalListItemCount = totalCount;
-            if (layerNumber > 0) tuneInMenuState.nlsLayerNumber = layerNumber;
-          }
-        }
-
-        if (this.stateReader.getSubSource(entityId) === "music-server") {
-          const musicServerState = this.musicServerStore.getBrowseState(entityId);
-          if (musicServerState) {
-            if (!musicServerState.harvestMode) musicServerState.nlsCursorOffset = cursorOffset;
-            musicServerState.totalListItemCount = totalCount;
-            if (layerNumber > 0 && !musicServerState.browseListFrozen) musicServerState.nlsLayerNumber = layerNumber;
-          }
-        }
+        this.effects.applyListHeader(entityId, this.stateReader.getSubSource(entityId), { cursorOffset, totalCount, layerNumber });
       }
     }
 
@@ -469,23 +412,14 @@ export class IscpCommandParser {
     // Check if the title contains a known network service name
     const detectedService = detectServiceFromText(text);
     if (detectedService) {
-      // NLT can arrive before avrState has committed the canonical sub-source
-      // (the capture shows the service title and list metadata in that order).
-      // Preserve the list total/layer immediately so XML-only browsers do not
-      // fall back to requesting a single root item.
+      // The service title can arrive before avrState has committed the sub-source; pass its list header on now.
       if (value.length >= 14 && /^[0-9A-Fa-f]{4}$/.test(value.substring(4, 8)) && /^[0-9A-Fa-f]{4}$/.test(value.substring(8, 12))) {
-        const cursorOffset = parseInt(value.substring(4, 8), 16);
-        const totalCount = parseInt(value.substring(8, 12), 16);
-        const layerNumber = /^[0-9A-Fa-f]{2}$/.test(value.substring(12, 14)) ? parseInt(value.substring(12, 14), 16) : 0;
-        const updateBrowseState = (state: { totalListItemCount: number; nlsCursorOffset: number; nlsLayerNumber: number; browseListFrozen?: boolean } | null): void => {
-          if (!state) return;
-          if (!state.browseListFrozen) state.nlsCursorOffset = cursorOffset;
-          state.totalListItemCount = totalCount;
-          if (layerNumber > 0 && !state.browseListFrozen) state.nlsLayerNumber = layerNumber;
+        const header: ListHeader = {
+          cursorOffset: parseInt(value.substring(4, 8), 16),
+          totalCount: parseInt(value.substring(8, 12), 16),
+          layerNumber: /^[0-9A-Fa-f]{2}$/.test(value.substring(12, 14)) ? parseInt(value.substring(12, 14), 16) : 0
         };
-        if (detectedService === "tidal") updateBrowseState(this.tidalStore.getBrowseState(entityId));
-        else if (detectedService === "deezer") updateBrowseState(this.deezerStore.getBrowseState(entityId));
-        else if (detectedService === "music-server") updateBrowseState(this.musicServerStore.getBrowseState(entityId));
+        this.effects.applyServiceEntryListHeader(entityId, detectedService, header);
       }
       const currentSubSource = this.stateReader.getSubSource(entityId);
       if (currentSubSource !== detectedService) {
@@ -542,25 +476,7 @@ export class IscpCommandParser {
       log.debug("%s [%s] Complete NRI payload (%d chars):\n%s", logSource, entityId, dumpable.length, dumpable.replace(/></g, ">\n<").replace(/>\n<\//g, "></"));
     }
 
-    setAvrInfo(entityId, info);
-    const dabPresets = listDabPresets(entityId);
-    const fmPresets = listFmPresets(entityId);
-    const emptyPresets = info.presets.filter((preset) => preset.band === PRESET_BAND_EMPTY);
-    log.debug("%s [%s] Collected AVR info: %d DAB preset(s), %d FM preset(s) of %d slot(s)", logSource, entityId, dabPresets.length, fmPresets.length, info.presetCount);
-    if (dabPresets.length > 0) {
-      log.debug("%s [%s] DAB presets (band=2, no frequency):\n%s", logSource, entityId, dabPresets.map((preset) => `  slot ${String(preset.slot).padStart(2, " ")}: ${preset.name}`).join("\n"));
-    }
-    if (fmPresets.length > 0) {
-      log.debug(
-        "%s [%s] FM presets (band=1, carries a frequency):\n%s",
-        logSource,
-        entityId,
-        fmPresets.map((preset) => `  slot ${String(preset.slot).padStart(2, " ")}: ${preset.name} @ ${preset.freq} MHz`).join("\n")
-      );
-    }
-    if (emptyPresets.length > 0) {
-      log.debug("%s [%s] Empty slots (band=0): %d (slots %s)", logSource, entityId, emptyPresets.length, emptyPresets.map((preset) => preset.slot).join(", "));
-    }
+    this.effects.storeAvrInfo(entityId, info);
 
     // Use the command name, not the raw NRI opcode, so the command receiver can dispatch it.
     result.command = "avr-info";
@@ -620,7 +536,7 @@ export class IscpCommandParser {
         if (detectedService) {
           // Known service detected - only emit if different from current subSource
           const currentSubSource = this.stateReader.getSubSource(entityId);
-          if (currentSubSource !== detectedService.toLowerCase()) {
+          if (currentSubSource !== toServiceId(detectedService)) {
             result.command = "FLD";
             result.argument = detectedService;
             return result;

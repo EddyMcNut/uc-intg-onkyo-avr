@@ -13,12 +13,15 @@ import { PlayMediaCommandHandler } from "./playMediaCommandHandler.js";
 import { findAvrSourceId, getAvrSourcesByPhysicalId } from "./avrSourceCatalog.js";
 import { stripInputSourceMarker } from "./inputSourcePresentation.js";
 import { isNetworkInputSource } from "./inputSourcePreferences.js";
-import { resetDeezerBrowseState } from "./deezerBrowserStore.js";
-import { resetMusicServerBrowseState } from "./musicServerBrowserStore.js";
-import { resetTidalBrowseState } from "./tidalBrowserStore.js";
 import { resetTuneInMenuBrowseState } from "./tuneInMenuStore.js";
+import { toServiceId } from "./networkServices.js";
+import { sharedAvrContexts, type AvrContextRegistry } from "./avrContext.js";
+import { getMenuBrowseService } from "./menuBrowseServices.js";
+import { DEEZER_SERVICE_ID, MUSIC_SERVER_SERVICE_ID, TIDAL_SERVICE_ID, TUNEIN_SERVICE_ID } from "./browseServiceContract.js";
 
 const logSource = "commandSender:";
+// Services that are marked active as soon as they are selected, before the AVR confirms the switch.
+const OPTIMISTIC_SUB_SOURCES = new Set([TUNEIN_SERVICE_ID, TIDAL_SERVICE_ID, DEEZER_SERVICE_ID, MUSIC_SERVER_SERVICE_ID, "spotify"]);
 
 export class CommandSender {
   private driver: uc.IntegrationAPI;
@@ -28,7 +31,14 @@ export class CommandSender {
   private commandReceiver: ICommandReceiver | undefined;
   private playMediaCommandHandler: PlayMediaCommandHandler;
 
-  constructor(driver: uc.IntegrationAPI, config: IntegrationConfig, eiscp: EiscpDriver, avrStateApi: AvrStateApi, commandReceiver: ICommandReceiver | undefined) {
+  constructor(
+    driver: uc.IntegrationAPI,
+    config: IntegrationConfig,
+    eiscp: EiscpDriver,
+    avrStateApi: AvrStateApi,
+    commandReceiver: ICommandReceiver | undefined,
+    private readonly avrContexts: AvrContextRegistry = sharedAvrContexts
+  ) {
     this.driver = driver;
     this.config = config;
     this.eiscp = eiscp;
@@ -174,10 +184,10 @@ export class CommandSender {
         // before validating or resolving the command.
         const request = stripInputSourceMarker(params.source).toLowerCase();
         const physicalAvrId = physicalAvrIdFromEntityId(_e.id);
-        const reportedSourceId = physicalAvrId ? findAvrSourceId(physicalAvrId, request) : undefined;
+        const reportedSourceId = physicalAvrId ? findAvrSourceId(physicalAvrId, request, this.avrContexts) : undefined;
         const isNetworkService = isNetworkInputSource(reportedSourceId ?? request, request);
         const discoveredSourceName =
-          physicalAvrId && reportedSourceId ? getAvrSourcesByPhysicalId(physicalAvrId).find((input) => input.id.toLowerCase() === reportedSourceId.toLowerCase())?.name : undefined;
+          physicalAvrId && reportedSourceId ? getAvrSourcesByPhysicalId(physicalAvrId, this.avrContexts).find((input) => input.id.toLowerCase() === reportedSourceId.toLowerCase())?.name : undefined;
         if (request.startsWith("raw ")) {
           const rawCmd = request.substring(3).trim().toUpperCase();
           if (rawCmd.length > MAX_LENGTHS.RAW_COMMAND) {
@@ -206,7 +216,7 @@ export class CommandSender {
         } else if (INPUT_NAMES_SET.has(request)) {
           this.resetBrowseStateBeforeSourceSelection(_e.id, request);
           await this.eiscp.command(sz(`input-selector ${request}`));
-        } else if (physicalAvrIdFromEntityId(_e.id) && findAvrSourceId(physicalAvrIdFromEntityId(_e.id)!, request)) {
+        } else if (physicalAvrIdFromEntityId(_e.id) && findAvrSourceId(physicalAvrIdFromEntityId(_e.id)!, request, this.avrContexts)) {
           this.resetBrowseStateBeforeSourceSelection(_e.id, request);
           await this.eiscp.command({ zone, command: "input-selector", args: request });
         } else {
@@ -351,26 +361,25 @@ export class CommandSender {
   }
 
   private resetBrowseStateBeforeSourceSelection(entityId: string, source: string): void {
-    const normalized = stripInputSourceMarker(source).toLowerCase().replace(/\s+/g, "-");
+    // Service id from any spelling: "TuneIn Radio" -> tunein, "musicserver" / "Music Server" -> music-server.
+    const serviceId = toServiceId(stripInputSourceMarker(source));
     const avr = this.config.avrs?.find((candidate) => buildEntityId(candidate.model, candidate.ip, candidate.zone) === entityId);
-    if ((normalized === "tunein" || normalized === "tunein-radio") && avr?.tuneinMenuStyle === "full") {
+    if (serviceId === TUNEIN_SERVICE_ID && avr?.tuneinMenuStyle === "full") {
       // Full Menu can be opened before the AVR sends its service notification.
       // Keep the learned display name out of routing and discard stale menus.
       // My Presets retains its service-entry notification/preload lifecycle.
       resetTuneInMenuBrowseState(entityId);
-      this.avrStateApi.setSubSource(entityId, "tunein");
+      this.avrStateApi.setSubSource(entityId, TUNEIN_SERVICE_ID);
       return;
     }
-    if (normalized === "tidal") resetTidalBrowseState(entityId);
-    else if (normalized === "deezer") resetDeezerBrowseState(entityId);
-    else if (normalized === "music-server" || normalized === "musicserver") resetMusicServerBrowseState(entityId);
+    getMenuBrowseService(serviceId)?.store.resetState(entityId);
 
     // The AVR reports the new NLT service entry shortly after accepting the
     // source command. Mark the requested service active immediately so a
     // browse request arriving in that gap cannot be handled by the previous
     // service's handler or return its cached menu.
-    if (normalized === "tidal" || normalized === "deezer" || normalized === "music-server" || normalized === "musicserver" || normalized === "spotify" || normalized === "tunein") {
-      this.avrStateApi.setSubSource(entityId, normalized === "musicserver" ? "music-server" : normalized);
+    if (OPTIMISTIC_SUB_SOURCES.has(serviceId)) {
+      this.avrStateApi.setSubSource(entityId, serviceId);
     }
   }
 }

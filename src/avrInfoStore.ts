@@ -7,7 +7,6 @@
 //
 // The payload is a flat, attribute-only document, so a targeted scan is used instead of a real
 // XML parser: this keeps the integration free of runtime dependencies.
-import { physicalAvrIdFromEntityId } from "./configManager.js";
 import { ZONE_ID_BY_ZONE } from "./zoneMappings.js";
 
 // Band values observed in the `band` attribute of `<preset>` elements. Verified against a live TX-RZ50: with the input set to DAB and the display showing "JOENstop", slot 12 of the `band=2` range is "JOEnstop". DAB service labels are space-padded to 8 characters (the ETSI EN 300 401 limit), which these names are, and DAB has no tuning frequency to report, which is why `freq` is "0". FM/AM presets carry a real frequency in `freq`.
@@ -272,91 +271,74 @@ function textElement(xml: string, tagName: string): string | undefined {
   return match ? match[1] : undefined;
 }
 
-const avrInfoByPhysicalAvr = new Map<string, AvrInfo>();
+// What one physical AVR reported about itself (NRI). One instance lives in that AVR's AvrContext (see avrContext.ts).
+export class AvrInfoStore {
+  private info: AvrInfo | null = null;
 
-export function getAvrInfo(entityId: string): AvrInfo | null {
-  const physicalAvrId = physicalAvrIdFromEntityId(entityId);
-  if (!physicalAvrId) {
-    return null;
+  get(): AvrInfo | null {
+    return this.info;
   }
-  return avrInfoByPhysicalAvr.get(physicalAvrId) ?? null;
-}
 
-export function setAvrInfo(entityId: string, info: AvrInfo): void {
-  const physicalAvrId = physicalAvrIdFromEntityId(entityId);
-  if (!physicalAvrId) {
-    return;
+  set(info: AvrInfo): void {
+    this.info = info;
   }
-  avrInfoByPhysicalAvr.set(physicalAvrId, info);
-}
 
-// DAB/DAB+ presets, ordered by AVR slot number. Empty slots are dropped so only actually stored stations are returned.
-export function listDabPresets(entityId: string): AvrPreset[] {
-  const info = getAvrInfo(entityId);
-  if (!info) {
-    return [];
+  reset(): void {
+    this.info = null;
   }
-  return info.presets.filter((preset) => preset.band === PRESET_BAND_DAB && preset.name !== "").sort((a, b) => a.slot - b.slot);
-}
 
-// FM/AM tuner presets, ordered by AVR slot number. Empty slots are dropped.
-export function listFmPresets(entityId: string): AvrPreset[] {
-  const info = getAvrInfo(entityId);
-  if (!info) {
-    return [];
+  // DAB/DAB+ presets, ordered by AVR slot number. Empty slots are dropped so only actually stored stations are returned.
+  dabPresets(): AvrPreset[] {
+    return (this.info?.presets ?? []).filter((preset) => preset.band === PRESET_BAND_DAB && preset.name !== "").sort((a, b) => a.slot - b.slot);
   }
-  return info.presets.filter((preset) => preset.band === PRESET_BAND_FM).sort((a, b) => a.slot - b.slot);
-}
 
-// Every preset slot the AVR has a station name for, on any band, ordered by AVR slot number. Empty slots (band=0, no name) are dropped: there is nothing to select there. The slot number is kept because that is what `PRS` takes to recall a station.
-export function listNamedPresets(entityId: string): AvrPreset[] {
-  const info = getAvrInfo(entityId);
-  if (!info) {
-    return [];
+  // FM/AM tuner presets, ordered by AVR slot number. Empty slots are dropped.
+  fmPresets(): AvrPreset[] {
+    return (this.info?.presets ?? []).filter((preset) => preset.band === PRESET_BAND_FM).sort((a, b) => a.slot - b.slot);
   }
-  return info.presets.filter((preset) => preset.name !== "").sort((a, b) => a.slot - b.slot);
-}
 
-// Inputs the AVR actually has, e.g. DAB, FM, NET, Bluetooth.
-export function listSelectors(entityId: string): AvrSelector[] {
-  return getAvrInfo(entityId)?.selectors ?? [];
-}
+  // Every preset slot the AVR has a station name for, on any band, ordered by AVR slot number. Empty slots (band=0, no
+  // name) are dropped: there is nothing to select there. The slot number is kept because that is what `PRS` takes.
+  namedPresets(): AvrPreset[] {
+    return (this.info?.presets ?? []).filter((preset) => preset.name !== "").sort((a, b) => a.slot - b.slot);
+  }
 
-// True when NRI contains both selector and network-service lists needed for AVR-specific source UI.
-export function hasCompleteInputSourceInfo(entityId: string): boolean {
-  const info = getAvrInfo(entityId);
-  return Boolean(info && info.selectors.length > 0 && info.netServices.length > 0);
-}
+  // Inputs the AVR actually has, e.g. DAB, FM, NET, Bluetooth.
+  selectors(): AvrSelector[] {
+    return this.info?.selectors ?? [];
+  }
 
-// Network services the AVR reports, e.g. TuneIn Radio, Spotify, TIDAL. This is the authoritative list for the current hardware: the hardcoded NETWORK_SERVICES constant has to guess, and gets it wrong for any AVR whose firmware reports a different spelling.
-export function listNetServiceNames(entityId: string): string[] {
-  return (getAvrInfo(entityId)?.netServices ?? []).map((service) => service.name).filter((name) => name !== "");
-}
+  // True when NRI contains both selector and network-service lists needed for AVR-specific source UI.
+  hasCompleteInputSourceInfo(): boolean {
+    return Boolean(this.info && this.info.selectors.length > 0 && this.info.netServices.length > 0);
+  }
 
-// Find a reported network service by its physical AVR id and logical service aliases.
-export function findNetServiceByName(physicalAvrId: string, names: string[]): AvrNetService | undefined {
-  const wanted = names.map((name) => name.toLowerCase().replace(/[^a-z0-9]/g, ""));
-  return [...avrInfoByPhysicalAvr.entries()]
-    .find(([id]) => id === physicalAvrId)?.[1]
-    .netServices.find((service) => service.enabled && wanted.includes(service.name.toLowerCase().replace(/[^a-z0-9]/g, "")));
-}
+  // Network services the AVR reports, e.g. TuneIn Radio, Spotify, TIDAL. This is the authoritative list for the
+  // current hardware: the networkServices table has to guess, and gets it wrong for any AVR whose firmware reports a
+  // different spelling.
+  netServiceNames(): string[] {
+    return (this.info?.netServices ?? []).map((service) => service.name).filter((name) => name !== "");
+  }
 
-// Read one control's raw value by id, e.g. getControlValue(id, "DolbyAtmos").
-export function getControlValue(entityId: string, controlId: string): string | undefined {
-  return getAvrInfo(entityId)?.controls.find((control) => control.id === controlId)?.value;
-}
+  // Find an enabled reported network service by any of the given names (compared in compact form).
+  findNetServiceByName(names: string[]): AvrNetService | undefined {
+    const wanted = names.map((name) => name.toLowerCase().replace(/[^a-z0-9]/g, ""));
+    return this.info?.netServices.find((service) => service.enabled && wanted.includes(service.name.toLowerCase().replace(/[^a-z0-9]/g, "")));
+  }
 
-// Highest volume the AVR shows on its own display, in display units (80 or 100). The scale is a property of the AVR rather than of the zone, so the zone itself is preferred and any other zone that reports a usable value is used as fallback. Returns undefined when nothing was collected yet, when the AVR does not support NRI, or when it reports no volume scale at all.
-export function getAvrVolumeScale(entityId: string, zone: string): number | undefined {
-  const zones = getAvrInfo(entityId)?.zones ?? [];
-  const hasVolumeScale = (candidate: AvrZone | undefined): boolean => (candidate?.volMax ?? 0) > 0;
-  const reporting = [zones.find((z) => z.id === ZONE_ID_BY_ZONE[zone]), ...zones].find(hasVolumeScale);
-  return reporting?.volMax;
-}
+  // Read one control's raw value by id, e.g. controlValue("DolbyAtmos").
+  controlValue(controlId: string): string | undefined {
+    return this.info?.controls.find((control) => control.id === controlId)?.value;
+  }
 
-export function resetAvrInfo(entityId: string): void {
-  const physicalAvrId = physicalAvrIdFromEntityId(entityId);
-  if (physicalAvrId) {
-    avrInfoByPhysicalAvr.delete(physicalAvrId);
+  // Highest volume the AVR shows on its own display, in display units (80 or 100). The scale is a property of the AVR
+  // rather than of the zone, so the zone itself is preferred and any other zone that reports a usable value is used as
+  // fallback. Returns undefined when nothing was collected yet, when the AVR does not support NRI, or when it reports
+  // no volume scale at all.
+  volumeScale(zone: string): number | undefined {
+    const zones = this.info?.zones ?? [];
+    const hasVolumeScale = (candidate: AvrZone | undefined): boolean => (candidate?.volMax ?? 0) > 0;
+    const reporting = [zones.find((z) => z.id === ZONE_ID_BY_ZONE[zone]), ...zones].find(hasVolumeScale);
+    return reporting?.volMax;
   }
 }

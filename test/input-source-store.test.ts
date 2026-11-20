@@ -1,5 +1,8 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { clearAllAvrInputs, clearAvrInputs, findAvrInputId, findAvrInputName, getAvrInputs, hasAvrInputs, normalizeAvrInputs, setAvrInputs, type AvrInput } from "../src/inputSourceStore.js";
+import { normalizeAvrInputs, type AvrInput } from "../src/inputSourceStore.js";
+import { AvrContextRegistry } from "../src/avrContext.js";
+
+const registry = new AvrContextRegistry();
 
 const AVR = "TX-RZ50 192.168.2.103";
 const REPORTED: AvrInput[] = [
@@ -10,12 +13,17 @@ const REPORTED: AvrInput[] = [
 ];
 
 describe("inputSourceStore", () => {
-  beforeEach(() => clearAllAvrInputs());
+  beforeEach(() => registry.clear());
 
   it("stores the inputs sorted by name, in the AVR's own spelling", () => {
-    setAvrInputs(AVR, REPORTED);
+    registry.get(AVR).inputs.set(REPORTED);
 
-    expect(getAvrInputs(AVR).map((input) => input.name)).toEqual(["BD/DVD", "CBL/SAT", "DAB", "NET"]);
+    expect(
+      registry
+        .get(AVR)
+        .inputs.list()
+        .map((input) => input.name)
+    ).toEqual(["BD/DVD", "CBL/SAT", "DAB", "NET"]);
   });
 
   it("drops entries without an id or a name and duplicates of id or name", () => {
@@ -53,59 +61,59 @@ describe("inputSourceStore", () => {
   });
 
   it("reports a change when only the placeholder entry disappears", () => {
-    setAvrInputs(AVR, [
+    registry.get(AVR).inputs.set([
       { id: "10", name: "BD/DVD" },
       { id: "80", name: "Source" }
     ]);
     // The placeholder never enters the list, so storing it again changes nothing.
-    expect(setAvrInputs(AVR, [{ id: "10", name: "BD/DVD" }])).toBe(false);
-    expect(getAvrInputs(AVR)).toEqual([{ id: "10", name: "BD/DVD" }]);
+    expect(registry.get(AVR).inputs.set([{ id: "10", name: "BD/DVD" }])).toBe(false);
+    expect(registry.get(AVR).inputs.list()).toEqual([{ id: "10", name: "BD/DVD" }]);
   });
 
   it("normalizes the id to lower case hex, as used by SLI", () => {
-    setAvrInputs(AVR, [{ id: "2E", name: "BLUETOOTH" }]);
+    registry.get(AVR).inputs.set([{ id: "2E", name: "BLUETOOTH" }]);
 
-    expect(findAvrInputId(AVR, "bluetooth")).toBe("2e");
-    expect(findAvrInputId(AVR, "Bluetooth")).toBe("2e");
+    expect(registry.get(AVR).inputs.findId("bluetooth")).toBe("2e");
+    expect(registry.get(AVR).inputs.findId("Bluetooth")).toBe("2e");
   });
 
   it("looks up inputs by name and by id", () => {
-    setAvrInputs(AVR, REPORTED);
+    registry.get(AVR).inputs.set(REPORTED);
 
-    expect(findAvrInputId(AVR, "BD/DVD")).toBe("10");
-    expect(findAvrInputName(AVR, "33")).toBe("DAB");
-    expect(findAvrInputName(AVR, "ff")).toBeUndefined();
-    expect(findAvrInputId(AVR, "not an input")).toBeUndefined();
+    expect(registry.get(AVR).inputs.findId("BD/DVD")).toBe("10");
+    expect(registry.get(AVR).inputs.findName("33")).toBe("DAB");
+    expect(registry.get(AVR).inputs.findName("ff")).toBeUndefined();
+    expect(registry.get(AVR).inputs.findId("not an input")).toBeUndefined();
   });
 
   it("reports whether anything was collected", () => {
-    expect(hasAvrInputs(AVR)).toBe(false);
-    setAvrInputs(AVR, REPORTED);
-    expect(hasAvrInputs(AVR)).toBe(true);
+    expect(registry.get(AVR).inputs.has()).toBe(false);
+    registry.get(AVR).inputs.set(REPORTED);
+    expect(registry.get(AVR).inputs.has()).toBe(true);
   });
 
   it("reports a change only when the effective list differs", () => {
-    expect(setAvrInputs(AVR, REPORTED)).toBe(true);
-    expect(setAvrInputs(AVR, [...REPORTED].reverse())).toBe(false);
-    expect(setAvrInputs(AVR, REPORTED.slice(0, 2))).toBe(true);
+    expect(registry.get(AVR).inputs.set(REPORTED)).toBe(true);
+    expect(registry.get(AVR).inputs.set([...REPORTED].reverse())).toBe(false);
+    expect(registry.get(AVR).inputs.set(REPORTED.slice(0, 2))).toBe(true);
   });
 
   it("forgets the inputs of a single AVR, and an empty collection drops them again", () => {
-    setAvrInputs(AVR, REPORTED);
-    setAvrInputs(AVR, []);
-    expect(hasAvrInputs(AVR)).toBe(false);
+    registry.get(AVR).inputs.set(REPORTED);
+    registry.get(AVR).inputs.set([]);
+    expect(registry.get(AVR).inputs.has()).toBe(false);
 
-    setAvrInputs(AVR, REPORTED);
-    clearAvrInputs(AVR);
-    expect(getAvrInputs(AVR)).toEqual([]);
+    registry.get(AVR).inputs.set(REPORTED);
+    registry.get(AVR).inputs.clear();
+    expect(registry.get(AVR).inputs.list()).toEqual([]);
   });
 
   it("keeps the inputs of other AVRs", () => {
-    setAvrInputs(AVR, REPORTED);
-    setAvrInputs("TX-NR860 192.168.2.104", [{ id: "01", name: "CBL/SAT" }]);
+    registry.get(AVR).inputs.set(REPORTED);
+    registry.get("TX-NR860 192.168.2.104").inputs.set([{ id: "01", name: "CBL/SAT" }]);
 
-    clearAvrInputs(AVR);
+    registry.get(AVR).inputs.clear();
 
-    expect(getAvrInputs("TX-NR860 192.168.2.104")).toEqual([{ id: "01", name: "CBL/SAT" }]);
+    expect(registry.get("TX-NR860 192.168.2.104").inputs.list()).toEqual([{ id: "01", name: "CBL/SAT" }]);
   });
 });

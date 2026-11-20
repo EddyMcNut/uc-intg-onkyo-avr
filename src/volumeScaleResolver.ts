@@ -1,5 +1,5 @@
 import { VOLUME_SCALE_AUTO, VOLUME_SCALE_FALLBACK, type AvrConfig, type VolumeScale } from "./configManager.js";
-import { getAvrVolumeScale } from "./avrInfoStore.js";
+import { sharedAvrContexts, type AvrContextRegistry } from "./avrContext.js";
 
 export type VolumeScaleResolution = {
   // The concrete scale to store in the config.
@@ -10,12 +10,13 @@ export type VolumeScaleResolution = {
 };
 
 // Resolve the volume scale of one AVR zone when it is set to "auto". Returns undefined when there is nothing to do: the zone already has a concrete scale, so a value that was set manually (or resolved earlier) is never overwritten.
-export function resolveAutoVolumeScale(avrConfig: AvrConfig, entityId: string): VolumeScaleResolution | undefined {
+// `contexts` defaults to the shared registry during the item-10 migration (see avrContext.ts).
+export function resolveAutoVolumeScale(avrConfig: AvrConfig, entityId: string, contexts: AvrContextRegistry = sharedAvrContexts): VolumeScaleResolution | undefined {
   if (avrConfig.volumeScale !== VOLUME_SCALE_AUTO) {
     return undefined;
   }
 
-  const reported = getAvrVolumeScale(entityId, avrConfig.zone);
+  const reported = contexts.forEntity(entityId)?.avrInfo.volumeScale(avrConfig.zone);
   if (reported === 80 || reported === 100) {
     return { scale: reported, reason: `AVR reports a maximum display volume of ${reported}`, discovered: true };
   }

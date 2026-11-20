@@ -73,13 +73,14 @@ export class SelectEntityHandler {
         case SelectCommands.SelectNext: {
           const i = options.indexOf(currentOption);
           if (i >= 0 && i < options.length - 1) newOption = options[i + 1];
-          else if (params?.cycle === true) newOption = options[0];
+          // UC select spec: `cycle` defaults to true when omitted.
+          else if (params?.cycle !== false) newOption = options[0];
           break;
         }
         case SelectCommands.SelectPrevious: {
           const i = options.indexOf(currentOption);
           if (i > 0) newOption = options[i - 1];
-          else if (params?.cycle === true) newOption = options[options.length - 1];
+          else if (params?.cycle !== false) newOption = options[options.length - 1];
           break;
         }
         default:

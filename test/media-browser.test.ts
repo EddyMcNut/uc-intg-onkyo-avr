@@ -1238,3 +1238,70 @@ it("CommandSender play_media routes TuneIn Back option to RETURN", async () => {
   expect(result).toBe(uc.StatusCodes.Ok);
   expect(rawCalls).toEqual(["NTCRETURN"]);
 });
+
+describe("CommandSender play_media with legacy network navigation", () => {
+  class MockEiscp {
+    public connected = true;
+    public commands: string[] = [];
+    public rawCommands: string[] = [];
+    async waitForConnect() {
+      return;
+    }
+    async command(cmd: string) {
+      this.commands.push(cmd);
+    }
+    async raw(cmd: string) {
+      this.rawCommands.push(cmd);
+    }
+  }
+
+  async function setup(ip: string, service: "tidal" | "deezer") {
+    const { CommandSender } = (await import("../src/commandSender.js")) as any;
+    const { avrStateManager } = (await import("../src/avrState.js")) as any;
+    const { getMenuBrowseService } = await import("../src/menuBrowseServices.js");
+    const entityId = `M ${ip} main`;
+    const eiscp = new MockEiscp();
+    const sender = new CommandSender(
+      { updateEntityAttributes: () => true } as any,
+      { avrs: [{ model: "M", ip, zone: "main", port: 60128, netMenuDelay: 0, networkNavigationMode: "legacy" }] },
+      eiscp as any,
+      avrStateManager,
+      null
+    );
+    avrStateManager.setSource(entityId, "net");
+    avrStateManager.setSubSource(entityId, service);
+    const store = getMenuBrowseService(service)!.store;
+    store.resetState(entityId);
+    return { sender, eiscp, entityId, avrStateManager, store };
+  }
+
+  it("switches to list mode before selecting a track while playing, and freezes the browse list", async () => {
+    const { sender, eiscp, entityId, avrStateManager, store } = await setup("1.2.3.21", "tidal");
+    avrStateManager.setPlaybackStatus(entityId, "playing");
+
+    const status = await sender.sharedCmdHandler(new uc.MediaPlayer(entityId, { en: entityId }, {}), uc.MediaPlayerCommands.PlayMedia, {
+      media_id: "tidal:menu:4:Song%20-%20Artist",
+      media_type: "tidal://menu"
+    } as any);
+
+    expect(status).toBe(uc.StatusCodes.Ok);
+    expect(eiscp.commands).toEqual(["network-usb list"]);
+    expect(eiscp.rawCommands).toEqual(["NLSI00004"]);
+    expect(store.getBrowseState(entityId)).toMatchObject({ browseListFrozen: true, nowPlayingTitle: "Song - Artist" });
+  });
+
+  it("does not switch to list mode again when it is already active", async () => {
+    const { sender, eiscp, entityId, avrStateManager, store } = await setup("1.2.3.22", "deezer");
+    avrStateManager.setPlaybackStatus(entityId, "playing");
+    store.getBrowseState(entityId)!.listModeActive = true;
+
+    const status = await sender.sharedCmdHandler(new uc.MediaPlayer(entityId, { en: entityId }, {}), uc.MediaPlayerCommands.PlayMedia, {
+      media_id: "deezer:menu:2:Song%20-%20Artist",
+      media_type: "deezer://menu"
+    } as any);
+
+    expect(status).toBe(uc.StatusCodes.Ok);
+    expect(eiscp.commands).toEqual([]);
+    expect(eiscp.rawCommands).toEqual(["NLSI00002"]);
+  });
+});

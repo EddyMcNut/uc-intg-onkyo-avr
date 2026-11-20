@@ -15,7 +15,7 @@ describe("avrInfoStore", () => {
   const invalidEntityId = "bad";
 
   beforeEach(async () => {
-    store = await import("../src/avrInfoStore.js");
+    store = { ...(await import("../src/avrInfoStore.js")), ...(await import("./helpers/avrInfo.js")) };
   });
 
   afterEach(() => {

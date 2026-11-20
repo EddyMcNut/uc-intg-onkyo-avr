@@ -9,10 +9,43 @@ export const REPORTED_INPUT_COMMAND_PREFIX = "INPUT_REPORTED_";
 
 const GRID_WIDTH = 7;
 
-// Remote entity — optional (createRemoteEntity config). Exposes the same media-player style commands as the media player
-// entity plus the generated simple commands, mapped to physical buttons and UI pages.
+// UC-recommended simple command names (core-api entity_remote.md, "Command Name Patterns") and the
+// media-player command each one performs. These are advertised in `simple_commands` and used for the
+// default button mapping and UI pages. The handler also keeps accepting the lowercase media-player ids,
+// because button mappings and UI pages of already-configured remote entities still use them.
+export const UC_REMOTE_COMMANDS: Readonly<Record<string, string>> = {
+  CURSOR_UP: uc.MediaPlayerCommands.CursorUp,
+  CURSOR_DOWN: uc.MediaPlayerCommands.CursorDown,
+  CURSOR_LEFT: uc.MediaPlayerCommands.CursorLeft,
+  CURSOR_RIGHT: uc.MediaPlayerCommands.CursorRight,
+  CURSOR_ENTER: uc.MediaPlayerCommands.CursorEnter,
+  BACK: uc.MediaPlayerCommands.Back,
+  HOME: uc.MediaPlayerCommands.Home,
+  SETTINGS: uc.MediaPlayerCommands.Settings,
+  INFO: uc.MediaPlayerCommands.Info,
+  VOLUME_UP: uc.MediaPlayerCommands.VolumeUp,
+  VOLUME_DOWN: uc.MediaPlayerCommands.VolumeDown,
+  MUTE_TOGGLE: uc.MediaPlayerCommands.MuteToggle,
+  MUTE: uc.MediaPlayerCommands.Mute,
+  UNMUTE: uc.MediaPlayerCommands.Unmute,
+  PLAY_PAUSE: uc.MediaPlayerCommands.PlayPause,
+  PREVIOUS: uc.MediaPlayerCommands.Previous,
+  NEXT: uc.MediaPlayerCommands.Next,
+  CHANNEL_UP: uc.MediaPlayerCommands.ChannelUp,
+  CHANNEL_DOWN: uc.MediaPlayerCommands.ChannelDown
+};
+
+// Power is the remote entity's own toggle command, not a simple command: UC reserves on/off/toggle.
+const REMOTE_TOGGLE_COMMAND = new uc.EntityCommand(`remote.${uc.RemoteCommands.Toggle}`);
+
+// Commands only the remote entity handles itself (stateful, see remoteEntityCommandHandler.adjustVocal).
+export const REMOTE_ONLY_COMMANDS = ["VOCAL_UP", "VOCAL_DOWN"] as const;
+
+// Remote entity — optional (createRemoteEntity config). Exposes the UC-named navigation, volume and playback commands
+// plus the generated simple commands, mapped to physical buttons and UI pages.
 export function createRemoteEntity(avrEntry: string, displayBaseName: string, cmdHandler?: CmdHandlerFn, reportedInputNames?: string[]): uc.Remote {
   const reportedInputCommands = reportedInputNames?.map((name) => `${REPORTED_INPUT_COMMAND_PREFIX}${encodeURIComponent(name)}`) ?? [];
+  const simpleCommands = [...new Set([...Object.keys(UC_REMOTE_COMMANDS), ...REMOTE_ONLY_COMMANDS, ...ALL_SIMPLE_COMMANDS, ...reportedInputCommands])];
   const remoteEntity = new uc.Remote(
     `${avrEntry}${REMOTE_SUFFIX}`,
     { en: `${displayBaseName} Remote` },
@@ -21,7 +54,7 @@ export function createRemoteEntity(avrEntry: string, displayBaseName: string, cm
       attributes: {
         [uc.RemoteAttributes.State]: uc.RemoteStates.Unknown
       },
-      simpleCommands: [...ALL_SIMPLE_COMMANDS, ...reportedInputCommands],
+      simpleCommands,
       buttonMapping: buildRemoteButtonMapping(),
       uiPages: buildRemoteUiPages(reportedInputNames),
       cmdHandler
@@ -33,22 +66,22 @@ export function createRemoteEntity(avrEntry: string, displayBaseName: string, cm
 // Physical button mapping for the remote entity — all commands are handled by remoteEntityCommandHandler.
 function buildRemoteButtonMapping(): uc.DeviceButtonMapping[] {
   return [
-    uc.createBtnMapping(uc.Buttons.Back, uc.MediaPlayerCommands.Back),
-    uc.createBtnMapping(uc.Buttons.Home, uc.MediaPlayerCommands.Home),
-    uc.createBtnMapping(uc.Buttons.ChannelUp, uc.MediaPlayerCommands.ChannelUp),
-    uc.createBtnMapping(uc.Buttons.ChannelDown, uc.MediaPlayerCommands.ChannelDown),
-    uc.createBtnMapping(uc.Buttons.DpadUp, uc.MediaPlayerCommands.CursorUp),
-    uc.createBtnMapping(uc.Buttons.DpadDown, uc.MediaPlayerCommands.CursorDown),
-    uc.createBtnMapping(uc.Buttons.DpadLeft, uc.MediaPlayerCommands.CursorLeft),
-    uc.createBtnMapping(uc.Buttons.DpadRight, uc.MediaPlayerCommands.CursorRight),
-    uc.createBtnMapping(uc.Buttons.DpadMiddle, uc.MediaPlayerCommands.CursorEnter),
-    uc.createBtnMapping(uc.Buttons.VolumeUp, uc.MediaPlayerCommands.VolumeUp),
-    uc.createBtnMapping(uc.Buttons.VolumeDown, uc.MediaPlayerCommands.VolumeDown),
-    uc.createBtnMapping(uc.Buttons.Mute, uc.MediaPlayerCommands.MuteToggle),
-    uc.createBtnMapping(uc.Buttons.Power, uc.MediaPlayerCommands.Toggle),
-    uc.createBtnMapping(uc.Buttons.Play, uc.MediaPlayerCommands.PlayPause),
-    uc.createBtnMapping(uc.Buttons.Prev, uc.MediaPlayerCommands.Previous),
-    uc.createBtnMapping(uc.Buttons.Next, uc.MediaPlayerCommands.Next)
+    uc.createBtnMapping(uc.Buttons.Back, "BACK"),
+    uc.createBtnMapping(uc.Buttons.Home, "HOME"),
+    uc.createBtnMapping(uc.Buttons.ChannelUp, "CHANNEL_UP"),
+    uc.createBtnMapping(uc.Buttons.ChannelDown, "CHANNEL_DOWN"),
+    uc.createBtnMapping(uc.Buttons.DpadUp, "CURSOR_UP"),
+    uc.createBtnMapping(uc.Buttons.DpadDown, "CURSOR_DOWN"),
+    uc.createBtnMapping(uc.Buttons.DpadLeft, "CURSOR_LEFT"),
+    uc.createBtnMapping(uc.Buttons.DpadRight, "CURSOR_RIGHT"),
+    uc.createBtnMapping(uc.Buttons.DpadMiddle, "CURSOR_ENTER"),
+    uc.createBtnMapping(uc.Buttons.VolumeUp, "VOLUME_UP"),
+    uc.createBtnMapping(uc.Buttons.VolumeDown, "VOLUME_DOWN"),
+    uc.createBtnMapping(uc.Buttons.Mute, "MUTE_TOGGLE"),
+    uc.createBtnMapping(uc.Buttons.Power, REMOTE_TOGGLE_COMMAND),
+    uc.createBtnMapping(uc.Buttons.Play, "PLAY_PAUSE"),
+    uc.createBtnMapping(uc.Buttons.Prev, "PREVIOUS"),
+    uc.createBtnMapping(uc.Buttons.Next, "NEXT")
   ];
 }
 
@@ -56,12 +89,12 @@ function buildRemoteUiPages(reportedInputNames?: string[]): uc.UiPage[] {
   const pages: uc.UiPage[] = [];
 
   const avrPage1 = new uc.UiPage("avr_commands1", "AVR commands (1)", new uc.Size(GRID_WIDTH, 8));
-  avrPage1.add(uc.createUiIcon("uc:power-on", 0, 0, uc.createRemoteSendCmd(uc.MediaPlayerCommands.Toggle)));
+  avrPage1.add(uc.createUiIcon("uc:power-on", 0, 0, REMOTE_TOGGLE_COMMAND));
   avrPage1.add(uc.createUiText("SLEEP", 6, 0, uc.createRemoteSendCmd("SLEEP_UP"), new uc.Size(1, 1)));
 
   avrPage1.add(uc.createUiText("Settings:", 0, 1, undefined, new uc.Size(2, 1)));
   avrPage1.add(uc.createUiText("Quick", 3, 1, uc.createRemoteSendCmd("SETUP_QUICK"), new uc.Size(1, 1)));
-  avrPage1.add(uc.createUiText("Full", 6, 1, uc.createRemoteSendCmd(uc.MediaPlayerCommands.Settings), new uc.Size(1, 1)));
+  avrPage1.add(uc.createUiText("Full", 6, 1, uc.createRemoteSendCmd("SETTINGS"), new uc.Size(1, 1)));
 
   avrPage1.add(uc.createUiText("Treble:", 0, 2, undefined, new uc.Size(2, 1)));
   avrPage1.add(uc.createUiIcon("uc:minus", 3, 2, uc.createRemoteSendCmd("TONE_FRONT_TREBLE_DOWN"), new uc.Size(1, 1)));

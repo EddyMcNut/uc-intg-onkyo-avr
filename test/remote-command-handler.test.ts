@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { EventEmitter } from "node:events";
 import * as uc from "@unfoldedcircle/integration-api";
-import { clearAllAvrInputs, setAvrInputs } from "../src/inputSourceStore.js";
+import { sharedAvrContexts } from "../src/avrContext.js";
 
 vi.mock("../src/utils.js", () => ({
   ensureEiscpConnected: vi.fn().mockResolvedValue(true),
@@ -196,7 +196,7 @@ describe("remoteEntityCommandHandler", () => {
   });
 
   it("routes a generated reported-source command with spaces through input-selector", async () => {
-    setAvrInputs("TX-RZ50 192.168.1.100", [{ id: "0e", name: "TuneIn Radio" }]);
+    sharedAvrContexts.get("TX-RZ50 192.168.1.100").inputs.set([{ id: "0e", name: "TuneIn Radio" }]);
     try {
       const mock = makeHandler();
       const handler = await createHandler(mock);
@@ -206,7 +206,7 @@ describe("remoteEntityCommandHandler", () => {
       expect(result).toBe(uc.StatusCodes.Ok);
       expect(mock.mockEiscp.command).toHaveBeenCalledWith({ zone: "main", command: "input-selector", args: "tunein radio" });
     } finally {
-      clearAllAvrInputs();
+      sharedAvrContexts.clear();
     }
   });
 
@@ -688,5 +688,58 @@ describe("remoteEntityCommandHandler", () => {
     const result = await handler.handle(entity, uc.RemoteCommands.SendCmdSequence, { sequence: ["NONEXISTENT_CMD"] });
 
     expect(result).toBe(uc.StatusCodes.NotImplemented);
+  });
+});
+
+describe("remoteEntityCommandHandler UC command names", () => {
+  it.each([
+    ["CURSOR_UP", "setup up"],
+    ["CURSOR_ENTER", "setup enter"],
+    ["SETTINGS", "setup menu"],
+    ["BACK", "setup exit"],
+    ["MUTE_TOGGLE", "audio-muting toggle"],
+    ["CHANNEL_UP", "preset up"],
+    ["PLAY_PAUSE", "network-usb play"],
+    ["NEXT", "network-usb trup"]
+  ])("executes %s as a simple command", async (name, expected) => {
+    const mock = makeHandler();
+    const handler = await createHandler(mock);
+
+    const result = await handler.handle({ id: REMOTE_ID, attributes: {} } as any, uc.RemoteCommands.SendCmd, { command: name });
+
+    expect(result).toBe(uc.StatusCodes.Ok);
+    expect(mock.mockEiscp.command).toHaveBeenCalledWith(expected);
+  });
+
+  it("executes VOLUME_UP from a button mapping", async () => {
+    const mock = makeHandler();
+    const handler = await createHandler(mock);
+
+    const result = await handler.handle({ id: REMOTE_ID, attributes: {} } as any, "VOLUME_UP");
+
+    expect(result).toBe(uc.StatusCodes.Ok);
+    expect(mock.mockEiscp.rawIfAvailable).toHaveBeenCalledTimes(1);
+  });
+
+  // Existing remote entities keep their originally generated button mapping (lowercase media-player ids).
+  it("still accepts the lowercase media-player ids of older button mappings", async () => {
+    const mock = makeHandler();
+    const handler = await createHandler(mock);
+
+    const result = await handler.handle({ id: REMOTE_ID, attributes: {} } as any, uc.MediaPlayerCommands.CursorDown);
+
+    expect(result).toBe(uc.StatusCodes.Ok);
+    expect(mock.mockEiscp.command).toHaveBeenCalledWith("setup down");
+  });
+
+  it("applies repeat to each command of a sequence", async () => {
+    const mock = makeHandler();
+    const handler = await createHandler(mock);
+
+    const result = await handler.handle({ id: REMOTE_ID, attributes: {} } as any, uc.RemoteCommands.SendCmdSequence, { sequence: ["CURSOR_DOWN", "CURSOR_ENTER"], repeat: 3 } as any);
+
+    expect(result).toBe(uc.StatusCodes.Ok);
+    const sent = mock.mockEiscp.command.mock.calls.map((call: unknown[]) => call[0]);
+    expect(sent).toEqual(["setup down", "setup down", "setup down", "setup enter", "setup enter", "setup enter"]);
   });
 });

@@ -10,7 +10,7 @@ import { TuneInZoneAgnosticAdapter } from "../src/zoneAgnosticServiceAdapters.js
 import { initMediaBrowser, TUNEIN_MENU_ROOT_ID, TUNEIN_MENU_ROOT_TYPE, TUNEIN_MENU_BACK_ID } from "../src/mediaBrowser.js";
 import { getTuneInMenuBrowseState, listTuneInMenuOptions, resetTuneInMenuBrowseState } from "../src/tuneInMenuStore.js";
 import { clearTuneInPresets, getTuneInBrowseState, listTuneInPresets } from "../src/tuneInBrowserStore.js";
-import { resetAvrInfo, setAvrInfo } from "../src/avrInfoStore.js";
+import { resetAvrInfo, setAvrInfo } from "./helpers/avrInfo.js";
 
 const entityId = "TX-RZ50 192.0.2.103 main";
 const physicalId = "TX-RZ50 192.0.2.103";

@@ -1,3 +1,4 @@
+import { AvrContextRegistry } from "../src/avrContext.js";
 import { describe, it, expect, vi } from "vitest";
 
 function makeDeps(overrides: Record<string, any> = {}) {
@@ -13,6 +14,7 @@ function makeDeps(overrides: Record<string, any> = {}) {
       updateNowPlaying: vi.fn(),
       clearNowPlaying: vi.fn()
     },
+    avrContexts: new AvrContextRegistry(),
     getPhysicalAvrId: vi.fn().mockReturnValue("M 1.2.3.4"),
     getNetZones: vi.fn().mockReturnValue([]),
     getServiceAdapter: vi.fn().mockReturnValue(undefined),

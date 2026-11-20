@@ -376,7 +376,7 @@ describe("ConfigManager static methods", () => {
       const result = ConfigManager.load();
       expect(result.avrs).toHaveLength(1);
       expect(result.avrs[0].model).toBe("TX-RZ50");
-      expect(result.avrs[0].createTunerPresets).toBe(true);
+      expect(result.avrs[0].createTunerPresets).toBe("alphabetical");
       expect(result.avrs[0].createRemoteEntity).toBe(true);
       expect(result.avrs[0].createDiracSelectEntity).toBe(true);
     });
@@ -393,9 +393,9 @@ describe("ConfigManager static methods", () => {
 
       expect(mockWriteFileSync).toHaveBeenCalledTimes(1);
       const written = JSON.parse(mockWriteFileSync.mock.calls[0][1]);
-      expect(written.avrs[0].createTunerPresets).toBe(true);
+      expect(written.avrs[0].createTunerPresets).toBe("alphabetical");
       expect(written.avrs[0].netMenuDelay).toBe(500);
-      expect(result.avrs[0].createTunerPresets).toBe(true);
+      expect(result.avrs[0].createTunerPresets).toBe("alphabetical");
     });
 
     it("removes the redundant config version and persists missing defaults", () => {
@@ -413,7 +413,7 @@ describe("ConfigManager static methods", () => {
       const written = JSON.parse(mockWriteFileSync.mock.calls[0][1]);
       expect(written.configVersion).toBeUndefined();
       expect(written.avrs[0].useAvrReportedInputs).toBe(true);
-      expect(written.avrs[0].createTunerPresets).toBe(true);
+      expect(written.avrs[0].createTunerPresets).toBe("alphabetical");
     });
 
     it("removes legacy learning/learningEnabled keys and persists cleaned config", () => {

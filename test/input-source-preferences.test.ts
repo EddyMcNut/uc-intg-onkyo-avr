@@ -6,10 +6,11 @@ import {
   getAliasesForReportedInput,
   getInputSourceAliases,
   getKnownInputSources,
-  normalizeInputSources,
+  isNetworkInputSource,
   resolveConfiguredInputSources
 } from "../src/inputSourcePreferences.js";
 import { collectAvrInputSources } from "../src/inputSourceResolver.js";
+import { normalizeInputSourceSettings } from "../src/configConstants.js";
 
 describe("input source preferences", () => {
   it("groups known SLI aliases and resolves known and NRI service aliases", () => {
@@ -21,7 +22,7 @@ describe("input source preferences", () => {
   });
 
   it("normalizes settings and resolves learned, aliases, exclusions, and duplicates", () => {
-    const settings = normalizeInputSources({
+    const settings = normalizeInputSourceSettings({
       "02": { name: "GAME", setting: DISCOVERED_INPUT_SOURCE },
       "03": { name: "AUX", setting: DONT_INCLUDE_INPUT_SOURCE },
       "04": { name: "AUX2", setting: "aux2" },
@@ -48,5 +49,33 @@ describe("input source preferences", () => {
       { id: "0a", name: "Spotify", network: true },
       { id: "12", name: "TV" }
     ]);
+  });
+});
+
+// Pins the NRI service-name behavior that is now derived from the networkServices table.
+describe("AVR-reported network service names", () => {
+  it.each([
+    ["TuneIn Radio", ["tunein"]],
+    ["Spotify", ["spotify"]],
+    ["Deezer", ["deezer"]],
+    ["TIDAL", ["tidal"]],
+    ["Amazon Music", ["amazonmusic"]],
+    ["Chromecast built-in", ["chromecast"]],
+    ["DTS Play-Fi", ["dts-play-fi"]],
+    ["AirPlay", ["airplay"]],
+    ["Amazon Alexa", ["alexa"]],
+    ["Music Server", ["music-server"]]
+  ])("maps %s to its input-selector aliases and marks it as a network source", (name, aliases) => {
+    expect(getAliasesForReportedInput("XX", name)).toEqual(aliases);
+    expect(isNetworkInputSource("XX", name)).toBe(true);
+  });
+
+  it("does not treat USB, Play Queue or the SLI 27 music-server input as network sources", () => {
+    expect(getAliasesForReportedInput("XX", "USB")).toEqual([]);
+    expect(isNetworkInputSource("XX", "USB")).toBe(false);
+    expect(isNetworkInputSource("XX", "Play Queue")).toBe(false);
+    // SLI 27 (musicserver / p4s / dlna) is a regular input, unlike the NSS10 Music Server network service.
+    expect(getAliasesForReportedInput("27", "Music Server")).toEqual(["musicserver", "p4s", "dlna"]);
+    expect(isNetworkInputSource("27", "Music Server")).toBe(false);
   });
 });

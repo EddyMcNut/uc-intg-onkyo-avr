@@ -3,6 +3,8 @@ import { ConfigManager, IntegrationConfig, buildEntityId } from "./configManager
 import { EiscpDriver } from "./eiscp.js";
 import log from "./loggers.js";
 import { SONG_INFO } from "./constants.js";
+import { getCanonicalServiceName } from "./serviceDetector.js";
+import { toServiceId } from "./networkServices.js";
 import { TuneInPreloader } from "./tuneInPreloader.js";
 import { ZoneAgnosticMediaStateStore } from "./zoneAgnosticMediaState.js";
 import { ZoneMediaRenderer } from "./zoneMediaRenderer.js";
@@ -11,7 +13,7 @@ import { ZoneAgnosticServiceCommandRouter } from "./zoneAgnosticServiceCommandRo
 import { ZoneAgnosticFrontPanelRouter } from "./zoneAgnosticFrontPanelRouter.js";
 import { TUNEIN_SERVICE_ID } from "./browseServiceContract.js";
 import type { AvrStateApi } from "./types.js";
-import { findTunerPresetByName } from "./tunerPresetStore.js";
+import { sharedAvrContexts, type AvrContextRegistry } from "./avrContext.js";
 import type { NetworkNavigationMode } from "./configConstants.js";
 
 const logSource = "zoneAgnosticUpdateProcessor:";
@@ -31,7 +33,8 @@ export class ZoneAgnosticUpdateProcessor {
     private readonly driver: uc.IntegrationAPI,
     config: IntegrationConfig,
     private readonly eiscpInstance: EiscpDriver,
-    private readonly state: AvrStateApi
+    private readonly state: AvrStateApi,
+    private readonly avrContexts: AvrContextRegistry = sharedAvrContexts
   ) {
     this.config = config;
     this.tuneInPreloader = new TuneInPreloader(eiscpInstance, (entityId) => this.mediaStateStore.getPhysicalAvrId(entityId));
@@ -62,6 +65,7 @@ export class ZoneAgnosticUpdateProcessor {
     ];
     this.serviceCommandRouter = new ZoneAgnosticServiceCommandRouter(this.serviceAdapters);
     this.frontPanelRouter = new ZoneAgnosticFrontPanelRouter({
+      avrContexts: this.avrContexts,
       driver,
       eiscpInstance,
       state: this.state,
@@ -113,8 +117,9 @@ export class ZoneAgnosticUpdateProcessor {
   }
 
   // Detect if FLD display text shows now-playing (e.g., "Spotify / Track Title") vs service name alone
-  private isNowPlayingDisplay(displayText: string, serviceName: string): boolean {
-    return displayText.toLowerCase().includes(serviceName.toLowerCase() + " / ");
+  private isNowPlayingDisplay(displayText: string, serviceId: string): boolean {
+    const displayName = getCanonicalServiceName(serviceId) ?? serviceId;
+    return displayText.toLowerCase().includes(displayName.toLowerCase() + " / ");
   }
 
   private async maybeRequestSongInfo(serviceName: string, zoneCount: number): Promise<void> {
@@ -220,7 +225,7 @@ export class ZoneAgnosticUpdateProcessor {
         artist: "DAB Radio"
       });
       const physicalAvrId = this.getPhysicalAvrId(zoneEntityId);
-      const preset = findTunerPresetByName(physicalAvrId, stationName);
+      const preset = this.avrContexts.get(physicalAvrId).tunerPresets.findByName(stationName);
       this.driver.updateEntityAttributes(`${zoneEntityId}_tuner_presets`, {
         [uc.SelectAttributes.CurrentOption]: preset?.name ?? ""
       });
@@ -233,7 +238,7 @@ export class ZoneAgnosticUpdateProcessor {
   async handleNlt(sourceEntityId: string, serviceName: string, eventZone: string): Promise<void> {
     const netZones = this.getNetZones(sourceEntityId);
     const affectedZones = this.ensureNonEmpty(netZones, sourceEntityId);
-    const normalizedService = serviceName.toLowerCase().replace(/\s+/g, "-");
+    const normalizedService = toServiceId(serviceName);
     const enteringZones: string[] = [];
 
     for (const zoneEntityId of affectedZones) {

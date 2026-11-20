@@ -1,17 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import {
-  clearAllTunerPresets,
-  clearTunerPresets,
-  findTunerPresetByName,
-  findTunerPresetNameBySlot,
-  getTunerPresetNames,
-  getTunerPresets,
-  hasTunerPresets,
-  normalizeTunerPresets,
-  setTunerPresets,
-  tunerPresetCommandValue,
-  type AvrTunerPreset
-} from "../src/tunerPresetStore.js";
+import { normalizeTunerPresets, tunerPresetCommandValue, type AvrTunerPreset } from "../src/tunerPresetStore.js";
+import { AvrContextRegistry } from "../src/avrContext.js";
 
 const AVR = "TX-RZ50 1.2.3.4";
 const OTHER_AVR = "TX-RZ50 1.2.3.5";
@@ -20,9 +9,12 @@ function preset(slot: number, name: string, band = "2", freq = "0"): AvrTunerPre
   return { slot, name, band, freq };
 }
 
+let registry: AvrContextRegistry;
+const store = (avr: string) => registry.get(avr).tunerPresets;
+
 describe("tunerPresetStore", () => {
   beforeEach(() => {
-    clearAllTunerPresets();
+    registry = new AvrContextRegistry();
   });
 
   it("keeps the stations in AVR slot order and drops empty slots", () => {
@@ -47,41 +39,41 @@ describe("tunerPresetStore", () => {
   });
 
   it("reports a change only when the effective list differs", () => {
-    expect(setTunerPresets(AVR, [preset(1, "R10 80s")])).toBe(true);
-    expect(setTunerPresets(AVR, [preset(1, "R10 80s")])).toBe(false);
-    expect(setTunerPresets(AVR, [preset(1, "R10 80s"), preset(2, "R10")])).toBe(true);
+    expect(store(AVR).set([preset(1, "R10 80s")])).toBe(true);
+    expect(store(AVR).set([preset(1, "R10 80s")])).toBe(false);
+    expect(store(AVR).set([preset(1, "R10 80s"), preset(2, "R10")])).toBe(true);
     // Dropping everything leaves the AVR without known stations.
-    expect(setTunerPresets(AVR, [])).toBe(true);
-    expect(hasTunerPresets(AVR)).toBe(false);
+    expect(store(AVR).set([])).toBe(true);
+    expect(store(AVR).has()).toBe(false);
   });
 
   it("looks up a station by name and by slot", () => {
-    setTunerPresets(AVR, [preset(1, "R10 80s"), preset(28, "STRKSTAD", "1", "107.20")]);
+    store(AVR).set([preset(1, "R10 80s"), preset(28, "STRKSTAD", "1", "107.20")]);
 
-    expect(findTunerPresetByName(AVR, "strkstad")?.slot).toBe(28);
-    expect(findTunerPresetByName(AVR, "STRKSTAD")?.freq).toBe("107.20");
-    expect(findTunerPresetByName(AVR, "NPO FunX")).toBeUndefined();
-    expect(findTunerPresetNameBySlot(AVR, 1)).toBe("R10 80s");
-    expect(findTunerPresetNameBySlot(AVR, 27)).toBeUndefined();
+    expect(store(AVR).findByName("strkstad")?.slot).toBe(28);
+    expect(store(AVR).findByName("STRKSTAD")?.freq).toBe("107.20");
+    expect(store(AVR).findByName("NPO FunX")).toBeUndefined();
+    expect(store(AVR).findNameBySlot(1)).toBe("R10 80s");
+    expect(store(AVR).findNameBySlot(27)).toBeUndefined();
   });
 
   it("offers the station names alphabetically", () => {
-    setTunerPresets(AVR, [preset(1, "STRKSTAD", "1", "107.20"), preset(28, "R10 80s")]);
+    store(AVR).set([preset(1, "STRKSTAD", "1", "107.20"), preset(28, "R10 80s")]);
 
-    expect(getTunerPresetNames(AVR)).toEqual(["R10 80s", "STRKSTAD"]);
-    expect(getTunerPresets(AVR)).toHaveLength(2);
+    expect(store(AVR).names()).toEqual(["R10 80s", "STRKSTAD"]);
+    expect(store(AVR).list()).toHaveLength(2);
   });
 
   it("keeps the presets of other AVRs apart", () => {
-    setTunerPresets(AVR, [preset(1, "R10 80s")]);
-    setTunerPresets(OTHER_AVR, [preset(2, "NPO FunX")]);
+    store(AVR).set([preset(1, "R10 80s")]);
+    store(OTHER_AVR).set([preset(2, "NPO FunX")]);
 
-    expect(getTunerPresetNames(AVR)).toEqual(["R10 80s"]);
-    expect(getTunerPresetNames(OTHER_AVR)).toEqual(["NPO FunX"]);
+    expect(store(AVR).names()).toEqual(["R10 80s"]);
+    expect(store(OTHER_AVR).names()).toEqual(["NPO FunX"]);
 
-    clearTunerPresets(AVR);
-    expect(hasTunerPresets(AVR)).toBe(false);
-    expect(hasTunerPresets(OTHER_AVR)).toBe(true);
+    store(AVR).clear();
+    expect(store(AVR).has()).toBe(false);
+    expect(store(OTHER_AVR).has()).toBe(true);
   });
 
   it("formats the PRS value as the slot number in upper case hex", () => {

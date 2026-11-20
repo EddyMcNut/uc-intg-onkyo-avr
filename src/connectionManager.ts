@@ -6,8 +6,11 @@ import { AvrConfig, IntegrationConfig, DEFAULT_QUEUE_THRESHOLD } from "./configM
 import EiscpDriver from "./eiscp.js";
 import { PhysicalConnection, CreateCommandReceiverFn, QueryAllZonesStateFn, EiscpDriverFactory, type AvrStateApi } from "./types.js";
 import { CONNECTION_TIMEOUT } from "./constants.js";
+import { sharedAvrContexts, type AvrContextRegistry } from "./avrContext.js";
 
 const logSource = "connectionManager:";
+
+export type AvailabilityChangeFn = (physicalAVR: string, available: boolean) => void;
 
 export default class ConnectionManager {
   private reconnectionManager: ReconnectionManager;
@@ -15,18 +18,23 @@ export default class ConnectionManager {
   private physicalConnections: Map<string, PhysicalConnection> = new Map();
   private readonly createEiscpDriver: EiscpDriverFactory;
   private readonly stateReader?: AvrStateApi;
+  private readonly onAvailabilityChange?: AvailabilityChangeFn;
 
   constructor(
     reconnectionManager: ReconnectionManager,
     queryAllZonesState: (physicalAvr: string, eiscp: EiscpDriver, context: string) => Promise<void>,
     createEiscpDriver?: EiscpDriverFactory,
-    stateReader?: AvrStateApi
+    stateReader?: AvrStateApi,
+    // Called with false when the TCP connection to an AVR is lost and with true when it is (re)established.
+    onAvailabilityChange?: AvailabilityChangeFn,
+    private readonly avrContexts: AvrContextRegistry = sharedAvrContexts
   ) {
+    this.onAvailabilityChange = onAvailabilityChange;
     this.reconnectionManager = reconnectionManager;
     this.queryAllZonesState = queryAllZonesState;
     this.stateReader = stateReader;
     // Default to the concrete EiscpDriver so production callers need no change. Tests can inject a fake factory to avoid opening real TCP sockets.
-    this.createEiscpDriver = createEiscpDriver ?? ((config) => new EiscpDriver(config, this.stateReader));
+    this.createEiscpDriver = createEiscpDriver ?? ((config) => new EiscpDriver(config, this.stateReader, this.avrContexts));
   }
 
   getPhysicalConnection(physicalAVR: string): PhysicalConnection | undefined {
@@ -87,6 +95,11 @@ export default class ConnectionManager {
 
     eiscpInstance.on("close", () => {
       log.warn(`${logSource} [${physicalAVR}] Connection to AVR lost`);
+      this.onAvailabilityChange?.(physicalAVR, false);
+    });
+
+    eiscpInstance.on("connect", () => {
+      this.onAvailabilityChange?.(physicalAVR, true);
     });
 
     try {

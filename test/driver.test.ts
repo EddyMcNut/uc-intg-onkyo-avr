@@ -150,7 +150,22 @@ vi.mock("../src/volumeScaleResolver.js", () => ({ resolveAutoVolumeScale: mockRe
 
 vi.mock("../src/inputSourceResolver.js", () => ({ resolveInputSourceList: mockResolveInputSourceList }));
 
-vi.mock("../src/inputSourceStore.js", () => ({ setAvrInputs: mockSetAvrInputs, clearAvrInputs: mockClearAvrInputs, hasAvrInputs: mockHasAvrInputs }));
+// The per-AVR input store (AvrContext.inputs), with set/has/clear routed to the mocks so the tests can control and check them.
+vi.mock("../src/inputSourceStore.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../src/inputSourceStore.js")>();
+  class InputSourceStore extends actual.InputSourceStore {
+    override set(inputs: Parameters<typeof actual.InputSourceStore.prototype.set>[0]): boolean {
+      return mockSetAvrInputs(inputs);
+    }
+    override has(): boolean {
+      return mockHasAvrInputs();
+    }
+    override clear(): void {
+      mockClearAvrInputs();
+    }
+  }
+  return { ...actual, InputSourceStore };
+});
 
 // For modules used with `new`, provide a plain function that returns the mock instance
 vi.mock("../src/eiscp.js", () => ({
@@ -685,7 +700,7 @@ describe("OnkyoDriver", () => {
       driver.handleAvrInfo("TX-RZ50_1.2.3.4_main");
 
       // The setting itself stays "auto": the collected inputs are kept in memory only.
-      expect(mockSetAvrInputs).toHaveBeenCalledWith("TX-RZ50_1.2.3.4", collectedInputs);
+      expect(mockSetAvrInputs).toHaveBeenCalledWith(collectedInputs);
       expect(configModule.ConfigManager.patchAvr).not.toHaveBeenCalled();
       expect(mockEntityRegistrar.createInputSelectorSelectEntity).toHaveBeenCalledTimes(1);
       expect(mockEntityRegistrar.createMediaPlayerEntity).toHaveBeenCalledTimes(1);
@@ -737,7 +752,7 @@ describe("OnkyoDriver", () => {
       driver.handleAvrInfo("TX-RZ50_1.2.3.4_main");
 
       expect(configModule.ConfigManager.patchAvr).toHaveBeenCalledWith("1.2.3.4", "main", { useAvrReportedInputs: false });
-      expect(mockClearAvrInputs).toHaveBeenCalledWith("TX-RZ50_1.2.3.4");
+      expect(mockClearAvrInputs).toHaveBeenCalledTimes(1);
       expect(mockLog.debug).toHaveBeenCalledWith("%s [%s] AVR-reported input names disabled: %s", "driver:", "TX-RZ50_1.2.3.4_main", "AVR reports no input sources, so integration mappings are used");
       expect(mockEntityRegistrar.createInputSelectorSelectEntity).toHaveBeenCalledTimes(1);
     });
@@ -780,9 +795,9 @@ describe("OnkyoDriver", () => {
     async function createDriverWithPresets(saved = presetsConfig) {
       const configModule = await import("../src/configManager.js");
       (configModule.ConfigManager.load as any).mockReturnValue(saved);
-      const tunerPresetStore = await import("../src/tunerPresetStore.js");
-      tunerPresetStore.clearAllTunerPresets();
-      const avrInfoStore = (await import("../src/avrInfoStore.js")) as any;
+      const { sharedAvrContexts } = await import("../src/avrContext.js");
+      sharedAvrContexts.clear();
+      const avrInfoStore = { ...(await import("../src/avrInfoStore.js")), ...(await import("./helpers/avrInfo.js")) } as any;
       avrInfoStore.setAvrInfo("TX-RZ50_1.2.3.4_main", avrInfoStore.parseAvrInfo(presetPayload));
       return createDriver();
     }
@@ -824,7 +839,7 @@ describe("OnkyoDriver", () => {
     });
 
     it("clears the stations when the AVR reports none", async () => {
-      const avrInfoStore = (await import("../src/avrInfoStore.js")) as any;
+      const avrInfoStore = { ...(await import("../src/avrInfoStore.js")), ...(await import("./helpers/avrInfo.js")) } as any;
       const driver = await createDriverWithPresets();
       driver.handleAvrInfo("TX-RZ50_1.2.3.4_main");
 
@@ -859,8 +874,8 @@ describe("OnkyoDriver", () => {
     it("sends PRS with the slot of the selected station", async () => {
       const driver = await createDriverWithPresets();
       const raw = vi.fn().mockResolvedValue(undefined);
-      const tunerPresetStore = await import("../src/tunerPresetStore.js");
-      tunerPresetStore.setTunerPresets("TX-RZ50_1.2.3.4", [
+      const { sharedAvrContexts } = await import("../src/avrContext.js");
+      sharedAvrContexts.get("TX-RZ50_1.2.3.4").tunerPresets.set([
         { slot: 1, name: "R10 80s", band: "2", freq: "0" },
         { slot: 12, name: "NPO FunX", band: "2", freq: "0" },
         { slot: 28, name: "STRKSTAD", band: "1", freq: "107.20" }

@@ -1,3 +1,4 @@
+import { createParserEffects } from "../src/parserEffects.js";
 import { describe, it, expect, vi } from "vitest";
 import { readFileSync } from "fs";
 import { fileURLToPath } from "url";
@@ -34,7 +35,7 @@ it("IscpCommandParser handles truncated and valid NLA frames", async () => {
   const { IscpCommandParser } = parserModule as { IscpCommandParser: new (...deps: any) => any };
 
   const h = makeParserHarness();
-  const parser = new IscpCommandParser(h.getEntityId, h.stateReader, h.deezerStoreApi, h.tidalStoreApi, h.tuneInStoreApi);
+  const parser = new IscpCommandParser(h.getEntityId, h.stateReader, createParserEffects({ deezer: h.deezerStoreApi, tidal: h.tidalStoreApi, tuneInMenu: h.tuneInStoreApi }));
 
   const result1 = parser.parse("NLA", "X");
   expect(result1).toBe(null);
@@ -56,7 +57,7 @@ it("IscpCommandParser parses malformed and valid NTM payloads", async () => {
   const { IscpCommandParser } = parserModule as { IscpCommandParser: new (...deps: any) => any };
 
   const h = makeParserHarness({ subSource: "spotify" });
-  const parser = new IscpCommandParser(h.getEntityId, h.stateReader, h.deezerStoreApi, h.tidalStoreApi, h.tuneInStoreApi);
+  const parser = new IscpCommandParser(h.getEntityId, h.stateReader, createParserEffects({ deezer: h.deezerStoreApi, tidal: h.tidalStoreApi, tuneInMenu: h.tuneInStoreApi }));
 
   const result1 = parser.parse("NTM", "abc:def:ghi/xyz:pqr:stu");
   expect(result1?.command).toBe("NTM");
@@ -79,7 +80,7 @@ it("IscpCommandParser metadata flows keep raw values and support patch/get", asy
   const { IscpCommandParser } = parserModule as { IscpCommandParser: new (...deps: any) => any };
 
   const h = makeParserHarness();
-  const parser = new IscpCommandParser(h.getEntityId, h.stateReader, h.deezerStoreApi, h.tidalStoreApi, h.tuneInStoreApi);
+  const parser = new IscpCommandParser(h.getEntityId, h.stateReader, createParserEffects({ deezer: h.deezerStoreApi, tidal: h.tidalStoreApi, tuneInMenu: h.tuneInStoreApi }));
 
   const result1 = parser.parse("NTI", "4F6E6B796F");
   expect(result1).toBeTruthy();
@@ -105,7 +106,7 @@ it("IscpCommandParser maps unknown commands to null and zone commands correctly"
   const { IscpCommandParser } = parserModule as { IscpCommandParser: new (...deps: any) => any };
 
   const h = makeParserHarness({ subSource: "spotify" });
-  const parser = new IscpCommandParser(h.getEntityId, h.stateReader, h.deezerStoreApi, h.tidalStoreApi, h.tuneInStoreApi);
+  const parser = new IscpCommandParser(h.getEntityId, h.stateReader, createParserEffects({ deezer: h.deezerStoreApi, tidal: h.tidalStoreApi, tuneInMenu: h.tuneInStoreApi }));
 
   expect(parser.parse("ZZZ", "1234")).toBe(null);
 
@@ -121,7 +122,7 @@ it("IscpCommandParser handles NLS validation and NLA extraction", async () => {
   const { IscpCommandParser } = parserModule as { IscpCommandParser: new (...deps: any) => any };
 
   const h = makeParserHarness();
-  const parser = new IscpCommandParser(h.getEntityId, h.stateReader, h.deezerStoreApi, h.tidalStoreApi, h.tuneInStoreApi);
+  const parser = new IscpCommandParser(h.getEntityId, h.stateReader, createParserEffects({ deezer: h.deezerStoreApi, tidal: h.tidalStoreApi, tuneInMenu: h.tuneInStoreApi }));
 
   expect(parser.parse("NLS", "U0-Menu Item")?.command).toBe("NLS");
   expect(parser.parse("NLS", "X0-Menu Item")).toBe(null);
@@ -138,7 +139,7 @@ it("IscpCommandParser emits NLT_CONTEXT for My Presets on NET source", async () 
   const { IscpCommandParser } = parserModule as { IscpCommandParser: new (...deps: any) => any };
 
   const h = makeParserHarness({ source: "net", subSource: "tunein" });
-  const parser = new IscpCommandParser(h.getEntityId, h.stateReader, h.deezerStoreApi, h.tidalStoreApi, h.tuneInStoreApi);
+  const parser = new IscpCommandParser(h.getEntityId, h.stateReader, createParserEffects({ deezer: h.deezerStoreApi, tidal: h.tidalStoreApi, tuneInMenu: h.tuneInStoreApi }));
 
   const result = parser.parse("NLT", "01010000000101my presets");
   expect(result?.command).toBe("NLT_CONTEXT");
@@ -151,7 +152,7 @@ it("IscpCommandParser updates browse state from NLT headers per active subsource
 
   const deezerState = { harvestMode: false, nlsCursorOffset: 0, totalListItemCount: 0, nlsLayerNumber: 0 };
   const h1 = makeParserHarness({ subSource: "deezer", deezerState });
-  const parser1 = new IscpCommandParser(h1.getEntityId, h1.stateReader, h1.deezerStoreApi, h1.tidalStoreApi, h1.tuneInStoreApi);
+  const parser1 = new IscpCommandParser(h1.getEntityId, h1.stateReader, createParserEffects({ deezer: h1.deezerStoreApi, tidal: h1.tidalStoreApi, tuneInMenu: h1.tuneInStoreApi }));
   parser1.parse("NLT", "0101000A001402browse");
   expect(deezerState.nlsCursorOffset).toBe(10);
   expect(deezerState.totalListItemCount).toBe(20);
@@ -159,7 +160,7 @@ it("IscpCommandParser updates browse state from NLT headers per active subsource
 
   const tidalState = { harvestMode: true, nlsCursorOffset: 9, totalListItemCount: 0, nlsLayerNumber: 0 };
   const h2 = makeParserHarness({ subSource: "tidal", tidalState });
-  const parser2 = new IscpCommandParser(h2.getEntityId, h2.stateReader, h2.deezerStoreApi, h2.tidalStoreApi, h2.tuneInStoreApi);
+  const parser2 = new IscpCommandParser(h2.getEntityId, h2.stateReader, createParserEffects({ deezer: h2.deezerStoreApi, tidal: h2.tidalStoreApi, tuneInMenu: h2.tuneInStoreApi }));
   parser2.parse("NLT", "0101000A001403browse");
   expect(tidalState.nlsCursorOffset).toBe(9);
   expect(tidalState.totalListItemCount).toBe(20);
@@ -167,7 +168,7 @@ it("IscpCommandParser updates browse state from NLT headers per active subsource
 
   const tuneInMenuState = { harvestMode: false, nlsCursorOffset: 0, totalListItemCount: 0, nlsLayerNumber: 0 };
   const h3 = makeParserHarness({ subSource: "tunein", tuneInMenuState });
-  const parser3 = new IscpCommandParser(h3.getEntityId, h3.stateReader, h3.deezerStoreApi, h3.tidalStoreApi, h3.tuneInStoreApi);
+  const parser3 = new IscpCommandParser(h3.getEntityId, h3.stateReader, createParserEffects({ deezer: h3.deezerStoreApi, tidal: h3.tidalStoreApi, tuneInMenu: h3.tuneInStoreApi }));
   parser3.parse("NLT", "0101000A001404browse");
   expect(tuneInMenuState.nlsCursorOffset).toBe(10);
   expect(tuneInMenuState.totalListItemCount).toBe(20);
@@ -179,24 +180,32 @@ it("IscpCommandParser FLD routing suppresses NET scrolling and handles FM/defaul
   const { IscpCommandParser } = parserModule as { IscpCommandParser: new (...deps: any) => any };
 
   const netDifferent = makeParserHarness({ source: "net", subSource: "tidal" });
-  const parserNetDifferent = new IscpCommandParser(netDifferent.getEntityId, netDifferent.stateReader, netDifferent.deezerStoreApi, netDifferent.tidalStoreApi, netDifferent.tuneInStoreApi);
+  const parserNetDifferent = new IscpCommandParser(
+    netDifferent.getEntityId,
+    netDifferent.stateReader,
+    createParserEffects({ deezer: netDifferent.deezerStoreApi, tidal: netDifferent.tidalStoreApi, tuneInMenu: netDifferent.tuneInStoreApi })
+  );
   const detected = parserNetDifferent.parse("FLD", toHex("Spotify / Track"));
   expect(detected?.command).toBe("FLD");
   expect(detected?.argument).toBe("Spotify");
 
   const netSame = makeParserHarness({ source: "net", subSource: "spotify" });
-  const parserNetSame = new IscpCommandParser(netSame.getEntityId, netSame.stateReader, netSame.deezerStoreApi, netSame.tidalStoreApi, netSame.tuneInStoreApi);
+  const parserNetSame = new IscpCommandParser(
+    netSame.getEntityId,
+    netSame.stateReader,
+    createParserEffects({ deezer: netSame.deezerStoreApi, tidal: netSame.tidalStoreApi, tuneInMenu: netSame.tuneInStoreApi })
+  );
   expect(parserNetSame.parse("FLD", toHex("Spotify / Track"))).toBe(null);
   expect(parserNetSame.parse("FLD", toHex("Random Scrolling Text"))).toBe(null);
 
   const fm = makeParserHarness({ source: "fm", subSource: "fm" });
-  const parserFm = new IscpCommandParser(fm.getEntityId, fm.stateReader, fm.deezerStoreApi, fm.tidalStoreApi, fm.tuneInStoreApi);
+  const parserFm = new IscpCommandParser(fm.getEntityId, fm.stateReader, createParserEffects({ deezer: fm.deezerStoreApi, tidal: fm.tidalStoreApi, tuneInMenu: fm.tuneInStoreApi }));
   const fmResult = parserFm.parse("FLD", toHex("StationAB"));
   expect(fmResult?.command).toBe("FLD");
   expect(fmResult?.argument).toBe("Station");
 
   const other = makeParserHarness({ source: "cd", subSource: "cd" });
-  const parserOther = new IscpCommandParser(other.getEntityId, other.stateReader, other.deezerStoreApi, other.tidalStoreApi, other.tuneInStoreApi);
+  const parserOther = new IscpCommandParser(other.getEntityId, other.stateReader, createParserEffects({ deezer: other.deezerStoreApi, tidal: other.tidalStoreApi, tuneInMenu: other.tuneInStoreApi }));
   const otherResult = parserOther.parse("FLD", toHex("Display1234"));
   expect(otherResult?.command).toBe("FLD");
   expect(otherResult?.argument).toBe("Display");
@@ -207,7 +216,7 @@ it("IscpCommandParser maps TuneIn NAT title to canonical service name", async ()
   const { IscpCommandParser } = parserModule as { IscpCommandParser: new (...deps: any) => any };
 
   const h = makeParserHarness({ subSource: "tunein" });
-  const parser = new IscpCommandParser(h.getEntityId, h.stateReader, h.deezerStoreApi, h.tidalStoreApi, h.tuneInStoreApi);
+  const parser = new IscpCommandParser(h.getEntityId, h.stateReader, createParserEffects({ deezer: h.deezerStoreApi, tidal: h.tidalStoreApi, tuneInMenu: h.tuneInStoreApi }));
 
   const result = parser.parse("NAT", "ignored-title");
   expect(result?.command).toBe("metadata");
@@ -219,7 +228,7 @@ it("IscpCommandParser parses IFA payload into normalized audio fields", async ()
   const { IscpCommandParser } = parserModule as { IscpCommandParser: new (...deps: any) => any };
 
   const h = makeParserHarness({ source: "net", subSource: "spotify" });
-  const parser = new IscpCommandParser(h.getEntityId, h.stateReader, h.deezerStoreApi, h.tidalStoreApi, h.tuneInStoreApi);
+  const parser = new IscpCommandParser(h.getEntityId, h.stateReader, createParserEffects({ deezer: h.deezerStoreApi, tidal: h.tidalStoreApi, tuneInMenu: h.tuneInStoreApi }));
 
   const result = parser.parse("IFA", " HDMI1 ,PCM,48kHz,2ch,AllCh Stereo,5.1.4ch");
   expect(result?.command).toBe("IFA");
@@ -240,7 +249,7 @@ it("IscpCommandParser parses IFV payload and handles unknown resolution display"
   const { IscpCommandParser } = parserModule as { IscpCommandParser: new (...deps: any) => any };
 
   const h = makeParserHarness({ source: "net", subSource: "spotify" });
-  const parser = new IscpCommandParser(h.getEntityId, h.stateReader, h.deezerStoreApi, h.tidalStoreApi, h.tuneInStoreApi);
+  const parser = new IscpCommandParser(h.getEntityId, h.stateReader, createParserEffects({ deezer: h.deezerStoreApi, tidal: h.tidalStoreApi, tuneInMenu: h.tuneInStoreApi }));
 
   const unknownRes = parser.parse("IFV", "IN,Unknown,YCbCr,10bit,TV,Unknown,RGB,8bit,,HDR10");
   expect(unknownRes?.command).toBe("IFV");
@@ -259,7 +268,7 @@ it("IscpCommandParser merges multi-frame metadata payloads", async () => {
   const { IscpCommandParser } = parserModule as { IscpCommandParser: new (...deps: any) => any };
 
   const h = makeParserHarness({ source: "net", subSource: "spotify" });
-  const parser = new IscpCommandParser(h.getEntityId, h.stateReader, h.deezerStoreApi, h.tidalStoreApi, h.tuneInStoreApi);
+  const parser = new IscpCommandParser(h.getEntityId, h.stateReader, createParserEffects({ deezer: h.deezerStoreApi, tidal: h.tidalStoreApi, tuneInMenu: h.tuneInStoreApi }));
 
   const value = "Track TitleISCP!1NTIArtist NameISCP!1NALAlbum Name";
   const result = parser.parse("NAT", value);
@@ -275,7 +284,7 @@ it("IscpCommandParser emits NLT when service text indicates subsource switch", a
   const { IscpCommandParser } = parserModule as { IscpCommandParser: new (...deps: any) => any };
 
   const h = makeParserHarness({ source: "net", subSource: "tidal" });
-  const parser = new IscpCommandParser(h.getEntityId, h.stateReader, h.deezerStoreApi, h.tidalStoreApi, h.tuneInStoreApi);
+  const parser = new IscpCommandParser(h.getEntityId, h.stateReader, createParserEffects({ deezer: h.deezerStoreApi, tidal: h.tidalStoreApi, tuneInMenu: h.tuneInStoreApi }));
 
   const result = parser.parse("NLT", "01010000000101Spotify / Track");
   expect(result?.command).toBe("NLT");
@@ -287,7 +296,7 @@ it("IscpCommandParser decodes generic hex payloads for mapped commands without i
   const { IscpCommandParser } = parserModule as { IscpCommandParser: new (...deps: any) => any };
 
   const h = makeParserHarness({ source: "net", subSource: "spotify" });
-  const parser = new IscpCommandParser(h.getEntityId, h.stateReader, h.deezerStoreApi, h.tidalStoreApi, h.tuneInStoreApi);
+  const parser = new IscpCommandParser(h.getEntityId, h.stateReader, createParserEffects({ deezer: h.deezerStoreApi, tidal: h.tidalStoreApi, tuneInMenu: h.tuneInStoreApi }));
 
   const single = parser.parse("SLI", "414243");
   expect(single?.command).toBe("input-selector");
@@ -303,13 +312,13 @@ it("IscpCommandParser FLD sanitizes characters and skips service text outside NE
   const { IscpCommandParser } = parserModule as { IscpCommandParser: new (...deps: any) => any };
 
   const fm = makeParserHarness({ source: "fm", subSource: "fm" });
-  const parserFm = new IscpCommandParser(fm.getEntityId, fm.stateReader, fm.deezerStoreApi, fm.tidalStoreApi, fm.tuneInStoreApi);
+  const parserFm = new IscpCommandParser(fm.getEntityId, fm.stateReader, createParserEffects({ deezer: fm.deezerStoreApi, tidal: fm.tidalStoreApi, tuneInMenu: fm.tuneInStoreApi }));
   const fmResult = parserFm.parse("FLD", toHex("Sta*tion[]AB"));
   expect(fmResult?.command).toBe("FLD");
   expect(fmResult?.argument).toBe("Station");
 
   const other = makeParserHarness({ source: "cd", subSource: "cd" });
-  const parserOther = new IscpCommandParser(other.getEntityId, other.stateReader, other.deezerStoreApi, other.tidalStoreApi, other.tuneInStoreApi);
+  const parserOther = new IscpCommandParser(other.getEntityId, other.stateReader, createParserEffects({ deezer: other.deezerStoreApi, tidal: other.tidalStoreApi, tuneInMenu: other.tuneInStoreApi }));
   expect(parserOther.parse("FLD", toHex("Spotify"))).toBe(null);
 });
 
@@ -318,7 +327,7 @@ it("IscpCommandParser decodes VOC responses as numeric vocal levels", async () =
   const { IscpCommandParser } = parserModule as { IscpCommandParser: new (...deps: any) => any };
 
   const h = makeParserHarness();
-  const parser = new IscpCommandParser(h.getEntityId, h.stateReader, h.deezerStoreApi, h.tidalStoreApi, h.tuneInStoreApi);
+  const parser = new IscpCommandParser(h.getEntityId, h.stateReader, createParserEffects({ deezer: h.deezerStoreApi, tidal: h.tidalStoreApi, tuneInMenu: h.tuneInStoreApi }));
 
   const level2 = parser.parse("VOC", "02");
   expect(level2?.command).toBe("vocal");
@@ -334,7 +343,7 @@ it("IscpCommandParser maps DSS query responses (100/200/300/400) to dirac slot k
   const { IscpCommandParser } = parserModule as { IscpCommandParser: new (...deps: any) => any };
 
   const h = makeParserHarness();
-  const parser = new IscpCommandParser(h.getEntityId, h.stateReader, h.deezerStoreApi, h.tidalStoreApi, h.tuneInStoreApi);
+  const parser = new IscpCommandParser(h.getEntityId, h.stateReader, createParserEffects({ deezer: h.deezerStoreApi, tidal: h.tidalStoreApi, tuneInMenu: h.tuneInStoreApi }));
 
   const off = parser.parse("DSS", "100");
   expect(off?.command).toBe("dirac");
@@ -358,7 +367,7 @@ it("IscpCommandParser decodes TFR tone-front responses into bass and treble", as
   const { IscpCommandParser } = parserModule as { IscpCommandParser: new (...deps: any) => any };
 
   const h = makeParserHarness();
-  const parser = new IscpCommandParser(h.getEntityId, h.stateReader, h.deezerStoreApi, h.tidalStoreApi, h.tuneInStoreApi);
+  const parser = new IscpCommandParser(h.getEntityId, h.stateReader, createParserEffects({ deezer: h.deezerStoreApi, tidal: h.tidalStoreApi, tuneInMenu: h.tuneInStoreApi }));
 
   const flat = parser.parse("TFR", "B00T00");
   expect(flat?.command).toBe("tone-front");
@@ -379,7 +388,7 @@ it("IscpCommandParser decodes CTL center-temporary-level responses in 0.5 dB ste
   const { IscpCommandParser } = parserModule as { IscpCommandParser: new (...deps: any) => any };
 
   const h = makeParserHarness();
-  const parser = new IscpCommandParser(h.getEntityId, h.stateReader, h.deezerStoreApi, h.tidalStoreApi, h.tuneInStoreApi);
+  const parser = new IscpCommandParser(h.getEntityId, h.stateReader, createParserEffects({ deezer: h.deezerStoreApi, tidal: h.tidalStoreApi, tuneInMenu: h.tuneInStoreApi }));
 
   const plus14 = parser.parse("CTL", "+0E");
   expect(plus14?.command).toBe("center-temporary-level");
@@ -403,7 +412,7 @@ it("IscpCommandParser decodes SWL subwoofer-temporary-level responses in 0.5 dB 
   const { IscpCommandParser } = parserModule as { IscpCommandParser: new (...deps: any) => any };
 
   const h = makeParserHarness();
-  const parser = new IscpCommandParser(h.getEntityId, h.stateReader, h.deezerStoreApi, h.tidalStoreApi, h.tuneInStoreApi);
+  const parser = new IscpCommandParser(h.getEntityId, h.stateReader, createParserEffects({ deezer: h.deezerStoreApi, tidal: h.tidalStoreApi, tuneInMenu: h.tuneInStoreApi }));
 
   const minusHalf = parser.parse("SWL", "-01");
   expect(minusHalf?.command).toBe("subwoofer-temporary-level");
@@ -425,7 +434,7 @@ describe("IscpCommandParser NJA handling", () => {
     const parserModule = await import("../src/eiscp-command-parser.js");
     const { IscpCommandParser } = parserModule as { IscpCommandParser: new (...deps: any) => any };
     const h = makeParserHarness();
-    return new IscpCommandParser(h.getEntityId, h.stateReader, h.deezerStoreApi, h.tidalStoreApi, h.tuneInStoreApi);
+    return new IscpCommandParser(h.getEntityId, h.stateReader, createParserEffects({ deezer: h.deezerStoreApi, tidal: h.tidalStoreApi, tuneInMenu: h.tuneInStoreApi }));
   }
 
   it("drops jacket art pushes in both documented forms instead of reporting them as unknown", async () => {
@@ -473,10 +482,10 @@ describe("IscpCommandParser NRI handling", () => {
   async function makeNriParser() {
     const parserModule = await import("../src/eiscp-command-parser.js");
     const { IscpCommandParser } = parserModule as { IscpCommandParser: new (...deps: any) => any };
-    const store = await import("../src/avrInfoStore.js");
+    const store = { ...(await import("../src/avrInfoStore.js")), ...(await import("./helpers/avrInfo.js")) };
     const h = makeParserHarness();
     h.getEntityId = () => entityId;
-    const parser = new IscpCommandParser(h.getEntityId, h.stateReader, h.deezerStoreApi, h.tidalStoreApi, h.tuneInStoreApi);
+    const parser = new IscpCommandParser(h.getEntityId, h.stateReader, createParserEffects({ deezer: h.deezerStoreApi, tidal: h.tidalStoreApi, tuneInMenu: h.tuneInStoreApi }));
     return { parser, store };
   }
 
@@ -558,16 +567,15 @@ describe("IscpCommandParser NRI handling", () => {
 
 it("IscpCommandParser reports the input name the AVR gave for an input it collected", async () => {
   const parserModule = await import("../src/eiscp-command-parser.js");
-  const inputSourceStore = (await import("../src/inputSourceStore.js")) as any;
   const { IscpCommandParser } = parserModule as { IscpCommandParser: new (...deps: any) => any };
 
   // The store is keyed by physical AVR id, so it is looked up via the zone entity id.
-  inputSourceStore.setAvrInputs("TX-RZ50 1.2.3.4", [
+  (await import("../src/avrContext.js")).sharedAvrContexts.get("TX-RZ50 1.2.3.4").inputs.set([
     { id: "33", name: "DAB" },
     { id: "10", name: "BD/DVD" }
   ]);
 
-  const parser = new IscpCommandParser(() => "TX-RZ50 1.2.3.4 main", makeParserHarness().stateReader, null, null, null);
+  const parser = new IscpCommandParser(() => "TX-RZ50 1.2.3.4 main", makeParserHarness().stateReader, createParserEffects({ deezer: null, tidal: null, tuneInMenu: null }));
 
   // SLI33 is "dab" in the hardcoded table, but the AVR calls it "DAB".
   expect(parser.parse("SLI", "33").argument).toBe("DAB");
@@ -575,7 +583,7 @@ it("IscpCommandParser reports the input name the AVR gave for an input it collec
   expect(parser.parse("SLI", "12").argument).toBe("tv");
   expect(parser.parse("SLI", "01").argument).toEqual(["video2", "cbl", "sat"]);
 
-  inputSourceStore.clearAllAvrInputs();
+  (await import("../src/avrContext.js")).sharedAvrContexts.clear();
 });
 
 it("IscpCommandParser covers status, level, navigation and source fallbacks", async () => {
@@ -583,7 +591,11 @@ it("IscpCommandParser covers status, level, navigation and source fallbacks", as
   const musicState = { harvestMode: false, nlsCursorOffset: 0, totalListItemCount: 0, nlsLayerNumber: 0 };
   const h = makeParserHarness({ source: "net", subSource: "spotify" });
   const musicServerStore = { getBrowseState: () => musicState };
-  const parser = new IscpCommandParser(h.getEntityId, h.stateReader, h.deezerStoreApi, h.tidalStoreApi, h.tuneInStoreApi, musicServerStore);
+  const parser = new IscpCommandParser(
+    h.getEntityId,
+    h.stateReader,
+    createParserEffects({ deezer: h.deezerStoreApi, tidal: h.tidalStoreApi, tuneInMenu: h.tuneInStoreApi, musicServer: musicServerStore })
+  );
 
   expect(parser.parse("DSN", "source")?.argument).toBe("source");
   expect(parser.parse("ABZ", "x")).toBeNull();
@@ -625,9 +637,14 @@ it("IscpCommandParser covers status, level, navigation and source fallbacks", as
   expect(parser.parse("NLT", "0101000A0014     ")).toBeNull();
   expect(parser.parse("NLT", "0101000A0014")).toBeNull();
   const musicHarness = makeParserHarness({ source: "net", subSource: "music-server" });
-  const musicParser = new IscpCommandParser(musicHarness.getEntityId, musicHarness.stateReader, musicHarness.deezerStoreApi, musicHarness.tidalStoreApi, musicHarness.tuneInStoreApi, musicServerStore);
+  const musicParser = new IscpCommandParser(
+    musicHarness.getEntityId,
+    musicHarness.stateReader,
+    createParserEffects({ deezer: musicHarness.deezerStoreApi, tidal: musicHarness.tidalStoreApi, tuneInMenu: musicHarness.tuneInStoreApi, musicServer: musicServerStore })
+  );
   const musicResult = musicParser.parse("NLT", "0101000A001404Music Server");
-  expect(musicResult?.argument).toBe("Music Server");
+  // Already on Music Server: list metadata is stored, but no service-change event is emitted.
+  expect(musicResult?.argument).toBeUndefined();
   expect(musicState.totalListItemCount).toBe(20);
   expect(musicState.nlsLayerNumber).toBe(4);
 
@@ -635,10 +652,7 @@ it("IscpCommandParser covers status, level, navigation and source fallbacks", as
   const noStateParser = new IscpCommandParser(
     noStateHarness.getEntityId,
     noStateHarness.stateReader,
-    { getBrowseState: () => null },
-    noStateHarness.tidalStoreApi,
-    noStateHarness.tuneInStoreApi,
-    musicServerStore
+    createParserEffects({ deezer: { getBrowseState: () => null }, tidal: noStateHarness.tidalStoreApi, tuneInMenu: noStateHarness.tuneInStoreApi, musicServer: musicServerStore })
   );
   expect(noStateParser.parse("NLT", "0101000A001400Title")).toBeNull();
   const deezerHarvest = { harvestMode: true, nlsCursorOffset: 7, totalListItemCount: 0, nlsLayerNumber: 0 };
@@ -646,10 +660,7 @@ it("IscpCommandParser covers status, level, navigation and source fallbacks", as
   const deezerParser = new IscpCommandParser(
     deezerHarness.getEntityId,
     deezerHarness.stateReader,
-    deezerHarness.deezerStoreApi,
-    deezerHarness.tidalStoreApi,
-    deezerHarness.tuneInStoreApi,
-    musicServerStore
+    createParserEffects({ deezer: deezerHarness.deezerStoreApi, tidal: deezerHarness.tidalStoreApi, tuneInMenu: deezerHarness.tuneInStoreApi, musicServer: musicServerStore })
   );
   expect(deezerParser.parse("NLT", "0101000A0014Title")).toBeNull();
   const noLayer = { harvestMode: true, nlsCursorOffset: 0, totalListItemCount: 0, nlsLayerNumber: 0 };
@@ -657,10 +668,7 @@ it("IscpCommandParser covers status, level, navigation and source fallbacks", as
   const harvestParser = new IscpCommandParser(
     harvestHarness.getEntityId,
     harvestHarness.stateReader,
-    harvestHarness.deezerStoreApi,
-    harvestHarness.tidalStoreApi,
-    harvestHarness.tuneInStoreApi,
-    musicServerStore
+    createParserEffects({ deezer: harvestHarness.deezerStoreApi, tidal: harvestHarness.tidalStoreApi, tuneInMenu: harvestHarness.tuneInStoreApi, musicServer: musicServerStore })
   );
   expect(harvestParser.parse("NLT", "0101000A001400Title")).toBeNull();
   const tidalLive = { harvestMode: false, nlsCursorOffset: 0, totalListItemCount: 0, nlsLayerNumber: 0 };
@@ -668,25 +676,28 @@ it("IscpCommandParser covers status, level, navigation and source fallbacks", as
   const tidalLiveParser = new IscpCommandParser(
     tidalLiveHarness.getEntityId,
     tidalLiveHarness.stateReader,
-    tidalLiveHarness.deezerStoreApi,
-    tidalLiveHarness.tidalStoreApi,
-    tidalLiveHarness.tuneInStoreApi,
-    musicServerStore
+    createParserEffects({ deezer: tidalLiveHarness.deezerStoreApi, tidal: tidalLiveHarness.tidalStoreApi, tuneInMenu: tidalLiveHarness.tuneInStoreApi, musicServer: musicServerStore })
   );
   expect(tidalLiveParser.parse("NLT", "0101000A0014Title")).toBeNull();
   const tuneState = { harvestMode: true, nlsCursorOffset: 0, totalListItemCount: 0, nlsLayerNumber: 0 };
   const tuneHarness = makeParserHarness({ source: "net", subSource: "tunein", tuneInMenuState: tuneState });
-  const tuneParser = new IscpCommandParser(tuneHarness.getEntityId, tuneHarness.stateReader, tuneHarness.deezerStoreApi, tuneHarness.tidalStoreApi, tuneHarness.tuneInStoreApi, musicServerStore);
+  const tuneParser = new IscpCommandParser(
+    tuneHarness.getEntityId,
+    tuneHarness.stateReader,
+    createParserEffects({ deezer: tuneHarness.deezerStoreApi, tidal: tuneHarness.tidalStoreApi, tuneInMenu: tuneHarness.tuneInStoreApi, musicServer: musicServerStore })
+  );
   expect(tuneParser.parse("NLT", "0101000A001400Title")).toBeNull();
   const musicHarvest = { harvestMode: true, nlsCursorOffset: 0, totalListItemCount: 0, nlsLayerNumber: 0 };
   const musicHarvestHarness = makeParserHarness({ source: "net", subSource: "music-server", tuneInMenuState: null });
   const musicHarvestParser = new IscpCommandParser(
     musicHarvestHarness.getEntityId,
     musicHarvestHarness.stateReader,
-    musicHarvestHarness.deezerStoreApi,
-    musicHarvestHarness.tidalStoreApi,
-    musicHarvestHarness.tuneInStoreApi,
-    { getBrowseState: () => musicHarvest }
+    createParserEffects({
+      deezer: musicHarvestHarness.deezerStoreApi,
+      tidal: musicHarvestHarness.tidalStoreApi,
+      tuneInMenu: musicHarvestHarness.tuneInStoreApi,
+      musicServer: { getBrowseState: () => musicHarvest }
+    })
   );
   expect(musicHarvestParser.parse("NLT", "0101000A0014Title")).toBeNull();
 
@@ -698,10 +709,18 @@ it("IscpCommandParser covers status, level, navigation and source fallbacks", as
   expect(parser.parse("FLD", Buffer.from("Spotify / song", "utf8").toString("hex"))).toBeNull();
   expect(parser.parse("FLD", Buffer.from("Random text", "utf8").toString("hex"))).toBeNull();
   const fm = makeParserHarness({ source: "fm", subSource: "fm" });
-  const fmParser = new IscpCommandParser(fm.getEntityId, fm.stateReader, fm.deezerStoreApi, fm.tidalStoreApi, fm.tuneInStoreApi, musicServerStore);
+  const fmParser = new IscpCommandParser(
+    fm.getEntityId,
+    fm.stateReader,
+    createParserEffects({ deezer: fm.deezerStoreApi, tidal: fm.tidalStoreApi, tuneInMenu: fm.tuneInStoreApi, musicServer: musicServerStore })
+  );
   expect(fmParser.parse("FLD", Buffer.from("StationAB", "utf8").toString("hex"))?.argument).toBe("Station");
   expect(fmParser.parse("FLD", Buffer.from("Spotify", "utf8").toString("hex"))).toBeNull();
   const cd = makeParserHarness({ source: "cd", subSource: "cd" });
-  const cdParser = new IscpCommandParser(cd.getEntityId, cd.stateReader, cd.deezerStoreApi, cd.tidalStoreApi, cd.tuneInStoreApi, musicServerStore);
+  const cdParser = new IscpCommandParser(
+    cd.getEntityId,
+    cd.stateReader,
+    createParserEffects({ deezer: cd.deezerStoreApi, tidal: cd.tidalStoreApi, tuneInMenu: cd.tuneInStoreApi, musicServer: musicServerStore })
+  );
   expect(cdParser.parse("FLD", Buffer.from("Display1234", "utf8").toString("hex"))?.argument).toBe("Display");
 });

@@ -3,6 +3,7 @@ import { readFileSync, existsSync } from "fs";
 import { resolve } from "path";
 import { ConfigManager, IntegrationConfig } from "./configManager.js";
 import log from "./loggers.js";
+import { readDriverMetadata, type DriverMetadata } from "./driverMetadata.js";
 
 const logSource = "backupRestoreManager:";
 
@@ -17,7 +18,7 @@ interface BackupPayload {
 
 export class BackupRestoreManager {
   async buildBackupString(getConfigDirPath: () => string | undefined): Promise<string> {
-    const metadata = await this.readDriverMetadata();
+    const metadata = this.readDriverMetadata();
     const configData = this.readConfigData(getConfigDirPath);
 
     const backupPayload: BackupPayload = {
@@ -64,19 +65,12 @@ export class BackupRestoreManager {
     return { normalized: validation.normalized as Partial<IntegrationConfig>, isValid: true, errors: [] };
   }
 
-  private async readDriverMetadata(): Promise<{ driverId: string; driverVersion: string }> {
-    try {
-      const driverJsonPath = resolve(process.cwd(), "driver.json");
-      const driverJsonRaw = readFileSync(driverJsonPath, "utf-8");
-      const driverJson = JSON.parse(driverJsonRaw);
-      return {
-        driverId: driverJson.driver_id || "unknown",
-        driverVersion: driverJson.version || "unknown"
-      };
-    } catch (err) {
-      log.debug("%s Driver metadata unavailable, using fallback metadata: %s", logSource, err);
-      return { driverId: "unknown", driverVersion: "unknown" };
+  private readDriverMetadata(): DriverMetadata {
+    const metadata = readDriverMetadata();
+    if (metadata.error) {
+      log.debug("%s Driver metadata unavailable, using fallback metadata: %s", logSource, metadata.error);
     }
+    return metadata;
   }
 
   private readConfigData(getConfigDirPath: () => string | undefined): unknown {

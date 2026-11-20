@@ -18,9 +18,6 @@ export type AvrInput = {
   network?: boolean;
 };
 
-// Collected inputs per physical AVR id ("MODEL HOST").
-const inputsByAvr = new Map<string, AvrInput[]>();
-
 // Sort the way the option list is presented: alphabetically, ignoring case and accents.
 function byName(a: AvrInput, b: AvrInput): number {
   return a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
@@ -55,46 +52,42 @@ export function normalizeAvrInputs(raw: AvrInput[]): AvrInput[] {
   return inputs.sort(byName);
 }
 
-// Store the inputs collected for an AVR. Returns true when the effective list changed.
-export function setAvrInputs(physicalAvrId: string, inputs: AvrInput[]): boolean {
-  const normalized = normalizeAvrInputs(inputs);
-  const changed = JSON.stringify(normalized) !== JSON.stringify(getAvrInputs(physicalAvrId));
-  if (normalized.length === 0) {
-    inputsByAvr.delete(physicalAvrId);
-  } else {
-    inputsByAvr.set(physicalAvrId, normalized);
+// The inputs collected for one physical AVR. One instance lives in that AVR's AvrContext (see avrContext.ts).
+export class InputSourceStore {
+  private inputs: AvrInput[] = [];
+
+  // Store the inputs collected for the AVR. Returns true when the effective list changed.
+  set(inputs: AvrInput[]): boolean {
+    const normalized = normalizeAvrInputs(inputs);
+    const changed = JSON.stringify(normalized) !== JSON.stringify(this.inputs);
+    this.inputs = normalized;
+    return changed;
   }
-  return changed;
-}
 
-// Inputs collected for an AVR, sorted by name. Empty when nothing was collected (or manual mode is used).
-export function getAvrInputs(physicalAvrId: string): AvrInput[] {
-  return inputsByAvr.get(physicalAvrId) ?? [];
-}
+  // Inputs sorted by name. Empty when nothing was collected (or manual mode is used).
+  list(): AvrInput[] {
+    return [...this.inputs];
+  }
 
-// True when the AVR reported inputs and they are in use.
-export function hasAvrInputs(physicalAvrId: string): boolean {
-  return (inputsByAvr.get(physicalAvrId)?.length ?? 0) > 0;
-}
+  // True when the AVR reported inputs and they are in use.
+  has(): boolean {
+    return this.inputs.length > 0;
+  }
 
-// Input id for an AVR-reported input name, used to send SLI with the id the AVR itself gave.
-export function findAvrInputId(physicalAvrId: string, name: string): string | undefined {
-  const wanted = name.trim().toLowerCase();
-  return getAvrInputs(physicalAvrId).find((input) => input.name.toLowerCase() === wanted)?.id;
-}
+  // Input id for an AVR-reported input name, used to send SLI with the id the AVR itself gave.
+  findId(name: string): string | undefined {
+    const wanted = name.trim().toLowerCase();
+    return this.inputs.find((input) => input.name.toLowerCase() === wanted)?.id;
+  }
 
-// AVR-reported name for an input id, used to report back what the AVR is playing.
-export function findAvrInputName(physicalAvrId: string, id: string): string | undefined {
-  const wanted = id.trim().toLowerCase();
-  return getAvrInputs(physicalAvrId).find((input) => input.id === wanted)?.name;
-}
+  // AVR-reported name for an input id, used to report back what the AVR is playing.
+  findName(id: string): string | undefined {
+    const wanted = id.trim().toLowerCase();
+    return this.inputs.find((input) => input.id === wanted)?.name;
+  }
 
-// Forget the collected inputs of an AVR, e.g. when the user switches the setting to "manual".
-export function clearAvrInputs(physicalAvrId: string): void {
-  inputsByAvr.delete(physicalAvrId);
-}
-
-// Forget every AVR, used when the config is cleared.
-export function clearAllAvrInputs(): void {
-  inputsByAvr.clear();
+  // Forget the collected inputs, e.g. when the user switches the setting to "manual".
+  clear(): void {
+    this.inputs = [];
+  }
 }

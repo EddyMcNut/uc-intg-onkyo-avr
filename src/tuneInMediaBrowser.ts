@@ -1,4 +1,5 @@
 // Focused responsibility: TuneIn service browsing and ingestion
+import { isNetworkServiceDisplayName } from "./networkServices.js";
 import * as uc from "@unfoldedcircle/integration-api";
 import log from "./loggers.js";
 import { looksLikeTuneInDirectory, normalizeTuneInLabel, extractTuneInStationKey, parseTuneInXmlItems } from "./tuneInFilters.js";
@@ -110,8 +111,7 @@ export class TuneInMediaBrowser {
     // Selecting TuneIn through the legacy NET menu can emit the intermediate
     // NET service list before the actual TuneIn menu. Do not let those rows
     // replace the TuneIn full-menu entries.
-    const netRootEntries = new Set(["tunein", "spotify", "deezer", "tidal", "amazonmusic", "chromecast built-in", "dts play-fi", "airplay", "alexa", "music server", "usb", "play queue"]);
-    if (netRootEntries.has(title.toLowerCase())) return;
+    if (isNetworkServiceDisplayName(title)) return;
 
     const cursorOffset = getTuneInMenuBrowseState(entityId)?.nlsCursorOffset ?? 0;
     const windowStart = Math.max(0, cursorOffset - 9);

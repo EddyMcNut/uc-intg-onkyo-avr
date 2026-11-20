@@ -1,3 +1,4 @@
+import { isNetworkServiceDisplayName } from "./networkServices.js";
 import {
   hasTuneInPresets,
   ingestDeezerXmlEntries,
@@ -326,8 +327,8 @@ export class MusicServerZoneAgnosticAdapter implements ZoneAgnosticServiceAdapte
         .match(/^U\d+-(.*)$/)?.[1]
         ?.trim()
         .toLowerCase();
-      const netRootEntries = new Set(["tunein", "spotify", "deezer", "tidal", "amazonmusic", "chromecast built-in", "dts play-fi", "airplay", "alexa", "music server", "usb", "play queue"]);
-      if (title && netRootEntries.has(title)) continue;
+      // Rows of the NET root menu are not Music Server entries.
+      if (title && isNetworkServiceDisplayName(title)) continue;
       ingestMusicServerListEntry(zoneEntityId, entry);
     }
   }

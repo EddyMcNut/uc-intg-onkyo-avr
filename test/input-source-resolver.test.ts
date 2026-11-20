@@ -1,7 +1,8 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { getEffectiveInputSourceOptions, resolveCanonicalInputSource, resolveInputSourceList } from "../src/inputSourceResolver.js";
-import { clearAllAvrInputs, setAvrInputs } from "../src/inputSourceStore.js";
-import { parseAvrInfo, setAvrInfo, resetAvrInfo } from "../src/avrInfoStore.js";
+import { sharedAvrContexts } from "../src/avrContext.js";
+import { parseAvrInfo } from "../src/avrInfoStore.js";
+import { setAvrInfo, resetAvrInfo } from "./helpers/avrInfo.js";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import type { AvrConfig } from "../src/configManager.js";
@@ -21,7 +22,7 @@ function nriXml(selectorList: string): string {
 
 describe("inputSourceResolver", () => {
   beforeEach(() => {
-    clearAllAvrInputs();
+    sharedAvrContexts.clear();
     resetAvrInfo(ENTITY_ID);
   });
 
@@ -147,7 +148,7 @@ describe("inputSourceResolver", () => {
 
   it("renames configured aliases when the AVR reports the same ID and keeps unmatched aliases", () => {
     setAvrInfo(ENTITY_ID, parseAvrInfo(nriXml('<selectorlist count="2"><selector id="10" name="Blu-ray" /><selector id="12" name="Television" /></selectorlist>')));
-    setAvrInputs("TX-RZ50 192.168.2.103", [
+    sharedAvrContexts.get("TX-RZ50 192.168.2.103").inputs.set([
       { id: "10", name: "Blu-ray" },
       { id: "12", name: "Television" }
     ]);
@@ -157,7 +158,7 @@ describe("inputSourceResolver", () => {
   });
 
   it("keeps AVR-learned display names separate from canonical source state", () => {
-    setAvrInputs("TX-RZ50 192.168.2.103", [{ id: "2b", name: "Network" }]);
+    sharedAvrContexts.get("TX-RZ50 192.168.2.103").inputs.set([{ id: "2b", name: "Network" }]);
 
     expect(resolveCanonicalInputSource("TX-RZ50 192.168.2.103", "Network")).toBe("net");
   });

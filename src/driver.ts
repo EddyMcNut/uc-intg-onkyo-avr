@@ -23,7 +23,7 @@ import { AvrStateManager } from "./avrState.js";
 import { avrStateQueryService } from "./avrStateQuery.js";
 import { initMediaBrowser } from "./mediaBrowser.js";
 import log, { setLogLevel } from "./loggers.js";
-import { addListeningModeSimpleCommands, logGeneratedCount } from "./simpleCommands.js";
+import { logGeneratedCount } from "./simpleCommands.js";
 import SetupHandler from "./setupHandler.js";
 import EntityRegistrar from "./entityRegistrar.js";
 import ConnectionManager from "./connectionManager.js";
@@ -35,10 +35,10 @@ import ConnectCoordinator from "./connectCoordinator.js";
 import { AvrInstance, EiscpInstance, type AvrStateApi } from "./types.js";
 import { resolveAutoVolumeScale } from "./volumeScaleResolver.js";
 import { resolveInputSourceList } from "./inputSourceResolver.js";
-import { setAvrInputs, clearAvrInputs, hasAvrInputs } from "./inputSourceStore.js";
-import { findTunerPresetByName, getTunerPresetNames, setTunerPresets, tunerPresetCommandValue } from "./tunerPresetStore.js";
-import { listNamedPresets } from "./avrInfoStore.js";
-import { readFileSync } from "node:fs";
+import { tunerPresetCommandValue } from "./tunerPresetStore.js";
+import { sharedAvrContexts, type AvrContextRegistry } from "./avrContext.js";
+import { readDriverMetadata } from "./driverMetadata.js";
+import { setZoneEntitiesAvailability } from "./entityAvailability.js";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { delay } from "./utils.js";
@@ -52,9 +52,11 @@ export default class Driver {
   private driver: uc.IntegrationAPI;
   private config: IntegrationConfig;
   private reconnectionManager: ReconnectionManager = new ReconnectionManager();
-  private connectionManager: import("./connectionManager.js").default;
+  private connectionManager: ConnectionManager;
   private readonly avrInstances = new Map<string, AvrInstance>();
   private readonly avrStateApi: AvrStateApi = new AvrStateManager();
+  // Per-AVR runtime state. TRANSITIONAL: the shared registry until every component receives it explicitly (item 10).
+  private readonly avrContexts: AvrContextRegistry = sharedAvrContexts;
   private driverVersion: string = "unknown";
 
   // Handler extracted to separate module for clarity/testing
@@ -78,13 +80,10 @@ export default class Driver {
     this.driver.init("driver.json", this.handleDriverSetup.bind(this));
 
     // Read driver version early so it's available when creating command receivers
-    try {
-      const driverJsonPath = resolve(process.cwd(), "driver.json");
-      const driverJsonRaw = readFileSync(driverJsonPath, "utf-8");
-      const driverJson = JSON.parse(driverJsonRaw);
-      this.driverVersion = driverJson.version || "unknown";
-    } catch (err) {
-      log.warn("%s Could not read driver version in constructor:", logSource, err);
+    const metadata = readDriverMetadata();
+    this.driverVersion = metadata.driverVersion;
+    if (metadata.error) {
+      log.warn("%s Could not read driver version in constructor:", logSource, metadata.error);
     }
 
     // Ensure ConfigManager uses the Integration API config dir so the Integration Manager can back up and restore the same files
@@ -99,15 +98,14 @@ export default class Driver {
     // Now load config from the correct path and continue setup
     this.config = ConfigManager.load();
     log.info("%s Active config file: %s", logSource, getConfigPath());
-    for (const avr of this.config.avrs ?? []) addListeningModeSimpleCommands(avr.listeningModes);
     if (this.config.logLevel) setLogLevel(this.config.logLevel);
     logGeneratedCount();
 
     // Create connection manager (needs reconnectionManager and query callback)
-    this.connectionManager = new ConnectionManager(this.reconnectionManager, this.queryAllZonesState.bind(this), undefined, this.avrStateApi);
+    this.connectionManager = new ConnectionManager(this.reconnectionManager, this.queryAllZonesState.bind(this), undefined, this.avrStateApi, this.handleAvrAvailability.bind(this), this.avrContexts);
 
     // Initialize entity registrar before handing it to helper classes
-    this.entityRegistrar = new EntityRegistrar(this.avrStateApi);
+    this.entityRegistrar = new EntityRegistrar(this.avrStateApi, this.avrContexts);
 
     // Initialize media browser with dependency injection
     initMediaBrowser(this.avrStateApi);
@@ -132,7 +130,7 @@ export default class Driver {
       this.sendTunerPreset.bind(this)
     );
     this.diracHandler = new SelectEntityHandler(this.driver, this.connectionManager, this.avrInstances, "_dirac", "dirac", "Dirac", () => [...DIRAC_OPTION_LABELS], diracOptionToServiceKey);
-    this.remoteEntityCommandHandler = new remoteEntityCommandHandler(this.driver, this.connectionManager, this.avrInstances, this.avrStateApi);
+    this.remoteEntityCommandHandler = new remoteEntityCommandHandler(this.driver, this.connectionManager, this.avrInstances, this.avrStateApi, this.avrContexts);
     this.subscriptionHandler = new SubscriptionHandler(this.connectionManager, this.avrInstances);
     this.entityRegistrationCoordinator = this.createEntityRegistrationCoordinator();
 
@@ -164,7 +162,6 @@ export default class Driver {
           const nextConfig = ConfigManager.load();
           this.reconcileConfiguration(nextConfig);
           this.config = nextConfig;
-          for (const avr of this.config.avrs ?? []) addListeningModeSimpleCommands(avr.listeningModes);
           if (this.config.logLevel) setLogLevel(this.config.logLevel);
           this.registerAvailableEntities();
           await this.handleConnect();
@@ -192,7 +189,7 @@ export default class Driver {
 
   private registerAvailableEntities(): void {
     log.info("%s Registering available entities from config", logSource);
-    if (!this.entityRegistrar) this.entityRegistrar = new EntityRegistrar(this.avrStateApi);
+    if (!this.entityRegistrar) this.entityRegistrar = new EntityRegistrar(this.avrStateApi, this.avrContexts);
     this.entityRegistrationCoordinator ??= this.createEntityRegistrationCoordinator();
     this.entityRegistrationCoordinator.register(this.config.avrs ?? [], (config) => buildEntityId(config.model, config.ip, config.zone), this.createRawSend.bind(this));
   }
@@ -251,7 +248,7 @@ export default class Driver {
   // Recall a tuner preset slot: the station name from the select entity is mapped back to the slot number the AVR reported it in, and sent as `PRS<slot in hex>`. The raw command is used on purpose: `PRS` is documented as "Preset No. 1-40 in hexadecimal", so the value has to be exactly that hex slot. Presets are a property of the AVR, not of a zone, so the command is sent for the main zone.
   private async sendTunerPreset(eiscp: EiscpInstance, avrEntry: string, _zone: string, option: string): Promise<void> {
     const physicalAVR = physicalAvrIdFromEntityId(avrEntry);
-    const preset = physicalAVR ? findTunerPresetByName(physicalAVR, option) : undefined;
+    const preset = physicalAVR ? this.avrContexts.get(physicalAVR).tunerPresets.findByName(option) : undefined;
     if (!preset) {
       log.warn("%s Tuner preset '%s' is not one of the stations the AVR reported, nothing sent", logSource, option);
       throw new Error(`Unknown tuner preset: ${option}`);
@@ -354,7 +351,7 @@ export default class Driver {
       const zoneEntry = buildEntityId(avrConfig.model, avrConfig.ip, avrConfig.zone);
       let changed = false;
 
-      const volumeResolution = resolveAutoVolumeScale(avrConfig, entityId);
+      const volumeResolution = resolveAutoVolumeScale(avrConfig, entityId, this.avrContexts);
       if (volumeResolution) {
         if (ConfigManager.patchAvr(avrConfig.ip, avrConfig.zone, { volumeScale: volumeResolution.scale, volumeScaleDiscovered: volumeResolution.discovered })) {
           log.debug("%s [%s] Volume scale 'auto' resolved to 0-%d: %s", logSource, zoneEntry, volumeResolution.scale, volumeResolution.reason);
@@ -365,7 +362,7 @@ export default class Driver {
         }
       }
 
-      const inputResolution = resolveInputSourceList(avrConfig, entityId);
+      const inputResolution = resolveInputSourceList(avrConfig, entityId, this.avrContexts);
       if (inputResolution) {
         if (!inputResolution.inputs) {
           // Nothing to collect: fall back to integration mappings and remember that, so unsupported
@@ -379,12 +376,12 @@ export default class Driver {
           }
           if (!inputsDecided) {
             inputsDecided = true;
-            inputsChanged = hasAvrInputs(physicalAVR);
-            clearAvrInputs(physicalAVR);
+            inputsChanged = this.avrContexts.get(physicalAVR).inputs.has();
+            this.avrContexts.get(physicalAVR).inputs.clear();
           }
         } else if (!inputsDecided) {
           inputsDecided = true;
-          inputsChanged = setAvrInputs(physicalAVR, inputResolution.inputs);
+          inputsChanged = this.avrContexts.get(physicalAVR).inputs.set(inputResolution.inputs);
           if (inputsChanged) {
             // The inputs changed, so the entities listing them have to be rebuilt.
             log.debug("%s [%s] Input source list 'auto' resolved: %s", logSource, zoneEntry, inputResolution.reason);
@@ -399,9 +396,9 @@ export default class Driver {
 
       if (isTunerPresetModeEnabled(avrConfig.createTunerPresets) && !presetsCollected) {
         presetsCollected = true;
-        presetsChanged = setTunerPresets(physicalAVR, listNamedPresets(entityId));
+        presetsChanged = this.avrContexts.get(physicalAVR).tunerPresets.set(this.avrContexts.get(physicalAVR).avrInfo.namedPresets());
         if (presetsChanged) {
-          const names = getTunerPresetNames(physicalAVR, parseTunerPresetMode(avrConfig.createTunerPresets) === "preset-order" ? "preset-order" : "alphabetical");
+          const names = this.avrContexts.get(physicalAVR).tunerPresets.names(parseTunerPresetMode(avrConfig.createTunerPresets) === "preset-order" ? "preset-order" : "alphabetical");
           log.debug("%s [%s] Tuner presets collected from the AVR: %d station(s): %s", logSource, zoneEntry, names.length, names.join(", "));
         }
       }
@@ -431,6 +428,14 @@ export default class Driver {
       }
       this.refreshZoneRuntimeConfig(updatedConfig);
     }
+  }
+
+  // Grey out (or restore) every entity of an AVR's configured zones when its TCP connection drops (or comes back).
+  private handleAvrAvailability(physicalAVR: string, available: boolean): void {
+    const zoneEntityIds = (this.config.avrs ?? [])
+      .filter((avrConfig) => buildPhysicalAvrId(avrConfig.model, avrConfig.ip) === physicalAVR)
+      .map((avrConfig) => buildEntityId(avrConfig.model, avrConfig.ip, avrConfig.zone));
+    setZoneEntitiesAvailability(this.driver, zoneEntityIds, available, this.avrStateApi);
   }
 
   // Push the stations the AVR reported into the existing tuner presets select entity.
@@ -586,9 +591,9 @@ export default class Driver {
       this.config,
       (avrConfig) => (eiscpInstance) => {
         const avrSpecificConfig = this.createAvrSpecificConfig(avrConfig);
-        return new CommandReceiver(this.driver, avrSpecificConfig, eiscpInstance, this.avrStateApi, this.driverVersion, this.handleAvrInfo.bind(this));
+        return new CommandReceiver(this.driver, avrSpecificConfig, eiscpInstance, this.avrStateApi, this.driverVersion, this.handleAvrInfo.bind(this), this.avrContexts);
       },
-      (avrSpecificConfig, eiscp, commandReceiver) => new CommandSender(this.driver, avrSpecificConfig, eiscp, this.avrStateApi, commandReceiver)
+      (avrSpecificConfig, eiscp, commandReceiver) => new CommandSender(this.driver, avrSpecificConfig, eiscp, this.avrStateApi, commandReceiver, this.avrContexts)
     );
 
     if (hasInstances) {

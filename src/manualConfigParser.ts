@@ -2,9 +2,15 @@
 import { LogLevel, AVR_DEFAULTS, parseBoolean, parseVolumeScale, type VolumeScale } from "./configManager.js";
 import type { AvrInput } from "./inputSourceStore.js";
 import {
-  NETWORK_INPUT_MARKERS,
+  parseAlbumArtUrl,
+  parseEntityNameStyle,
+  parseInputSourceLayout,
+  parseIntegerSetting,
+  parseNetworkInputMarker,
+  parseNetworkNavigationMode,
   parseTunerPresetMode,
   parseTuneInMenuStyle,
+  parseVolumeDisplay,
   type InputSourceLayout,
   type InputSourceSettings,
   type NetworkInputMarker,
@@ -94,7 +100,7 @@ export class ManualConfigParser {
       inputSources: Array.isArray(input.inputSources) ? (input.inputSources as AvrInput[]) : [],
       inputSourceDiscoveryAvailable: Boolean(input.inputSourceDiscoveryAvailable),
       volumeDisplayValue: this.parseVolumeDisplay(input.volumeDisplay),
-      adjustVolumeDisplValue: parseBoolean(input.adjustVolumeDispl, true),
+      adjustVolumeDisplValue: parseBoolean(input.adjustVolumeDispl, AVR_DEFAULTS.adjustVolumeDispl),
       entityNameStyleValue: this.parseEntityNameStyle(input.entityNameStyle),
       createSensorsValue: parseBoolean(input.createSensors, AVR_DEFAULTS.createSensors),
       createTunerPresetsValue: parseTunerPresetMode(input.createTunerPresets ?? AVR_DEFAULTS.createTunerPresets),
@@ -112,10 +118,7 @@ export class ManualConfigParser {
   }
 
   private parseInputSourceLayout(raw: unknown): InputSourceLayout {
-    const value = String(raw ?? "combined").toLowerCase();
-    if (value === "network-first") return "network-first";
-    if (value === "network-last" || value === "separate") return "network-last";
-    return "combined";
+    return parseInputSourceLayout(raw);
   }
 
   private parseListeningModePreferences(input: ManualConfigInput): Record<string, string> {
@@ -151,19 +154,18 @@ export class ManualConfigParser {
     return settings;
   }
 
+  // Numbers are only converted here (not a number -> default). Range checks are left to
+  // ConfigManager.validateAvrPayload, so an out-of-range value is reported to the user instead of silently replaced.
   private parsePort(port: unknown): number {
-    const p = parseInt((port ?? "").toString(), 10);
-    return isNaN(p) ? AVR_DEFAULTS.port : p;
+    return parseIntegerSetting(port, AVR_DEFAULTS.port);
   }
 
   private parseQueueThreshold(threshold: unknown): number {
-    if (threshold === undefined || threshold === null || threshold === "") return AVR_DEFAULTS.queueThreshold;
-    const parsed = parseInt(String(threshold), 10);
-    return isNaN(parsed) ? AVR_DEFAULTS.queueThreshold : parsed;
+    return parseIntegerSetting(threshold, AVR_DEFAULTS.queueThreshold);
   }
 
   private parseAlbumArtUrl(url: unknown): string {
-    return typeof url === "string" && url.trim() !== "" ? url.trim() : AVR_DEFAULTS.albumArtURL;
+    return parseAlbumArtUrl(url);
   }
 
   private parseVolumeScale(scale: unknown): VolumeScale {
@@ -171,22 +173,19 @@ export class ManualConfigParser {
   }
 
   private parseVolumeDisplay(display: unknown): "absolute" | "relative" {
-    return String(display ?? AVR_DEFAULTS.volumeDisplay).toLowerCase() === "relative" ? "relative" : "absolute";
+    return parseVolumeDisplay(display);
   }
 
   private parseEntityNameStyle(style: unknown): "long" | "short" {
-    return String(style ?? AVR_DEFAULTS.entityNameStyle).toLowerCase() === "short" ? "short" : "long";
+    return parseEntityNameStyle(style);
   }
 
   private parseNetMenuDelay(delay: unknown): number {
-    const parsed = parseInt(String(delay), 10);
-    return isNaN(parsed) ? AVR_DEFAULTS.netMenuDelay : parsed;
+    return parseIntegerSetting(delay, AVR_DEFAULTS.netMenuDelay);
   }
 
   private parseTuneInPresetPosition(position: unknown): number {
-    const parsed = parseInt(String(position), 10);
-    if (isNaN(parsed)) return AVR_DEFAULTS.tuneinPresetPosition;
-    return parsed >= 1 && parsed <= 10 ? parsed : AVR_DEFAULTS.tuneinPresetPosition;
+    return parseIntegerSetting(position, AVR_DEFAULTS.tuneinPresetPosition);
   }
 
   private parseTuneInMenuStyle(style: unknown): TuneInMenuStyle {
@@ -194,11 +193,11 @@ export class ManualConfigParser {
   }
 
   private parseNetworkInputMarker(marker: unknown): NetworkInputMarker {
-    return NETWORK_INPUT_MARKERS.includes(marker as NetworkInputMarker) ? (marker as NetworkInputMarker) : "none";
+    return parseNetworkInputMarker(marker);
   }
 
   private parseNetworkNavigationMode(mode: unknown): NetworkNavigationMode {
-    return String(mode ?? AVR_DEFAULTS.networkNavigationMode).toLowerCase() === "legacy" ? "legacy" : "modern";
+    return parseNetworkNavigationMode(mode);
   }
 
   private parseLogLevel(level: unknown, fallback: LogLevel): LogLevel {

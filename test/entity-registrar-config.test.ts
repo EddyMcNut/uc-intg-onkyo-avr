@@ -93,7 +93,6 @@ it("EntityRegistrar uses AVR-reported input names when enabled", async () => {
   try {
     const module = (await import("../src/entityRegistrar.js")) as any;
     const cfgModule = (await import("../src/configManager.js")) as any;
-    const inputSourceStore = (await import("../src/inputSourceStore.js")) as any;
 
     const { ConfigManager, setConfigDir } = cfgModule;
     if (typeof setConfigDir === "function") setConfigDir(tmp);
@@ -109,7 +108,7 @@ it("EntityRegistrar uses AVR-reported input names when enabled", async () => {
     // Before the AVR reported anything, the built-in list is used.
     expect(registrar.getInputSelectorOptions(avrEntry).length).toBeGreaterThan(5);
 
-    inputSourceStore.setAvrInputs("M 1.2.3.4", [
+    (await import("../src/avrContext.js")).sharedAvrContexts.get("M 1.2.3.4").inputs.set([
       { id: "10", name: "BD/DVD" },
       { id: "33", name: "DAB" }
     ]);
@@ -119,7 +118,7 @@ it("EntityRegistrar uses AVR-reported input names when enabled", async () => {
     ConfigManager.save({ avrs: [{ model: "M", ip: "1.2.3.4", port: 60128, zone: "main", useAvrReportedInputs: false }] });
     expect(registrar.getInputSelectorOptions(avrEntry).length).toBeGreaterThan(5);
 
-    inputSourceStore.clearAllAvrInputs();
+    (await import("../src/avrContext.js")).sharedAvrContexts.clear();
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
   }
@@ -130,7 +129,6 @@ it("EntityRegistrar applies AVR names to matching aliases and keeps unmatched op
   try {
     const module = (await import("../src/entityRegistrar.js")) as any;
     const cfgModule = (await import("../src/configManager.js")) as any;
-    const inputSourceStore = (await import("../src/inputSourceStore.js")) as any;
 
     const { ConfigManager, setConfigDir } = cfgModule;
     if (typeof setConfigDir === "function") setConfigDir(tmp);
@@ -141,11 +139,11 @@ it("EntityRegistrar applies AVR names to matching aliases and keeps unmatched op
     const registrar = new EntityRegistrar(avrStateManager);
 
     ConfigManager.save({ avrs: [{ model: "M", ip: "1.2.3.4", port: 60128, zone: "main", useAvrReportedInputs: true }] });
-    inputSourceStore.setAvrInputs("M 1.2.3.4", [{ id: "10", name: "BD/DVD" }]);
+    (await import("../src/avrContext.js")).sharedAvrContexts.get("M 1.2.3.4").inputs.set([{ id: "10", name: "BD/DVD" }]);
 
     expect(registrar.getInputSelectorOptions("M 1.2.3.4 main")).toEqual(["BD/DVD"]);
 
-    inputSourceStore.clearAllAvrInputs();
+    (await import("../src/avrContext.js")).sharedAvrContexts.clear();
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
   }
@@ -156,7 +154,7 @@ it("EntityRegistrar lists the tuner preset stations the AVR reported, and none b
   try {
     const module = (await import("../src/entityRegistrar.js")) as any;
     const cfgModule = (await import("../src/configManager.js")) as any;
-    const tunerPresetStore = (await import("../src/tunerPresetStore.js")) as any;
+    const { sharedAvrContexts } = await import("../src/avrContext.js");
 
     const { ConfigManager, setConfigDir } = cfgModule;
     if (typeof setConfigDir === "function") setConfigDir(tmp);
@@ -175,7 +173,7 @@ it("EntityRegistrar lists the tuner preset stations the AVR reported, and none b
     expect(select.id).toBe(`${avrEntry}_tuner_presets`);
     expect((select as any).attributes.options).toEqual([]);
 
-    tunerPresetStore.setTunerPresets("M 1.2.3.4", [
+    sharedAvrContexts.get("M 1.2.3.4").tunerPresets.set([
       { slot: 12, name: "NPO FunX", band: "2", freq: "0" },
       { slot: 28, name: "STRKSTAD", band: "1", freq: "107.20" }
     ]);
@@ -184,7 +182,7 @@ it("EntityRegistrar lists the tuner preset stations the AVR reported, and none b
     // The stations are also part of the entity definition, not only of the attribute update.
     expect((registrar.createTunerPresetsSelectEntity(avrEntry, async () => {}) as any).attributes.options).toEqual(["NPO FunX", "STRKSTAD"]);
 
-    tunerPresetStore.clearAllTunerPresets();
+    sharedAvrContexts.clear();
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
   }

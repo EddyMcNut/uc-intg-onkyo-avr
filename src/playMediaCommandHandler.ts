@@ -22,9 +22,7 @@ import {
   TUNEIN_MENU_BACK_ID,
   TUNEIN_MENU_ROOT_TYPE
 } from "./mediaBrowser.js";
-import { consumeTidalListModeActive, consumeTraceNextTidalSelectionAfterMainMenu, getTidalBrowseState, listTidalMenuOptions } from "./tidalBrowserStore.js";
-import { consumeDeezerListModeActive, consumeTraceNextDeezerSelectionAfterMainMenu, getDeezerBrowseState, listDeezerMenuOptions } from "./deezerBrowserStore.js";
-import { consumeMusicServerListModeActive, consumeTraceNextMusicServerSelectionAfterMainMenu, getMusicServerBrowseState, listMusicServerMenuOptions } from "./musicServerBrowserStore.js";
+import { getMenuBrowseService, xmlBrowseSelectCommand } from "./menuBrowseServices.js";
 import { consumeTuneInListModeActive, getTuneInMenuBrowseState, resetTuneInMenuBrowseState, setTuneInMenuBrowseFrozen, setTuneInMenuNowPlayingStation } from "./tuneInMenuStore.js";
 import { getTuneInBrowseState, getTuneInPreset, listTuneInPresets, setTuneInBrowseFrozen } from "./tuneInBrowserStore.js";
 import { AVR_DEFAULTS, ConfigManager, DEFAULT_QUEUE_THRESHOLD, buildEntityId } from "./configManager.js";
@@ -40,35 +38,8 @@ import {
 import type { NetworkNavigationMode } from "./configConstants.js";
 
 const logSource = "playMediaCommandHandler:";
-
-// The AVR's XML music-server browser uses NLAI to select an item.  The
-// older NLSI command selects an item in the ten-line display list and is not
-// equivalent: it can appear to work for the first page, but does not follow
-// the object/layer selected by the NLA/NLAL browser.  NLAI uses a zero-based
-// item index, while our media IDs and store use one-based menu indices.
-function musicServerSelectCommand(menuIndex: number, layerNumber: number | undefined): string {
-  const layer = Math.max(1, layerNumber ?? 1)
-    .toString(16)
-    .padStart(2, "0")
-    .toUpperCase();
-  const index = Math.max(0, menuIndex - 1)
-    .toString(16)
-    .padStart(4, "0")
-    .toUpperCase();
-  return `NLAI${layer}${index}----`;
-}
-
-function xmlBrowseSelectCommand(menuIndex: number, layerNumber: number | undefined): string {
-  const layer = Math.max(1, layerNumber ?? 1)
-    .toString(16)
-    .padStart(2, "0")
-    .toUpperCase();
-  const index = Math.max(0, menuIndex - 1)
-    .toString(16)
-    .padStart(4, "0")
-    .toUpperCase();
-  return `NLAI${layer}${index}----`;
-}
+// Modern (XML/NSV) navigation: opens TuneIn directly. The menu-browse services have theirs in menuBrowseServices.ts.
+const TUNEIN_MODERN_SELECT_SOURCE_COMMAND = "NSV0E0";
 
 type ZonePrefixFn = (cmd: string) => string;
 
@@ -148,27 +119,15 @@ export class PlayMediaCommandHandler {
     // Do not wait for the AVR's asynchronous NLT notification before routing
     // browse requests. A remote may ask for the root immediately after NSV;
     // keep that request from being handled by the previous service.
-    const pendingSubSource =
-      serviceId === TUNEIN_SERVICE_ID
-        ? "tunein"
-        : serviceId === MUSIC_SERVER_SERVICE_ID
-          ? "music-server"
-          : serviceId === TIDAL_SERVICE_ID
-            ? "tidal"
-            : serviceId === DEEZER_SERVICE_ID
-              ? "deezer"
-              : undefined;
-    if (pendingSubSource) this.avrStateApi.setSubSource(entityId, pendingSubSource);
+    // The browse service ids are also the sub-source ids.
+    this.avrStateApi.setSubSource(entityId, serviceId);
 
     const modern = (this.eiscp.eiscpConfig?.networkNavigationMode ?? "modern") !== "legacy";
+    const menuService = getMenuBrowseService(serviceId);
     if (modern && serviceId === TUNEIN_SERVICE_ID) {
-      await this.eiscp.raw("NSV0E0");
-    } else if (modern && serviceId === MUSIC_SERVER_SERVICE_ID) {
-      await this.eiscp.raw("NSV000");
-    } else if (modern && serviceId === TIDAL_SERVICE_ID) {
-      await this.eiscp.raw("NSV1B0");
-    } else if (modern && serviceId === DEEZER_SERVICE_ID) {
-      await this.eiscp.raw("NSV120");
+      await this.eiscp.raw(TUNEIN_MODERN_SELECT_SOURCE_COMMAND);
+    } else if (modern && menuService) {
+      await this.eiscp.raw(menuService.modernSelectSourceCommand);
     } else {
       await this.eiscp.command(setZonePrefix(getBrowseServiceSelectSourceCommand(serviceId)));
     }
@@ -323,20 +282,16 @@ export class PlayMediaCommandHandler {
 
     const activeServiceId = tidalOption ? TIDAL_SERVICE_ID : deezerOption ? DEEZER_SERVICE_ID : musicServerOption ? MUSIC_SERVER_SERVICE_ID : undefined;
     const activeOption = tidalOption ?? deezerOption ?? musicServerOption;
-    const activeLabel = activeServiceId === TIDAL_SERVICE_ID ? "Tidal" : activeServiceId === DEEZER_SERVICE_ID ? "Deezer" : "Music Server";
+    const activeService = activeServiceId ? getMenuBrowseService(activeServiceId) : undefined;
 
-    if (!activeOption || !activeServiceId) {
+    if (!activeOption || !activeServiceId || !activeService) {
       return uc.StatusCodes.NotFound;
     }
+    const activeLabel = activeService.label;
+    const activeStore = activeService.store;
 
-    const shouldTraceSelection =
-      activeServiceId === TIDAL_SERVICE_ID
-        ? consumeTraceNextTidalSelectionAfterMainMenu(entityId)
-        : activeServiceId === DEEZER_SERVICE_ID
-          ? consumeTraceNextDeezerSelectionAfterMainMenu(entityId)
-          : consumeTraceNextMusicServerSelectionAfterMainMenu(entityId);
-    const activeOptions =
-      activeServiceId === TIDAL_SERVICE_ID ? listTidalMenuOptions(entityId) : activeServiceId === DEEZER_SERVICE_ID ? listDeezerMenuOptions(entityId) : listMusicServerMenuOptions(entityId);
+    const shouldTraceSelection = activeStore.consumeTraceNextSelectionAfterMainMenu(entityId);
+    const activeOptions = activeStore.listOptions(entityId);
 
     const requestedTitle = /^Menu \d+$/.test(activeOption.title) ? activeOptions.find((item) => item.menuIndex === activeOption.menuIndex)?.title : activeOption.title;
     if (shouldTraceSelection) {
@@ -356,12 +311,7 @@ export class PlayMediaCommandHandler {
     if (!isBrowseServiceActive(currentSource, currentSubSource, activeServiceId)) {
       await this.selectBrowseService(entityId, activeServiceId, setZonePrefix, netMenuDelay, { delayAfterSelect: true });
     } else if (!modern && !selectedIsBrowsable) {
-      const alreadyInListMode =
-        activeServiceId === TIDAL_SERVICE_ID
-          ? consumeTidalListModeActive(entityId)
-          : activeServiceId === DEEZER_SERVICE_ID
-            ? consumeDeezerListModeActive(entityId)
-            : consumeMusicServerListModeActive(entityId);
+      const alreadyInListMode = activeStore.consumeListModeActive(entityId);
       if (!alreadyInListMode) {
         const playbackStatus = this.avrStateApi.getPlaybackStatus(entityId);
         if (["playing", "paused", "ff", "fr"].includes(playbackStatus)) {
@@ -384,43 +334,16 @@ export class PlayMediaCommandHandler {
       log.info("%s [%s] TRACE final %s selection index=%d source=%s subsource=%s", logSource, entityId, activeLabel, menuIndexToSelect, currentSource, currentSubSource);
     }
 
-    if (activeServiceId === TIDAL_SERVICE_ID) {
-      const tidalState = getTidalBrowseState(entityId);
-      if (tidalState) {
-        tidalState.browseListFrozen = !selectedIsBrowsable;
-        if (!selectedIsBrowsable) {
-          tidalState.nowPlayingTitle = selectedTitle;
-        }
-      }
-    } else if (activeServiceId === DEEZER_SERVICE_ID) {
-      const deezerState = getDeezerBrowseState(entityId);
-      if (deezerState) {
-        deezerState.browseListFrozen = !selectedIsBrowsable;
-        if (!selectedIsBrowsable) {
-          deezerState.nowPlayingTitle = selectedTitle;
-        }
-      }
-    } else {
-      const musicServerState = getMusicServerBrowseState(entityId);
-      if (musicServerState) {
-        musicServerState.browseListFrozen = !selectedIsBrowsable;
-        if (!selectedIsBrowsable) {
-          musicServerState.nowPlayingTitle = selectedTitle;
-        }
+    const activeState = activeStore.getBrowseState(entityId);
+    if (activeState) {
+      activeState.browseListFrozen = !selectedIsBrowsable;
+      if (!selectedIsBrowsable) {
+        activeState.nowPlayingTitle = selectedTitle;
       }
     }
-    if (modern && activeServiceId === MUSIC_SERVER_SERVICE_ID) {
-      const musicServerState = getMusicServerBrowseState(entityId);
-      log.info("%s [%s] selecting %s menu index=%d layer=%s title='%s'", logSource, entityId, activeLabel, menuIndexToSelect, musicServerState?.nlsLayerNumber ?? 0, selectedTitle);
-      await this.eiscp.raw(musicServerSelectCommand(menuIndexToSelect, musicServerState?.nlsLayerNumber));
-    } else if (modern && activeServiceId === TIDAL_SERVICE_ID) {
-      const tidalState = getTidalBrowseState(entityId);
-      log.info("%s [%s] selecting %s menu index=%d layer=%s title='%s'", logSource, entityId, activeLabel, menuIndexToSelect, tidalState?.nlsLayerNumber ?? 0, selectedTitle);
-      await this.eiscp.raw(xmlBrowseSelectCommand(menuIndexToSelect, tidalState?.nlsLayerNumber));
-    } else if (modern && activeServiceId === DEEZER_SERVICE_ID) {
-      const deezerState = getDeezerBrowseState(entityId);
-      log.info("%s [%s] selecting %s menu index=%d layer=%s title='%s'", logSource, entityId, activeLabel, menuIndexToSelect, deezerState?.nlsLayerNumber ?? 0, selectedTitle);
-      await this.eiscp.raw(xmlBrowseSelectCommand(menuIndexToSelect, deezerState?.nlsLayerNumber));
+    if (modern) {
+      log.info("%s [%s] selecting %s menu index=%d layer=%s title='%s'", logSource, entityId, activeLabel, menuIndexToSelect, activeState?.nlsLayerNumber ?? 0, selectedTitle);
+      await this.eiscp.raw(xmlBrowseSelectCommand(menuIndexToSelect, activeState?.nlsLayerNumber));
     } else {
       await this.eiscp.raw(`NLSI${String(menuIndexToSelect).padStart(5, "0")}`);
     }

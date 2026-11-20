@@ -21,22 +21,10 @@ describe("simpleCommands", () => {
     }
   });
 
-  it("does not add context-dependent AVR names as simple commands", async () => {
-    const { addListeningModeSimpleCommands, SIMPLE_COMMANDS_MAP } = await import("../src/simpleCommands.js");
-    const { getKnownListeningModes } = await import("../src/listeningModePreferences.js");
-    const knownCode = getKnownListeningModes().find((mode) => mode.aliases.includes("direct"))!.code;
-
-    addListeningModeSimpleCommands({
-      [knownCode]: { name: "Direct learned", setting: "detected" },
-      "00": { name: "Custom Stereo", setting: "detected" },
-      "03": { name: "Disabled", setting: "disable" },
-      "02": { name: "Excluded", setting: "dont-include" },
-      "04": { name: "  ", setting: "discover" }
-    });
+  it("does not expose context-dependent AVR listening-mode names as simple commands", async () => {
+    const { SIMPLE_COMMANDS_MAP } = await import("../src/simpleCommands.js");
 
     expect(SIMPLE_COMMANDS_MAP.LISTENING_MODE_CUSTOM_STEREO).toBeUndefined();
     expect(SIMPLE_COMMANDS_MAP.LISTENING_MODE_DIRECT_LEARNED).toBeUndefined();
-    addListeningModeSimpleCommands({ "00": { name: "Custom Stereo", setting: "discover" } });
-    expect(SIMPLE_COMMANDS_MAP.LISTENING_MODE_CUSTOM_STEREO).toBeUndefined();
   });
 });

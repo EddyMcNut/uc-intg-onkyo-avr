@@ -140,8 +140,7 @@ describe("sendIscp routing through commandToIscp", () => {
   });
 
   it("sends an AVR-reported input name as the input id the AVR gave", async () => {
-    const inputSourceStore = (await import("../src/inputSourceStore.js")) as any;
-    inputSourceStore.setAvrInputs("TX-RZ50 1.2.3.4", [
+    (await import("../src/avrContext.js")).sharedAvrContexts.get("TX-RZ50 1.2.3.4").inputs.set([
       { id: "10", name: "BD/DVD" },
       { id: "01", name: "CBL/SAT" }
     ]);
@@ -155,7 +154,7 @@ describe("sendIscp routing through commandToIscp", () => {
     await driver.command({ zone: "zone2", command: "input-selector", args: "cbl/sat" });
     expect(rawSpy).toHaveBeenCalledWith("SLZ01");
 
-    inputSourceStore.clearAllAvrInputs();
+    (await import("../src/avrContext.js")).sharedAvrContexts.clear();
   });
 
   it("still warns for an input that the AVR did not report and that is not in the command table", async () => {
@@ -178,7 +177,7 @@ describe("sendIscp routing through commandToIscp", () => {
   it("uses the NRI service id for direct network-service selection", async () => {
     const driver = await makeDriver();
     const rawSpy = vi.spyOn(driver, "raw").mockResolvedValue(undefined);
-    const { setAvrInfo } = await import("../src/avrInfoStore.js");
+    const { setAvrInfo } = { ...(await import("../src/avrInfoStore.js")), ...(await import("./helpers/avrInfo.js")) };
     setAvrInfo("TX-RZ50 1.2.3.4 main", {
       model: "TX-RZ50",
       friendlyName: "",

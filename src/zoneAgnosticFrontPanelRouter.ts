@@ -4,9 +4,10 @@ import type { AvrStateApi } from "./types.js";
 import type { ZoneAgnosticServiceAdapter } from "./zoneAgnosticServiceAdapters.js";
 import type { ZoneAgnosticMediaStateStore } from "./zoneAgnosticMediaState.js";
 import type { EiscpDriver } from "./eiscp.js";
-import { findTunerPresetByName } from "./tunerPresetStore.js";
+import type { AvrContextRegistry } from "./avrContext.js";
 
 type FrontPanelRouterDeps = {
+  avrContexts: AvrContextRegistry;
   driver: uc.IntegrationAPI;
   eiscpInstance: EiscpDriver;
   state: AvrStateApi;
@@ -49,7 +50,7 @@ export class ZoneAgnosticFrontPanelRouter {
           station: frontPanelText,
           artist: `${source.toUpperCase()} Radio`
         });
-        const preset = findTunerPresetByName(physicalAvrId, frontPanelText);
+        const preset = this.deps.avrContexts.get(physicalAvrId).tunerPresets.findByName(frontPanelText);
         this.deps.driver.updateEntityAttributes(`${zoneEntityId}_tuner_presets`, {
           [uc.SelectAttributes.CurrentOption]: preset?.name ?? ""
         });

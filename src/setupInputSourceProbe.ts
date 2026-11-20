@@ -2,7 +2,7 @@ import EiscpDriver from "./eiscp.js";
 import { buildEntityId } from "./configManager.js";
 import { collectAvrInputSources } from "./inputSourceResolver.js";
 import type { AvrInput } from "./inputSourceStore.js";
-import { getAvrInfo } from "./avrInfoStore.js";
+import { sharedAvrContexts } from "./avrContext.js";
 import log from "./loggers.js";
 
 export type SetupEiscpDriverFactory = (config: { host?: string; port?: number; model?: string }) => EiscpDriver;
@@ -48,7 +48,8 @@ export class SetupInputSourceProbe {
       });
       await probe.command({ zone: "main", command: "avr-info", args: "query" });
       await response;
-      const info = getAvrInfo(entityId);
+      // TRANSITIONAL (item 10): the probe's EiscpDriver writes to the shared registry; the last step gives it its own.
+      const info = sharedAvrContexts.forEntity(entityId)?.avrInfo.get();
       const inputs = collectAvrInputSources(
         info?.selectors ?? [],
         (info?.netServices ?? []).filter((service) => service.enabled).map((service) => ({ id: service.id, name: service.name }))

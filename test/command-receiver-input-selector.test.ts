@@ -202,13 +202,12 @@ it("CommandReceiver uses the AVR-reported input name and ignores a manual input 
     }
 
     const mockEiscp = new MockEiscp();
-    const inputSourceStore = (await import("../src/inputSourceStore.js")) as any;
 
     // The setting is "auto" (the default) and the AVR reported these inputs. A leftover manual list
     // must not be applied on top of them.
     const cfg = { avrs: [{ model: "M", ip: "1.2.3.4", port: 60128, zone: "main", useAvrReportedInputs: true, inputSelectorOptions: ["cd", "dvd", "tv"] }] };
     await makeReceiver(mockDriver, tmp, cfg, mockEiscp);
-    inputSourceStore.setAvrInputs("M 1.2.3.4", [
+    (await import("../src/avrContext.js")).sharedAvrContexts.get("M 1.2.3.4").inputs.set([
       { id: "33", name: "DAB" },
       { id: "10", name: "BD/DVD" }
     ]);
@@ -232,7 +231,7 @@ it("CommandReceiver uses the AVR-reported input name and ignores a manual input 
     // The DAB presets are still queried, identified by the input id the AVR reported.
     expect(raws).toContain("DSNQSTN");
   } finally {
-    ((await import("../src/inputSourceStore.js")) as any).clearAllAvrInputs();
+    (await import("../src/avrContext.js")).sharedAvrContexts.clear();
     fs.rmSync(tmp, { recursive: true, force: true });
   }
 });
@@ -262,11 +261,10 @@ it("CommandReceiver ignores collected inputs once the input source list is manua
     }
 
     const mockEiscp = new MockEiscp();
-    const inputSourceStore = (await import("../src/inputSourceStore.js")) as any;
 
     const cfg = { avrs: [{ model: "M", ip: "1.2.3.4", port: 60128, zone: "main", useAvrReportedInputs: false, inputSelectorOptions: ["dvd"] }] };
     await makeReceiver(mockDriver, tmp, cfg, mockEiscp);
-    inputSourceStore.setAvrInputs("M 1.2.3.4", [{ id: "33", name: "DAB" }]);
+    (await import("../src/avrContext.js")).sharedAvrContexts.get("M 1.2.3.4").inputs.set([{ id: "33", name: "DAB" }]);
 
     mockEiscp.emit("data", {
       command: "input-selector",
@@ -281,7 +279,7 @@ it("CommandReceiver ignores collected inputs once the input source list is manua
     const isoUpdates = updates.filter((u) => u.id.endsWith("_input_selector") && u.attrs && u.attrs.current_option);
     expect(isoUpdates[isoUpdates.length - 1].attrs.current_option).toBe("bd");
   } finally {
-    ((await import("../src/inputSourceStore.js")) as any).clearAllAvrInputs();
+    (await import("../src/avrContext.js")).sharedAvrContexts.clear();
     fs.rmSync(tmp, { recursive: true, force: true });
   }
 });

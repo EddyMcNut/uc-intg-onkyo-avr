@@ -8,7 +8,7 @@ import { getCompatibleListeningModes } from "./listeningModeFilters.js";
 import { ConfigManager, buildEntityId, buildPhysicalAvrId } from "./configManager.js";
 import { getAvrSourceCatalog } from "./avrSourceCatalog.js";
 import { getEffectiveInputSourceOptions } from "./inputSourceResolver.js";
-import { getTunerPresetNames } from "./tunerPresetStore.js";
+import { sharedAvrContexts, type AvrContextRegistry } from "./avrContext.js";
 import { parseTunerPresetMode } from "./configConstants.js";
 import { getLearnedListeningModes } from "./learnedListeningModeStore.js";
 import { displayListeningModeName, resolveListeningModes } from "./listeningModePreferences.js";
@@ -60,7 +60,10 @@ type EntityBrowseHandler = {
 export default class EntityRegistrar {
   private readonly browseHandlers: EntityBrowseHandler[];
 
-  constructor(private readonly avrStateApi: AvrStateApi) {
+  constructor(
+    private readonly avrStateApi: AvrStateApi,
+    private readonly avrContexts: AvrContextRegistry = sharedAvrContexts
+  ) {
     this.browseHandlers = [
       new TuneInBrowseHandler(avrStateApi),
       createMenuBrowseHandler({
@@ -363,7 +366,7 @@ export default class EntityRegistrar {
       const match = cfg?.avrs?.find((a) => buildEntityId(a.model, a.ip, a.zone) === avrEntry);
       if (match) {
         const mode = parseTunerPresetMode(match.createTunerPresets) === "preset-order" ? "preset-order" : "alphabetical";
-        return getTunerPresetNames(buildPhysicalAvrId(match.model, match.ip), mode);
+        return this.avrContexts.get(buildPhysicalAvrId(match.model, match.ip)).tunerPresets.names(mode);
       }
     } catch {
       // ignore and show no options
@@ -399,7 +402,7 @@ export default class EntityRegistrar {
     try {
       const cfg = ConfigManager.get()?.avrs?.find((a) => buildEntityId(a.model, a.ip, a.zone) === avrEntry);
       if (!cfg?.useAvrReportedInputs) return undefined;
-      const catalog = getAvrSourceCatalog(avrEntry);
+      const catalog = getAvrSourceCatalog(avrEntry, this.avrContexts);
       if (!catalog.complete) return undefined;
       const names = catalog.sources.map((input) => input.name);
       return names.length > 0 ? names : undefined;

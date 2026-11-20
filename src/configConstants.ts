@@ -312,81 +312,91 @@ export interface NormalizedAvrConfig {
   idInputSources: InputSourceSettings;
 }
 
-// Coerce and apply defaults to a raw AvrConfig. OCP: adding a field only requires touching this function and AvrConfig/NormalizedAvrConfig.
+// ---------------------------------------------------------------------------------------------------------------
+// Per-field parsers: the single definition of how each AVR setting is read from untyped input (config file,
+// backup payload, setup form). They never throw; anything unusable becomes the field's default.
+// Used by normalizeAvrConfig (runtime and config load), ConfigManager.validateAvrPayload and ManualConfigParser.
+// ---------------------------------------------------------------------------------------------------------------
+
+// Integer from a number or numeric string. Values that are not a number, or fall outside [min, max], give `fallback`.
+export function parseIntegerSetting(raw: unknown, fallback: number, min = -Infinity, max = Infinity): number {
+  const parsed = typeof raw === "number" ? raw : parseInt(String(raw ?? "").trim(), 10);
+  return Number.isNaN(parsed) || parsed < min || parsed > max ? fallback : parsed;
+}
+
+export function parsePort(raw: unknown): number {
+  return parseIntegerSetting(raw, AVR_DEFAULTS.port, 1, 65535);
+}
+
+export function parseQueueThreshold(raw: unknown): number {
+  return parseIntegerSetting(raw, AVR_DEFAULTS.queueThreshold, 0);
+}
+
+export function parseNetMenuDelay(raw: unknown): number {
+  return parseIntegerSetting(raw, AVR_DEFAULTS.netMenuDelay, 0);
+}
+
+export const TUNEIN_PRESET_POSITION_MIN = 1;
+export const TUNEIN_PRESET_POSITION_MAX = 10;
+
+export function parseTuneInPresetPosition(raw: unknown): number {
+  return parseIntegerSetting(raw, AVR_DEFAULTS.tuneinPresetPosition, TUNEIN_PRESET_POSITION_MIN, TUNEIN_PRESET_POSITION_MAX);
+}
+
+export function parseAlbumArtUrl(raw: unknown): string {
+  return typeof raw === "string" && raw.trim() !== "" ? raw.trim() : AVR_DEFAULTS.albumArtURL;
+}
+
+export function parseVolumeDisplay(raw: unknown): VolumeDisplay {
+  return String(raw ?? AVR_DEFAULTS.volumeDisplay).toLowerCase() === "relative" ? "relative" : "absolute";
+}
+
+export function parseEntityNameStyle(raw: unknown): EntityNameStyle {
+  return String(raw ?? AVR_DEFAULTS.entityNameStyle).toLowerCase() === "short" ? "short" : "long";
+}
+
+// The legacy persisted value "separate" means "network-last".
+export function parseInputSourceLayout(raw: unknown): InputSourceLayout {
+  const value = String(raw ?? AVR_DEFAULTS.inputSourceLayout).toLowerCase();
+  if (value === "network-first") return "network-first";
+  if (value === "network-last" || value === "separate") return "network-last";
+  return "combined";
+}
+
+export function parseNetworkInputMarker(raw: unknown): NetworkInputMarker {
+  return NETWORK_INPUT_MARKERS.includes(raw as NetworkInputMarker) ? (raw as NetworkInputMarker) : AVR_DEFAULTS.networkInputMarker;
+}
+
+export function parseNetworkNavigationMode(raw: unknown): NetworkNavigationMode {
+  return String(raw ?? AVR_DEFAULTS.networkNavigationMode).toLowerCase() === "legacy" ? "legacy" : "modern";
+}
+
+// Coerce and apply defaults to a raw AvrConfig. Adding a field: add its parser above, then add it here and to
+// AvrConfig/NormalizedAvrConfig. ConfigManager.applyDefaults and validateAvrPayload build on this function.
 export function normalizeAvrConfig(raw: AvrConfig): NormalizedAvrConfig {
-  const queueThreshold = (() => {
-    const v = raw.queueThreshold ?? AVR_DEFAULTS.queueThreshold;
-    const n = typeof v === "number" ? v : parseInt(String(v), 10);
-    return isNaN(n) || n < 0 ? DEFAULT_QUEUE_THRESHOLD : n;
-  })();
-
-  const albumArtURL = typeof raw.albumArtURL === "string" && raw.albumArtURL.trim() !== "" ? raw.albumArtURL.trim() : AVR_DEFAULTS.albumArtURL;
-
-  const volumeScale = parseVolumeScale(raw.volumeScale);
-
-  const useAvrReportedInputs = parseBoolean(raw.useAvrReportedInputs, AVR_DEFAULTS.useAvrReportedInputs);
-
-  const volumeDisplay: VolumeDisplay = String(raw.volumeDisplay ?? AVR_DEFAULTS.volumeDisplay).toLowerCase() === "relative" ? "relative" : "absolute";
-
-  const adjustVolumeDispl = parseBoolean(raw.adjustVolumeDispl, AVR_DEFAULTS.adjustVolumeDispl);
-
-  const entityNameStyle: EntityNameStyle = String(raw.entityNameStyle ?? AVR_DEFAULTS.entityNameStyle).toLowerCase() === "short" ? "short" : "long";
-
-  const createSensors = parseBoolean(raw.createSensors, AVR_DEFAULTS.createSensors);
-
-  const createTunerPresets = parseTunerPresetMode(raw.createTunerPresets ?? AVR_DEFAULTS.createTunerPresets);
-
-  const createRemoteEntity = parseBoolean(raw.createRemoteEntity, AVR_DEFAULTS.createRemoteEntity);
-
-  const createDiracSelectEntity = parseBoolean(raw.createDiracSelectEntity, AVR_DEFAULTS.createDiracSelectEntity);
-
-  const netMenuDelay = (() => {
-    const v = typeof raw.netMenuDelay === "number" ? raw.netMenuDelay : parseInt(String(raw.netMenuDelay ?? ""), 10);
-    return isNaN(v) || v < 0 ? AVR_DEFAULTS.netMenuDelay : v;
-  })();
-
-  const tuneinPresetPosition = (() => {
-    const v = typeof raw.tuneinPresetPosition === "number" ? raw.tuneinPresetPosition : parseInt(String(raw.tuneinPresetPosition ?? ""), 10);
-    if (isNaN(v) || v < 1 || v > 10) return AVR_DEFAULTS.tuneinPresetPosition;
-    return v;
-  })();
-
-  const tuneinMenuStyle = parseTuneInMenuStyle(raw.tuneinMenuStyle ?? AVR_DEFAULTS.tuneinMenuStyle);
-
-  const rawInputSourceLayout = String(raw.inputSourceLayout ?? "combined").toLowerCase();
-  const inputSourceLayout: InputSourceLayout =
-    rawInputSourceLayout === "network-first" ? "network-first" : rawInputSourceLayout === "network-last" || rawInputSourceLayout === "separate" ? "network-last" : "combined";
-  const networkInputMarker: NetworkInputMarker = NETWORK_INPUT_MARKERS.includes(raw.networkInputMarker as NetworkInputMarker) ? (raw.networkInputMarker as NetworkInputMarker) : "none";
-  const networkNavigationMode: NetworkNavigationMode = String(raw.networkNavigationMode ?? AVR_DEFAULTS.networkNavigationMode).toLowerCase() === "legacy" ? "legacy" : "modern";
-
-  const port = (() => {
-    const p = typeof raw.port === "number" ? raw.port : parseInt(String(raw.port ?? ""), 10);
-    return isNaN(p) || p < 1 || p > 65535 ? AVR_DEFAULTS.port : p;
-  })();
-
   return {
     model: raw.model,
     ip: raw.ip,
-    port,
+    port: parsePort(raw.port),
     zone: raw.zone,
-    queueThreshold,
-    albumArtURL,
-    volumeScale,
+    queueThreshold: parseQueueThreshold(raw.queueThreshold),
+    albumArtURL: parseAlbumArtUrl(raw.albumArtURL),
+    volumeScale: parseVolumeScale(raw.volumeScale),
     volumeScaleDiscovered: Boolean(raw.volumeScaleDiscovered),
-    useAvrReportedInputs,
-    volumeDisplay,
-    adjustVolumeDispl,
-    entityNameStyle,
-    createSensors,
-    createTunerPresets,
-    createRemoteEntity,
-    createDiracSelectEntity,
-    netMenuDelay,
-    tuneinPresetPosition,
-    tuneinMenuStyle,
-    inputSourceLayout,
-    networkInputMarker,
-    networkNavigationMode,
+    useAvrReportedInputs: parseBoolean(raw.useAvrReportedInputs, AVR_DEFAULTS.useAvrReportedInputs),
+    volumeDisplay: parseVolumeDisplay(raw.volumeDisplay),
+    adjustVolumeDispl: parseBoolean(raw.adjustVolumeDispl, AVR_DEFAULTS.adjustVolumeDispl),
+    entityNameStyle: parseEntityNameStyle(raw.entityNameStyle),
+    createSensors: parseBoolean(raw.createSensors, AVR_DEFAULTS.createSensors),
+    createTunerPresets: parseTunerPresetMode(raw.createTunerPresets ?? AVR_DEFAULTS.createTunerPresets),
+    createRemoteEntity: parseBoolean(raw.createRemoteEntity, AVR_DEFAULTS.createRemoteEntity),
+    createDiracSelectEntity: parseBoolean(raw.createDiracSelectEntity, AVR_DEFAULTS.createDiracSelectEntity),
+    netMenuDelay: parseNetMenuDelay(raw.netMenuDelay),
+    tuneinPresetPosition: parseTuneInPresetPosition(raw.tuneinPresetPosition),
+    tuneinMenuStyle: parseTuneInMenuStyle(raw.tuneinMenuStyle ?? AVR_DEFAULTS.tuneinMenuStyle),
+    inputSourceLayout: parseInputSourceLayout(raw.inputSourceLayout),
+    networkInputMarker: parseNetworkInputMarker(raw.networkInputMarker),
+    networkNavigationMode: parseNetworkNavigationMode(raw.networkNavigationMode),
     listeningModes:
       raw.listeningModes && typeof raw.listeningModes === "object" && !Array.isArray(raw.listeningModes) ? { ...(raw.listeningModes as Record<string, { name: string; setting: string }>) } : {},
     idInputSources: normalizeInputSourceSettings(raw.idInputSources)

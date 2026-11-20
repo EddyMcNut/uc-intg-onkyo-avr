@@ -1,4 +1,4 @@
-import { NETWORK_SERVICES } from "./constants.js";
+import { isNetworkServiceDisplayName } from "./networkServices.js";
 
 export function normalizeTuneInLabel(label: string): string {
   const pipeIndex = label.indexOf("|");
@@ -18,13 +18,12 @@ export function extractTuneInStationKey(label: string): string {
 export function looksLikeTuneInDirectory(title: string, iconId?: string): boolean {
   const normalized = title.trim().toLowerCase();
   const normalizedIconId = (iconId || "").trim().toUpperCase();
-  const knownServiceNames = NETWORK_SERVICES.map((service) => service.toLowerCase());
 
   if (["29", "2A", "2B", "2C", "38", "3A", "3B", "3C", "3D", "43", "44"].includes(normalizedIconId)) {
     return true;
   }
 
-  if (knownServiceNames.includes(normalized)) {
+  if (isNetworkServiceDisplayName(normalized)) {
     return true;
   }
 

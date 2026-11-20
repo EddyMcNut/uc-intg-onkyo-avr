@@ -1,19 +1,20 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { getAvrSourceCatalog, findAvrSourceId } from "../src/avrSourceCatalog.js";
-import { clearAllAvrInputs, setAvrInputs } from "../src/inputSourceStore.js";
-import { parseAvrInfo, resetAvrInfo, setAvrInfo } from "../src/avrInfoStore.js";
+import { sharedAvrContexts } from "../src/avrContext.js";
+import { parseAvrInfo } from "../src/avrInfoStore.js";
+import { resetAvrInfo, setAvrInfo } from "./helpers/avrInfo.js";
 
 const ENTITY = "TX-RZ50 1.2.3.4 main";
 const PHYSICAL = "TX-RZ50 1.2.3.4";
 
 describe("avrSourceCatalog", () => {
   beforeEach(() => {
-    clearAllAvrInputs();
+    sharedAvrContexts.clear();
     resetAvrInfo(ENTITY);
   });
 
   it("provides normalized sources and reports complete NRI readiness", () => {
-    setAvrInputs(PHYSICAL, [
+    sharedAvrContexts.get(PHYSICAL).inputs.set([
       { id: "0e", name: "TuneIn Radio" },
       { id: "2b", name: "NET" }
     ]);

@@ -2,7 +2,7 @@
 import { eiscpMappings } from "./eiscp-mappings.js";
 import { type AvrConfig } from "./configManager.js";
 import { normalizeAvrInputs, type AvrInput } from "./inputSourceStore.js";
-import { getAvrInfo, listSelectors } from "./avrInfoStore.js";
+import { sharedAvrContexts, type AvrContextRegistry } from "./avrContext.js";
 import { getAvrSourcesByPhysicalId } from "./avrSourceCatalog.js";
 import { getInputSourceAliases } from "./inputSourcePreferences.js";
 import { presentInputSourceOptions, stripInputSourceMarker } from "./inputSourcePresentation.js";
@@ -50,13 +50,15 @@ export function getEffectiveInputSourceOptions(avrConfig: AvrConfig, physicalAvr
 }
 
 // Resolve the AVR's input list when AVR-reported names are enabled.
-export function resolveInputSourceList(avrConfig: AvrConfig, entityId: string): InputSourceListResolution | undefined {
+// `contexts` defaults to the shared registry during the item-10 migration (see avrContext.ts).
+export function resolveInputSourceList(avrConfig: AvrConfig, entityId: string, contexts: AvrContextRegistry = sharedAvrContexts): InputSourceListResolution | undefined {
   if (!avrConfig.useAvrReportedInputs) {
     return undefined;
   }
 
-  const selectors = listSelectors(entityId);
-  const info = getAvrInfo(entityId);
+  const avrInfo = contexts.forEntity(entityId)?.avrInfo;
+  const selectors = avrInfo?.selectors() ?? [];
+  const info = avrInfo?.get();
   const services = (info?.netServices ?? []).filter((service) => service.enabled && service.id && service.name).map((service) => ({ id: service.id, name: service.name }));
   const inputs = collectAvrInputSources(
     selectors.map((selector) => ({ id: selector.id, name: selector.name })),

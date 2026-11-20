@@ -6,13 +6,6 @@ export const MUSIC_SERVER_SERVICE_ID = "music-server";
 export const BROWSE_SERVICE_IDS = [TUNEIN_SERVICE_ID, TIDAL_SERVICE_ID, DEEZER_SERVICE_ID, MUSIC_SERVER_SERVICE_ID] as const;
 export type BrowseServiceId = (typeof BROWSE_SERVICE_IDS)[number];
 
-const BROWSE_SERVICE_SELECT_SOURCE: Record<BrowseServiceId, string> = {
-  [TUNEIN_SERVICE_ID]: "input-selector tunein",
-  [TIDAL_SERVICE_ID]: "input-selector tidal",
-  [DEEZER_SERVICE_ID]: "input-selector deezer",
-  [MUSIC_SERVER_SERVICE_ID]: "input-selector music-server"
-};
-
 export function isBrowseServiceId(serviceId: string): serviceId is BrowseServiceId {
   return (BROWSE_SERVICE_IDS as readonly string[]).includes(serviceId);
 }
@@ -21,6 +14,7 @@ export function isBrowseServiceActive(source: string, subSource: string, service
   return source === "net" && subSource === serviceId;
 }
 
+// The browse service ids are also their input-selector aliases (see networkServices.ts and the SLI value mappings).
 export function getBrowseServiceSelectSourceCommand(serviceId: BrowseServiceId): string {
-  return BROWSE_SERVICE_SELECT_SOURCE[serviceId];
+  return `input-selector ${serviceId}`;
 }

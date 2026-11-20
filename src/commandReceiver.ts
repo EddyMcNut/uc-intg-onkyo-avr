@@ -2,7 +2,7 @@ import * as uc from "@unfoldedcircle/integration-api";
 import { SelectAttributes } from "@unfoldedcircle/integration-api";
 import { IntegrationConfig, buildEntityId, buildPhysicalAvrId, physicalAvrIdFromEntityId, resolveVolumeScale } from "./configManager.js";
 import { resolveCanonicalInputSource, resolveInputSourceId } from "./inputSourceResolver.js";
-import { findTunerPresetByName, findTunerPresetNameBySlot } from "./tunerPresetStore.js";
+import { sharedAvrContexts, type AvrContextRegistry } from "./avrContext.js";
 import { EiscpDriver } from "./eiscp.js";
 import { getCompatibleListeningModes } from "./listeningModeFilters.js";
 import { classifyAudioFormat, formatAudioTypeName } from "./audioFormatClassifier.js";
@@ -56,14 +56,22 @@ export class CommandReceiver {
   private onAvrInfo?: (entityId: string) => void;
   private readonly pendingListeningModeCodes = new Map<string, string>();
 
-  constructor(driver: uc.IntegrationAPI, config: IntegrationConfig, eiscpInstance: EiscpDriver, avrStateApi: AvrStateApi, driverVersion: string = "unknown", onAvrInfo?: (entityId: string) => void) {
+  constructor(
+    driver: uc.IntegrationAPI,
+    config: IntegrationConfig,
+    eiscpInstance: EiscpDriver,
+    avrStateApi: AvrStateApi,
+    driverVersion: string = "unknown",
+    onAvrInfo?: (entityId: string) => void,
+    private readonly avrContexts: AvrContextRegistry = sharedAvrContexts
+  ) {
     this.driver = driver;
     this.config = config;
     this.eiscpInstance = eiscpInstance;
     this.avrStateApi = avrStateApi;
     this.driverVersion = driverVersion;
     this.onAvrInfo = onAvrInfo;
-    this.zoneAgnosticProcessor = new ZoneAgnosticUpdateProcessor(driver, config, eiscpInstance, avrStateApi);
+    this.zoneAgnosticProcessor = new ZoneAgnosticUpdateProcessor(driver, config, eiscpInstance, avrStateApi, avrContexts);
     this.zoneAgnosticHandlers = {
       IFA: async (avrUpdates, entityId, eventZone) => {
         const argument = avrUpdates.argument as Record<string, string> | undefined;
@@ -298,7 +306,7 @@ export class CommandReceiver {
       return;
     }
     const physicalAVR = physicalAvrIdFromEntityId(entityId);
-    const station = physicalAVR ? findTunerPresetNameBySlot(physicalAVR, avrUpdates.argument) : undefined;
+    const station = physicalAVR ? this.avrContexts.get(physicalAVR).tunerPresets.findNameBySlot(avrUpdates.argument) : undefined;
     if (!station) {
       this.driver.updateEntityAttributes(`${entityId}_tuner_presets`, {
         [SelectAttributes.CurrentOption]: ""
@@ -314,7 +322,7 @@ export class CommandReceiver {
     if (!physicalAVR) {
       return;
     }
-    const preset = findTunerPresetByName(physicalAVR, stationName);
+    const preset = this.avrContexts.get(physicalAVR).tunerPresets.findByName(stationName);
     this.driver.updateEntityAttributes(`${entityId}_tuner_presets`, {
       [SelectAttributes.CurrentOption]: preset?.name ?? ""
     });

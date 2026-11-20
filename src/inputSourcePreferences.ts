@@ -1,5 +1,6 @@
 import { eiscpMappings } from "./eiscp-mappings.js";
-import { normalizeInputSourceSettings, type InputSourceSettings } from "./configConstants.js";
+import { NETWORK_SERVICE_DEFINITIONS, findNetworkService } from "./networkServices.js";
+import type { InputSourceSettings } from "./configConstants.js";
 
 export const DISCOVERED_INPUT_SOURCE = "discovered";
 const LEGACY_DETECTED_INPUT_SOURCE = "detected";
@@ -8,24 +9,15 @@ export const DONT_INCLUDE_INPUT_SOURCE = "dont-include";
 
 export type KnownInputSource = { id: string; aliases: string[] };
 
-const NRI_SERVICE_ALIASES: Record<string, string[]> = {
-  tuneinradio: ["tunein"],
-  spotify: ["spotify"],
-  deezer: ["deezer"],
-  tidal: ["tidal"],
-  amazonmusic: ["amazonmusic"],
-  chromecastbuiltin: ["chromecast"],
-  dtsplayfi: ["dts-play-fi"],
-  airplay: ["airplay"],
-  amazonalexa: ["alexa"],
-  musicserver: ["music-server"]
-};
+// Input-selector aliases of the network services, e.g. "tunein", "chromecast", "music-server". The SLI value of a
+// network service is its NSS code, so these are the aliases of each service's NSS code in the networkServices table.
+// (SLI 27 "musicserver" / "dlna" is a regular input, not the NSS10 Music Server network service.)
+function aliasesForNetworkService(name: string): string[] {
+  const nss = findNetworkService(name)?.nss;
+  return nss ? getInputSourceAliases(nss) : [];
+}
 
-const NETWORK_SOURCE_ALIASES = new Set(
-  Object.values(NRI_SERVICE_ALIASES)
-    .flat()
-    .map((alias) => alias.toLowerCase())
-);
+const NETWORK_SOURCE_ALIASES = new Set(NETWORK_SERVICE_DEFINITIONS.flatMap((service) => (service.nss ? getInputSourceAliases(service.nss) : [])).map((alias) => alias.toLowerCase()));
 
 function normalizeSourceName(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9]/g, "");
@@ -54,7 +46,7 @@ export function getInputSourceAliases(id: string): string[] {
 export function getAliasesForReportedInput(id: string, name: string): string[] {
   const byId = getInputSourceAliases(id);
   if (byId.length > 0) return byId;
-  return NRI_SERVICE_ALIASES[normalizeSourceName(name)] ?? [];
+  return aliasesForNetworkService(name);
 }
 
 export function isNetworkInputSource(id: string, name: string, aliases: string[] = getAliasesForReportedInput(id, name)): boolean {
@@ -63,10 +55,6 @@ export function isNetworkInputSource(id: string, name: string, aliases: string[]
     aliases.some((alias) => NETWORK_SOURCE_ALIASES.has(normalizeSourceName(alias)) || NETWORK_SOURCE_ALIASES.has(alias.toLowerCase())) ||
     NETWORK_SOURCE_ALIASES.has(normalizeSourceName(name))
   );
-}
-
-export function normalizeInputSources(raw: unknown): InputSourceSettings {
-  return normalizeInputSourceSettings(raw);
 }
 
 // Resolve configured input-source settings into the names exposed by a selector entity.
