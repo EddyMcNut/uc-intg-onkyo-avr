@@ -1,9 +1,9 @@
 // Test helpers with the former avrInfoStore function names, working on the AVR info of an entity's AvrContext in the
-// shared registry (the registry components use when they are constructed without one).
-import { sharedAvrContexts } from "../../src/avrContext.js";
+// test registry (testAvrContexts, which tests pass to the components they exercise).
+import { testAvrContexts } from "./contexts.js";
 import type { AvrInfo } from "../../src/avrInfoStore.js";
 
-const avrInfoOf = (entityId: string) => sharedAvrContexts.forEntity(entityId)?.avrInfo;
+const avrInfoOf = (entityId: string) => testAvrContexts.forEntity(entityId)?.avrInfo;
 
 export const setAvrInfo = (entityId: string, info: AvrInfo): void => avrInfoOf(entityId)?.set(info);
 export const resetAvrInfo = (entityId: string): void => avrInfoOf(entityId)?.reset();

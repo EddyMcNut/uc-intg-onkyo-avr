@@ -4,12 +4,12 @@ import * as uc from "@unfoldedcircle/integration-api";
 import log from "./loggers.js";
 import { looksLikeTuneInDirectory, normalizeTuneInLabel, extractTuneInStationKey, parseTuneInXmlItems } from "./tuneInFilters.js";
 import type { TuneInPreset } from "./tuneInBrowserStore.js";
-import { sharedAvrContexts, type AvrContextRegistry } from "./avrContext.js";
+import type { AvrContextRegistry } from "./avrContext.js";
 
 import { addTuneInMenuOption, listTuneInMenuOptions, getTuneInMenuBrowseState, setTuneInMenuBrowseContextState, type TuneInMenuOption } from "./tuneInMenuStore.js";
 import { createServiceThumbnails } from "./serviceThumbnails.js";
 import { parseIndexedMenuEntry, getXmlOffset } from "./menuEntryParser.js";
-import { ConfigManager, buildEntityId } from "./configManager.js";
+import { findAvrConfig, type ConfigSource } from "./configManager.js";
 
 const logSource = "tuneInMediaBrowser:";
 const NOW_PLAYING_LABEL = "▶ Now Playing";
@@ -62,14 +62,17 @@ export const TUNEIN_MENU_BACK_ID = "tunein:menu-back";
 const TUNEIN_EXCLUDED_MENU_TITLES = new Set(["search", "login", "logout", "log out", "all stations"]);
 
 export class TuneInMediaBrowser {
-  constructor(private readonly avrContexts: AvrContextRegistry = sharedAvrContexts) {}
+  constructor(
+    private readonly avrContexts: AvrContextRegistry,
+    private readonly configSource: ConfigSource
+  ) {}
 
   private tuneInPresetsOf(entityId: string) {
     return this.avrContexts.forEntity(entityId)?.tuneInPresets;
   }
 
   private getPresetSortOrder(entityId: string): "alphabetical" | "preset-order" {
-    const avr = ConfigManager.get()?.avrs?.find((candidate) => buildEntityId(candidate.model, candidate.ip, candidate.zone) === entityId);
+    const avr = findAvrConfig(this.configSource, entityId);
     const style = String(avr?.tuneinMenuStyle ?? "mypresets-alphabetical").toLowerCase();
     return style === "full" || style === "mypresets-preset-order" || style === "preset-order" ? "preset-order" : "alphabetical";
   }
@@ -127,7 +130,7 @@ export class TuneInMediaBrowser {
 
     const isStationLike = title.includes("|") || /\(.+\)/.test(title);
     const isBrowsable = looksLikeTuneInDirectory(title) || !isStationLike;
-    addTuneInMenuOption(entityId, absoluteMenuIndex, title, isBrowsable, getOrCreateTuneInThumbnail, false, false, this.avrContexts);
+    addTuneInMenuOption(entityId, absoluteMenuIndex, title, isBrowsable, this.avrContexts, { thumbnailResolver: getOrCreateTuneInThumbnail });
   }
 
   ingestMenuXmlEntries(entityId: string, xmlPayload: string): void {
@@ -147,7 +150,7 @@ export class TuneInMediaBrowser {
       const isStationLike = item.title.includes("|") || /\(.+\)/.test(item.title);
       const isBrowsable = looksLikeTuneInDirectory(item.title, item.iconId) || !isStationLike;
       const hidden = !item.selectable || TUNEIN_EXCLUDED_MENU_TITLES.has(item.title.toLowerCase());
-      addTuneInMenuOption(entityId, menuIndex, item.title, isBrowsable, getOrCreateTuneInThumbnail, hidden, true, this.avrContexts);
+      addTuneInMenuOption(entityId, menuIndex, item.title, isBrowsable, this.avrContexts, { thumbnailResolver: getOrCreateTuneInThumbnail, hidden, allowWhenFrozen: true });
     }
   }
 

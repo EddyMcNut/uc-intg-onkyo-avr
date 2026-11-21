@@ -1,4 +1,6 @@
+import { testAvrContexts } from "./helpers/contexts.js";
 import { describe, it, expect, vi } from "vitest";
+import { testConfigStore } from "./helpers/configStore.js";
 
 // Mock eiscp module so constructor doesn't need net.Socket
 vi.mock("../src/eiscp.js", () => ({
@@ -40,6 +42,8 @@ it("constructor stores injected dependencies", async () => {
   const cm = new CM(
     reconMgr,
     async () => {},
+    testAvrContexts,
+    testConfigStore,
     () => "v"
   );
 
@@ -56,6 +60,8 @@ it("updateConnectionConfig updates eiscp config when connection exists", async (
   const cm = new CM(
     reconMgr,
     async () => {},
+    testAvrContexts,
+    testConfigStore,
     () => "v"
   );
 
@@ -84,6 +90,8 @@ it("updateConnectionConfig updates commandReceiver when runtimeConfig provided",
   const cm = new CM(
     reconMgr,
     async () => {},
+    testAvrContexts,
+    testConfigStore,
     () => "v"
   );
 
@@ -106,6 +114,8 @@ it("updateConnectionConfig is no-op for unknown AVR", async () => {
   const cm = new CM(
     reconMgr,
     async () => {},
+    testAvrContexts,
+    testConfigStore,
     () => "v"
   );
 
@@ -122,6 +132,8 @@ it("disconnectAll disconnects all connected AVRs", async () => {
   const cm = new CM(
     reconMgr,
     async () => {},
+    testAvrContexts,
+    testConfigStore,
     () => "v"
   );
 
@@ -150,6 +162,8 @@ it("clearAllConnections disconnects and clears map", async () => {
   const cm = new CM(
     reconMgr,
     async () => {},
+    testAvrContexts,
+    testConfigStore,
     () => "v"
   );
 
@@ -173,6 +187,8 @@ describe("attemptReconnection", () => {
     const cm = new CM(
       reconMgr,
       async () => {},
+      testAvrContexts,
+      testConfigStore,
       () => "v"
     );
 
@@ -190,6 +206,8 @@ describe("attemptReconnection", () => {
     const cm = new CM(
       reconMgr,
       async () => {},
+      testAvrContexts,
+      testConfigStore,
       () => "v"
     );
 
@@ -216,6 +234,8 @@ describe("attemptReconnection", () => {
     const cm = new CM(
       stub as any,
       async () => {},
+      testAvrContexts,
+      testConfigStore,
       () => "v"
     );
 
@@ -244,6 +264,8 @@ describe("attemptReconnection", () => {
     const cm = new CM(
       stub as any,
       async () => {},
+      testAvrContexts,
+      testConfigStore,
       () => "v"
     );
 
@@ -271,6 +293,8 @@ describe("createAndConnect", () => {
     const cm = new CM(
       reconMgr,
       async () => {},
+      testAvrContexts,
+      testConfigStore,
       () => eiscp
     );
 
@@ -298,6 +322,8 @@ describe("createAndConnect", () => {
     const cm = new CM(
       reconMgr,
       async () => {},
+      testAvrContexts,
+      testConfigStore,
       () => eiscp
     );
 
@@ -324,6 +350,8 @@ describe("createAndConnect", () => {
     const cm = new CM(
       reconMgr,
       async () => {},
+      testAvrContexts,
+      testConfigStore,
       () => eiscp
     );
 
@@ -348,6 +376,8 @@ describe("createAndConnect", () => {
     const cm = new CM(
       reconMgr,
       async () => {},
+      testAvrContexts,
+      testConfigStore,
       () => eiscp
     );
 
@@ -378,6 +408,8 @@ describe("attemptReconnection with failed result", () => {
     const cm = new CM(
       stub as any,
       async () => {},
+      testAvrContexts,
+      testConfigStore,
       () => "v"
     );
 
@@ -399,7 +431,7 @@ describe("constructor without factory", () => {
     const { ReconnectionManager } = reconMod as any;
 
     const reconMgr = new ReconnectionManager();
-    const cm = new CM(reconMgr, async () => {});
+    const cm = new CM(reconMgr, async () => {}, testAvrContexts, testConfigStore);
 
     expect(cm.createEiscpDriver).toBeDefined();
     expect(typeof cm.createEiscpDriver).toBe("function");
@@ -413,7 +445,7 @@ describe("constructor without factory", () => {
 
     const reconMgr = new ReconnectionManager();
     const factory = () => "fake-eiscp" as any;
-    const cm = new CM(reconMgr, async () => {}, factory);
+    const cm = new CM(reconMgr, async () => {}, testAvrContexts, testConfigStore, factory);
 
     expect(cm.createEiscpDriver).toBe(factory);
     const result = cm.createEiscpDriver({} as any);

@@ -1,4 +1,4 @@
-import { sharedAvrContexts, type AvrContextRegistry } from "./avrContext.js";
+import type { AvrContextRegistry } from "./avrContext.js";
 import * as uc from "@unfoldedcircle/integration-api";
 import log from "./loggers.js";
 import { createServiceThumbnails } from "./serviceThumbnails.js";
@@ -82,7 +82,7 @@ function createExcludedTitleChecker(excludedPrefixes: string[]): (title: string)
   };
 }
 
-export function createMediaBrowser(cfg: MediaBrowserConfig, store: MenuBrowseStore, contexts: AvrContextRegistry = sharedAvrContexts): MediaBrowserApi {
+export function createMediaBrowser(cfg: MediaBrowserConfig, store: MenuBrowseStore, contexts: AvrContextRegistry): MediaBrowserApi {
   const logSource = `${cfg.providerLabel.toLowerCase().replace(/\s+/g, "")}MediaBrowser:`;
   const isExcludedTitle = createExcludedTitleChecker(cfg.excludedPrefixes);
 
@@ -103,7 +103,11 @@ export function createMediaBrowser(cfg: MediaBrowserConfig, store: MenuBrowseSto
       const menuIndex = xmlOffset + i + 1;
       // XML responses are explicit browse results. They must still populate
       // later pages after playback has frozen the now-playing decoration.
-      store.addMenuOption(entityId, menuIndex, item.title, getOrCreateThumbnail, item.iconType === "M" ? false : undefined, true, true, contexts);
+      store.addMenuOption(entityId, menuIndex, item.title, contexts, {
+        thumbnailResolver: getOrCreateThumbnail,
+        isBrowsable: item.iconType === "M" ? false : undefined,
+        allowWhenFrozen: true
+      });
     }
   }
 
@@ -128,7 +132,7 @@ export function createMediaBrowser(cfg: MediaBrowserConfig, store: MenuBrowseSto
     const absoluteMenuIndex = windowStart + parsed.menuIndex + 1;
     // Legacy NLS can arrive as several ten-line windows, each restarting at
     // U0. Do not clear the accumulated list when a later window starts.
-    store.addMenuOption(entityId, absoluteMenuIndex, title, getOrCreateThumbnail, undefined, false, false, contexts);
+    store.addMenuOption(entityId, absoluteMenuIndex, title, contexts, { thumbnailResolver: getOrCreateThumbnail, clearOnLowIndex: false });
   }
 
   function resolveMenuOption(mediaId?: string, mediaType?: string): MenuBrowseOption | undefined {

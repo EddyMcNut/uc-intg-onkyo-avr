@@ -48,7 +48,7 @@ const config = {
 describe("EntityRegistrationCoordinator", () => {
   it("registers only enabled entity groups", () => {
     const { dependencies, registered } = createDependencies();
-    const coordinator = new EntityRegistrationCoordinator(dependencies);
+    const coordinator = new EntityRegistrationCoordinator(dependencies as never);
 
     coordinator.register(
       [config],
@@ -62,7 +62,7 @@ describe("EntityRegistrationCoordinator", () => {
 
   it("registers a media player independently", () => {
     const { dependencies, registered, registrar } = createDependencies();
-    const coordinator = new EntityRegistrationCoordinator(dependencies);
+    const coordinator = new EntityRegistrationCoordinator(dependencies as never);
 
     coordinator.registerMediaPlayer(config, () => vi.fn());
 

@@ -1,20 +1,20 @@
 /*jslint node:true nomen:true*/
 "use strict";
+import type { MediaBrowser } from "./mediaBrowser.js";
 import * as uc from "@unfoldedcircle/integration-api";
 import { Select, SelectStates } from "@unfoldedcircle/integration-api";
 import { eiscpMappings } from "./eiscp-mappings.js";
 import { ALL_SIMPLE_COMMANDS } from "./simpleCommands.js";
 import { getCompatibleListeningModes } from "./listeningModeFilters.js";
-import { ConfigManager, buildEntityId, buildPhysicalAvrId } from "./configManager.js";
+import { AVR_DEFAULTS, buildPhysicalAvrId, findAvrConfig, type ConfigStore } from "./configManager.js";
 import { getAvrSourceCatalog } from "./avrSourceCatalog.js";
 import { getEffectiveInputSourceOptions } from "./inputSourceResolver.js";
-import { sharedAvrContexts, type AvrContextRegistry } from "./avrContext.js";
+import type { AvrContextRegistry } from "./avrContext.js";
 import { parseTunerPresetMode } from "./configConstants.js";
 import { getLearnedListeningModes } from "./learnedListeningModeStore.js";
 import { displayListeningModeName, resolveListeningModes } from "./listeningModePreferences.js";
 import { getKnownListeningModes } from "./listeningModePreferences.js";
 import {
-  browseMedia,
   isTidalMainMenuRequest,
   isTidalBackRequest,
   resolveTidalMenuOption,
@@ -35,9 +35,9 @@ import {
   MUSIC_SERVER_ROOT_TYPE
 } from "./mediaBrowser.js";
 import { createMenuBrowseHandler } from "./menuBrowseHandler.js";
-import { listTidalMenuOptions, resetTidalBrowseState, getTidalBrowseState } from "./tidalBrowserStore.js";
-import { listDeezerMenuOptions, resetDeezerBrowseState, getDeezerBrowseState } from "./deezerBrowserStore.js";
-import { listMusicServerMenuOptions, resetMusicServerBrowseState, getMusicServerBrowseState } from "./musicServerBrowserStore.js";
+import { tidalStore } from "./tidalBrowserStore.js";
+import { deezerStore } from "./deezerBrowserStore.js";
+import { musicServerStore } from "./musicServerBrowserStore.js";
 import { TuneInBrowseHandler } from "./tuneInBrowseHandler.js";
 import { SELECT_SUFFIXES } from "./sensorSuffixes.js";
 import { DIRAC_OPTION_LABELS } from "./diracSelect.js";
@@ -62,23 +62,26 @@ export default class EntityRegistrar {
 
   constructor(
     private readonly avrStateApi: AvrStateApi,
-    private readonly avrContexts: AvrContextRegistry = sharedAvrContexts
+    private readonly avrContexts: AvrContextRegistry,
+    private readonly mediaBrowser: MediaBrowser,
+    private readonly configStore: Pick<ConfigStore, "get" | "save">
   ) {
     this.browseHandlers = [
-      new TuneInBrowseHandler(avrStateApi, avrContexts),
+      new TuneInBrowseHandler(avrStateApi, avrContexts, this.mediaBrowser, this.configStore),
       createMenuBrowseHandler({
         providerLabel: "Tidal",
         logSource: "tidalBrowseHandler:",
         rootId: TIDAL_ROOT_ID,
         rootType: TIDAL_ROOT_TYPE,
         backId: TIDAL_BACK_ID,
-        browseMedia,
+        browseMedia: (entityId, options) => this.mediaBrowser.browseMedia(entityId, options),
         isMainMenuRequest: isTidalMainMenuRequest,
         isBackRequest: isTidalBackRequest,
         resolveMenuOption: (mediaId, mediaType) => resolveTidalMenuOption(mediaId, mediaType),
-        resetState: resetTidalBrowseState,
-        getBrowseState: getTidalBrowseState,
-        listMenuItems: listTidalMenuOptions,
+        resetState: (entityId) => tidalStore.resetState(entityId, this.avrContexts),
+        getBrowseState: (entityId) => tidalStore.getBrowseState(entityId, this.avrContexts),
+        listMenuItems: (entityId) => tidalStore.listOptions(entityId, this.avrContexts),
+        getMenuDelay: (entityId) => this.getMenuDelay(entityId),
         waitForMenuStableBeforeHarvest: false,
         waitForXmlResponse: true,
         isServiceActive: (entityId) => !this.avrStateApi || this.avrStateApi.getSubSource(entityId) === "tidal"
@@ -89,13 +92,14 @@ export default class EntityRegistrar {
         rootId: DEEZER_ROOT_ID,
         rootType: DEEZER_ROOT_TYPE,
         backId: DEEZER_BACK_ID,
-        browseMedia,
+        browseMedia: (entityId, options) => this.mediaBrowser.browseMedia(entityId, options),
         isMainMenuRequest: isDeezerMainMenuRequest,
         isBackRequest: isDeezerBackRequest,
         resolveMenuOption: (mediaId, mediaType) => resolveDeezerMenuOption(mediaId, mediaType),
-        resetState: resetDeezerBrowseState,
-        getBrowseState: getDeezerBrowseState,
-        listMenuItems: listDeezerMenuOptions,
+        resetState: (entityId) => deezerStore.resetState(entityId, this.avrContexts),
+        getBrowseState: (entityId) => deezerStore.getBrowseState(entityId, this.avrContexts),
+        listMenuItems: (entityId) => deezerStore.listOptions(entityId, this.avrContexts),
+        getMenuDelay: (entityId) => this.getMenuDelay(entityId),
         isServiceActive: (entityId) => !this.avrStateApi || this.avrStateApi.getSubSource(entityId) === "deezer",
         waitForXmlResponse: true,
         waitForMenuStableBeforeHarvest: false
@@ -106,13 +110,14 @@ export default class EntityRegistrar {
         rootId: MUSIC_SERVER_ROOT_ID,
         rootType: MUSIC_SERVER_ROOT_TYPE,
         backId: MUSIC_SERVER_BACK_ID,
-        browseMedia,
+        browseMedia: (entityId, options) => this.mediaBrowser.browseMedia(entityId, options),
         isMainMenuRequest: isMusicServerMainMenuRequest,
         isBackRequest: isMusicServerBackRequest,
         resolveMenuOption: (mediaId, mediaType) => resolveMusicServerMenuOption(mediaId, mediaType),
-        resetState: resetMusicServerBrowseState,
-        getBrowseState: getMusicServerBrowseState,
-        listMenuItems: listMusicServerMenuOptions,
+        resetState: (entityId) => musicServerStore.resetState(entityId, this.avrContexts),
+        getBrowseState: (entityId) => musicServerStore.getBrowseState(entityId, this.avrContexts),
+        listMenuItems: (entityId) => musicServerStore.listOptions(entityId, this.avrContexts),
+        getMenuDelay: (entityId) => this.getMenuDelay(entityId),
         waitForMenuStableBeforeHarvest: (entityId) => this.isLegacyNetworkNavigation(entityId),
         waitForXmlResponse: true,
         isServiceActive: (entityId) => !this.avrStateApi || this.avrStateApi.getSubSource(entityId) === "music-server"
@@ -121,15 +126,16 @@ export default class EntityRegistrar {
   }
 
   private isLegacyNetworkNavigation(entityId: string): boolean {
-    const cfg = ConfigManager.get();
-    const avr = cfg?.avrs?.find((candidate) => buildEntityId(candidate.model, candidate.ip, candidate.zone) === entityId);
-    return avr?.networkNavigationMode === "legacy";
+    return findAvrConfig(this.configStore, entityId)?.networkNavigationMode === "legacy";
+  }
+
+  private getMenuDelay(entityId: string): number {
+    return findAvrConfig(this.configStore, entityId)?.netMenuDelay ?? AVR_DEFAULTS.netMenuDelay;
   }
 
   // Build a user-facing base name from an AVR entry id. Input format is typically: "MODEL HOST ZONE". Long style keeps the full entry, short style omits HOST (IP/hostname).
   private getDisplayBaseName(avrEntry: string): string {
-    const cfg = ConfigManager.get();
-    const match = cfg?.avrs?.find((a) => buildEntityId(a.model, a.ip, a.zone) === avrEntry);
+    const match = findAvrConfig(this.configStore, avrEntry);
     const entityNameStyle = match?.entityNameStyle ?? "long";
     if (entityNameStyle !== "short") {
       return avrEntry;
@@ -159,11 +165,11 @@ export default class EntityRegistrar {
     // If avrEntry provided and config contains user-specified options, return them
     if (avrEntry) {
       try {
-        const cfg = ConfigManager.get();
+        const cfg = this.configStore.get();
         if (cfg && Array.isArray(cfg.avrs)) {
-          const match = cfg.avrs.find((a) => buildEntityId(a.model, a.ip, a.zone) === avrEntry);
+          const match = findAvrConfig(this.configStore, avrEntry);
           if (match?.listeningModes) {
-            const learned = getLearnedListeningModes(avrEntry, this.avrStateApi.getSource(avrEntry), audioFormat ?? "");
+            const learned = getLearnedListeningModes(this.configStore, avrEntry, this.avrStateApi.getSource(avrEntry), audioFormat ?? "");
             return resolveListeningModes(match.listeningModes, learned);
           }
         }
@@ -173,7 +179,7 @@ export default class EntityRegistrar {
     }
 
     if (avrEntry && audioFormat) {
-      const learned = getLearnedListeningModes(avrEntry, this.avrStateApi.getSource(avrEntry), audioFormat);
+      const learned = getLearnedListeningModes(this.configStore, avrEntry, this.avrStateApi.getSource(avrEntry), audioFormat);
       if (learned.length > 0) {
         return learned.map((mode) => mode.name).sort((a, b) => a.localeCompare(b));
       }
@@ -243,7 +249,7 @@ export default class EntityRegistrar {
         }
       }
 
-      return browseMedia(avrEntry, options);
+      return this.mediaBrowser.browseMedia(avrEntry, options);
     };
     return mediaPlayerEntity;
   }
@@ -316,15 +322,15 @@ export default class EntityRegistrar {
   getInputSelectorOptions(avrEntry?: string): string[] {
     if (avrEntry) {
       try {
-        const cfg = ConfigManager.get();
+        const cfg = this.configStore.get();
         if (cfg && Array.isArray(cfg.avrs)) {
-          const match = cfg.avrs.find((a) => buildEntityId(a.model, a.ip, a.zone) === avrEntry);
+          const match = findAvrConfig(this.configStore, avrEntry);
           if (match) {
             const sliMappings = eiscpMappings.value_mappings.SLI;
             const builtInOptions = Object.keys(sliMappings)
               .filter((key) => !["up", "down", "query"].includes(key))
               .sort();
-            return getEffectiveInputSourceOptions(match, buildPhysicalAvrId(match.model, match.ip), builtInOptions);
+            return getEffectiveInputSourceOptions(match, buildPhysicalAvrId(match.model, match.ip), builtInOptions, this.avrContexts);
           }
         }
       } catch {
@@ -362,8 +368,7 @@ export default class EntityRegistrar {
   // leaves the select with: an empty option list rather than a made-up set of stations.
   getTunerPresetOptions(avrEntry: string): string[] {
     try {
-      const cfg = ConfigManager.get();
-      const match = cfg?.avrs?.find((a) => buildEntityId(a.model, a.ip, a.zone) === avrEntry);
+      const match = findAvrConfig(this.configStore, avrEntry);
       if (match) {
         const mode = parseTunerPresetMode(match.createTunerPresets) === "preset-order" ? "preset-order" : "alphabetical";
         return this.avrContexts.get(buildPhysicalAvrId(match.model, match.ip)).tunerPresets.names(mode);
@@ -400,7 +405,7 @@ export default class EntityRegistrar {
 
   private getReportedRemoteInputNames(avrEntry: string): string[] | undefined {
     try {
-      const cfg = ConfigManager.get()?.avrs?.find((a) => buildEntityId(a.model, a.ip, a.zone) === avrEntry);
+      const cfg = findAvrConfig(this.configStore, avrEntry);
       if (!cfg?.useAvrReportedInputs) return undefined;
       const catalog = getAvrSourceCatalog(avrEntry, this.avrContexts);
       if (!catalog.complete) return undefined;

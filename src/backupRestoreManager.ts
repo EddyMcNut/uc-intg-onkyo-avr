@@ -1,7 +1,8 @@
 // Focused responsibility: Backup and restore configuration data with file I/O
+import { validateConfigPayload } from "./configValidation.js";
 import { readFileSync, existsSync } from "fs";
 import { resolve } from "path";
-import { ConfigManager, IntegrationConfig } from "./configManager.js";
+import { IntegrationConfig, type ConfigSource } from "./configManager.js";
 import log from "./loggers.js";
 import { readDriverMetadata, type DriverMetadata } from "./driverMetadata.js";
 
@@ -17,6 +18,8 @@ interface BackupPayload {
 }
 
 export class BackupRestoreManager {
+  constructor(private readonly configSource: ConfigSource) {}
+
   async buildBackupString(getConfigDirPath: () => string | undefined): Promise<string> {
     const metadata = this.readDriverMetadata();
     const configData = this.readConfigData(getConfigDirPath);
@@ -56,7 +59,7 @@ export class BackupRestoreManager {
     }
 
     const configToValidate = payload && payload.config ? payload.config : payload;
-    const validation = ConfigManager.validateConfigPayload(configToValidate);
+    const validation = validateConfigPayload(configToValidate);
 
     if (validation.errors && validation.errors.length > 0) {
       return { normalized: null, isValid: false, errors: validation.errors };
@@ -80,10 +83,10 @@ export class BackupRestoreManager {
         const rawCfg = readFileSync(cfgPath, "utf-8");
         return this.removeLegacyConfigVersion(JSON.parse(rawCfg));
       }
-      return this.removeLegacyConfigVersion(ConfigManager.get());
+      return this.removeLegacyConfigVersion(this.configSource.get());
     } catch (err) {
       log.debug("%s Config file unavailable, using in-memory configuration: %s", logSource, err);
-      return this.removeLegacyConfigVersion(ConfigManager.get());
+      return this.removeLegacyConfigVersion(this.configSource.get());
     }
   }
 

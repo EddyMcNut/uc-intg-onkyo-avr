@@ -18,10 +18,14 @@ vi.mock("node:fs", () => ({
 describe("configPersistenceManager", () => {
   let ConfigPersistenceManager: any;
   let onConfigSaved: any;
+  // A file-backed store on the mocked fs, so the tests can inspect what is written.
+  let newStore: () => unknown;
 
   beforeAll(async () => {
     const mod = await import("../src/configPersistenceManager.js");
     ConfigPersistenceManager = mod.ConfigPersistenceManager;
+    const { ConfigStore, configPathFor } = await import("../src/configManager.js");
+    newStore = () => new ConfigStore(configPathFor("/tmp/uc-test"));
   });
 
   beforeEach(() => {
@@ -59,7 +63,7 @@ describe("configPersistenceManager", () => {
     });
 
     it("saves single-zone config successfully", async () => {
-      const mgr = new ConfigPersistenceManager(onConfigSaved);
+      const mgr = new ConfigPersistenceManager(onConfigSaved, newStore());
       const result = await mgr.saveManualConfiguration({
         ...baseParsedConfig,
         zoneCountValue: 1
@@ -70,7 +74,7 @@ describe("configPersistenceManager", () => {
     });
 
     it("writes AVR input name setting into the stored config", async () => {
-      const mgr = new ConfigPersistenceManager(onConfigSaved);
+      const mgr = new ConfigPersistenceManager(onConfigSaved, newStore());
       await mgr.saveManualConfiguration({
         ...baseParsedConfig,
         zoneCountValue: 1,
@@ -82,7 +86,7 @@ describe("configPersistenceManager", () => {
     });
 
     it("excludes known inputs absent from a discovered AVR input list", async () => {
-      const mgr = new ConfigPersistenceManager(onConfigSaved);
+      const mgr = new ConfigPersistenceManager(onConfigSaved, newStore());
       await mgr.saveManualConfiguration({
         ...baseParsedConfig,
         ipVal: "9.8.7.6",
@@ -102,7 +106,7 @@ describe("configPersistenceManager", () => {
     });
 
     it("persists an empty input selector filter as all", async () => {
-      const mgr = new ConfigPersistenceManager(onConfigSaved);
+      const mgr = new ConfigPersistenceManager(onConfigSaved, newStore());
       await mgr.saveManualConfiguration({
         ...baseParsedConfig,
         zoneCountValue: 1,
@@ -114,7 +118,7 @@ describe("configPersistenceManager", () => {
     });
 
     it("saves multi-zone config", async () => {
-      const mgr = new ConfigPersistenceManager(onConfigSaved);
+      const mgr = new ConfigPersistenceManager(onConfigSaved, newStore());
       const result = await mgr.saveManualConfiguration({
         ...baseParsedConfig,
         zoneCountValue: 3
@@ -124,7 +128,7 @@ describe("configPersistenceManager", () => {
     });
 
     it("saves 4-zone config", async () => {
-      const mgr = new ConfigPersistenceManager(onConfigSaved);
+      const mgr = new ConfigPersistenceManager(onConfigSaved, newStore());
       const result = await mgr.saveManualConfiguration({
         ...baseParsedConfig,
         zoneCountValue: 4
@@ -133,7 +137,7 @@ describe("configPersistenceManager", () => {
     });
 
     it("fails with invalid payload", async () => {
-      const mgr = new ConfigPersistenceManager(onConfigSaved);
+      const mgr = new ConfigPersistenceManager(onConfigSaved, newStore());
       const result = await mgr.saveManualConfiguration({
         ...baseParsedConfig,
         modelName: "",
@@ -146,7 +150,7 @@ describe("configPersistenceManager", () => {
 
   describe("saveDiscoveredAvr", () => {
     it("handles empty listening mode options", async () => {
-      const mgr = new ConfigPersistenceManager(onConfigSaved);
+      const mgr = new ConfigPersistenceManager(onConfigSaved, newStore());
       await mgr.saveDiscoveredAvr(
         { model: "X", host: "1.2.3.4", port: 60128 },
         {
@@ -166,7 +170,7 @@ describe("configPersistenceManager", () => {
     });
 
     it("handles valid input selector options", async () => {
-      const mgr = new ConfigPersistenceManager(onConfigSaved);
+      const mgr = new ConfigPersistenceManager(onConfigSaved, newStore());
       await mgr.saveDiscoveredAvr(
         { model: "X", host: "1.2.3.4", port: 60128 },
         {

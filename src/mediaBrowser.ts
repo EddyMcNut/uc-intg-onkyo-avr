@@ -1,6 +1,5 @@
 import * as uc from "@unfoldedcircle/integration-api";
 import { MEDIA_BROWSING } from "./constants.js";
-import { avrStateManager } from "./avrState.js";
 import type { AvrStateApi } from "./types.js";
 import log from "./loggers.js";
 import {
@@ -8,11 +7,6 @@ import {
   DEEZER_MENU_ROOT_ID,
   DEEZER_ROOT_ID,
   DEEZER_ROOT_TYPE,
-  browseDeezerMedia,
-  browseMusicServerMedia,
-  browseTidalMedia,
-  browseTuneInMedia,
-  browseTuneInMenuMedia,
   MUSIC_SERVER_BACK_ID,
   MUSIC_SERVER_MENU_ROOT_ID,
   MUSIC_SERVER_ROOT_ID,
@@ -26,18 +20,6 @@ import {
   TUNEIN_MENU_ROOT_TYPE,
   TUNEIN_ROOT_ID,
   TUNEIN_ROOT_TYPE,
-  getTuneInPresetCount,
-  hasTuneInPresets,
-  ingestDeezerListEntry,
-  ingestDeezerXmlEntries,
-  ingestMusicServerListEntry,
-  ingestMusicServerXmlEntries,
-  ingestTidalListEntry,
-  ingestTidalXmlEntries,
-  ingestTuneInListEntry,
-  ingestTuneInMenuListEntry,
-  ingestTuneInMenuXmlEntries,
-  ingestTuneInXmlEntries,
   isDeezerBackRequest,
   isDeezerMainMenuRequest,
   isMusicServerBackRequest,
@@ -49,9 +31,8 @@ import {
   resolveDeezerMenuOption,
   resolveMusicServerMenuOption,
   resolveTidalMenuOption,
-  resolveTuneInMenuOption,
   resolveTuneInPreset,
-  setTuneInBrowseContext
+  type MediaBrowserServices
 } from "./mediaBrowserServices.js";
 
 const logSource = "mediaBrowser:";
@@ -62,23 +43,6 @@ export {
   DEEZER_MENU_ROOT_ID,
   DEEZER_ROOT_ID,
   DEEZER_ROOT_TYPE,
-  browseDeezerMedia,
-  browseMusicServerMedia,
-  browseTidalMedia,
-  browseTuneInMedia,
-  browseTuneInMenuMedia,
-  getTuneInPresetCount,
-  hasTuneInPresets,
-  ingestDeezerListEntry,
-  ingestDeezerXmlEntries,
-  ingestMusicServerListEntry,
-  ingestMusicServerXmlEntries,
-  ingestTidalListEntry,
-  ingestTidalXmlEntries,
-  ingestTuneInListEntry,
-  ingestTuneInMenuListEntry,
-  ingestTuneInMenuXmlEntries,
-  ingestTuneInXmlEntries,
   isDeezerBackRequest,
   isDeezerMainMenuRequest,
   isMusicServerBackRequest,
@@ -90,9 +54,7 @@ export {
   resolveDeezerMenuOption,
   resolveMusicServerMenuOption,
   resolveTidalMenuOption,
-  resolveTuneInMenuOption,
   resolveTuneInPreset,
-  setTuneInBrowseContext,
   MUSIC_SERVER_BACK_ID,
   MUSIC_SERVER_MENU_ROOT_ID,
   MUSIC_SERVER_ROOT_ID,
@@ -113,59 +75,43 @@ function withPaging(options: uc.BrowseOptions): uc.BrowseOptions {
   return { ...options, paging: new uc.Paging(1, DEFAULT_BROWSE_PAGE_SIZE) };
 }
 
-export function createMediaBrowser(avrStateApi: AvrStateApi) {
-  return {
-    isMediaBrowsingAvailable(entityId: string, subSource?: string): boolean {
-      const source = avrStateApi.getSource(entityId);
-      const effectiveSubSource = subSource ?? avrStateApi.getSubSource(entityId);
-      return source === "net" && MEDIA_BROWSING.includes(effectiveSubSource);
-    },
+// Routes a browse request to the service browser of the zone's current sub-source. One instance is created by the
+// driver and passed to the components that browse; `services` gives them the per-service browsers.
+export class MediaBrowser {
+  constructor(
+    // Only source and sub-source are read.
+    private readonly avrStateApi: Pick<AvrStateApi, "getSource" | "getSubSource">,
+    readonly services: MediaBrowserServices
+  ) {}
 
-    async browseMedia(entityId: string, options: uc.BrowseOptions): Promise<uc.StatusCodes | uc.BrowseResult> {
-      const subSource = avrStateApi.getSubSource(entityId);
-      if (!this.isMediaBrowsingAvailable(entityId, subSource)) {
-        log.debug("%s [%s] ignoring browse request outside browsable context", logSource, entityId);
-        return uc.StatusCodes.NotFound;
-      }
-
-      switch (subSource) {
-        case "tunein":
-          if (options.media_type === TUNEIN_MENU_ROOT_TYPE) {
-            return browseTuneInMenuMedia(entityId, withPaging(options));
-          }
-          return browseTuneInMedia(entityId, withPaging(options));
-        case "tidal":
-          return browseTidalMedia(entityId, withPaging(options));
-        case "deezer":
-          return browseDeezerMedia(entityId, withPaging(options));
-        case "music-server":
-          return browseMusicServerMedia(entityId, withPaging(options));
-        default:
-          log.debug("%s [%s] unsupported media browsing for subSource [%s]", logSource, entityId, subSource);
-          return uc.StatusCodes.NotFound;
-      }
-    }
-  };
-}
-
-// Singleton instance created in driver.ts
-let mediaBrowser: ReturnType<typeof createMediaBrowser>;
-
-function getMediaBrowser(): ReturnType<typeof createMediaBrowser> {
-  if (!mediaBrowser) {
-    mediaBrowser = createMediaBrowser(avrStateManager);
+  isMediaBrowsingAvailable(entityId: string, subSource?: string): boolean {
+    const source = this.avrStateApi.getSource(entityId);
+    const effectiveSubSource = subSource ?? this.avrStateApi.getSubSource(entityId);
+    return source === "net" && MEDIA_BROWSING.includes(effectiveSubSource);
   }
-  return mediaBrowser;
-}
 
-export function initMediaBrowser(avrStateApi: AvrStateApi): void {
-  mediaBrowser = createMediaBrowser(avrStateApi);
-}
+  async browseMedia(entityId: string, options: uc.BrowseOptions): Promise<uc.StatusCodes | uc.BrowseResult> {
+    const subSource = this.avrStateApi.getSubSource(entityId);
+    if (!this.isMediaBrowsingAvailable(entityId, subSource)) {
+      log.debug("%s [%s] ignoring browse request outside browsable context", logSource, entityId);
+      return uc.StatusCodes.NotFound;
+    }
 
-export function isMediaBrowsingAvailable(entityId: string, subSource?: string): boolean {
-  return getMediaBrowser().isMediaBrowsingAvailable(entityId, subSource);
-}
-
-export async function browseMedia(entityId: string, options: uc.BrowseOptions): Promise<uc.StatusCodes | uc.BrowseResult> {
-  return getMediaBrowser().browseMedia(entityId, options);
+    switch (subSource) {
+      case "tunein":
+        if (options.media_type === TUNEIN_MENU_ROOT_TYPE) {
+          return this.services.browseTuneInMenuMedia(entityId, withPaging(options));
+        }
+        return this.services.browseTuneInMedia(entityId, withPaging(options));
+      case "tidal":
+        return this.services.browseTidalMedia(entityId, withPaging(options));
+      case "deezer":
+        return this.services.browseDeezerMedia(entityId, withPaging(options));
+      case "music-server":
+        return this.services.browseMusicServerMedia(entityId, withPaging(options));
+      default:
+        log.debug("%s [%s] unsupported media browsing for subSource [%s]", logSource, entityId, subSource);
+        return uc.StatusCodes.NotFound;
+    }
+  }
 }

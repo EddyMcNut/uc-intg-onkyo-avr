@@ -1,6 +1,6 @@
+import { testAvrContexts } from "./helpers/contexts.js";
 import { describe, it, expect, beforeEach } from "vitest";
 import { getEffectiveInputSourceOptions, resolveCanonicalInputSource, resolveInputSourceList } from "../src/inputSourceResolver.js";
-import { sharedAvrContexts } from "../src/avrContext.js";
 import { parseAvrInfo } from "../src/avrInfoStore.js";
 import { setAvrInfo, resetAvrInfo } from "./helpers/avrInfo.js";
 import { readFileSync } from "node:fs";
@@ -22,14 +22,14 @@ function nriXml(selectorList: string): string {
 
 describe("inputSourceResolver", () => {
   beforeEach(() => {
-    sharedAvrContexts.clear();
+    testAvrContexts.clear();
     resetAvrInfo(ENTITY_ID);
   });
 
   it("keeps 'auto' and returns the inputs the AVR reported", () => {
-    setAvrInfo(ENTITY_ID, parseAvrInfo(nriXml('<selectorlist count="2"><selector id="10" name="BD/DVD" /><selector id="01" name="CBL/SAT" /></selectorlist>')));
+    setAvrInfo(ENTITY_ID, parseAvrInfo(nriXml('<selectorlist count="2"><selector id="10" name="BD/DVD" /><selector id="01" name="CBL/SAT" /></selectorlist>'))!);
 
-    const resolution = resolveInputSourceList(AVR_CONFIG, ENTITY_ID);
+    const resolution = resolveInputSourceList(AVR_CONFIG, ENTITY_ID, testAvrContexts);
 
     // Sorted by name, so the option list is presented in a stable order.
     expect(resolution?.inputs).toEqual([
@@ -50,7 +50,7 @@ describe("inputSourceResolver", () => {
       }
     } as AvrConfig;
 
-    expect(getEffectiveInputSourceOptions(config, "TX-RZ50 192.168.2.103", ["BD/DVD", "Spotify"])).toEqual(["bd/dvd", "🌐 spotify"]);
+    expect(getEffectiveInputSourceOptions(config, "TX-RZ50 192.168.2.103", ["BD/DVD", "Spotify"], testAvrContexts)).toEqual(["bd/dvd", "🌐 spotify"]);
   });
 
   it("puts network sources first when requested", () => {
@@ -63,35 +63,35 @@ describe("inputSourceResolver", () => {
       }
     } as AvrConfig;
 
-    expect(getEffectiveInputSourceOptions(config, "TX-RZ50 192.168.2.103", ["BD/DVD", "Spotify"])).toEqual(["spotify", "bd/dvd"]);
+    expect(getEffectiveInputSourceOptions(config, "TX-RZ50 192.168.2.103", ["BD/DVD", "Spotify"], testAvrContexts)).toEqual(["spotify", "bd/dvd"]);
   });
 
   it("falls back to integration mappings when the AVR reports no inputs", () => {
-    setAvrInfo(ENTITY_ID, parseAvrInfo(nriXml("")));
+    setAvrInfo(ENTITY_ID, parseAvrInfo(nriXml(""))!);
 
-    const resolution = resolveInputSourceList(AVR_CONFIG, ENTITY_ID);
+    const resolution = resolveInputSourceList(AVR_CONFIG, ENTITY_ID, testAvrContexts);
 
     expect(resolution?.inputs).toBeUndefined();
     expect(resolution?.reason).toContain("no input sources");
   });
 
   it("falls back to integration mappings when nothing was collected at all", () => {
-    expect(resolveInputSourceList(AVR_CONFIG, ENTITY_ID)?.inputs).toBeUndefined();
+    expect(resolveInputSourceList(AVR_CONFIG, ENTITY_ID, testAvrContexts)?.inputs).toBeUndefined();
   });
 
   it("ignores reported inputs without a usable name", () => {
-    setAvrInfo(ENTITY_ID, parseAvrInfo(nriXml('<selectorlist count="2"><selector id="10" name="" /><selector id="" name="TV" /></selectorlist>')));
+    setAvrInfo(ENTITY_ID, parseAvrInfo(nriXml('<selectorlist count="2"><selector id="10" name="" /><selector id="" name="TV" /></selectorlist>'))!);
 
-    const resolution = resolveInputSourceList(AVR_CONFIG, ENTITY_ID);
+    const resolution = resolveInputSourceList(AVR_CONFIG, ENTITY_ID, testAvrContexts);
 
     expect(resolution?.inputs).toBeUndefined();
     expect(resolution?.reason).toContain("no usable");
   });
 
   it("skips the placeholder entry 'Source' some AVRs report", () => {
-    setAvrInfo(ENTITY_ID, parseAvrInfo(nriXml('<selectorlist count="3"><selector id="10" name="BD/DVD" /><selector id="12" name="TV" /><selector id="80" name="Source" /></selectorlist>')));
+    setAvrInfo(ENTITY_ID, parseAvrInfo(nriXml('<selectorlist count="3"><selector id="10" name="BD/DVD" /><selector id="12" name="TV" /><selector id="80" name="Source" /></selectorlist>'))!);
 
-    const resolution = resolveInputSourceList(AVR_CONFIG, ENTITY_ID);
+    const resolution = resolveInputSourceList(AVR_CONFIG, ENTITY_ID, testAvrContexts);
 
     expect(resolution?.inputs).toEqual([
       { id: "10", name: "BD/DVD" },
@@ -100,24 +100,24 @@ describe("inputSourceResolver", () => {
   });
 
   it("falls back when the AVR only reports placeholder inputs", () => {
-    setAvrInfo(ENTITY_ID, parseAvrInfo(nriXml('<selectorlist count="1"><selector id="80" name="SOURCE" /></selectorlist>')));
+    setAvrInfo(ENTITY_ID, parseAvrInfo(nriXml('<selectorlist count="1"><selector id="80" name="SOURCE" /></selectorlist>'))!);
 
-    const resolution = resolveInputSourceList(AVR_CONFIG, ENTITY_ID);
+    const resolution = resolveInputSourceList(AVR_CONFIG, ENTITY_ID, testAvrContexts);
 
     expect(resolution?.inputs).toBeUndefined();
   });
 
   it("does nothing when AVR-reported names are disabled", () => {
-    setAvrInfo(ENTITY_ID, parseAvrInfo(nriXml('<selectorlist count="1"><selector id="10" name="BD/DVD" /></selectorlist>')));
+    setAvrInfo(ENTITY_ID, parseAvrInfo(nriXml('<selectorlist count="1"><selector id="10" name="BD/DVD" /></selectorlist>'))!);
 
-    expect(resolveInputSourceList({ ...AVR_CONFIG, useAvrReportedInputs: false }, ENTITY_ID)).toBeUndefined();
+    expect(resolveInputSourceList({ ...AVR_CONFIG, useAvrReportedInputs: false }, ENTITY_ID, testAvrContexts)).toBeUndefined();
   });
 
   it("reads the inputs of a real AVR payload", () => {
     const xml = readFileSync(path.join(__dirname, "fixtures", "nri-response.xml"), "utf-8");
-    setAvrInfo(ENTITY_ID, parseAvrInfo(xml));
+    setAvrInfo(ENTITY_ID, parseAvrInfo(xml)!);
 
-    const resolution = resolveInputSourceList(AVR_CONFIG, ENTITY_ID);
+    const resolution = resolveInputSourceList(AVR_CONFIG, ENTITY_ID, testAvrContexts);
 
     expect(resolution?.inputs?.map((input) => input.name)).toContain("BD/DVD");
     expect(resolution?.inputs?.find((input) => input.name === "DAB")?.id).toBe("33");
@@ -135,10 +135,10 @@ describe("inputSourceResolver", () => {
             '<netservice id="40" name="Chromecast built-in" value="2" enable="1" /></netservicelist>'
           ].join("")
         )
-      )
+      )!
     );
 
-    expect(resolveInputSourceList(AVR_CONFIG, ENTITY_ID)?.inputs).toEqual([
+    expect(resolveInputSourceList(AVR_CONFIG, ENTITY_ID, testAvrContexts)?.inputs).toEqual([
       { id: "10", name: "BD/DVD" },
       { id: "40", name: "Chromecast built-in", network: true },
       { id: "0a", name: "Spotify", network: true },
@@ -147,19 +147,19 @@ describe("inputSourceResolver", () => {
   });
 
   it("renames configured aliases when the AVR reports the same ID and keeps unmatched aliases", () => {
-    setAvrInfo(ENTITY_ID, parseAvrInfo(nriXml('<selectorlist count="2"><selector id="10" name="Blu-ray" /><selector id="12" name="Television" /></selectorlist>')));
-    sharedAvrContexts.get("TX-RZ50 192.168.2.103").inputs.set([
+    setAvrInfo(ENTITY_ID, parseAvrInfo(nriXml('<selectorlist count="2"><selector id="10" name="Blu-ray" /><selector id="12" name="Television" /></selectorlist>'))!);
+    testAvrContexts.get("TX-RZ50 192.168.2.103").inputs.set([
       { id: "10", name: "Blu-ray" },
       { id: "12", name: "Television" }
     ]);
     const config = { ...AVR_CONFIG, inputSelectorOptions: ["bd", "tv", "cd"] };
 
-    expect(getEffectiveInputSourceOptions(config, "TX-RZ50 192.168.2.103", ["bd", "tv", "cd"])).toEqual(["Blu-ray", "Television"]);
+    expect(getEffectiveInputSourceOptions(config, "TX-RZ50 192.168.2.103", ["bd", "tv", "cd"], testAvrContexts)).toEqual(["Blu-ray", "Television"]);
   });
 
   it("keeps AVR-learned display names separate from canonical source state", () => {
-    sharedAvrContexts.get("TX-RZ50 192.168.2.103").inputs.set([{ id: "2b", name: "Network" }]);
+    testAvrContexts.get("TX-RZ50 192.168.2.103").inputs.set([{ id: "2b", name: "Network" }]);
 
-    expect(resolveCanonicalInputSource("TX-RZ50 192.168.2.103", "Network")).toBe("net");
+    expect(resolveCanonicalInputSource("TX-RZ50 192.168.2.103", "Network", testAvrContexts)).toBe("net");
   });
 });

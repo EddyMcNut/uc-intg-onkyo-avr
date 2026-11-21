@@ -1,11 +1,12 @@
 /*jslint node:true nomen:true*/
 "use strict";
-import { sharedAvrContexts, type AvrContextRegistry } from "./avrContext.js";
+import type { MediaBrowser } from "./mediaBrowser.js";
+import type { AvrContextRegistry } from "./avrContext.js";
 import * as uc from "@unfoldedcircle/integration-api";
-import { browseMedia, TUNEIN_MENU_BACK_ID, TUNEIN_MENU_ROOT_ID, TUNEIN_MENU_ROOT_TYPE } from "./mediaBrowser.js";
+import { TUNEIN_MENU_BACK_ID, TUNEIN_MENU_ROOT_ID, TUNEIN_MENU_ROOT_TYPE } from "./mediaBrowser.js";
 import { listTuneInMenuOptions, getTuneInMenuBrowseState, resetTuneInMenuBrowseState } from "./tuneInMenuStore.js";
 import { looksLikeTuneInDirectory } from "./tuneInFilters.js";
-import { ConfigManager, AVR_DEFAULTS, buildEntityId } from "./configManager.js";
+import { AVR_DEFAULTS, findAvrConfig, type ConfigSource } from "./configManager.js";
 import type { AvrStateApi } from "./types.js";
 import log from "./loggers.js";
 import { MenuBrowseHandlerBase } from "./menuBrowseHandlerBase.js";
@@ -22,18 +23,6 @@ type TuneInMenuSelection = {
   mediaId: string;
   isBrowsable: boolean;
 };
-
-function isTuneInFullMenuEntity(entityId: string): boolean {
-  const cfg = ConfigManager.get();
-  const avr = cfg?.avrs?.find((a) => buildEntityId(a.model, a.ip, a.zone) === entityId);
-  return String(avr?.tuneinMenuStyle ?? "").toLowerCase() === "full";
-}
-
-function getMenuDelay(entityId: string): number {
-  const cfg = ConfigManager.get();
-  const avr = cfg?.avrs?.find((a) => buildEntityId(a.model, a.ip, a.zone) === entityId);
-  return avr?.netMenuDelay ?? AVR_DEFAULTS.netMenuDelay;
-}
 
 function resolveTuneInMenuSelection(entityId: string, mediaId: string | undefined, mediaType: string | undefined, contexts: AvrContextRegistry): TuneInMenuSelection | undefined {
   if (!mediaId) {
@@ -75,9 +64,11 @@ export class TuneInBrowseHandler extends MenuBrowseHandlerBase {
   private tuneInListSequence = 0;
 
   private isLegacyNavigation(entityId: string): boolean {
-    const cfg = ConfigManager.get();
-    const avr = cfg?.avrs?.find((candidate) => buildEntityId(candidate.model, candidate.ip, candidate.zone) === entityId);
-    return avr?.networkNavigationMode === "legacy";
+    return findAvrConfig(this.configSource, entityId)?.networkNavigationMode === "legacy";
+  }
+
+  private isTuneInFullMenuEntity(entityId: string): boolean {
+    return String(findAvrConfig(this.configSource, entityId)?.tuneinMenuStyle ?? "").toLowerCase() === "full";
   }
 
   private async waitForTuneInMenu(entityId: string, menuDelay: number): Promise<void> {
@@ -95,7 +86,7 @@ export class TuneInBrowseHandler extends MenuBrowseHandlerBase {
     // remaining rows, probing adjacent layers on older receivers.
     const state = getTuneInMenuBrowseState(entityId, this.avrContexts);
     if (!state || state.harvestMode || state.totalListItemCount <= this.getContiguousItemCount(entityId)) return;
-    const menuDelay = getMenuDelay(entityId);
+    const menuDelay = this.getMenuDelay(entityId);
     const scanDelay = Math.max(150, Math.min(Math.floor(menuDelay / 3), 400));
     const knownLayer = state.nlsLayerNumber;
     const layers = knownLayer > 0 ? [knownLayer, knownLayer - 1, knownLayer + 1].filter((layer) => layer > 0).map((layer) => toHex(layer, 2)) : ["02", "01", "03"];
@@ -123,7 +114,9 @@ export class TuneInBrowseHandler extends MenuBrowseHandlerBase {
 
   constructor(
     private readonly avrStateApi: AvrStateApi,
-    private readonly avrContexts: AvrContextRegistry = sharedAvrContexts
+    private readonly avrContexts: AvrContextRegistry,
+    private readonly mediaBrowser: MediaBrowser,
+    private readonly configSource: ConfigSource
   ) {
     super();
   }
@@ -143,7 +136,7 @@ export class TuneInBrowseHandler extends MenuBrowseHandlerBase {
   }
 
   protected getMenuDelay(entityId: string): number {
-    return getMenuDelay(entityId);
+    return findAvrConfig(this.configSource, entityId)?.netMenuDelay ?? AVR_DEFAULTS.netMenuDelay;
   }
 
   protected getContiguousItemCount(entityId: string): number {
@@ -168,7 +161,7 @@ export class TuneInBrowseHandler extends MenuBrowseHandlerBase {
   ): Promise<uc.StatusCodes | uc.BrowseResult | undefined> {
     if (!cmdHandler) return undefined;
 
-    if (!isTuneInFullMenuEntity(entityId) || this.avrStateApi.getSubSource(entityId) !== "tunein") {
+    if (!this.isTuneInFullMenuEntity(entityId) || this.avrStateApi.getSubSource(entityId) !== "tunein") {
       return undefined;
     }
 
@@ -176,10 +169,10 @@ export class TuneInBrowseHandler extends MenuBrowseHandlerBase {
     const isBackRequest = options.media_id === TUNEIN_MENU_BACK_ID && (options.media_type === undefined || options.media_type === TUNEIN_MENU_ROOT_TYPE);
     const isExplicitMainMenuSelection = options.media_id === TUNEIN_MENU_ROOT_ID && options.media_type === TUNEIN_MENU_ROOT_TYPE;
     const isRootRequest = !options.media_id || isExplicitMainMenuSelection;
-    const menuDelay = getMenuDelay(entityId);
+    const menuDelay = this.getMenuDelay(entityId);
 
     if (isBackRequest && cmdHandler) {
-      const menuDelay = getMenuDelay(entityId);
+      const menuDelay = this.getMenuDelay(entityId);
       log.info("%s [%s] sending TuneIn Back command to AVR", logSource, entityId);
       resetTuneInMenuBrowseState(entityId, this.avrContexts);
       const backBrowseState = getTuneInMenuBrowseState(entityId, this.avrContexts);
@@ -195,7 +188,7 @@ export class TuneInBrowseHandler extends MenuBrowseHandlerBase {
       if (rawSend) {
         await this.harvestListItems(entityId, rawSend);
       }
-      return browseMedia(entityId, {
+      return this.mediaBrowser.browseMedia(entityId, {
         ...options,
         media_id: TUNEIN_MENU_ROOT_ID,
         media_type: TUNEIN_MENU_ROOT_TYPE
@@ -226,7 +219,7 @@ export class TuneInBrowseHandler extends MenuBrowseHandlerBase {
           await this.harvestListItems(entityId, rawSend);
         }
       }
-      return browseMedia(entityId, {
+      return this.mediaBrowser.browseMedia(entityId, {
         ...options,
         media_id: TUNEIN_MENU_ROOT_ID,
         media_type: TUNEIN_MENU_ROOT_TYPE
@@ -258,7 +251,7 @@ export class TuneInBrowseHandler extends MenuBrowseHandlerBase {
         }
       }
 
-      return browseMedia(entityId, {
+      return this.mediaBrowser.browseMedia(entityId, {
         ...options,
         media_id: TUNEIN_MENU_ROOT_ID,
         media_type: TUNEIN_MENU_ROOT_TYPE

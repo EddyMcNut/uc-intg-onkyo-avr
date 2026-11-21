@@ -1,17 +1,18 @@
+import { testMediaBrowser, testMediaBrowserServices } from "./helpers/mediaBrowserServices.js";
+import { testAvrContexts } from "./helpers/contexts.js";
 import { describe, it, expect } from "vitest";
 import * as uc from "@unfoldedcircle/integration-api";
 import path from "path";
+import { testConfigStore } from "./helpers/configStore.js";
 
 it("Media player browse returns TuneIn presets only for NET TuneIn", async () => {
   const registrarModule = await import("../src/entityRegistrar.js");
-  const avrStateModule = await import("../src/avrState.js");
   const mediaBrowserModule = await import("../src/mediaBrowser.js");
 
   const EntityRegistrar = registrarModule.default as any;
-  const { avrStateManager } = avrStateModule as any;
-  const { setTuneInBrowseContext, ingestTuneInListEntry } = mediaBrowserModule as any;
+  const { avrStateManager } = await import("./helpers/avrState.js");
 
-  const registrar = new EntityRegistrar(avrStateManager);
+  const registrar = new EntityRegistrar(avrStateManager, testAvrContexts, testMediaBrowser(avrStateManager), testConfigStore);
   const entityId = "TX-RZ50 192.168.1.2 main";
   const player = registrar.createMediaPlayerEntity(entityId, 100, async () => uc.StatusCodes.Ok);
 
@@ -20,10 +21,10 @@ it("Media player browse returns TuneIn presets only for NET TuneIn", async () =>
 
   avrStateManager.setSource(entityId, "net");
   avrStateManager.setSubSource(entityId, "tunein");
-  setTuneInBrowseContext(entityId, "My Presets");
-  ingestTuneInListEntry(entityId, "U0-89.7 | WTMD (Alternative Rock)");
-  ingestTuneInListEntry(entityId, "U1-America's Country (Country)");
-  ingestTuneInListEntry(entityId, "U2-Decibel EuroDance (Euro Hits)");
+  testMediaBrowserServices.setTuneInBrowseContext(entityId, "My Presets");
+  testMediaBrowserServices.ingestTuneInListEntry(entityId, "U0-89.7 | WTMD (Alternative Rock)");
+  testMediaBrowserServices.ingestTuneInListEntry(entityId, "U1-America's Country (Country)");
+  testMediaBrowserServices.ingestTuneInListEntry(entityId, "U2-Decibel EuroDance (Euro Hits)");
 
   const result = await player.browse({ paging: new uc.Paging(1, 2) });
   expect(result).toBeInstanceOf(uc.BrowseResult);
@@ -52,31 +53,29 @@ it("Media player browse returns TuneIn presets only for NET TuneIn", async () =>
 
 it("Media player browse ignores TuneIn menu entries until My Presets is active", async () => {
   const registrarModule = await import("../src/entityRegistrar.js");
-  const avrStateModule = await import("../src/avrState.js");
   const mediaBrowserModule = await import("../src/mediaBrowser.js");
 
   const EntityRegistrar = registrarModule.default as any;
-  const { avrStateManager } = avrStateModule as any;
-  const { ingestTuneInListEntry, setTuneInBrowseContext } = mediaBrowserModule as any;
+  const { avrStateManager } = await import("./helpers/avrState.js");
 
-  const registrar = new EntityRegistrar(avrStateManager);
+  const registrar = new EntityRegistrar(avrStateManager, testAvrContexts, testMediaBrowser(avrStateManager), testConfigStore);
   const entityId = "TX-RZ50 192.168.1.21 main";
   const player = registrar.createMediaPlayerEntity(entityId, 100, async () => uc.StatusCodes.Ok);
 
   avrStateManager.setSource(entityId, "net");
   avrStateManager.setSubSource(entityId, "tunein");
-  ingestTuneInListEntry(entityId, "U0-Login");
-  ingestTuneInListEntry(entityId, "U1-TuneIn");
-  ingestTuneInListEntry(entityId, "U2-Spotify");
+  testMediaBrowserServices.ingestTuneInListEntry(entityId, "U0-Login");
+  testMediaBrowserServices.ingestTuneInListEntry(entityId, "U1-TuneIn");
+  testMediaBrowserServices.ingestTuneInListEntry(entityId, "U2-Spotify");
 
   let result = await player.browse({ paging: new uc.Paging(1, 10) });
 
   expect(result).toBeInstanceOf(uc.BrowseResult);
   expect((result as uc.BrowseResult).media?.items?.map((item) => item.title)).toEqual([]);
 
-  setTuneInBrowseContext(entityId, "My Presets");
-  ingestTuneInListEntry(entityId, "U0-89.7 | WTMD (Alternative Rock)");
-  ingestTuneInListEntry(entityId, "U1-America's Country (Country)");
+  testMediaBrowserServices.setTuneInBrowseContext(entityId, "My Presets");
+  testMediaBrowserServices.ingestTuneInListEntry(entityId, "U0-89.7 | WTMD (Alternative Rock)");
+  testMediaBrowserServices.ingestTuneInListEntry(entityId, "U1-America's Country (Country)");
 
   result = await player.browse({ paging: new uc.Paging(1, 10) });
   expect((result as uc.BrowseResult).media?.items?.map((item) => item.title)).toEqual(["America's Country (Country)", "WTMD (Alternative Rock)"]);
@@ -84,31 +83,29 @@ it("Media player browse ignores TuneIn menu entries until My Presets is active",
 
 it("TuneIn browse root exposes all presets when the list is longer than 10", async () => {
   const registrarModule = await import("../src/entityRegistrar.js");
-  const avrStateModule = await import("../src/avrState.js");
   const mediaBrowserModule = await import("../src/mediaBrowser.js");
 
   const EntityRegistrar = registrarModule.default as any;
-  const { avrStateManager } = avrStateModule as any;
-  const { setTuneInBrowseContext, ingestTuneInListEntry, ingestTuneInXmlEntries } = mediaBrowserModule as any;
+  const { avrStateManager } = await import("./helpers/avrState.js");
 
-  const registrar = new EntityRegistrar(avrStateManager);
+  const registrar = new EntityRegistrar(avrStateManager, testAvrContexts, testMediaBrowser(avrStateManager), testConfigStore);
   const entityId = "TX-RZ50 192.168.1.3 main";
   const player = registrar.createMediaPlayerEntity(entityId, 100, async () => uc.StatusCodes.Ok);
 
   avrStateManager.setSource(entityId, "net");
   avrStateManager.setSubSource(entityId, "tunein");
-  setTuneInBrowseContext(entityId, "My Presets");
+  testMediaBrowserServices.setTuneInBrowseContext(entityId, "My Presets");
 
   for (let index = 0; index < 10; index += 1) {
-    ingestTuneInListEntry(entityId, `U${index}-Station ${String.fromCharCode(65 + index)}`);
+    testMediaBrowserServices.ingestTuneInListEntry(entityId, `U${index}-Station ${String.fromCharCode(65 + index)}`);
   }
 
   const pagedWindow = ["Station B", "Station C", "Station D", "Station E", "Station F", "Station G", "Station H", "Station I", "Station J", "Station K"];
-  pagedWindow.forEach((title, index) => ingestTuneInListEntry(entityId, `U${index}-${title}`));
+  pagedWindow.forEach((title, index) => testMediaBrowserServices.ingestTuneInListEntry(entityId, `U${index}-${title}`));
   const finalWindow = ["Station C", "Station D", "Station E", "Station F", "Station G", "Station H", "Station I", "Station J", "Station K", "Station L"];
-  finalWindow.forEach((title, index) => ingestTuneInListEntry(entityId, `U${index}-${title}`));
+  finalWindow.forEach((title, index) => testMediaBrowserServices.ingestTuneInListEntry(entityId, `U${index}-${title}`));
 
-  ingestTuneInXmlEntries(
+  testMediaBrowserServices.ingestTuneInXmlEntries(
     entityId,
     '<?xml version="1.0" encoding="UTF-8"?><response status="ok"><items offset="0000" totalitems="000F"><item iconid="29" title="Browse" url="menu-1"/><item iconid="44" title="Stations" url="menu-2"/><item iconid="2F" title="Station A" url="0"/><item iconid="2F" title="Station B" url="1"/><item iconid="2F" title="Station C" url="2"/><item iconid="2F" title="Station D" url="3"/><item iconid="2F" title="Station E" url="4"/><item iconid="2F" title="Station F" url="5"/><item iconid="2F" title="Station G" url="6"/><item iconid="44" title="By Location" url="menu-3"/><item iconid="2F" title="Station H" url="7"/><item iconid="2F" title="Station I" url="8"/><item iconid="2F" title="Station J" url="9"/><item iconid="2F" title="Station K" url="10"/><item iconid="2F" title="Station L" url="11"/></items></response>'
   );
@@ -138,24 +135,25 @@ it("TuneIn browse root exposes all presets when the list is longer than 10", asy
 
 it("Media player browse returns TuneIn full menu items from NET TuneIn", async () => {
   const registrarModule = await import("../src/entityRegistrar.js");
-  const avrStateModule = await import("../src/avrState.js");
   const mediaBrowserModule = await import("../src/mediaBrowser.js");
 
   const EntityRegistrar = registrarModule.default as any;
-  const { avrStateManager } = avrStateModule as any;
-  const { ingestTuneInMenuListEntry, ingestTuneInMenuXmlEntries } = mediaBrowserModule as any;
+  const { avrStateManager } = await import("./helpers/avrState.js");
 
-  const registrar = new EntityRegistrar(avrStateManager);
+  const registrar = new EntityRegistrar(avrStateManager, testAvrContexts, testMediaBrowser(avrStateManager), testConfigStore);
   const entityId = "TX-RZ50 192.168.1.30 main";
   const player = registrar.createMediaPlayerEntity(entityId, 100, async () => uc.StatusCodes.Ok);
 
   avrStateManager.setSource(entityId, "net");
   avrStateManager.setSubSource(entityId, "tunein");
 
-  ingestTuneInMenuListEntry(entityId, "U0-Browse");
-  ingestTuneInMenuListEntry(entityId, "U1-Stations");
-  ingestTuneInMenuListEntry(entityId, "U2-Station A");
-  ingestTuneInMenuXmlEntries(entityId, '<?xml version="1.0" encoding="UTF-8"?><response status="ok"><items offset="0003"><item iconid="2F" title="Station B" url="0"/></items></response>');
+  testMediaBrowserServices.ingestTuneInMenuListEntry(entityId, "U0-Browse");
+  testMediaBrowserServices.ingestTuneInMenuListEntry(entityId, "U1-Stations");
+  testMediaBrowserServices.ingestTuneInMenuListEntry(entityId, "U2-Station A");
+  testMediaBrowserServices.ingestTuneInMenuXmlEntries(
+    entityId,
+    '<?xml version="1.0" encoding="UTF-8"?><response status="ok"><items offset="0003"><item iconid="2F" title="Station B" url="0"/></items></response>'
+  );
 
   const result = await player.browse({
     media_id: "tunein:menu-root",
@@ -170,25 +168,23 @@ it("Media player browse returns TuneIn full menu items from NET TuneIn", async (
 
 it("Media player browse hides TuneIn Login menu item", async () => {
   const registrarModule = await import("../src/entityRegistrar.js");
-  const avrStateModule = await import("../src/avrState.js");
   const mediaBrowserModule = await import("../src/mediaBrowser.js");
 
   const EntityRegistrar = registrarModule.default as any;
-  const { avrStateManager } = avrStateModule as any;
-  const { ingestTuneInMenuListEntry } = mediaBrowserModule as any;
+  const { avrStateManager } = await import("./helpers/avrState.js");
 
-  const registrar = new EntityRegistrar(avrStateManager);
+  const registrar = new EntityRegistrar(avrStateManager, testAvrContexts, testMediaBrowser(avrStateManager), testConfigStore);
   const entityId = "TX-RZ50 192.168.1.31 main";
   const player = registrar.createMediaPlayerEntity(entityId, 100, async () => uc.StatusCodes.Ok);
 
   avrStateManager.setSource(entityId, "net");
   avrStateManager.setSubSource(entityId, "tunein");
 
-  ingestTuneInMenuListEntry(entityId, "U0-Login");
-  ingestTuneInMenuListEntry(entityId, "U1-Search");
-  ingestTuneInMenuListEntry(entityId, "U2-Logout");
-  ingestTuneInMenuListEntry(entityId, "U3-Browse");
-  ingestTuneInMenuListEntry(entityId, "U4-Station A");
+  testMediaBrowserServices.ingestTuneInMenuListEntry(entityId, "U0-Login");
+  testMediaBrowserServices.ingestTuneInMenuListEntry(entityId, "U1-Search");
+  testMediaBrowserServices.ingestTuneInMenuListEntry(entityId, "U2-Logout");
+  testMediaBrowserServices.ingestTuneInMenuListEntry(entityId, "U3-Browse");
+  testMediaBrowserServices.ingestTuneInMenuListEntry(entityId, "U4-Station A");
 
   const result = await player.browse({
     media_id: "tunein:menu-root",
@@ -202,12 +198,10 @@ it("Media player browse hides TuneIn Login menu item", async () => {
 });
 
 it("TuneIn selection keeps subsource and state so browse can be repeated", async () => {
-  const avrStateModule = await import("../src/avrState.js");
   const mediaBrowserModule = await import("../src/mediaBrowser.js");
   const processorModule = await import("../src/zoneAgnosticUpdateProcessor.js");
 
-  const { avrStateManager } = avrStateModule as any;
-  const { isMediaBrowsingAvailable } = mediaBrowserModule as any;
+  const { avrStateManager } = await import("./helpers/avrState.js");
   const { ZoneAgnosticUpdateProcessor } = processorModule as any;
 
   const capturedStates = new Map<string, uc.MediaPlayerStates>();
@@ -227,7 +221,7 @@ it("TuneIn selection keeps subsource and state so browse can be repeated", async
   } as any;
 
   const entityId = "M 1.2.3.4 main";
-  const processor = new ZoneAgnosticUpdateProcessor(mockDriver, { ip: "1.2.3.4", albumArtURL: "na" } as any, mockEiscp, avrStateManager);
+  const processor = new ZoneAgnosticUpdateProcessor(mockDriver, { ip: "1.2.3.4", albumArtURL: "na" } as any, mockEiscp, avrStateManager, testAvrContexts, testMediaBrowserServices, testConfigStore);
 
   avrStateManager.setPowerState(entityId, "on", mockDriver);
   avrStateManager.setSource(entityId, "net", undefined, undefined, mockDriver);
@@ -236,35 +230,33 @@ it("TuneIn selection keeps subsource and state so browse can be repeated", async
   await processor.handleFld(entityId, "WTMD (Alternative Rock)", "main");
 
   expect(avrStateManager.getSubSource(entityId)).toBe("tunein");
-  expect(isMediaBrowsingAvailable(entityId)).toBe(true);
+  expect(testMediaBrowser(avrStateManager).isMediaBrowsingAvailable(entityId)).toBe(true);
   expect(capturedStates.get(entityId)).toBe(uc.MediaPlayerStates.Playing);
 });
 
 it("TuneIn preset cache survives post-select menu updates", async () => {
   const registrarModule = await import("../src/entityRegistrar.js");
-  const avrStateModule = await import("../src/avrState.js");
   const mediaBrowserModule = await import("../src/mediaBrowser.js");
 
   const EntityRegistrar = registrarModule.default as any;
-  const { avrStateManager } = avrStateModule as any;
-  const { setTuneInBrowseContext, ingestTuneInListEntry } = mediaBrowserModule as any;
+  const { avrStateManager } = await import("./helpers/avrState.js");
 
-  const registrar = new EntityRegistrar(avrStateManager);
+  const registrar = new EntityRegistrar(avrStateManager, testAvrContexts, testMediaBrowser(avrStateManager), testConfigStore);
   const entityId = "TX-RZ50 192.168.1.22 main";
   const player = registrar.createMediaPlayerEntity(entityId, 100, async () => uc.StatusCodes.Ok);
 
   avrStateManager.setSource(entityId, "net");
   avrStateManager.setSubSource(entityId, "tunein");
-  setTuneInBrowseContext(entityId, "My Presets");
-  ingestTuneInListEntry(entityId, "U0-89.7 | WTMD (Alternative Rock)");
-  ingestTuneInListEntry(entityId, "U1-America's Country (Country)");
+  testMediaBrowserServices.setTuneInBrowseContext(entityId, "My Presets");
+  testMediaBrowserServices.ingestTuneInListEntry(entityId, "U0-89.7 | WTMD (Alternative Rock)");
+  testMediaBrowserServices.ingestTuneInListEntry(entityId, "U1-America's Country (Country)");
 
   let result = await player.browse({ paging: new uc.Paging(1, 10) });
   expect(result).toBeInstanceOf(uc.BrowseResult);
   expect((result as uc.BrowseResult).media?.items?.length).toBe(2);
 
-  setTuneInBrowseContext(entityId, "Now Playing");
-  ingestTuneInListEntry(entityId, "U0-Search Stations");
+  testMediaBrowserServices.setTuneInBrowseContext(entityId, "Now Playing");
+  testMediaBrowserServices.ingestTuneInListEntry(entityId, "U0-Search Stations");
 
   result = await player.browse({ paging: new uc.Paging(1, 10) });
   expect(result).toBeInstanceOf(uc.BrowseResult);
@@ -273,23 +265,21 @@ it("TuneIn preset cache survives post-select menu updates", async () => {
 
 it("Media player browse returns Tidal menu entries from AVR NLS updates", async () => {
   const registrarModule = await import("../src/entityRegistrar.js");
-  const avrStateModule = await import("../src/avrState.js");
   const mediaBrowserModule = await import("../src/mediaBrowser.js");
 
   const EntityRegistrar = registrarModule.default as any;
-  const { avrStateManager } = avrStateModule as any;
-  const { ingestTidalListEntry } = mediaBrowserModule as any;
+  const { avrStateManager } = await import("./helpers/avrState.js");
 
-  const registrar = new EntityRegistrar(avrStateManager);
+  const registrar = new EntityRegistrar(avrStateManager, testAvrContexts, testMediaBrowser(avrStateManager), testConfigStore);
   const entityId = "TX-RZ50 192.168.1.24 main";
   const player = registrar.createMediaPlayerEntity(entityId, 100, async () => uc.StatusCodes.Ok);
 
   avrStateManager.setSource(entityId, "net");
   avrStateManager.setSubSource(entityId, "tidal");
 
-  ingestTidalListEntry(entityId, "U0-New %s");
-  ingestTidalListEntry(entityId, "U1-TIDAL Rising %s");
-  ingestTidalListEntry(entityId, "U2-Playlists %s");
+  testMediaBrowserServices.ingestTidalListEntry(entityId, "U0-New %s");
+  testMediaBrowserServices.ingestTidalListEntry(entityId, "U1-TIDAL Rising %s");
+  testMediaBrowserServices.ingestTidalListEntry(entityId, "U2-Playlists %s");
 
   const result = await player.browse({ paging: new uc.Paging(1, 10) });
 
@@ -301,23 +291,21 @@ it("Media player browse returns Tidal menu entries from AVR NLS updates", async 
 
 it("Media player browse returns Deezer menu entries from AVR NLS updates", async () => {
   const registrarModule = await import("../src/entityRegistrar.js");
-  const avrStateModule = await import("../src/avrState.js");
   const mediaBrowserModule = await import("../src/mediaBrowser.js");
 
   const EntityRegistrar = registrarModule.default as any;
-  const { avrStateManager } = avrStateModule as any;
-  const { ingestDeezerListEntry } = mediaBrowserModule as any;
+  const { avrStateManager } = await import("./helpers/avrState.js");
 
-  const registrar = new EntityRegistrar(avrStateManager);
+  const registrar = new EntityRegistrar(avrStateManager, testAvrContexts, testMediaBrowser(avrStateManager), testConfigStore);
   const entityId = "TX-RZ50 192.168.1.27 main";
   const player = registrar.createMediaPlayerEntity(entityId, 100, async () => uc.StatusCodes.Ok);
 
   avrStateManager.setSource(entityId, "net");
   avrStateManager.setSubSource(entityId, "deezer");
 
-  ingestDeezerListEntry(entityId, "U0-New %s");
-  ingestDeezerListEntry(entityId, "U1-Charts %s");
-  ingestDeezerListEntry(entityId, "U2-Playlists %s");
+  testMediaBrowserServices.ingestDeezerListEntry(entityId, "U0-New %s");
+  testMediaBrowserServices.ingestDeezerListEntry(entityId, "U1-Charts %s");
+  testMediaBrowserServices.ingestDeezerListEntry(entityId, "U2-Playlists %s");
 
   const result = await player.browse({ paging: new uc.Paging(1, 10) });
 
@@ -329,22 +317,20 @@ it("Media player browse returns Deezer menu entries from AVR NLS updates", async
 
 it("Media player browse marks Deezer NLS entries without %s as playable tracks", async () => {
   const registrarModule = await import("../src/entityRegistrar.js");
-  const avrStateModule = await import("../src/avrState.js");
   const mediaBrowserModule = await import("../src/mediaBrowser.js");
 
   const EntityRegistrar = registrarModule.default as any;
-  const { avrStateManager } = avrStateModule as any;
-  const { ingestDeezerListEntry } = mediaBrowserModule as any;
+  const { avrStateManager } = await import("./helpers/avrState.js");
 
-  const registrar = new EntityRegistrar(avrStateManager);
+  const registrar = new EntityRegistrar(avrStateManager, testAvrContexts, testMediaBrowser(avrStateManager), testConfigStore);
   const entityId = "TX-RZ50 192.168.1.28 main";
   const player = registrar.createMediaPlayerEntity(entityId, 100, async () => uc.StatusCodes.Ok);
 
   avrStateManager.setSource(entityId, "net");
   avrStateManager.setSubSource(entityId, "deezer");
 
-  ingestDeezerListEntry(entityId, "U0-New %s");
-  ingestDeezerListEntry(entityId, "U1-My Song Title / Artist Name");
+  testMediaBrowserServices.ingestDeezerListEntry(entityId, "U0-New %s");
+  testMediaBrowserServices.ingestDeezerListEntry(entityId, "U1-My Song Title / Artist Name");
 
   const result = await player.browse({ paging: new uc.Paging(1, 10) });
   expect(result).toBeInstanceOf(uc.BrowseResult);
@@ -356,25 +342,23 @@ it("Media player browse marks Deezer NLS entries without %s as playable tracks",
 
 it("Media player browse hides excluded Tidal menu items", async () => {
   const registrarModule = await import("../src/entityRegistrar.js");
-  const avrStateModule = await import("../src/avrState.js");
   const mediaBrowserModule = await import("../src/mediaBrowser.js");
 
   const EntityRegistrar = registrarModule.default as any;
-  const { avrStateManager } = avrStateModule as any;
-  const { ingestTidalListEntry } = mediaBrowserModule as any;
+  const { avrStateManager } = await import("./helpers/avrState.js");
 
-  const registrar = new EntityRegistrar(avrStateManager);
+  const registrar = new EntityRegistrar(avrStateManager, testAvrContexts, testMediaBrowser(avrStateManager), testConfigStore);
   const entityId = "TX-RZ50 192.168.1.26 main";
   const player = registrar.createMediaPlayerEntity(entityId, 100, async () => uc.StatusCodes.Ok);
 
   avrStateManager.setSource(entityId, "net");
   avrStateManager.setSubSource(entityId, "tidal");
 
-  ingestTidalListEntry(entityId, "U0-Login %s");
-  ingestTidalListEntry(entityId, "U1-Search %s");
-  ingestTidalListEntry(entityId, "U2-Logout %s");
-  ingestTidalListEntry(entityId, "U3-New %s");
-  ingestTidalListEntry(entityId, "U4-Playlists %s");
+  testMediaBrowserServices.ingestTidalListEntry(entityId, "U0-Login %s");
+  testMediaBrowserServices.ingestTidalListEntry(entityId, "U1-Search %s");
+  testMediaBrowserServices.ingestTidalListEntry(entityId, "U2-Logout %s");
+  testMediaBrowserServices.ingestTidalListEntry(entityId, "U3-New %s");
+  testMediaBrowserServices.ingestTidalListEntry(entityId, "U4-Playlists %s");
 
   const result = await player.browse({ paging: new uc.Paging(1, 10) });
 
@@ -385,14 +369,12 @@ it("Media player browse hides excluded Tidal menu items", async () => {
 
 it("Media player browse defaults to 25 items per page when paging is omitted", async () => {
   const registrarModule = await import("../src/entityRegistrar.js");
-  const avrStateModule = await import("../src/avrState.js");
   const mediaBrowserModule = await import("../src/mediaBrowser.js");
 
   const EntityRegistrar = registrarModule.default as any;
-  const { avrStateManager } = avrStateModule as any;
-  const { ingestTidalListEntry } = mediaBrowserModule as any;
+  const { avrStateManager } = await import("./helpers/avrState.js");
 
-  const registrar = new EntityRegistrar(avrStateManager);
+  const registrar = new EntityRegistrar(avrStateManager, testAvrContexts, testMediaBrowser(avrStateManager), testConfigStore);
   const entityId = "TX-RZ50 192.168.1.25 main";
   const player = registrar.createMediaPlayerEntity(entityId, 100, async () => uc.StatusCodes.Ok);
 
@@ -400,7 +382,7 @@ it("Media player browse defaults to 25 items per page when paging is omitted", a
   avrStateManager.setSubSource(entityId, "tidal");
 
   for (let index = 0; index < 30; index += 1) {
-    ingestTidalListEntry(entityId, `U${index}-Track ${index + 1} %s`);
+    testMediaBrowserServices.ingestTidalListEntry(entityId, `U${index}-Track ${index + 1} %s`);
   }
 
   const result = await player.browse({} as uc.BrowseOptions);
@@ -414,11 +396,10 @@ it("Media player browse defaults to 25 items per page when paging is omitted", a
 
 it("Tidal browse survives DAB-to-NET transition when NLT/NLS arrive early", async () => {
   const registrarModule = await import("../src/entityRegistrar.js");
-  const avrStateModule = await import("../src/avrState.js");
   const processorModule = await import("../src/zoneAgnosticUpdateProcessor.js");
 
   const EntityRegistrar = registrarModule.default as any;
-  const { avrStateManager } = avrStateModule as any;
+  const { avrStateManager } = await import("./helpers/avrState.js");
   const { ZoneAgnosticUpdateProcessor } = processorModule as any;
 
   const mockDriver = { updateEntityAttributes: () => true } as any;
@@ -428,8 +409,16 @@ it("Tidal browse survives DAB-to-NET transition when NLT/NLS arrive early", asyn
   } as any;
 
   const entityId = "TX-RZ50 192.168.2.103 main";
-  const processor = new ZoneAgnosticUpdateProcessor(mockDriver, { ip: "192.168.2.103", albumArtURL: "na" } as any, mockEiscp, avrStateManager);
-  const registrar = new EntityRegistrar();
+  const processor = new ZoneAgnosticUpdateProcessor(
+    mockDriver,
+    { ip: "192.168.2.103", albumArtURL: "na" } as any,
+    mockEiscp,
+    avrStateManager,
+    testAvrContexts,
+    testMediaBrowserServices,
+    testConfigStore
+  );
+  const registrar = new EntityRegistrar(undefined as never, testAvrContexts, testMediaBrowser(avrStateManager), testConfigStore);
   const player = registrar.createMediaPlayerEntity(entityId, 100, async () => uc.StatusCodes.Ok);
 
   avrStateManager.setPowerState(entityId, "on", mockDriver);
@@ -448,11 +437,10 @@ it("Tidal browse survives DAB-to-NET transition when NLT/NLS arrive early", asyn
 
 it("Repeated NLT tidal updates do not clear existing Tidal menu options", async () => {
   const registrarModule = await import("../src/entityRegistrar.js");
-  const avrStateModule = await import("../src/avrState.js");
   const processorModule = await import("../src/zoneAgnosticUpdateProcessor.js");
 
   const EntityRegistrar = registrarModule.default as any;
-  const { avrStateManager } = avrStateModule as any;
+  const { avrStateManager } = await import("./helpers/avrState.js");
   const { ZoneAgnosticUpdateProcessor } = processorModule as any;
 
   const mockDriver = { updateEntityAttributes: () => true } as any;
@@ -462,8 +450,16 @@ it("Repeated NLT tidal updates do not clear existing Tidal menu options", async 
   } as any;
 
   const entityId = "TX-RZ50 192.168.2.104 main";
-  const processor = new ZoneAgnosticUpdateProcessor(mockDriver, { ip: "192.168.2.104", albumArtURL: "na" } as any, mockEiscp, avrStateManager);
-  const registrar = new EntityRegistrar();
+  const processor = new ZoneAgnosticUpdateProcessor(
+    mockDriver,
+    { ip: "192.168.2.104", albumArtURL: "na" } as any,
+    mockEiscp,
+    avrStateManager,
+    testAvrContexts,
+    testMediaBrowserServices,
+    testConfigStore
+  );
+  const registrar = new EntityRegistrar(undefined as never, testAvrContexts, testMediaBrowser(avrStateManager), testConfigStore);
   const player = registrar.createMediaPlayerEntity(entityId, 100, async () => uc.StatusCodes.Ok);
 
   avrStateManager.setPowerState(entityId, "on", mockDriver);
@@ -481,10 +477,9 @@ it("Repeated NLT tidal updates do not clear existing Tidal menu options", async 
 });
 
 it("TuneIn service selection preloads My Presets for browsing", async () => {
-  const avrStateModule = await import("../src/avrState.js");
   const processorModule = await import("../src/zoneAgnosticUpdateProcessor.js");
 
-  const { avrStateManager } = avrStateModule as any;
+  const { avrStateManager } = await import("./helpers/avrState.js");
   const { ZoneAgnosticUpdateProcessor } = processorModule as any;
 
   const rawCommands: string[] = [];
@@ -499,7 +494,7 @@ it("TuneIn service selection preloads My Presets for browsing", async () => {
   } as any;
 
   const entityId = "M 1.2.3.4 main";
-  const processor = new ZoneAgnosticUpdateProcessor(mockDriver, { ip: "1.2.3.4", albumArtURL: "na" } as any, mockEiscp, avrStateManager);
+  const processor = new ZoneAgnosticUpdateProcessor(mockDriver, { ip: "1.2.3.4", albumArtURL: "na" } as any, mockEiscp, avrStateManager, testAvrContexts, testMediaBrowserServices, testConfigStore);
 
   avrStateManager.setPowerState(entityId, "on", mockDriver);
   avrStateManager.setSource(entityId, "net", undefined, undefined, mockDriver);
@@ -513,12 +508,11 @@ it("TuneIn service selection preloads My Presets for browsing", async () => {
 });
 
 it("clears the stale TuneIn now-playing mark after switching to DAB and back to TuneIn", async () => {
-  const avrStateModule = await import("../src/avrState.js");
   const processorModule = await import("../src/zoneAgnosticUpdateProcessor.js");
   const tuneInBrowserStoreModule = { ...(await import("../src/tuneInBrowserStore.js")), ...(await import("./helpers/tuneInPresets.js")) };
   const tuneInMenuStoreModule = await import("../src/tuneInMenuStore.js");
 
-  const { avrStateManager } = avrStateModule as any;
+  const { avrStateManager } = await import("./helpers/avrState.js");
   const { ZoneAgnosticUpdateProcessor } = processorModule as any;
   const { addTuneInPreset, updateNowPlayingStation, getTuneInBrowseState } = tuneInBrowserStoreModule as any;
   const { setTuneInMenuNowPlayingStation, getTuneInMenuBrowseState } = tuneInMenuStoreModule as any;
@@ -535,7 +529,15 @@ it("clears the stale TuneIn now-playing mark after switching to DAB and back to 
   } as any;
 
   const entityId = "TX-RZ50 192.168.2.113 main";
-  const processor = new ZoneAgnosticUpdateProcessor(mockDriver, { ip: "192.168.2.113", albumArtURL: "na" } as any, mockEiscp, avrStateManager);
+  const processor = new ZoneAgnosticUpdateProcessor(
+    mockDriver,
+    { ip: "192.168.2.113", albumArtURL: "na" } as any,
+    mockEiscp,
+    avrStateManager,
+    testAvrContexts,
+    testMediaBrowserServices,
+    testConfigStore
+  );
 
   avrStateManager.setPowerState(entityId, "on", mockDriver);
   avrStateManager.setSource(entityId, "net", undefined, undefined, mockDriver);
@@ -544,9 +546,9 @@ it("clears the stale TuneIn now-playing mark after switching to DAB and back to 
   await processor.handleNlt(entityId, "TuneIn", "main");
   addTuneInPreset(entityId, "JOE Non-stop (80's)", "JOE Non-stop (80's)", "JOE Non-stop (80's)", () => "");
   updateNowPlayingStation(entityId, "JOE Non-stop (80's)");
-  setTuneInMenuNowPlayingStation(entityId, "JOE Non-stop (80's)");
+  setTuneInMenuNowPlayingStation(entityId, "JOE Non-stop (80's)", testAvrContexts);
   expect(getTuneInBrowseState(entityId)?.nowPlayingStation ?? "").toBe("JOE Non-stop (80's)");
-  expect(getTuneInMenuBrowseState(entityId)?.nowPlayingTitle ?? "").toBe("JOE Non-stop (80's)");
+  expect(getTuneInMenuBrowseState(entityId, testAvrContexts)?.nowPlayingTitle ?? "").toBe("JOE Non-stop (80's)");
 
   // Leave for DAB: the stale sub-source must be dropped so a later re-entry is detected as a change.
   avrStateManager.setSource(entityId, "dab", undefined, undefined, mockDriver);
@@ -557,15 +559,14 @@ it("clears the stale TuneIn now-playing mark after switching to DAB and back to 
   await processor.handleNlt(entityId, "TuneIn", "main");
 
   expect(getTuneInBrowseState(entityId)?.nowPlayingStation ?? "").toBe("");
-  expect(getTuneInMenuBrowseState(entityId)?.nowPlayingTitle ?? "").toBe("");
+  expect(getTuneInMenuBrowseState(entityId, testAvrContexts)?.nowPlayingTitle ?? "").toBe("");
 });
 
 it("CommandSender silently absorbs shuffle, repeat, and browse commands", async () => {
   const senderModule = await import("../src/commandSender.js");
-  const avrStateModule = await import("../src/avrState.js");
 
   const CommandSender = senderModule.CommandSender as any;
-  const { avrStateManager } = avrStateModule as any;
+  const { avrStateManager } = await import("./helpers/avrState.js");
 
   class MockEiscp {
     public connected = true;
@@ -586,7 +587,9 @@ it("CommandSender silently absorbs shuffle, repeat, and browse commands", async 
     { avrs: [{ model: "M", ip: "1.2.3.4", zone: "main", port: 60128, netMenuDelay: 0 }] },
     new MockEiscp() as any,
     avrStateManager,
-    null
+    null,
+    testAvrContexts,
+    testMediaBrowser(avrStateManager)
   );
 
   avrStateManager.setPowerState(entityId, "on");
@@ -602,10 +605,9 @@ it("CommandSender silently absorbs shuffle, repeat, and browse commands", async 
 
 it("CommandSender play_media routes TuneIn preset IDs to tunein-preset", async () => {
   const senderModule = await import("../src/commandSender.js");
-  const avrStateModule = await import("../src/avrState.js");
 
   const CommandSender = senderModule.CommandSender as any;
-  const { avrStateManager } = avrStateModule as any;
+  const { avrStateManager } = await import("./helpers/avrState.js");
 
   class MockEiscp {
     public connected = true;
@@ -632,7 +634,9 @@ it("CommandSender play_media routes TuneIn preset IDs to tunein-preset", async (
     { avrs: [{ model: "M", ip: "1.2.3.4", zone: "main", port: 60128, netMenuDelay: 0 }] },
     eiscp as any,
     avrStateManager,
-    null
+    null,
+    testAvrContexts,
+    testMediaBrowser(avrStateManager)
   );
 
   avrStateManager.setSource(entityId, "cd");
@@ -650,10 +654,9 @@ it("CommandSender play_media routes TuneIn preset IDs to tunein-preset", async (
 
 it("CommandSender play_media routes Tidal menu IDs to NLSI", async () => {
   const senderModule = await import("../src/commandSender.js");
-  const avrStateModule = await import("../src/avrState.js");
 
   const CommandSender = senderModule.CommandSender as any;
-  const { avrStateManager } = avrStateModule as any;
+  const { avrStateManager } = await import("./helpers/avrState.js");
 
   class MockEiscp {
     public connected = true;
@@ -680,7 +683,9 @@ it("CommandSender play_media routes Tidal menu IDs to NLSI", async () => {
     { avrs: [{ model: "M", ip: "1.2.3.5", zone: "main", port: 60128, netMenuDelay: 0 }] },
     eiscp as any,
     avrStateManager,
-    null
+    null,
+    testAvrContexts,
+    testMediaBrowser(avrStateManager)
   );
 
   avrStateManager.setSource(entityId, "cd");
@@ -698,10 +703,9 @@ it("CommandSender play_media routes Tidal menu IDs to NLSI", async () => {
 
 it("CommandSender play_media routes Deezer menu IDs through XML browsing", async () => {
   const senderModule = await import("../src/commandSender.js");
-  const avrStateModule = await import("../src/avrState.js");
 
   const CommandSender = senderModule.CommandSender as any;
-  const { avrStateManager } = avrStateModule as any;
+  const { avrStateManager } = await import("./helpers/avrState.js");
 
   class MockEiscp {
     public connected = true;
@@ -728,7 +732,9 @@ it("CommandSender play_media routes Deezer menu IDs through XML browsing", async
     { avrs: [{ model: "M", ip: "1.2.3.9", zone: "main", port: 60128, netMenuDelay: 0 }] },
     eiscp as any,
     avrStateManager,
-    null
+    null,
+    testAvrContexts,
+    testMediaBrowser(avrStateManager)
   );
 
   avrStateManager.setSource(entityId, "cd");
@@ -746,14 +752,12 @@ it("CommandSender play_media routes Deezer menu IDs through XML browsing", async
 
 it("CommandSender Deezer track selection uses XML browsing and sets now-playing title", async () => {
   const senderModule = await import("../src/commandSender.js");
-  const avrStateModule = await import("../src/avrState.js");
   const mediaBrowserModule = await import("../src/mediaBrowser.js");
   const deezerStoreModule = await import("../src/deezerBrowserStore.js");
 
   const CommandSender = senderModule.CommandSender as any;
-  const { avrStateManager } = avrStateModule as any;
-  const { ingestDeezerListEntry } = mediaBrowserModule as any;
-  const { getDeezerBrowseState } = deezerStoreModule as any;
+  const { avrStateManager } = await import("./helpers/avrState.js");
+  const { deezerStore } = deezerStoreModule;
 
   class MockEiscp {
     public connected = true;
@@ -780,12 +784,14 @@ it("CommandSender Deezer track selection uses XML browsing and sets now-playing 
     { avrs: [{ model: "M", ip: "1.2.3.10", zone: "main", port: 60128, netMenuDelay: 0 }] },
     eiscp as any,
     avrStateManager,
-    null
+    null,
+    testAvrContexts,
+    testMediaBrowser(avrStateManager)
   );
 
   avrStateManager.setSource(entityId, "net");
   avrStateManager.setSubSource(entityId, "deezer");
-  ingestDeezerListEntry(entityId, "U0-My Song Title / Artist Name");
+  testMediaBrowserServices.ingestDeezerListEntry(entityId, "U0-My Song Title / Artist Name");
 
   const status = await sender.sharedCmdHandler(new uc.MediaPlayer(entityId, { en: entityId }, {}), uc.MediaPlayerCommands.PlayMedia, {
     media_id: "deezer:menu:1:My%20Song%20Title%20%2F%20Artist%20Name",
@@ -794,18 +800,16 @@ it("CommandSender Deezer track selection uses XML browsing and sets now-playing 
 
   expect(status).toBe(uc.StatusCodes.Ok);
   expect(eiscp.rawCommands).toEqual(["NLAI010000----"]);
-  expect(getDeezerBrowseState(entityId)?.browseListFrozen).toBe(true);
-  expect(getDeezerBrowseState(entityId)?.nowPlayingTitle).toBe("My Song Title / Artist Name");
+  expect(deezerStore.getBrowseState(entityId, testAvrContexts)?.browseListFrozen).toBe(true);
+  expect(deezerStore.getBrowseState(entityId, testAvrContexts)?.nowPlayingTitle).toBe("My Song Title / Artist Name");
 });
 
 it("CommandSender remaps stale Tidal index using title encoded in media_id", async () => {
   const senderModule = await import("../src/commandSender.js");
-  const avrStateModule = await import("../src/avrState.js");
   const mediaBrowserModule = await import("../src/mediaBrowser.js");
 
   const CommandSender = senderModule.CommandSender as any;
-  const { avrStateManager } = avrStateModule as any;
-  const { ingestTidalListEntry } = mediaBrowserModule as any;
+  const { avrStateManager } = await import("./helpers/avrState.js");
 
   class MockEiscp {
     public connected = true;
@@ -832,14 +836,16 @@ it("CommandSender remaps stale Tidal index using title encoded in media_id", asy
     { avrs: [{ model: "M", ip: "1.2.3.7", zone: "main", port: 60128, netMenuDelay: 0 }] },
     eiscp as any,
     avrStateManager,
-    null
+    null,
+    testAvrContexts,
+    testMediaBrowser(avrStateManager)
   );
 
   avrStateManager.setSource(entityId, "net");
   avrStateManager.setSubSource(entityId, "tidal");
 
-  ingestTidalListEntry(entityId, "U0-Playlists %s");
-  ingestTidalListEntry(entityId, "U1-New %s");
+  testMediaBrowserServices.ingestTidalListEntry(entityId, "U0-Playlists %s");
+  testMediaBrowserServices.ingestTidalListEntry(entityId, "U1-New %s");
 
   const status = await sender.sharedCmdHandler(new uc.MediaPlayer(entityId, { en: entityId }, {}), uc.MediaPlayerCommands.PlayMedia, {
     media_id: "tidal:menu:9:Playlists",
@@ -853,12 +859,11 @@ it("CommandSender remaps stale Tidal index using title encoded in media_id", asy
 
 it("CommandSender first selection after Main Tidal Menu skips pre-list command", async () => {
   const senderModule = await import("../src/commandSender.js");
-  const avrStateModule = await import("../src/avrState.js");
   const tidalStoreModule = await import("../src/tidalBrowserStore.js");
 
   const CommandSender = senderModule.CommandSender as any;
-  const { avrStateManager } = avrStateModule as any;
-  const { getTidalBrowseState } = tidalStoreModule as any;
+  const { avrStateManager } = await import("./helpers/avrState.js");
+  const { tidalStore } = tidalStoreModule;
 
   class MockEiscp {
     public connected = true;
@@ -885,12 +890,14 @@ it("CommandSender first selection after Main Tidal Menu skips pre-list command",
     { avrs: [{ model: "M", ip: "1.2.3.8", zone: "main", port: 60128, netMenuDelay: 0 }] },
     eiscp as any,
     avrStateManager,
-    null
+    null,
+    testAvrContexts,
+    testMediaBrowser(avrStateManager)
   );
 
   avrStateManager.setSource(entityId, "net");
   avrStateManager.setSubSource(entityId, "tidal");
-  const browseState47 = getTidalBrowseState(entityId);
+  const browseState47 = tidalStore.getBrowseState(entityId, testAvrContexts);
   if (browseState47) browseState47.traceNextSelectionAfterMainMenu = true;
 
   const status = await sender.sharedCmdHandler(new uc.MediaPlayer(entityId, { en: entityId }, {}), uc.MediaPlayerCommands.PlayMedia, {
@@ -905,12 +912,11 @@ it("CommandSender first selection after Main Tidal Menu skips pre-list command",
 
 it("CommandSender in-Tidal track selection uses direct NLSI when AVR is in list mode", async () => {
   const senderModule = await import("../src/commandSender.js");
-  const avrStateModule = await import("../src/avrState.js");
   const storeModule = await import("../src/tidalBrowserStore.js");
 
   const CommandSender = senderModule.CommandSender as any;
-  const { avrStateManager } = avrStateModule as any;
-  const { getTidalBrowseState } = storeModule as any;
+  const { avrStateManager } = await import("./helpers/avrState.js");
+  const { tidalStore } = storeModule;
 
   class MockEiscp {
     public connected = true;
@@ -934,7 +940,9 @@ it("CommandSender in-Tidal track selection uses direct NLSI when AVR is in list 
     { avrs: [{ model: "M", ip: "1.2.3.9", zone: "main", port: 60128, netMenuDelay: 0 }] },
     eiscp as any,
     avrStateManager,
-    null
+    null,
+    testAvrContexts,
+    testMediaBrowser(avrStateManager)
   );
 
   avrStateManager.setSource(entityId, "net");
@@ -942,7 +950,7 @@ it("CommandSender in-Tidal track selection uses direct NLSI when AVR is in list 
   // Simulate a song playing in the background while user was browsing menus
   avrStateManager.setPlaybackStatus(entityId, "playing", undefined);
   // Browse callback just finished streaming the NLS list — AVR is in list mode
-  const browseState48 = getTidalBrowseState(entityId);
+  const browseState48 = tidalStore.getBrowseState(entityId, testAvrContexts);
   if (browseState48) browseState48.listModeActive = true;
 
   const status = await sender.sharedCmdHandler(new uc.MediaPlayer(entityId, { en: entityId }, {}), uc.MediaPlayerCommands.PlayMedia, {
@@ -958,10 +966,9 @@ it("CommandSender in-Tidal track selection uses direct NLSI when AVR is in list 
 
 it("CommandSender in-Tidal track selection sends list before NLSI when AVR is playing", async () => {
   const senderModule = await import("../src/commandSender.js");
-  const avrStateModule = await import("../src/avrState.js");
 
   const CommandSender = senderModule.CommandSender as any;
-  const { avrStateManager } = avrStateModule as any;
+  const { avrStateManager } = await import("./helpers/avrState.js");
 
   class MockEiscp {
     public connected = true;
@@ -985,7 +992,9 @@ it("CommandSender in-Tidal track selection sends list before NLSI when AVR is pl
     { avrs: [{ model: "M", ip: "1.2.3.10", zone: "main", port: 60128, netMenuDelay: 0 }] },
     eiscp as any,
     avrStateManager,
-    null
+    null,
+    testAvrContexts,
+    testMediaBrowser(avrStateManager)
   );
 
   avrStateManager.setSource(entityId, "net");
@@ -1004,10 +1013,9 @@ it("CommandSender in-Tidal track selection sends list before NLSI when AVR is pl
 
 it("CommandSender in-Tidal menu selection uses direct NLSI even when AVR is playing", async () => {
   const senderModule = await import("../src/commandSender.js");
-  const avrStateModule = await import("../src/avrState.js");
 
   const CommandSender = senderModule.CommandSender as any;
-  const { avrStateManager } = avrStateModule as any;
+  const { avrStateManager } = await import("./helpers/avrState.js");
 
   class MockEiscp {
     public connected = true;
@@ -1031,7 +1039,9 @@ it("CommandSender in-Tidal menu selection uses direct NLSI even when AVR is play
     { avrs: [{ model: "M", ip: "1.2.3.11", zone: "main", port: 60128, netMenuDelay: 0 }] },
     eiscp as any,
     avrStateManager,
-    null
+    null,
+    testAvrContexts,
+    testMediaBrowser(avrStateManager)
   );
 
   avrStateManager.setSource(entityId, "net");
@@ -1050,10 +1060,9 @@ it("CommandSender in-Tidal menu selection uses direct NLSI even when AVR is play
 
 it("CommandSender play_media routes Main Tidal Menu to input-selector tidal", async () => {
   const senderModule = await import("../src/commandSender.js");
-  const avrStateModule = await import("../src/avrState.js");
 
   const CommandSender = senderModule.CommandSender as any;
-  const { avrStateManager } = avrStateModule as any;
+  const { avrStateManager } = await import("./helpers/avrState.js");
 
   const commandCalls: string[] = [];
 
@@ -1070,7 +1079,15 @@ it("CommandSender play_media routes Main Tidal Menu to input-selector tidal", as
   const entityId = "M 1.2.3.6 main";
   const mockDriver = { updateEntityAttributes: () => true } as any;
   const mockReceiver = {} as any;
-  const sender = new CommandSender(mockDriver, { avrs: [{ model: "M", ip: "1.2.3.6", zone: "main", netMenuDelay: 0 }] } as any, new MockEiscp(), avrStateManager, mockReceiver);
+  const sender = new CommandSender(
+    mockDriver,
+    { avrs: [{ model: "M", ip: "1.2.3.6", zone: "main", netMenuDelay: 0 }] } as any,
+    new MockEiscp(),
+    avrStateManager,
+    mockReceiver,
+    testAvrContexts,
+    testMediaBrowser(avrStateManager)
+  );
 
   avrStateManager.setSource(entityId, "net");
   avrStateManager.setSubSource(entityId, "tidal");
@@ -1086,10 +1103,9 @@ it("CommandSender play_media routes Main Tidal Menu to input-selector tidal", as
 
 it("CommandSender play_media routes TuneIn main menu through NSV0E0", async () => {
   const senderModule = await import("../src/commandSender.js");
-  const avrStateModule = await import("../src/avrState.js");
 
   const CommandSender = senderModule.CommandSender as any;
-  const { avrStateManager } = avrStateModule as any;
+  const { avrStateManager } = await import("./helpers/avrState.js");
 
   const commandCalls: string[] = [];
   const rawCalls: string[] = [];
@@ -1109,7 +1125,15 @@ it("CommandSender play_media routes TuneIn main menu through NSV0E0", async () =
   const entityId = "M 1.2.3.6 main";
   const mockDriver = { updateEntityAttributes: () => true } as any;
   const mockReceiver = {} as any;
-  const sender = new CommandSender(mockDriver, { avrs: [{ model: "M", ip: "1.2.3.6", zone: "main", netMenuDelay: 0 }] } as any, new MockEiscp(), avrStateManager, mockReceiver);
+  const sender = new CommandSender(
+    mockDriver,
+    { avrs: [{ model: "M", ip: "1.2.3.6", zone: "main", netMenuDelay: 0 }] } as any,
+    new MockEiscp(),
+    avrStateManager,
+    mockReceiver,
+    testAvrContexts,
+    testMediaBrowser(avrStateManager)
+  );
 
   avrStateManager.setSource(entityId, "net");
   avrStateManager.setSubSource(entityId, "tunein");
@@ -1125,10 +1149,9 @@ it("CommandSender play_media routes TuneIn main menu through NSV0E0", async () =
 
 it("CommandSender legacy TuneIn root relies on source selection without entering My Presets", async () => {
   const senderModule = await import("../src/commandSender.js");
-  const avrStateModule = await import("../src/avrState.js");
 
   const CommandSender = senderModule.CommandSender as any;
-  const { avrStateManager } = avrStateModule as any;
+  const { avrStateManager } = await import("./helpers/avrState.js");
   const commandCalls: string[] = [];
   const rawCalls: string[] = [];
 
@@ -1152,7 +1175,9 @@ it("CommandSender legacy TuneIn root relies on source selection without entering
     { avrs: [{ model: "M", ip: "1.2.3.7", zone: "main", netMenuDelay: 0, networkNavigationMode: "legacy" }] } as any,
     new MockEiscp(),
     avrStateManager,
-    {} as any
+    {} as any,
+    testAvrContexts,
+    testMediaBrowser(avrStateManager)
   );
 
   avrStateManager.setSource(entityId, "net");
@@ -1172,7 +1197,7 @@ it("CommandSender play_media routes Tidal Back option to RETURN", async () => {
   const avrStateModule = await import("../src/avrState.js");
 
   const CommandSender = senderModule.CommandSender as any;
-  const { avrStateManager } = avrStateModule as any;
+  const { avrStateManager } = await import("./helpers/avrState.js");
 
   const rawCalls: string[] = [];
 
@@ -1189,7 +1214,15 @@ it("CommandSender play_media routes Tidal Back option to RETURN", async () => {
   const entityId = "M 1.2.3.6 main";
   const mockDriver = { updateEntityAttributes: () => true } as any;
   const mockReceiver = {} as any;
-  const sender = new CommandSender(mockDriver, { avrs: [{ model: "M", ip: "1.2.3.6", zone: "main", netMenuDelay: 0 }] } as any, new MockEiscp(), avrStateManager, mockReceiver);
+  const sender = new CommandSender(
+    mockDriver,
+    { avrs: [{ model: "M", ip: "1.2.3.6", zone: "main", netMenuDelay: 0 }] } as any,
+    new MockEiscp(),
+    avrStateManager,
+    mockReceiver,
+    testAvrContexts,
+    testMediaBrowser(avrStateManager)
+  );
 
   avrStateManager.setSource(entityId, "net");
   avrStateManager.setSubSource(entityId, "tidal");
@@ -1208,7 +1241,7 @@ it("CommandSender play_media routes TuneIn Back option to RETURN", async () => {
   const avrStateModule = await import("../src/avrState.js");
 
   const CommandSender = senderModule.CommandSender as any;
-  const { avrStateManager } = avrStateModule as any;
+  const { avrStateManager } = await import("./helpers/avrState.js");
 
   const rawCalls: string[] = [];
 
@@ -1225,7 +1258,15 @@ it("CommandSender play_media routes TuneIn Back option to RETURN", async () => {
   const entityId = "M 1.2.3.6 main";
   const mockDriver = { updateEntityAttributes: () => true } as any;
   const mockReceiver = {} as any;
-  const sender = new CommandSender(mockDriver, { avrs: [{ model: "M", ip: "1.2.3.6", zone: "main", netMenuDelay: 0 }] } as any, new MockEiscp(), avrStateManager, mockReceiver);
+  const sender = new CommandSender(
+    mockDriver,
+    { avrs: [{ model: "M", ip: "1.2.3.6", zone: "main", netMenuDelay: 0 }] } as any,
+    new MockEiscp(),
+    avrStateManager,
+    mockReceiver,
+    testAvrContexts,
+    testMediaBrowser(avrStateManager)
+  );
 
   avrStateManager.setSource(entityId, "net");
   avrStateManager.setSubSource(entityId, "tunein");
@@ -1257,7 +1298,7 @@ describe("CommandSender play_media with legacy network navigation", () => {
 
   async function setup(ip: string, service: "tidal" | "deezer") {
     const { CommandSender } = (await import("../src/commandSender.js")) as any;
-    const { avrStateManager } = (await import("../src/avrState.js")) as any;
+    const { avrStateManager } = await import("./helpers/avrState.js");
     const { getMenuBrowseService } = await import("../src/menuBrowseServices.js");
     const entityId = `M ${ip} main`;
     const eiscp = new MockEiscp();
@@ -1266,12 +1307,14 @@ describe("CommandSender play_media with legacy network navigation", () => {
       { avrs: [{ model: "M", ip, zone: "main", port: 60128, netMenuDelay: 0, networkNavigationMode: "legacy" }] },
       eiscp as any,
       avrStateManager,
-      null
+      null,
+      testAvrContexts,
+      testMediaBrowser(avrStateManager)
     );
     avrStateManager.setSource(entityId, "net");
     avrStateManager.setSubSource(entityId, service);
     const store = getMenuBrowseService(service)!.store;
-    store.resetState(entityId);
+    store.resetState(entityId, testAvrContexts);
     return { sender, eiscp, entityId, avrStateManager, store };
   }
 
@@ -1287,13 +1330,13 @@ describe("CommandSender play_media with legacy network navigation", () => {
     expect(status).toBe(uc.StatusCodes.Ok);
     expect(eiscp.commands).toEqual(["network-usb list"]);
     expect(eiscp.rawCommands).toEqual(["NLSI00004"]);
-    expect(store.getBrowseState(entityId)).toMatchObject({ browseListFrozen: true, nowPlayingTitle: "Song - Artist" });
+    expect(store.getBrowseState(entityId, testAvrContexts)).toMatchObject({ browseListFrozen: true, nowPlayingTitle: "Song - Artist" });
   });
 
   it("does not switch to list mode again when it is already active", async () => {
     const { sender, eiscp, entityId, avrStateManager, store } = await setup("1.2.3.22", "deezer");
     avrStateManager.setPlaybackStatus(entityId, "playing");
-    store.getBrowseState(entityId)!.listModeActive = true;
+    store.getBrowseState(entityId, testAvrContexts)!.listModeActive = true;
 
     const status = await sender.sharedCmdHandler(new uc.MediaPlayer(entityId, { en: entityId }, {}), uc.MediaPlayerCommands.PlayMedia, {
       media_id: "deezer:menu:2:Song%20-%20Artist",

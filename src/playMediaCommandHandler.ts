@@ -1,3 +1,4 @@
+import type { MediaBrowserServices } from "./mediaBrowserServices.js";
 import * as uc from "@unfoldedcircle/integration-api";
 import { EiscpDriver } from "./eiscp.js";
 import { ICommandReceiver, AvrStateApi } from "./types.js";
@@ -13,7 +14,6 @@ import {
   resolveDeezerMenuOption,
   resolveMusicServerMenuOption,
   resolveTidalMenuOption,
-  resolveTuneInMenuOption,
   resolveTuneInPreset,
   TIDAL_BACK_ID,
   TIDAL_ROOT_TYPE,
@@ -25,8 +25,8 @@ import {
 import { getMenuBrowseService, xmlBrowseSelectCommand } from "./menuBrowseServices.js";
 import { consumeTuneInListModeActive, getTuneInMenuBrowseState, resetTuneInMenuBrowseState, setTuneInMenuBrowseFrozen, setTuneInMenuNowPlayingStation } from "./tuneInMenuStore.js";
 import type { TuneInPresetStore } from "./tuneInBrowserStore.js";
-import { sharedAvrContexts, type AvrContextRegistry } from "./avrContext.js";
-import { AVR_DEFAULTS, ConfigManager, DEFAULT_QUEUE_THRESHOLD, buildEntityId } from "./configManager.js";
+import type { AvrContextRegistry } from "./avrContext.js";
+import { AVR_DEFAULTS, DEFAULT_QUEUE_THRESHOLD } from "./configManager.js";
 import {
   DEEZER_SERVICE_ID,
   getBrowseServiceSelectSourceCommand,
@@ -44,18 +44,13 @@ const TUNEIN_MODERN_SELECT_SOURCE_COMMAND = "NSV0E0";
 
 type ZonePrefixFn = (cmd: string) => string;
 
-function getTuneInPresetPosition(entityId: string): number {
-  const cfg = ConfigManager.get();
-  const avr = cfg?.avrs?.find((candidate) => buildEntityId(candidate.model, candidate.ip, candidate.zone) === entityId);
-  return avr?.tuneinPresetPosition ?? AVR_DEFAULTS.tuneinPresetPosition;
-}
-
 export type PlayMediaCommandContext = {
   entityId: string;
   mediaId?: string;
   mediaType?: string;
   netMenuDelay?: number;
   networkNavigationMode?: NetworkNavigationMode;
+  tuneinPresetPosition?: number;
   setZonePrefix: ZonePrefixFn;
 };
 
@@ -101,7 +96,8 @@ export class PlayMediaCommandHandler {
     private readonly eiscp: EiscpDriver,
     private readonly avrStateApi: AvrStateApi,
     private readonly commandReceiver: ICommandReceiver | undefined,
-    private readonly avrContexts: AvrContextRegistry = sharedAvrContexts
+    private readonly avrContexts: AvrContextRegistry,
+    private readonly mediaServices: MediaBrowserServices
   ) {}
 
   private tuneInPresetsOf(entityId: string): TuneInPresetStore | undefined {
@@ -148,7 +144,7 @@ export class PlayMediaCommandHandler {
     const modern = context.networkNavigationMode !== "legacy";
 
     const preset = resolveTuneInPreset(mediaId, mediaType);
-    const tuneInMenuOption = resolveTuneInMenuOption(entityId, mediaId, mediaType);
+    const tuneInMenuOption = this.mediaServices.resolveTuneInMenuOption(entityId, mediaId, mediaType);
     const tuneInRootRequest = isTuneInMenuRootRequest(mediaId, mediaType);
     const tidalMainMenu = isTidalMainMenuRequest(mediaId, mediaType);
     const deezerMainMenu = isDeezerMainMenuRequest(mediaId, mediaType);
@@ -257,7 +253,7 @@ export class PlayMediaCommandHandler {
         log.info("%s [%s] legacy TuneIn selection '%s': NLSI%s", logSource, entityId, tuneInMenuOption.title, String(tuneInMenuOption.menuIndex).padStart(5, "0"));
         await this.eiscp.raw(`NLSI${String(tuneInMenuOption.menuIndex).padStart(5, "0")}`);
       } else if (tuneInMenuOption.title.trim().toLowerCase() === "my presets") {
-        await this.eiscp.raw(`NLSI${String(getTuneInPresetPosition(entityId)).padStart(5, "0")}`);
+        await this.eiscp.raw(`NLSI${String(context.tuneinPresetPosition ?? AVR_DEFAULTS.tuneinPresetPosition).padStart(5, "0")}`);
       } else if (this.tuneInPresetsOf(entityId)?.state().contextTitle === "my presets") {
         // TuneIn's My Presets NLSI positions are one-based, even though the
         // XML browser's NLAI item indexes are zero-based.

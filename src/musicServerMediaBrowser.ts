@@ -1,7 +1,7 @@
 import type { MenuBrowseOption } from "./menuBrowseState.js";
 import { musicServerStore } from "./musicServerBrowserStore.js";
 import { createMediaBrowser, type MediaBrowserApi, type MediaBrowserConfig } from "./menuMediaBrowser.js";
-import { sharedAvrContexts, type AvrContextRegistry } from "./avrContext.js";
+import type { AvrContextRegistry } from "./avrContext.js";
 import type * as uc from "@unfoldedcircle/integration-api";
 
 export const MUSIC_SERVER_ROOT_ID = "music-server:root";
@@ -83,7 +83,7 @@ const BROWSER_CONFIG: MediaBrowserConfig = {
 export class MusicServerMediaBrowser {
   private readonly browser: MediaBrowserApi;
 
-  constructor(private readonly avrContexts: AvrContextRegistry = sharedAvrContexts) {
+  constructor(private readonly avrContexts: AvrContextRegistry) {
     this.browser = createMediaBrowser(BROWSER_CONFIG, musicServerStore, avrContexts);
   }
 

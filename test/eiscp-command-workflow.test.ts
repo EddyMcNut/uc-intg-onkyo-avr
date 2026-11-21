@@ -1,3 +1,4 @@
+import { testAvrContexts } from "./helpers/contexts.js";
 import { describe, expect, it, vi } from "vitest";
 import { EiscpCommandWorkflow } from "../src/eiscpCommandWorkflow.js";
 
@@ -6,6 +7,7 @@ describe("EiscpCommandWorkflow", () => {
     const raw = vi.fn().mockResolvedValue(undefined);
     const publishMetadata = vi.fn();
     const workflow = new EiscpCommandWorkflow({
+      avrContexts: testAvrContexts,
       getConfig: () => ({ netMenuDelay: 0, tuneinPresetPosition: 2 }),
       raw,
       publishMetadata
@@ -20,6 +22,7 @@ describe("EiscpCommandWorkflow", () => {
   it("selects a network service by ID using the requested zone prefix", async () => {
     const raw = vi.fn().mockResolvedValue(undefined);
     const workflow = new EiscpCommandWorkflow({
+      avrContexts: testAvrContexts,
       getConfig: () => ({ netMenuDelay: 0 }),
       raw,
       publishMetadata: vi.fn()

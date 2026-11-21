@@ -1,9 +1,12 @@
 /// <reference types="node" />
+import { testMediaBrowser, testMediaBrowserServices } from "./helpers/mediaBrowserServices.js";
+import { testAvrContexts } from "./helpers/contexts.js";
 import { describe, it, expect, vi } from "vitest";
 import * as uc from "@unfoldedcircle/integration-api";
 import fs from "fs";
 import os from "os";
 import path from "path";
+import { testConfigStore } from "./helpers/configStore.js";
 
 function mkTmpDir(prefix = "onkyo-test-") {
   return fs.mkdtempSync(path.join(os.tmpdir(), prefix));
@@ -48,13 +51,17 @@ describe("createDiracSelectEntity", () => {
     const tmp = mkTmpDir();
     try {
       const cfgModule = (await import("../src/configManager.js")) as any;
-      if (typeof cfgModule.setConfigDir === "function") cfgModule.setConfigDir(tmp);
-      cfgModule.ConfigManager.save({ avrs: [{ model: "TX-RZ50", ip: "192.168.1.2", port: 60128, zone: "main", entityNameStyle: "short" }] });
+      const configStore = new cfgModule.ConfigStore(cfgModule.configPathFor(tmp));
+      configStore.save({ avrs: [{ model: "TX-RZ50", ip: "192.168.1.2", port: 60128, zone: "main", entityNameStyle: "short" }] });
 
       const module = (await import("../src/entityRegistrar.js")) as any;
       const EntityRegistrar = module.default;
-      const avrStateModule = (await import("../src/avrState.js")) as any;
-      const registrar = new EntityRegistrar(avrStateModule.avrStateManager);
+      const registrar = new EntityRegistrar(
+        (await import("./helpers/avrState.js")).avrStateManager,
+        testAvrContexts,
+        testMediaBrowser((await import("./helpers/avrState.js")).avrStateManager),
+        configStore
+      );
       const avrEntry = "TX-RZ50 192.168.1.2 main";
 
       const select = registrar.createDiracSelectEntity(avrEntry, async () => uc.StatusCodes.Ok);
@@ -75,16 +82,21 @@ describe("createDiracSelectEntity", () => {
     const tmp = mkTmpDir();
     try {
       const cfgModule = (await import("../src/configManager.js")) as any;
-      if (typeof cfgModule.setConfigDir === "function") cfgModule.setConfigDir(tmp);
+      const configStore = new cfgModule.ConfigStore(cfgModule.configPathFor(tmp));
       // Even with bogus listeningModeOptions config, Dirac options remain the fixed set.
-      cfgModule.ConfigManager.save({
+      configStore.save({
         avrs: [{ model: "TX-RZ50", ip: "192.168.1.2", port: 60128, zone: "main", entityNameStyle: "short", listeningModeOptions: ["stereo", "direct"] }]
       });
 
       const module = (await import("../src/entityRegistrar.js")) as any;
       const EntityRegistrar = module.default;
       const avrStateModule = (await import("../src/avrState.js")) as any;
-      const registrar = new EntityRegistrar(avrStateModule.avrStateManager);
+      const registrar = new EntityRegistrar(
+        (await import("./helpers/avrState.js")).avrStateManager,
+        testAvrContexts,
+        testMediaBrowser((await import("./helpers/avrState.js")).avrStateManager),
+        configStore
+      );
       const select = registrar.createDiracSelectEntity("TX-RZ50 192.168.1.2 main", async () => uc.StatusCodes.Ok);
 
       expect((select.attributes || {}).options).toEqual(["Off", "Slot 1", "Slot 2", "Slot 3"]);
@@ -102,10 +114,9 @@ describe("Dirac receive path (CommandReceiver.handleDirac)", () => {
       const ConfigModule = (await import("../src/configManager.js")) as any;
       const avrStateModule = (await import("../src/avrState.js")) as any;
       const { CommandReceiver } = crModule;
-      const { ConfigManager, setConfigDir } = ConfigModule;
-      const { avrStateManager } = avrStateModule;
-      if (typeof setConfigDir === "function") setConfigDir(tmp);
-      ConfigManager.save({ avrs: [{ model: "M", ip: "1.2.3.4", port: 60128, zone: "main" }] });
+      const { avrStateManager } = await import("./helpers/avrState.js");
+      const configStore = new ConfigModule.ConfigStore(ConfigModule.configPathFor(tmp));
+      configStore.save({ avrs: [{ model: "M", ip: "1.2.3.4", port: 60128, zone: "main" }] });
 
       const updates: Array<{ id: string; attrs: { [key: string]: string | number | boolean } }> = [];
       const mockDriver: Partial<uc.IntegrationAPI> = {
@@ -129,7 +140,7 @@ describe("Dirac receive path (CommandReceiver.handleDirac)", () => {
       }
       const mockEiscp = new MockEiscp();
 
-      const receiver = new CommandReceiver(mockDriver, ConfigManager.load(), mockEiscp as any, avrStateManager, "v-test");
+      const receiver = new CommandReceiver(mockDriver, configStore.load(), mockEiscp as any, avrStateManager, testAvrContexts, testMediaBrowser(avrStateManager), configStore, "v-test");
       receiver.setupEiscpListener();
       const entityId = "M 1.2.3.4 main";
 
@@ -161,10 +172,9 @@ describe("Dirac receive path (CommandReceiver.handleDirac)", () => {
       const ConfigModule = (await import("../src/configManager.js")) as any;
       const avrStateModule = (await import("../src/avrState.js")) as any;
       const { CommandReceiver } = crModule;
-      const { ConfigManager, setConfigDir } = ConfigModule;
-      const { avrStateManager } = avrStateModule;
-      if (typeof setConfigDir === "function") setConfigDir(tmp);
-      ConfigManager.save({ avrs: [{ model: "M", ip: "1.2.3.4", port: 60128, zone: "main" }] });
+      const { avrStateManager } = await import("./helpers/avrState.js");
+      const configStore = new ConfigModule.ConfigStore(ConfigModule.configPathFor(tmp));
+      configStore.save({ avrs: [{ model: "M", ip: "1.2.3.4", port: 60128, zone: "main" }] });
 
       const updates: Array<{ id: string; attrs: { [key: string]: string | number | boolean } }> = [];
       const mockDriver: Partial<uc.IntegrationAPI> = {
@@ -188,7 +198,7 @@ describe("Dirac receive path (CommandReceiver.handleDirac)", () => {
       }
       const mockEiscp = new MockEiscp();
 
-      const receiver = new CommandReceiver(mockDriver, ConfigManager.load(), mockEiscp as any, avrStateManager, "v-test");
+      const receiver = new CommandReceiver(mockDriver, configStore.load(), mockEiscp as any, avrStateManager, testAvrContexts, testMediaBrowser(avrStateManager), configStore, "v-test");
       receiver.setupEiscpListener();
 
       for (const arg of ["undefined", "unknown", "query"]) {

@@ -1,11 +1,13 @@
+import { testMediaBrowser, testMediaBrowserServices } from "./helpers/mediaBrowserServices.js";
+import { testAvrContexts } from "./helpers/contexts.js";
 import { describe, expect, it, vi } from "vitest";
 import { normalizeAvrConfig, normalizeLearnedListeningModes, parseBoolean, parseSelectOptions, parseVolumeScale, resolveVolumeScale } from "../src/configConstants.js";
 import { getKnownListeningModes, normalizeListeningModePreferences, normalizeListeningModes, resolveListeningModePreferences, resolveListeningModes } from "../src/listeningModePreferences.js";
-import { ConfigManager } from "../src/configManager.js";
 import { findLearnedListeningModeCode, findLearnedListeningModeName, getLearnedListeningModes, learnListeningMode } from "../src/learnedListeningModeStore.js";
 import { parseAvrInfo } from "../src/avrInfoStore.js";
 import { ZoneAgnosticUpdateProcessor } from "../src/zoneAgnosticUpdateProcessor.js";
 import { EiscpDriver } from "../src/eiscp.js";
+import { memoryConfigStore, testConfigStore } from "./helpers/configStore.js";
 
 describe("configuration branch coverage", () => {
   it("handles every select-option sentinel and invalid input type", () => {
@@ -116,20 +118,21 @@ describe("listening mode branch coverage", () => {
 
 describe("learned mode store branches", () => {
   it("handles malformed entities, lookups, learning and duplicates", () => {
-    ConfigManager.save({ avrs: [{ model: "M", ip: "1.2.3.4", port: 60128, zone: "main", listeningModes: { "00": { name: "Stereo", setting: "stereo" } } }] });
-    expect(getLearnedListeningModes("bad")).toEqual([]);
-    expect(findLearnedListeningModeCode("M 1.2.3.4", " stereo ")).toBe("00");
-    expect(findLearnedListeningModeCode("M 1.2.3.4", "missing")).toBeUndefined();
-    expect(findLearnedListeningModeName("M 1.2.3.4", "00")).toBe("Stereo");
-    expect(findLearnedListeningModeName("M 1.2.3.4", "ff")).toBeUndefined();
-    expect(learnListeningMode("bad", { code: "01", name: "Bad" })).toBe(false);
-    expect(learnListeningMode("M 1.2.3.4 main", { code: "01", name: "Direct" })).toBe(true);
-    expect(learnListeningMode("M 1.2.3.4 main", { code: "01", name: "Direct" })).toBe(false);
-    expect(learnListeningMode("M 1.2.3.4 main", { code: "80", name: "Dolby Audio - Surr", source: "stm", audioFormat: "PCM Stereo", inputChannels: "2.0 ch" })).toBe(true);
-    expect(learnListeningMode("M 1.2.3.4 main", { code: "80", name: "Dolby Atmos", source: "stm", audioFormat: "Dolby Atmos", inputChannels: "5.1 ch" })).toBe(true);
-    expect(getLearnedListeningModes("M 1.2.3.4 main", "stm", "PCM Stereo", "2.0 ch").map((mode) => mode.name)).toContain("Dolby Audio - Surr");
-    expect(getLearnedListeningModes("M 1.2.3.4 main", "stm", "Dolby Atmos", "5.1 ch").map((mode) => mode.name)).toContain("Dolby Atmos");
-    expect(learnListeningMode("M 1.2.3.4 main", { code: "bad", name: "Bad" })).toBe(false);
+    const store = memoryConfigStore();
+    store.save({ avrs: [{ model: "M", ip: "1.2.3.4", port: 60128, zone: "main", listeningModes: { "00": { name: "Stereo", setting: "stereo" } } }] });
+    expect(getLearnedListeningModes(store, "bad")).toEqual([]);
+    expect(findLearnedListeningModeCode(store, "M 1.2.3.4", " stereo ")).toBe("00");
+    expect(findLearnedListeningModeCode(store, "M 1.2.3.4", "missing")).toBeUndefined();
+    expect(findLearnedListeningModeName(store, "M 1.2.3.4", "00")).toBe("Stereo");
+    expect(findLearnedListeningModeName(store, "M 1.2.3.4", "ff")).toBeUndefined();
+    expect(learnListeningMode(store, "bad", { code: "01", name: "Bad" })).toBe(false);
+    expect(learnListeningMode(store, "M 1.2.3.4 main", { code: "01", name: "Direct" })).toBe(true);
+    expect(learnListeningMode(store, "M 1.2.3.4 main", { code: "01", name: "Direct" })).toBe(false);
+    expect(learnListeningMode(store, "M 1.2.3.4 main", { code: "80", name: "Dolby Audio - Surr", source: "stm", audioFormat: "PCM Stereo", inputChannels: "2.0 ch" })).toBe(true);
+    expect(learnListeningMode(store, "M 1.2.3.4 main", { code: "80", name: "Dolby Atmos", source: "stm", audioFormat: "Dolby Atmos", inputChannels: "5.1 ch" })).toBe(true);
+    expect(getLearnedListeningModes(store, "M 1.2.3.4 main", "stm", "PCM Stereo", "2.0 ch").map((mode) => mode.name)).toContain("Dolby Audio - Surr");
+    expect(getLearnedListeningModes(store, "M 1.2.3.4 main", "stm", "Dolby Atmos", "5.1 ch").map((mode) => mode.name)).toContain("Dolby Atmos");
+    expect(learnListeningMode(store, "M 1.2.3.4 main", { code: "bad", name: "Bad" })).toBe(false);
   });
 });
 
@@ -166,7 +169,7 @@ describe("zone-agnostic processor branches", () => {
       setAudioFormat: () => true
     } as any;
     const eiscp = { raw: vi.fn().mockResolvedValue(undefined) } as any;
-    return new ZoneAgnosticUpdateProcessor(driver, { avrs: [] }, eiscp, state) as any;
+    return new ZoneAgnosticUpdateProcessor(driver, { avrs: [] }, eiscp, state, testAvrContexts, testMediaBrowserServices, testConfigStore) as any;
   }
 
   it("covers fallback zones, IFA defaults and song-info requests", async () => {
@@ -195,7 +198,7 @@ describe("zone-agnostic processor branches", () => {
 
 describe("eISCP command routing branches", () => {
   it("covers NSS, NSV, TIP validation and unmapped LMD values", async () => {
-    const driver = new EiscpDriver({ model: "M", host: "1.2.3.4", netMenuDelay: 0, tuneinPresetPosition: 2 }) as any;
+    const driver = new EiscpDriver({ model: "M", host: "1.2.3.4", netMenuDelay: 0, tuneinPresetPosition: 2 }, testAvrContexts, testConfigStore) as any;
     const raw = vi.spyOn(driver, "raw").mockResolvedValue(undefined);
     expect(driver.extractNSSCode("NSS01")).toBe("NSS01");
     expect(driver.extractNSSCode("SLINSSxx")).toBeUndefined();
@@ -215,7 +218,7 @@ describe("eISCP command routing branches", () => {
   });
 
   it("covers waitForConnect success, close, error and timeout paths", async () => {
-    const driver = new EiscpDriver({ model: "M", host: "1.2.3.4" }) as any;
+    const driver = new EiscpDriver({ model: "M", host: "1.2.3.4" }, testAvrContexts, testConfigStore) as any;
     driver.isConnected = true;
     await expect(driver.waitForConnect()).resolves.toBeUndefined();
     driver.isConnected = false;

@@ -1,7 +1,7 @@
 import type { MenuBrowseOption } from "./menuBrowseState.js";
 import { tidalStore } from "./tidalBrowserStore.js";
 import { createMediaBrowser, type MediaBrowserApi, type MediaBrowserConfig } from "./menuMediaBrowser.js";
-import { sharedAvrContexts, type AvrContextRegistry } from "./avrContext.js";
+import type { AvrContextRegistry } from "./avrContext.js";
 import type * as uc from "@unfoldedcircle/integration-api";
 
 export const TIDAL_ROOT_ID = "tidal:root";
@@ -73,7 +73,7 @@ const BROWSER_CONFIG: MediaBrowserConfig = {
 export class TidalMediaBrowser {
   private readonly browser: MediaBrowserApi;
 
-  constructor(private readonly avrContexts: AvrContextRegistry = sharedAvrContexts) {
+  constructor(private readonly avrContexts: AvrContextRegistry) {
     this.browser = createMediaBrowser(BROWSER_CONFIG, tidalStore, avrContexts);
   }
 

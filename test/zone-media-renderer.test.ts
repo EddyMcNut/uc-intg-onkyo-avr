@@ -75,7 +75,7 @@ describe("renderZoneMedia", () => {
     });
     vi.stubGlobal("fetch", fetchMock);
     try {
-      const { avrStateManager } = await import("../src/avrState.js");
+      const { avrStateManager } = await import("./helpers/avrState.js");
       const entityId = `M 1.2.3.4 main network-normalization-${Date.now()}`;
       avrStateManager.setSource(entityId, "Network");
 

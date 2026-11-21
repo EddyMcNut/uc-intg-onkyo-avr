@@ -1,8 +1,10 @@
+import { testMediaBrowser, testMediaBrowserServices } from "./helpers/mediaBrowserServices.js";
+import { testAvrContexts } from "./helpers/contexts.js";
 import { describe, it, expect } from "vitest";
 
 it("MenuBrowseHandlerBase harvest contract populates contiguous items and clears harvestMode", async () => {
   const baseModule = await import("../src/menuBrowseHandlerBase.js");
-  const { MenuBrowseHandlerBase } = baseModule as { MenuBrowseHandlerBase: new () => any };
+  const { MenuBrowseHandlerBase } = baseModule as unknown as { MenuBrowseHandlerBase: new () => any };
 
   class TestHandler extends MenuBrowseHandlerBase {
     protected readonly logSource = "test:handler";
@@ -79,7 +81,7 @@ it("TuneIn adapter contract ignores legacy NLS menu updates", async () => {
   const tuneInStoreModule = await import("../src/tuneInMenuStore.js");
 
   const { TuneInZoneAgnosticAdapter } = adaptersModule as { TuneInZoneAgnosticAdapter: new (deps: any) => any };
-  const { listTuneInMenuOptions } = tuneInStoreModule as { listTuneInMenuOptions: (entityId: string) => unknown[] };
+  const { listTuneInMenuOptions } = tuneInStoreModule;
 
   const activeZone = "TX-CONTRACT 10.0.0.82 main";
   const controlZone = "TX-CONTRACT 10.0.0.92 main";
@@ -101,6 +103,8 @@ it("TuneIn adapter contract ignores legacy NLS menu updates", async () => {
   };
 
   const adapter = new TuneInZoneAgnosticAdapter({
+    avrContexts: testAvrContexts,
+    mediaBrowserServices: testMediaBrowserServices,
     state,
     getPhysicalAvrId: (entityId: string) => (entityId === controlZone ? "TX-CONTRACT 10.0.0.92" : "TX-CONTRACT 10.0.0.82"),
     isTuneInFullMenu: async () => true,
@@ -109,8 +113,8 @@ it("TuneIn adapter contract ignores legacy NLS menu updates", async () => {
 
   adapter.handleNls(activeZone, "U0-Browse");
 
-  expect(listTuneInMenuOptions(activeZone).length).toBe(0);
-  expect(listTuneInMenuOptions(controlZone).length).toBe(0);
+  expect(listTuneInMenuOptions(activeZone, testAvrContexts).length).toBe(0);
+  expect(listTuneInMenuOptions(controlZone, testAvrContexts).length).toBe(0);
 });
 
 it("TuneIn adapter contract clears stale now-playing marks on fresh entry (even when enteringZones is empty)", async () => {
@@ -119,17 +123,8 @@ it("TuneIn adapter contract clears stale now-playing marks on fresh entry (even 
   const tuneInBrowserStoreModule = { ...(await import("../src/tuneInBrowserStore.js")), ...(await import("./helpers/tuneInPresets.js")) };
 
   const { TuneInZoneAgnosticAdapter } = adaptersModule as { TuneInZoneAgnosticAdapter: new (deps: any) => any };
-  const { addTuneInMenuOption, getTuneInMenuBrowseState, setTuneInMenuNowPlayingStation } = tuneInMenuStoreModule as {
-    addTuneInMenuOption: (entityId: string, menuIndex: number, title: string, isBrowsable: boolean) => void;
-    getTuneInMenuBrowseState: (entityId: string) => { nowPlayingTitle: string } | null;
-    setTuneInMenuNowPlayingStation: (entityId: string, station: string) => void;
-  };
-  const { addTuneInPreset, getTuneInBrowseState, listTuneInPresets, updateNowPlayingStation } = tuneInBrowserStoreModule as {
-    addTuneInPreset: (entityId: string, title: string, stationKey: string, rawLabel: string, resolver: () => string) => void;
-    getTuneInBrowseState: (entityId: string) => { nowPlayingStation: string } | null;
-    listTuneInPresets: (entityId: string) => unknown[];
-    updateNowPlayingStation: (entityId: string, candidate: string) => void;
-  };
+  const { addTuneInMenuOption, getTuneInMenuBrowseState, setTuneInMenuNowPlayingStation } = tuneInMenuStoreModule;
+  const { addTuneInPreset, getTuneInBrowseState, listTuneInPresets, updateNowPlayingStation } = tuneInBrowserStoreModule;
 
   const activeZone = "TX-CONTRACT 10.0.0.95 main";
   const physicalAvrId = "TX-CONTRACT 10.0.0.95";
@@ -137,11 +132,11 @@ it("TuneIn adapter contract clears stale now-playing marks on fresh entry (even 
   // Simulate yesterday's station still marked as now playing in both the preset and menu stores.
   addTuneInPreset(activeZone, "Radio 1", "radio1", "Radio 1", (): string => "");
   updateNowPlayingStation(activeZone, "Radio 1");
-  addTuneInMenuOption(activeZone, 1, "Radio 1", false);
-  setTuneInMenuNowPlayingStation(activeZone, "Radio 1");
+  addTuneInMenuOption(activeZone, 1, "Radio 1", false, testAvrContexts);
+  setTuneInMenuNowPlayingStation(activeZone, "Radio 1", testAvrContexts);
 
   expect(getTuneInBrowseState(activeZone)?.nowPlayingStation).toBe("Radio 1");
-  expect(getTuneInMenuBrowseState(activeZone)?.nowPlayingTitle).toBe("Radio 1");
+  expect(getTuneInMenuBrowseState(activeZone, testAvrContexts)?.nowPlayingTitle).toBe("Radio 1");
 
   const state = {
     getSubSource: (_entityId: string) => "tunein",
@@ -154,6 +149,8 @@ it("TuneIn adapter contract clears stale now-playing marks on fresh entry (even 
   };
 
   const adapter = new TuneInZoneAgnosticAdapter({
+    avrContexts: testAvrContexts,
+    mediaBrowserServices: testMediaBrowserServices,
     state,
     getPhysicalAvrId: (entityId: string) => (entityId === activeZone ? physicalAvrId : "other"),
     isTuneInFullMenu: async () => true,
@@ -165,7 +162,7 @@ it("TuneIn adapter contract clears stale now-playing marks on fresh entry (even 
   await adapter.onServiceEntered(activeZone, [activeZone], []);
 
   expect(getTuneInBrowseState(activeZone)?.nowPlayingStation).toBe("");
-  expect(getTuneInMenuBrowseState(activeZone)?.nowPlayingTitle).toBe("");
+  expect(getTuneInMenuBrowseState(activeZone, testAvrContexts)?.nowPlayingTitle).toBe("");
   expect(listTuneInPresets(activeZone)).toHaveLength(0);
 });
 
@@ -174,10 +171,7 @@ it("Tidal adapter contract ingests NLA and metadata for active zones", async () 
   const tidalStoreModule = await import("../src/tidalBrowserStore.js");
 
   const { TidalZoneAgnosticAdapter } = adaptersModule as { TidalZoneAgnosticAdapter: new (deps: any) => any };
-  const { listTidalMenuOptions, getTidalBrowseState } = tidalStoreModule as {
-    listTidalMenuOptions: (entityId: string) => unknown[];
-    getTidalBrowseState: (entityId: string) => { nowPlayingTitle: string } | null;
-  };
+  const { tidalStore } = tidalStoreModule;
 
   const activeZone = "TX-CONTRACT 10.0.0.83 main";
   const controlZone = "TX-CONTRACT 10.0.0.93 main";
@@ -199,6 +193,8 @@ it("Tidal adapter contract ingests NLA and metadata for active zones", async () 
   };
 
   const adapter = new TidalZoneAgnosticAdapter({
+    avrContexts: testAvrContexts,
+    mediaBrowserServices: testMediaBrowserServices,
     state,
     getPhysicalAvrId: (entityId: string) => (entityId === controlZone ? "TX-CONTRACT 10.0.0.93" : "TX-CONTRACT 10.0.0.83")
   });
@@ -206,9 +202,9 @@ it("Tidal adapter contract ingests NLA and metadata for active zones", async () 
   adapter.handleNla(activeZone, '<?xml version="1.0" encoding="UTF-8"?><response status="ok"><items offset="0000"><item iconid="2F" title="Track A" url="0"/></items></response>');
   adapter.handleMetadata(activeZone, "Artist A");
 
-  expect(listTidalMenuOptions(activeZone).length).toBe(1);
-  expect(listTidalMenuOptions(controlZone).length).toBe(0);
-  expect(getTidalBrowseState(activeZone)?.nowPlayingTitle).toBe("Artist A");
+  expect(tidalStore.listOptions(activeZone, testAvrContexts).length).toBe(1);
+  expect(tidalStore.listOptions(controlZone, testAvrContexts).length).toBe(0);
+  expect(tidalStore.getBrowseState(activeZone, testAvrContexts)?.nowPlayingTitle).toBe("Artist A");
 });
 
 it("Browse service contract maps service ids to activation rules and selector commands", async () => {

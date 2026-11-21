@@ -1,7 +1,8 @@
+import type { AvrConfig } from "../src/configConstants.js";
+import { testAvrContexts } from "./helpers/contexts.js";
 import { describe, it, expect, vi } from "vitest";
 import { EventEmitter } from "node:events";
 import * as uc from "@unfoldedcircle/integration-api";
-import { sharedAvrContexts } from "../src/avrContext.js";
 
 vi.mock("../src/utils.js", () => ({
   ensureEiscpConnected: vi.fn().mockResolvedValue(true),
@@ -23,13 +24,18 @@ function makeMockEiscp(connected = true) {
   return eiscp;
 }
 
+// The handler only reads the entity id; a full uc.Remote is not needed for these tests.
+function remoteEntity(): uc.Entity {
+  return { id: REMOTE_ID, attributes: {} } as unknown as uc.Entity;
+}
+
 function makeHandler(overrides: any = {}) {
   const driver = { updateEntityAttributes: vi.fn() };
   const mockEiscp = makeMockEiscp();
   const connMgr = {
     getPhysicalConnection: vi.fn().mockReturnValue({ eiscp: mockEiscp, commandReceiver: undefined })
   };
-  const instance = {
+  const instance: { config: AvrConfig } = {
     config: {
       model: "TX-RZ50",
       ip: "192.168.1.100",
@@ -52,7 +58,7 @@ function makeHandler(overrides: any = {}) {
 
 async function createHandler(mock: ReturnType<typeof makeHandler>) {
   const { remoteEntityCommandHandler } = await import("../src/remoteEntityCommandHandler.js");
-  return new remoteEntityCommandHandler(mock.driver as any, mock.connMgr as any, mock.avrMgr as any, mock.avrStateApi as any);
+  return new remoteEntityCommandHandler(mock.driver as any, mock.connMgr as any, mock.avrMgr as any, mock.avrStateApi as any, testAvrContexts);
 }
 
 describe("remoteEntityCommandHandler", () => {
@@ -61,7 +67,7 @@ describe("remoteEntityCommandHandler", () => {
     mock.avrMgr.get.mockReturnValue(undefined);
     const handler = await createHandler(mock);
 
-    const entity = { id: REMOTE_ID, attributes: {} };
+    const entity = remoteEntity();
     const result = await handler.handle(entity, uc.RemoteCommands.On, {});
 
     expect(result).toBe(uc.StatusCodes.NotFound);
@@ -73,7 +79,7 @@ describe("remoteEntityCommandHandler", () => {
     mock.connMgr.getPhysicalConnection.mockReturnValue(undefined);
     const handler = await createHandler(mock);
 
-    const entity = { id: REMOTE_ID, attributes: {} };
+    const entity = remoteEntity();
     const result = await handler.handle(entity, uc.RemoteCommands.On, {});
 
     expect(result).toBe(uc.StatusCodes.ServiceUnavailable);
@@ -85,7 +91,7 @@ describe("remoteEntityCommandHandler", () => {
     (ensureEiscpConnected as any).mockResolvedValueOnce(false);
     const handler = await createHandler(mock);
 
-    const entity = { id: REMOTE_ID, attributes: {} };
+    const entity = remoteEntity();
     const result = await handler.handle(entity, uc.RemoteCommands.On, {});
 
     expect(result).toBe(uc.StatusCodes.Timeout);
@@ -95,7 +101,7 @@ describe("remoteEntityCommandHandler", () => {
     const mock = makeHandler();
     const handler = await createHandler(mock);
 
-    const entity = { id: REMOTE_ID, attributes: {} };
+    const entity = remoteEntity();
     const result = await handler.handle(entity, uc.RemoteCommands.On, {});
 
     expect(result).toBe(uc.StatusCodes.Ok);
@@ -107,7 +113,7 @@ describe("remoteEntityCommandHandler", () => {
     const mock = makeHandler();
     const handler = await createHandler(mock);
 
-    const entity = { id: REMOTE_ID, attributes: {} };
+    const entity = remoteEntity();
     const result = await handler.handle(entity, uc.RemoteCommands.Off, {});
 
     expect(result).toBe(uc.StatusCodes.Ok);
@@ -120,7 +126,7 @@ describe("remoteEntityCommandHandler", () => {
     mock.avrStateApi.isEntityOn.mockReturnValue(false);
     const handler = await createHandler(mock);
 
-    const entity = { id: REMOTE_ID, attributes: {} };
+    const entity = remoteEntity();
     const result = await handler.handle(entity, uc.RemoteCommands.Toggle, {});
 
     expect(result).toBe(uc.StatusCodes.Ok);
@@ -132,7 +138,7 @@ describe("remoteEntityCommandHandler", () => {
     const mock = makeHandler();
     const handler = await createHandler(mock);
 
-    const entity = { id: REMOTE_ID, attributes: {} };
+    const entity = remoteEntity();
     const result = await handler.handle(entity, uc.MediaPlayerCommands.VolumeUp, {});
 
     expect(result).toBe(uc.StatusCodes.Ok);
@@ -143,7 +149,7 @@ describe("remoteEntityCommandHandler", () => {
     const mock = makeHandler();
     const handler = await createHandler(mock);
 
-    const entity = { id: REMOTE_ID, attributes: {} };
+    const entity = remoteEntity();
     const result = await handler.handle(entity, uc.MediaPlayerCommands.ChannelDown, {});
 
     expect(result).toBe(uc.StatusCodes.Ok);
@@ -154,7 +160,7 @@ describe("remoteEntityCommandHandler", () => {
     const mock = makeHandler();
     const handler = await createHandler(mock);
 
-    const entity = { id: REMOTE_ID, attributes: {} };
+    const entity = remoteEntity();
     const result = await handler.handle(entity, uc.MediaPlayerCommands.Volume, { volume: 50 });
 
     expect(result).toBe(uc.StatusCodes.Ok);
@@ -166,7 +172,7 @@ describe("remoteEntityCommandHandler", () => {
     mock.instance.config.volumeDisplay = "relative";
     const handler = await createHandler(mock);
 
-    const entity = { id: REMOTE_ID, attributes: {} };
+    const entity = remoteEntity();
     const result = await handler.handle(entity, uc.MediaPlayerCommands.Volume, { volume: 50 });
 
     expect(result).toBe(uc.StatusCodes.Ok);
@@ -177,7 +183,7 @@ describe("remoteEntityCommandHandler", () => {
     const mock = makeHandler();
     const handler = await createHandler(mock);
 
-    const entity = { id: REMOTE_ID, attributes: {} };
+    const entity = remoteEntity();
     const result = await handler.handle(entity, uc.MediaPlayerCommands.MuteToggle, {});
 
     expect(result).toBe(uc.StatusCodes.Ok);
@@ -188,7 +194,7 @@ describe("remoteEntityCommandHandler", () => {
     const mock = makeHandler();
     const handler = await createHandler(mock);
 
-    const entity = { id: REMOTE_ID, attributes: {} };
+    const entity = remoteEntity();
     const result = await handler.handle(entity, uc.MediaPlayerCommands.SelectSource, { source: "TV" });
 
     expect(result).toBe(uc.StatusCodes.Ok);
@@ -196,17 +202,17 @@ describe("remoteEntityCommandHandler", () => {
   });
 
   it("routes a generated reported-source command with spaces through input-selector", async () => {
-    sharedAvrContexts.get("TX-RZ50 192.168.1.100").inputs.set([{ id: "0e", name: "TuneIn Radio" }]);
+    testAvrContexts.get("TX-RZ50 192.168.1.100").inputs.set([{ id: "0e", name: "TuneIn Radio" }]);
     try {
       const mock = makeHandler();
       const handler = await createHandler(mock);
-      const entity = { id: REMOTE_ID, attributes: {} };
+      const entity = remoteEntity();
       const result = await handler.handle(entity, "INPUT_REPORTED_TuneIn%20Radio", {});
 
       expect(result).toBe(uc.StatusCodes.Ok);
       expect(mock.mockEiscp.command).toHaveBeenCalledWith({ zone: "main", command: "input-selector", args: "tunein radio" });
     } finally {
-      sharedAvrContexts.clear();
+      testAvrContexts.clear();
     }
   });
 
@@ -214,7 +220,7 @@ describe("remoteEntityCommandHandler", () => {
     const mock = makeHandler();
     const handler = await createHandler(mock);
 
-    const entity = { id: REMOTE_ID, attributes: {} };
+    const entity = remoteEntity();
     const result = await handler.handle(entity, uc.MediaPlayerCommands.SelectSource, { source: "multi-zone input-selector BD" });
 
     expect(result).toBe(uc.StatusCodes.Ok);
@@ -225,7 +231,7 @@ describe("remoteEntityCommandHandler", () => {
     const mock = makeHandler();
     const handler = await createHandler(mock);
 
-    const entity = { id: REMOTE_ID, attributes: {} };
+    const entity = remoteEntity();
     const result = await handler.handle(entity, uc.MediaPlayerCommands.SelectSource, { source: "raw MV L@@@" });
 
     expect(result).toBe(uc.StatusCodes.BadRequest);
@@ -236,7 +242,7 @@ describe("remoteEntityCommandHandler", () => {
     const mock = makeHandler();
     const handler = await createHandler(mock);
 
-    const entity = { id: REMOTE_ID, attributes: {} };
+    const entity = remoteEntity();
     const result = await handler.handle(entity, "DIMMER_BRIGHT", {});
 
     expect(result).toBe(uc.StatusCodes.Ok);
@@ -255,7 +261,7 @@ describe("remoteEntityCommandHandler", () => {
       return Promise.resolve();
     });
 
-    const entity = { id: REMOTE_ID, attributes: {} };
+    const entity = remoteEntity();
     const upResult = await handler.handle(entity, "VOCAL_UP", {});
     currentLevel = 2;
     const downResult = await handler.handle(entity, "VOCAL_DOWN", {});
@@ -279,7 +285,7 @@ describe("remoteEntityCommandHandler", () => {
       return Promise.resolve();
     });
 
-    const entity = { id: REMOTE_ID, attributes: {} };
+    const entity = remoteEntity();
     await handler.handle(entity, "VOCAL_UP", {});
     currentLevel = 0;
     await handler.handle(entity, "VOCAL_DOWN", {});
@@ -293,7 +299,7 @@ describe("remoteEntityCommandHandler", () => {
     try {
       const mock = makeHandler();
       const handler = await createHandler(mock);
-      const entity = { id: REMOTE_ID, attributes: {} };
+      const entity = remoteEntity();
 
       const pending = handler.handle(entity, "VOCAL_UP", {});
       await vi.advanceTimersByTimeAsync(2000);
@@ -311,7 +317,7 @@ describe("remoteEntityCommandHandler", () => {
     const mock = makeHandler();
     const handler = await createHandler(mock);
 
-    const entity = { id: REMOTE_ID, attributes: {} };
+    const entity = remoteEntity();
     const result = await handler.handle(entity, "NONEXISTENT_CMD", {});
 
     expect(result).toBe(uc.StatusCodes.NotImplemented);
@@ -321,7 +327,7 @@ describe("remoteEntityCommandHandler", () => {
     const mock = makeHandler();
     const handler = await createHandler(mock);
 
-    const entity = { id: REMOTE_ID, attributes: {} };
+    const entity = remoteEntity();
     const result = await handler.handle(entity, uc.RemoteCommands.SendCmd, {});
 
     expect(result).toBe(uc.StatusCodes.BadRequest);
@@ -331,7 +337,7 @@ describe("remoteEntityCommandHandler", () => {
     const mock = makeHandler();
     const handler = await createHandler(mock);
 
-    const entity = { id: REMOTE_ID, attributes: {} };
+    const entity = remoteEntity();
     const result = await handler.handle(entity, uc.RemoteCommands.SendCmd, { command: "INPUT_BD" });
 
     expect(result).toBe(uc.StatusCodes.Ok);
@@ -342,7 +348,7 @@ describe("remoteEntityCommandHandler", () => {
     const mock = makeHandler();
     const handler = await createHandler(mock);
 
-    const entity = { id: REMOTE_ID, attributes: {} };
+    const entity = remoteEntity();
     const result = await handler.handle(entity, uc.RemoteCommands.SendCmdSequence, {});
 
     expect(result).toBe(uc.StatusCodes.BadRequest);
@@ -352,7 +358,7 @@ describe("remoteEntityCommandHandler", () => {
     const mock = makeHandler();
     const handler = await createHandler(mock);
 
-    const entity = { id: REMOTE_ID, attributes: {} };
+    const entity = remoteEntity();
     const result = await handler.handle(entity, uc.RemoteCommands.SendCmdSequence, { sequence: ["INPUT_BD", "DIMMER_BRIGHT"] });
 
     expect(result).toBe(uc.StatusCodes.Ok);
@@ -365,7 +371,7 @@ describe("remoteEntityCommandHandler", () => {
     mock.instance.config.zone = "zone2";
     const handler = await createHandler(mock);
 
-    const entity = { id: REMOTE_ID, attributes: {} };
+    const entity = remoteEntity();
     const result = await handler.handle(entity, "DIMMER_BRIGHT", {});
 
     expect(result).toBe(uc.StatusCodes.Ok);
@@ -377,7 +383,7 @@ describe("remoteEntityCommandHandler", () => {
     mock.avrStateApi.isEntityOn.mockReturnValue(true);
     const handler = await createHandler(mock);
 
-    const entity = { id: REMOTE_ID, attributes: {} };
+    const entity = remoteEntity();
     const result = await handler.handle(entity, uc.RemoteCommands.Toggle, {});
 
     expect(result).toBe(uc.StatusCodes.Ok);
@@ -389,7 +395,7 @@ describe("remoteEntityCommandHandler", () => {
     const mock = makeHandler();
     const handler = await createHandler(mock);
 
-    const entity = { id: REMOTE_ID, attributes: {} };
+    const entity = remoteEntity();
     const result = await handler.handle(entity, uc.RemoteCommands.On, undefined);
 
     expect(result).toBe(uc.StatusCodes.Ok);
@@ -400,7 +406,7 @@ describe("remoteEntityCommandHandler", () => {
     const mock = makeHandler();
     const handler = await createHandler(mock);
 
-    const entity = { id: REMOTE_ID, attributes: {} };
+    const entity = remoteEntity();
     const result = await handler.handle(entity, uc.MediaPlayerCommands.VolumeDown, {});
 
     expect(result).toBe(uc.StatusCodes.Ok);
@@ -411,7 +417,7 @@ describe("remoteEntityCommandHandler", () => {
     const mock = makeHandler();
     const handler = await createHandler(mock);
 
-    const entity = { id: REMOTE_ID, attributes: {} };
+    const entity = remoteEntity();
     const result = await handler.handle(entity, uc.MediaPlayerCommands.Mute, {});
 
     expect(result).toBe(uc.StatusCodes.Ok);
@@ -422,7 +428,7 @@ describe("remoteEntityCommandHandler", () => {
     const mock = makeHandler();
     const handler = await createHandler(mock);
 
-    const entity = { id: REMOTE_ID, attributes: {} };
+    const entity = remoteEntity();
     const result = await handler.handle(entity, uc.MediaPlayerCommands.Unmute, {});
 
     expect(result).toBe(uc.StatusCodes.Ok);
@@ -433,7 +439,7 @@ describe("remoteEntityCommandHandler", () => {
     const mock = makeHandler();
     const handler = await createHandler(mock);
 
-    const entity = { id: REMOTE_ID, attributes: {} };
+    const entity = remoteEntity();
     const result = await handler.handle(entity, uc.MediaPlayerCommands.ChannelUp, {});
 
     expect(result).toBe(uc.StatusCodes.Ok);
@@ -450,7 +456,7 @@ describe("remoteEntityCommandHandler", () => {
     const mock = makeHandler();
     const handler = await createHandler(mock);
 
-    const entity = { id: REMOTE_ID, attributes: {} };
+    const entity = remoteEntity();
     const result = await handler.handle(entity, cmd as uc.MediaPlayerCommands, {});
 
     expect(result).toBe(uc.StatusCodes.Ok);
@@ -461,7 +467,7 @@ describe("remoteEntityCommandHandler", () => {
     const mock = makeHandler();
     const handler = await createHandler(mock);
 
-    const entity = { id: REMOTE_ID, attributes: {} };
+    const entity = remoteEntity();
     const result = await handler.handle(entity, uc.MediaPlayerCommands.Settings, {});
 
     expect(result).toBe(uc.StatusCodes.Ok);
@@ -475,7 +481,7 @@ describe("remoteEntityCommandHandler", () => {
     const mock = makeHandler();
     const handler = await createHandler(mock);
 
-    const entity = { id: REMOTE_ID, attributes: {} };
+    const entity = remoteEntity();
     const result = await handler.handle(entity, cmd as uc.MediaPlayerCommands, {});
 
     expect(result).toBe(uc.StatusCodes.Ok);
@@ -486,7 +492,7 @@ describe("remoteEntityCommandHandler", () => {
     const mock = makeHandler();
     const handler = await createHandler(mock);
 
-    const entity = { id: REMOTE_ID, attributes: {} };
+    const entity = remoteEntity();
     const result = await handler.handle(entity, uc.MediaPlayerCommands.Info, {});
 
     expect(result).toBe(uc.StatusCodes.Ok);
@@ -497,7 +503,7 @@ describe("remoteEntityCommandHandler", () => {
     const mock = makeHandler();
     const handler = await createHandler(mock);
 
-    const entity = { id: REMOTE_ID, attributes: {} };
+    const entity = remoteEntity();
     const result = await handler.handle(entity, uc.MediaPlayerCommands.PlayPause, {});
 
     expect(result).toBe(uc.StatusCodes.Ok);
@@ -511,7 +517,7 @@ describe("remoteEntityCommandHandler", () => {
     const mock = makeHandler();
     const handler = await createHandler(mock);
 
-    const entity = { id: REMOTE_ID, attributes: {} };
+    const entity = remoteEntity();
     const result = await handler.handle(entity, cmd as uc.MediaPlayerCommands, {});
 
     expect(result).toBe(uc.StatusCodes.Ok);
@@ -522,7 +528,7 @@ describe("remoteEntityCommandHandler", () => {
     const mock = makeHandler();
     const handler = await createHandler(mock);
 
-    const entity = { id: REMOTE_ID, attributes: {} };
+    const entity = remoteEntity();
     const result = await handler.handle(entity, uc.MediaPlayerCommands.Volume, {});
 
     expect(result).toBe(uc.StatusCodes.Ok);
@@ -531,10 +537,11 @@ describe("remoteEntityCommandHandler", () => {
 
   it("falls back to volumeScale 100 when not configured", async () => {
     const mock = makeHandler();
-    mock.instance.config.volumeScale = 0;
+    // An invalid stored value (not 80, 100 or "auto").
+    mock.instance.config.volumeScale = 0 as unknown as AvrConfig["volumeScale"];
     const handler = await createHandler(mock);
 
-    const entity = { id: REMOTE_ID, attributes: {} };
+    const entity = remoteEntity();
     const result = await handler.handle(entity, uc.MediaPlayerCommands.Volume, { volume: 50 });
 
     expect(result).toBe(uc.StatusCodes.Ok);
@@ -546,7 +553,7 @@ describe("remoteEntityCommandHandler", () => {
     mock.instance.config.adjustVolumeDispl = false;
     const handler = await createHandler(mock);
 
-    const entity = { id: REMOTE_ID, attributes: {} };
+    const entity = remoteEntity();
     const result = await handler.handle(entity, uc.MediaPlayerCommands.Volume, { volume: 50 });
 
     expect(result).toBe(uc.StatusCodes.Ok);
@@ -558,7 +565,7 @@ describe("remoteEntityCommandHandler", () => {
     mock.instance.config.adjustVolumeDispl = undefined;
     const handler = await createHandler(mock);
 
-    const entity = { id: REMOTE_ID, attributes: {} };
+    const entity = remoteEntity();
     const result = await handler.handle(entity, uc.MediaPlayerCommands.Volume, { volume: 50 });
 
     expect(result).toBe(uc.StatusCodes.Ok);
@@ -570,7 +577,7 @@ describe("remoteEntityCommandHandler", () => {
     mock.instance.config.volumeDisplay = undefined;
     const handler = await createHandler(mock);
 
-    const entity = { id: REMOTE_ID, attributes: {} };
+    const entity = remoteEntity();
     const result = await handler.handle(entity, uc.MediaPlayerCommands.Volume, { volume: 50 });
 
     expect(result).toBe(uc.StatusCodes.Ok);
@@ -581,7 +588,7 @@ describe("remoteEntityCommandHandler", () => {
     const mock = makeHandler();
     const handler = await createHandler(mock);
 
-    const entity = { id: REMOTE_ID, attributes: {} };
+    const entity = remoteEntity();
     const result = await handler.handle(entity, uc.MediaPlayerCommands.SelectSource, {});
 
     expect(result).toBe(uc.StatusCodes.Ok);
@@ -593,7 +600,7 @@ describe("remoteEntityCommandHandler", () => {
     const mock = makeHandler();
     const handler = await createHandler(mock);
 
-    const entity = { id: REMOTE_ID, attributes: {} };
+    const entity = remoteEntity();
     const result = await handler.handle(entity, uc.MediaPlayerCommands.SelectSource, { source: 123 });
 
     expect(result).toBe(uc.StatusCodes.Ok);
@@ -605,7 +612,7 @@ describe("remoteEntityCommandHandler", () => {
     const mock = makeHandler();
     const handler = await createHandler(mock);
 
-    const entity = { id: REMOTE_ID, attributes: {} };
+    const entity = remoteEntity();
     const result = await handler.handle(entity, uc.MediaPlayerCommands.SelectSource, { source: "raw MVL99" });
 
     expect(result).toBe(uc.StatusCodes.Ok);
@@ -616,7 +623,7 @@ describe("remoteEntityCommandHandler", () => {
     const mock = makeHandler();
     const handler = await createHandler(mock);
 
-    const entity = { id: REMOTE_ID, attributes: {} };
+    const entity = remoteEntity();
     const result = await handler.handle(entity, uc.MediaPlayerCommands.SelectSource, { source: `raw ${"A".repeat(21)}` });
 
     expect(result).toBe(uc.StatusCodes.BadRequest);
@@ -627,7 +634,7 @@ describe("remoteEntityCommandHandler", () => {
     const mock = makeHandler();
     const handler = await createHandler(mock);
 
-    const entity = { id: REMOTE_ID, attributes: {} };
+    const entity = remoteEntity();
     const result = await handler.handle(entity, uc.MediaPlayerCommands.SelectSource, { source: "foo@bar" });
 
     expect(result).toBe(uc.StatusCodes.BadRequest);
@@ -638,7 +645,7 @@ describe("remoteEntityCommandHandler", () => {
     const mock = makeHandler();
     const handler = await createHandler(mock);
 
-    const entity = { id: REMOTE_ID, attributes: {} };
+    const entity = remoteEntity();
     const result = await handler.handle(entity, uc.MediaPlayerCommands.SelectSource, { source: "somecommand" });
 
     expect(result).toBe(uc.StatusCodes.Ok);
@@ -650,7 +657,7 @@ describe("remoteEntityCommandHandler", () => {
     const { delay } = await import("../src/utils.js");
     const handler = await createHandler(mock);
 
-    const entity = { id: REMOTE_ID, attributes: {} };
+    const entity = remoteEntity();
     const result = await handler.handle(entity, uc.RemoteCommands.SendCmd, { command: "INPUT_BD", repeat: 2, delay: 10 });
 
     expect(result).toBe(uc.StatusCodes.Ok);
@@ -662,7 +669,7 @@ describe("remoteEntityCommandHandler", () => {
     const mock = makeHandler();
     const handler = await createHandler(mock);
 
-    const entity = { id: REMOTE_ID, attributes: {} };
+    const entity = remoteEntity();
     const result = await handler.handle(entity, uc.RemoteCommands.SendCmd, { command: "NONEXISTENT_CMD" });
 
     expect(result).toBe(uc.StatusCodes.NotImplemented);
@@ -673,7 +680,7 @@ describe("remoteEntityCommandHandler", () => {
     const { delay } = await import("../src/utils.js");
     const handler = await createHandler(mock);
 
-    const entity = { id: REMOTE_ID, attributes: {} };
+    const entity = remoteEntity();
     const result = await handler.handle(entity, uc.RemoteCommands.SendCmdSequence, { sequence: ["INPUT_BD", "DIMMER_BRIGHT"], delay: 10 });
 
     expect(result).toBe(uc.StatusCodes.Ok);
@@ -684,7 +691,7 @@ describe("remoteEntityCommandHandler", () => {
     const mock = makeHandler();
     const handler = await createHandler(mock);
 
-    const entity = { id: REMOTE_ID, attributes: {} };
+    const entity = remoteEntity();
     const result = await handler.handle(entity, uc.RemoteCommands.SendCmdSequence, { sequence: ["NONEXISTENT_CMD"] });
 
     expect(result).toBe(uc.StatusCodes.NotImplemented);

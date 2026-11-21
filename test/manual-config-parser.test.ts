@@ -1,3 +1,4 @@
+import { validateAvrPayload } from "../src/configValidation.js";
 import { describe, it, expect } from "vitest";
 
 describe("ManualConfigParser", () => {
@@ -104,7 +105,7 @@ describe("ManualConfigParser", () => {
     expect(result.useAvrReportedInputsValue).toBe(true);
   });
 
-  // The parser only converts types; ranges are checked by ConfigManager.validateAvrPayload so the user gets an error.
+  // The parser only converts types; ranges are checked by validateAvrPayload so the user gets an error.
   it("converts tuneinPresetPosition and leaves the 1-10 range check to validation", async () => {
     const mod = await import("../src/manualConfigParser.js");
     const { ManualConfigParser } = mod as { ManualConfigParser: new () => any };
@@ -114,8 +115,7 @@ describe("ManualConfigParser", () => {
     expect(parser.parse({ tuneinPresetPosition: 0 }).tuneinPresetPositionValue).toBe(0);
     expect(parser.parse({ tuneinPresetPosition: "abc" }).tuneinPresetPositionValue).toBe(1);
 
-    const { ConfigManager } = await import("../src/configManager.js");
-    const result = ConfigManager.validateAvrPayload({ model: "TX-RZ50", ip: "192.168.1.10", port: 60128, zone: "main", tuneinPresetPosition: 0 });
+    const result = validateAvrPayload({ model: "TX-RZ50", ip: "192.168.1.10", port: 60128, zone: "main", tuneinPresetPosition: 0 });
     expect(result.errors).toContain("tuneinPresetPosition must be an integer between 1 and 10");
   });
 

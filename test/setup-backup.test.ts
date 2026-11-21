@@ -4,7 +4,7 @@ import os from "os";
 import path from "path";
 import * as uc from "@unfoldedcircle/integration-api";
 import type { IntegrationAPI } from "@unfoldedcircle/integration-api";
-import { setConfigDir, ConfigManager } from "../src/configManager.js";
+import { ConfigStore, configPathFor } from "../src/configManager.js";
 
 function mkTmpDir(prefix = "onkyo-test-") {
   const base = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
@@ -17,32 +17,22 @@ function mkTmpDir(prefix = "onkyo-test-") {
 it("backup flow returns backup_data JSON", async () => {
   const tmp = mkTmpDir();
   try {
-    setConfigDir(tmp);
+    const configStore = new ConfigStore(configPathFor(tmp));
 
     // Seed a sample config
     const sampleConfig = {
       avrs: [{ model: "TX-RZ50", ip: "192.168.2.103", port: 60128, zone: "main", entityNameStyle: "short" }]
     } as Partial<import("../src/configManager.js").IntegrationConfig>;
-    ConfigManager.save(sampleConfig);
+    configStore.save(sampleConfig);
     console.log("on-disk-config (after src save):", fs.readFileSync(path.join(tmp, "config.json"), "utf-8"));
 
     // Import compiled driver using a file:// URL (required on Windows ESM loader)
     const driverModule = await import("../src/driver.js");
     const OnkyoDriver = driverModule.default as any;
-    // Ensure the compiled ConfigManager uses the same temp config dir at runtime
-    const configManagerModule = await import("../src/configManager.js");
-    if (configManagerModule && typeof configManagerModule.setConfigDir === "function") {
-      configManagerModule.setConfigDir(tmp);
-      console.log("dist config path set to", configManagerModule.getConfigPath && configManagerModule.getConfigPath());
-      // Ensure dist config actually loads from disk
-      if (typeof configManagerModule.load === "function") {
-        const loaded = configManagerModule.load();
-        console.log("dist config after load:", JSON.stringify(loaded));
-      }
-    }
 
     // Create a driver-like object without invoking constructor to avoid starting the API server
     interface DriverLike {
+      configStore?: unknown;
       driver?: Partial<IntegrationAPI>;
       config?: any;
       handleConnect?: () => Promise<void>;
@@ -51,7 +41,8 @@ it("backup flow returns backup_data JSON", async () => {
     }
     const drv = Object.create(OnkyoDriver.prototype) as DriverLike;
     drv.driver = { addAvailableEntity: () => {}, getConfigDirPath: () => tmp, setDeviceState: async () => {}, getConfiguredEntities: () => ({}) } as unknown as Partial<IntegrationAPI>;
-    drv.config = ConfigManager.load();
+    drv.config = configStore.load();
+    drv.configStore = configStore;
     drv.handleConnect = async () => {};
     drv.registerAvailableEntities = (OnkyoDriver.prototype as any).registerAvailableEntities.bind(drv);
 
@@ -111,29 +102,19 @@ it("backup flow returns backup_data JSON", async () => {
 it("restore flow applies provided backup_data", async () => {
   const tmp = mkTmpDir();
   try {
-    setConfigDir(tmp);
+    const configStore = new ConfigStore(configPathFor(tmp));
 
     // Start with an empty/other config so we can see it change
-    ConfigManager.save({ avrs: [{ model: "OLD", ip: "0.0.0.0", port: 60128, zone: "main" }] });
+    configStore.save({ avrs: [{ model: "OLD", ip: "0.0.0.0", port: 60128, zone: "main" }] });
     console.log("on-disk-config (after src save - restore test):", fs.readFileSync(path.join(tmp, "config.json"), "utf-8"));
 
     // Import compiled driver using a file:// URL (required on Windows ESM loader)
     const driverModule = await import("../src/driver.js");
     const OnkyoDriver = driverModule.default as any;
-    // Ensure the compiled ConfigManager uses the same temp config dir at runtime
-    const configManagerModule = await import("../src/configManager.js");
-    if (configManagerModule && typeof configManagerModule.setConfigDir === "function") {
-      configManagerModule.setConfigDir(tmp);
-      console.log("dist config path set to", configManagerModule.getConfigPath && configManagerModule.getConfigPath());
-      // Ensure dist config actually loads from disk
-      if (typeof configManagerModule.load === "function") {
-        const loaded = configManagerModule.load();
-        console.log("dist config after load:", JSON.stringify(loaded));
-      }
-    }
 
     // Create a driver-like object without invoking constructor to avoid starting the API server
     interface DriverLike {
+      configStore?: unknown;
       driver?: Partial<IntegrationAPI>;
       config?: any;
       handleConnect?: () => Promise<void>;
@@ -142,7 +123,8 @@ it("restore flow applies provided backup_data", async () => {
     }
     const drv = Object.create(OnkyoDriver.prototype) as DriverLike;
     drv.driver = { addAvailableEntity: () => {}, getConfigDirPath: () => tmp, setDeviceState: async () => {}, getConfiguredEntities: () => ({}) } as unknown as Partial<IntegrationAPI>;
-    drv.config = ConfigManager.load();
+    drv.config = configStore.load();
+    drv.configStore = configStore;
     drv.handleConnect = async () => {};
     drv.registerAvailableEntities = (OnkyoDriver.prototype as any).registerAvailableEntities.bind(drv);
 
@@ -157,7 +139,7 @@ it("restore flow applies provided backup_data", async () => {
     expect(restoreResp).toBeInstanceOf(uc.SetupComplete);
 
     // Verify config applied
-    const reloaded = ConfigManager.load();
+    const reloaded = configStore.load();
     expect(reloaded.avrs).toBeTruthy();
     expect(reloaded.avrs?.[0].model).toBe(targetConfig.avrs![0].model);
     expect(reloaded.avrs?.[0].ip).toBe(targetConfig.avrs![0].ip);
@@ -170,18 +152,15 @@ it("restore flow applies provided backup_data", async () => {
 it("restore flow defaults missing TuneIn menu setting to mypresets", async () => {
   const tmp = mkTmpDir();
   try {
-    setConfigDir(tmp);
+    const configStore = new ConfigStore(configPathFor(tmp));
 
-    ConfigManager.save({ avrs: [{ model: "OLD", ip: "0.0.0.0", port: 60128, zone: "main" }] });
+    configStore.save({ avrs: [{ model: "OLD", ip: "0.0.0.0", port: 60128, zone: "main" }] });
 
     const driverModule = await import("../src/driver.js");
     const OnkyoDriver = driverModule.default as any;
-    const configManagerModule = await import("../src/configManager.js");
-    if (configManagerModule && typeof configManagerModule.setConfigDir === "function") {
-      configManagerModule.setConfigDir(tmp);
-    }
 
     interface DriverLike {
+      configStore?: unknown;
       driver?: Partial<IntegrationAPI>;
       config?: any;
       handleConnect?: () => Promise<void>;
@@ -190,7 +169,8 @@ it("restore flow defaults missing TuneIn menu setting to mypresets", async () =>
     }
     const drv = Object.create(OnkyoDriver.prototype) as DriverLike;
     drv.driver = { addAvailableEntity: () => {}, getConfigDirPath: () => tmp, setDeviceState: async () => {}, getConfiguredEntities: () => ({}) } as unknown as Partial<IntegrationAPI>;
-    drv.config = ConfigManager.load();
+    drv.config = configStore.load();
+    drv.configStore = configStore;
     drv.handleConnect = async () => {};
     drv.registerAvailableEntities = (OnkyoDriver.prototype as any).registerAvailableEntities.bind(drv);
 
@@ -202,7 +182,7 @@ it("restore flow defaults missing TuneIn menu setting to mypresets", async () =>
     const restoreResp = await drv.handleDriverSetup?.(new uc.UserDataResponse({ action: "restore", backup_data: payloadString }));
     expect(restoreResp).toBeInstanceOf(uc.SetupComplete);
 
-    const reloaded = ConfigManager.load();
+    const reloaded = configStore.load();
     expect(reloaded.avrs).toBeTruthy();
     expect(reloaded.avrs?.[0].model).toBe(targetConfig.avrs![0].model);
     expect(reloaded.avrs?.[0].ip).toBe(targetConfig.avrs![0].ip);
@@ -216,18 +196,15 @@ it("restore flow defaults missing TuneIn menu setting to mypresets", async () =>
 it("restore flow accepts intg-manager restore_from_backup payload", async () => {
   const tmp = mkTmpDir();
   try {
-    setConfigDir(tmp);
+    const configStore = new ConfigStore(configPathFor(tmp));
 
-    ConfigManager.save({ avrs: [{ model: "OLD", ip: "0.0.0.0", port: 60128, zone: "main" }] });
+    configStore.save({ avrs: [{ model: "OLD", ip: "0.0.0.0", port: 60128, zone: "main" }] });
 
     const driverModule = await import("../src/driver.js");
     const OnkyoDriver = driverModule.default as any;
-    const configManagerModule = await import("../src/configManager.js");
-    if (configManagerModule && typeof configManagerModule.setConfigDir === "function") {
-      configManagerModule.setConfigDir(tmp);
-    }
 
     interface DriverLike {
+      configStore?: unknown;
       driver?: Partial<IntegrationAPI>;
       config?: any;
       handleConnect?: () => Promise<void>;
@@ -236,7 +213,8 @@ it("restore flow accepts intg-manager restore_from_backup payload", async () => 
     }
     const drv = Object.create(OnkyoDriver.prototype) as DriverLike;
     drv.driver = { addAvailableEntity: () => {}, getConfigDirPath: () => tmp, setDeviceState: async () => {}, getConfiguredEntities: () => ({}) } as unknown as Partial<IntegrationAPI>;
-    drv.config = ConfigManager.load();
+    drv.config = configStore.load();
+    drv.configStore = configStore;
     drv.handleConnect = async () => {};
     drv.registerAvailableEntities = (OnkyoDriver.prototype as any).registerAvailableEntities.bind(drv);
 
@@ -254,7 +232,7 @@ it("restore flow accepts intg-manager restore_from_backup payload", async () => 
     const restoreResp = await drv.handleDriverSetup?.(new uc.UserDataResponse({ restore_from_backup: "true", restore_data: payloadString }));
     expect(restoreResp).toBeInstanceOf(uc.SetupComplete);
 
-    const reloaded = ConfigManager.load();
+    const reloaded = configStore.load();
     expect(reloaded.avrs).toBeTruthy();
     expect(reloaded.avrs?.[0].model).toBe(targetConfig.avrs![0].model);
     expect(reloaded.avrs?.[0].ip).toBe(targetConfig.avrs![0].ip);
@@ -267,18 +245,15 @@ it("restore flow accepts intg-manager restore_from_backup payload", async () => 
 it("restore flow applies restore_data submitted from the restore form", async () => {
   const tmp = mkTmpDir();
   try {
-    setConfigDir(tmp);
+    const configStore = new ConfigStore(configPathFor(tmp));
 
-    ConfigManager.save({ avrs: [{ model: "OLD", ip: "0.0.0.0", port: 60128, zone: "main" }] });
+    configStore.save({ avrs: [{ model: "OLD", ip: "0.0.0.0", port: 60128, zone: "main" }] });
 
     const driverModule = await import("../src/driver.js");
     const OnkyoDriver = driverModule.default as any;
-    const configManagerModule = await import("../src/configManager.js");
-    if (configManagerModule && typeof configManagerModule.setConfigDir === "function") {
-      configManagerModule.setConfigDir(tmp);
-    }
 
     interface DriverLike {
+      configStore?: unknown;
       driver?: Partial<IntegrationAPI>;
       config?: any;
       handleConnect?: () => Promise<void>;
@@ -287,7 +262,8 @@ it("restore flow applies restore_data submitted from the restore form", async ()
     }
     const drv = Object.create(OnkyoDriver.prototype) as DriverLike;
     drv.driver = { addAvailableEntity: () => {}, getConfigDirPath: () => tmp, setDeviceState: async () => {}, getConfiguredEntities: () => ({}) } as unknown as Partial<IntegrationAPI>;
-    drv.config = ConfigManager.load();
+    drv.config = configStore.load();
+    drv.configStore = configStore;
     drv.handleConnect = async () => {};
     drv.registerAvailableEntities = (OnkyoDriver.prototype as any).registerAvailableEntities.bind(drv);
 
@@ -299,7 +275,7 @@ it("restore flow applies restore_data submitted from the restore form", async ()
     const restoreResp = await drv.handleDriverSetup?.(new uc.UserDataResponse({ restore_data: payloadString }));
     expect(restoreResp).toBeInstanceOf(uc.SetupComplete);
 
-    const reloaded = ConfigManager.load();
+    const reloaded = configStore.load();
     expect(reloaded.avrs).toBeTruthy();
     expect(reloaded.avrs?.[0].model).toBe(targetConfig.avrs![0].model);
     expect(reloaded.avrs?.[0].ip).toBe(targetConfig.avrs![0].ip);
@@ -312,18 +288,15 @@ it("restore flow applies restore_data submitted from the restore form", async ()
 it("backup flow exits setup when the backup form is submitted", async () => {
   const tmp = mkTmpDir();
   try {
-    setConfigDir(tmp);
+    const configStore = new ConfigStore(configPathFor(tmp));
 
-    ConfigManager.save({ avrs: [{ model: "TX-RZ50", ip: "192.168.2.103", port: 60128, zone: "main", entityNameStyle: "short" }] });
+    configStore.save({ avrs: [{ model: "TX-RZ50", ip: "192.168.2.103", port: 60128, zone: "main", entityNameStyle: "short" }] });
 
     const driverModule = await import("../src/driver.js");
     const OnkyoDriver = driverModule.default as any;
-    const configManagerModule = await import("../src/configManager.js");
-    if (configManagerModule && typeof configManagerModule.setConfigDir === "function") {
-      configManagerModule.setConfigDir(tmp);
-    }
 
     interface DriverLike {
+      configStore?: unknown;
       driver?: Partial<IntegrationAPI>;
       config?: any;
       handleConnect?: () => Promise<void>;
@@ -332,7 +305,8 @@ it("backup flow exits setup when the backup form is submitted", async () => {
     }
     const drv = Object.create(OnkyoDriver.prototype) as DriverLike;
     drv.driver = { addAvailableEntity: () => {}, getConfigDirPath: () => tmp, setDeviceState: async () => {}, getConfiguredEntities: () => ({}) } as unknown as Partial<IntegrationAPI>;
-    drv.config = ConfigManager.load();
+    drv.config = configStore.load();
+    drv.configStore = configStore;
     drv.handleConnect = async () => {};
     drv.registerAvailableEntities = (OnkyoDriver.prototype as any).registerAvailableEntities.bind(drv);
 
@@ -356,16 +330,13 @@ it("backup flow exits setup when the backup form is submitted", async () => {
 it("initial setup manual mode opens configuration form", async () => {
   const tmp = mkTmpDir();
   try {
-    setConfigDir(tmp);
+    const configStore = new ConfigStore(configPathFor(tmp));
 
     const driverModule = await import("../src/driver.js");
     const OnkyoDriver = driverModule.default as any;
-    const configManagerModule = await import("../src/configManager.js");
-    if (configManagerModule && typeof configManagerModule.setConfigDir === "function") {
-      configManagerModule.setConfigDir(tmp);
-    }
 
     interface DriverLike {
+      configStore?: unknown;
       driver?: Partial<IntegrationAPI>;
       config?: any;
       handleConnect?: () => Promise<void>;
@@ -374,7 +345,8 @@ it("initial setup manual mode opens configuration form", async () => {
     }
     const drv = Object.create(OnkyoDriver.prototype) as DriverLike;
     drv.driver = { addAvailableEntity: () => {}, getConfigDirPath: () => tmp, setDeviceState: async () => {}, getConfiguredEntities: () => ({}) } as unknown as Partial<IntegrationAPI>;
-    drv.config = ConfigManager.load();
+    drv.config = configStore.load();
+    drv.configStore = configStore;
     drv.handleConnect = async () => {};
     drv.registerAvailableEntities = (OnkyoDriver.prototype as any).registerAvailableEntities.bind(drv);
 

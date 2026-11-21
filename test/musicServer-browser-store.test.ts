@@ -1,3 +1,4 @@
+import { testAvrContexts } from "./helpers/contexts.js";
 import { describe, it, expect, vi, afterEach } from "vitest";
 import * as uc from "@unfoldedcircle/integration-api";
 
@@ -7,69 +8,6 @@ vi.mock("../src/loggers.js", () => ({
 
 const ENTITY_ID = "NXR-001 192.168.1.100 main";
 
-describe("waitForNlaIngestion", () => {
-  afterEach(() => {
-    vi.useRealTimers();
-    vi.restoreAllMocks();
-  });
-
-  it("returns immediately when state is null (no browse state for entityId)", async () => {
-    const { waitForNlaIngestion } = await import("../src/musicServerBrowserStore.js");
-    await waitForNlaIngestion("invalid");
-  });
-
-  it("returns immediately when totalExpected is 0", async () => {
-    const store = await import("../src/musicServerBrowserStore.js");
-    store.addMusicServerMenuOption(ENTITY_ID, 1, "Item 1");
-    const state = store.getMusicServerBrowseState(ENTITY_ID);
-    state!.totalListItemCount = 0;
-    const { waitForNlaIngestion } = await import("../src/musicServerBrowserStore.js");
-    await waitForNlaIngestion(ENTITY_ID);
-  });
-
-  it("returns immediately when currentCount >= totalExpected", async () => {
-    const store = await import("../src/musicServerBrowserStore.js");
-    store.addMusicServerMenuOption(ENTITY_ID, 1, "Item 1");
-    store.addMusicServerMenuOption(ENTITY_ID, 2, "Item 2");
-    const state = store.getMusicServerBrowseState(ENTITY_ID);
-    state!.totalListItemCount = 2;
-    const { waitForNlaIngestion } = await import("../src/musicServerBrowserStore.js");
-    await waitForNlaIngestion(ENTITY_ID);
-  });
-
-  it("returns when count grows during polling", async () => {
-    vi.useFakeTimers();
-    const store = await import("../src/musicServerBrowserStore.js");
-    store.addMusicServerMenuOption(ENTITY_ID, 1, "Item 1");
-    const state = store.getMusicServerBrowseState(ENTITY_ID);
-    state!.totalListItemCount = 2;
-
-    const { waitForNlaIngestion } = await import("../src/musicServerBrowserStore.js");
-    const p = waitForNlaIngestion(ENTITY_ID);
-
-    await vi.advanceTimersByTimeAsync(350);
-    store.addMusicServerMenuOption(ENTITY_ID, 2, "Item 2");
-    await vi.advanceTimersByTimeAsync(350);
-
-    await p;
-  });
-
-  it("returns after timeout when count never grows", async () => {
-    vi.useFakeTimers();
-    const store = await import("../src/musicServerBrowserStore.js");
-    store.addMusicServerMenuOption(ENTITY_ID, 1, "Item 1");
-    const state = store.getMusicServerBrowseState(ENTITY_ID);
-    state!.totalListItemCount = 5;
-
-    const { waitForNlaIngestion } = await import("../src/musicServerBrowserStore.js");
-    const p = waitForNlaIngestion(ENTITY_ID);
-
-    await vi.advanceTimersByTimeAsync(4000);
-
-    await p;
-  });
-});
-
 describe("MusicServerMediaBrowser", () => {
   afterEach(() => {
     vi.restoreAllMocks();
@@ -77,7 +15,7 @@ describe("MusicServerMediaBrowser", () => {
 
   it("browse returns items from list entries", async () => {
     const { MusicServerMediaBrowser } = await import("../src/musicServerMediaBrowser.js");
-    const browser = new MusicServerMediaBrowser();
+    const browser = new MusicServerMediaBrowser(testAvrContexts);
     browser.ingestXmlEntries(ENTITY_ID, '<items offset="0"><item title="My Folder"/><item title="Song - Artist"/></items>');
 
     const result = await browser.browse(ENTITY_ID, { paging: new uc.Paging(1, 25) });
@@ -87,9 +25,9 @@ describe("MusicServerMediaBrowser", () => {
   it("marks fuzzy-matching music server tracks as now playing", async () => {
     const store = await import("../src/musicServerBrowserStore.js");
     const { MusicServerMediaBrowser } = await import("../src/musicServerMediaBrowser.js");
-    const browser = new MusicServerMediaBrowser();
+    const browser = new MusicServerMediaBrowser(testAvrContexts);
     browser.ingestXmlEntries(ENTITY_ID, '<items offset="0"><item title="Song - Artist"/></items>');
-    const state = store.getMusicServerBrowseState(ENTITY_ID)!;
+    const state = store.musicServerStore.getBrowseState(ENTITY_ID, testAvrContexts)!;
     state.nowPlayingTitle = "Song - Artist";
     await browser.browse(ENTITY_ID, { media_id: "music-server:root", media_type: "music-server://menu", paging: new uc.Paging(1, 25) });
     state.nowPlayingTitle = "Song";
@@ -98,7 +36,7 @@ describe("MusicServerMediaBrowser", () => {
 
   it("ingestXmlEntries parses XML items", async () => {
     const { MusicServerMediaBrowser } = await import("../src/musicServerMediaBrowser.js");
-    const browser = new MusicServerMediaBrowser();
+    const browser = new MusicServerMediaBrowser(testAvrContexts);
     browser.ingestXmlEntries(ENTITY_ID, '<items offset="0000"><item title="Album 1"/><item title="Song - Artist"/></items>');
 
     const result = await browser.browse(ENTITY_ID, { paging: new uc.Paging(1, 25) });
@@ -107,7 +45,7 @@ describe("MusicServerMediaBrowser", () => {
 
   it("isMainMenuRequest and isBackRequest detect correct IDs", async () => {
     const { MusicServerMediaBrowser } = await import("../src/musicServerMediaBrowser.js");
-    const browser = new MusicServerMediaBrowser();
+    const browser = new MusicServerMediaBrowser(testAvrContexts);
     expect(browser.isMainMenuRequest("music-server:main-menu", "music-server://menu")).toBe(true);
     expect(browser.isBackRequest("music-server:menu-back", "music-server://menu")).toBe(true);
     expect(browser.isMainMenuRequest("other:id")).toBe(false);
@@ -116,7 +54,7 @@ describe("MusicServerMediaBrowser", () => {
 
   it("resolveMenuOption returns undefined for non-matching media_id", async () => {
     const { MusicServerMediaBrowser } = await import("../src/musicServerMediaBrowser.js");
-    const browser = new MusicServerMediaBrowser();
+    const browser = new MusicServerMediaBrowser(testAvrContexts);
     expect(browser.resolveMenuOption(undefined)).toBeUndefined();
     expect(browser.resolveMenuOption("no-match")).toBeUndefined();
     expect(browser.resolveMenuOption("music-server:menu:abc")).toBeUndefined();
@@ -125,7 +63,7 @@ describe("MusicServerMediaBrowser", () => {
 
   it("resolveMenuOption handles encoded title", async () => {
     const { MusicServerMediaBrowser } = await import("../src/musicServerMediaBrowser.js");
-    const browser = new MusicServerMediaBrowser();
+    const browser = new MusicServerMediaBrowser(testAvrContexts);
     const option = browser.resolveMenuOption("music-server:menu:5:Hello%20World", "music-server://menu");
     expect(option).toBeDefined();
     expect(option!.menuIndex).toBe(5);
@@ -134,7 +72,7 @@ describe("MusicServerMediaBrowser", () => {
 
   it("resolveMenuOption handles invalid URI gracefully", async () => {
     const { MusicServerMediaBrowser } = await import("../src/musicServerMediaBrowser.js");
-    const browser = new MusicServerMediaBrowser();
+    const browser = new MusicServerMediaBrowser(testAvrContexts);
     const option = browser.resolveMenuOption("music-server:menu:3:%E0%80%80", "music-server://menu");
     expect(option).toBeDefined();
     expect(option!.title).toBe("Menu 3");
@@ -142,14 +80,14 @@ describe("MusicServerMediaBrowser", () => {
 
   it("resolveMenuOption rejects mismatched media_type", async () => {
     const { MusicServerMediaBrowser } = await import("../src/musicServerMediaBrowser.js");
-    const browser = new MusicServerMediaBrowser();
+    const browser = new MusicServerMediaBrowser(testAvrContexts);
     const option = browser.resolveMenuOption("music-server:menu:1", "wrong://type");
     expect(option).toBeUndefined();
   });
 
   it("resolveMenuOption without mediaType", async () => {
     const { MusicServerMediaBrowser } = await import("../src/musicServerMediaBrowser.js");
-    const browser = new MusicServerMediaBrowser();
+    const browser = new MusicServerMediaBrowser(testAvrContexts);
     const option = browser.resolveMenuOption("music-server:menu:1:Title");
     expect(option).toBeDefined();
     expect(option!.menuIndex).toBe(1);
@@ -158,7 +96,7 @@ describe("MusicServerMediaBrowser", () => {
 
   it("resolveMenuOption detects track title as not browsable", async () => {
     const { MusicServerMediaBrowser } = await import("../src/musicServerMediaBrowser.js");
-    const browser = new MusicServerMediaBrowser();
+    const browser = new MusicServerMediaBrowser(testAvrContexts);
     const option = browser.resolveMenuOption("music-server:menu:1:Song%20-%20Artist", "music-server://menu");
     expect(option).toBeDefined();
     expect(option!.isBrowsable).toBe(false);
@@ -166,7 +104,7 @@ describe("MusicServerMediaBrowser", () => {
 
   it("browse with root id", async () => {
     const { MusicServerMediaBrowser } = await import("../src/musicServerMediaBrowser.js");
-    const browser = new MusicServerMediaBrowser();
+    const browser = new MusicServerMediaBrowser(testAvrContexts);
     browser.ingestXmlEntries(ENTITY_ID, '<items offset="0"><item title="Folder"/></items>');
     const result = await browser.browse(ENTITY_ID, { media_id: "music-server:root", media_type: "music-server://menu", paging: new uc.Paging(1, 25) });
     expect(result).toBeDefined();
@@ -174,28 +112,28 @@ describe("MusicServerMediaBrowser", () => {
 
   it("browse with main menu id", async () => {
     const { MusicServerMediaBrowser } = await import("../src/musicServerMediaBrowser.js");
-    const browser = new MusicServerMediaBrowser();
+    const browser = new MusicServerMediaBrowser(testAvrContexts);
     const result = await browser.browse(ENTITY_ID, { media_id: "music-server:main-menu", media_type: "music-server://menu", paging: new uc.Paging(1, 25) });
     expect(result).toBeDefined();
   });
 
   it("browse with back id", async () => {
     const { MusicServerMediaBrowser } = await import("../src/musicServerMediaBrowser.js");
-    const browser = new MusicServerMediaBrowser();
+    const browser = new MusicServerMediaBrowser(testAvrContexts);
     const result = await browser.browse(ENTITY_ID, { media_id: "music-server:menu-back", media_type: "music-server://menu", paging: new uc.Paging(1, 25) });
     expect(result).toBeDefined();
   });
 
   it("browse with unknown menu id returns BrowseResult", async () => {
     const { MusicServerMediaBrowser } = await import("../src/musicServerMediaBrowser.js");
-    const browser = new MusicServerMediaBrowser();
+    const browser = new MusicServerMediaBrowser(testAvrContexts);
     const result = await browser.browse(ENTITY_ID, { media_id: "music-server:menu:999", media_type: "music-server://menu", paging: new uc.Paging(1, 25) });
     expect(result).toBeDefined();
   });
 
   it("browse with empty media_id", async () => {
     const { MusicServerMediaBrowser } = await import("../src/musicServerMediaBrowser.js");
-    const browser = new MusicServerMediaBrowser();
+    const browser = new MusicServerMediaBrowser(testAvrContexts);
     const result = await browser.browse(ENTITY_ID, { paging: new uc.Paging(1, 25) });
     expect(result).toBeDefined();
   });

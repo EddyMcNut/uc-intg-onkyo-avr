@@ -1,3 +1,4 @@
+import type { AvrContextRegistry } from "./avrContext.js";
 import type { AvrConfig } from "./configManager.js";
 import { getAvrSourcesByPhysicalId } from "./avrSourceCatalog.js";
 import { eiscpMappings } from "./eiscp-mappings.js";
@@ -13,9 +14,9 @@ export function stripInputSourceMarker(option: string): string {
   return option.replace(new RegExp(`^(?:${markers})\\s+`, "u"), "");
 }
 
-export function presentInputSourceOptions(avrConfig: AvrConfig, physicalAvrId: string, builtInOptions: string[]): string[] {
-  const options = getInputSourceOptions(avrConfig, physicalAvrId, builtInOptions);
-  const reportedByName = new Map(getAvrSourcesByPhysicalId(physicalAvrId).map((input) => [input.name.toLowerCase(), input]));
+export function presentInputSourceOptions(avrConfig: AvrConfig, physicalAvrId: string, builtInOptions: string[], contexts: AvrContextRegistry): string[] {
+  const options = getInputSourceOptions(avrConfig, physicalAvrId, builtInOptions, contexts);
+  const reportedByName = new Map(getAvrSourcesByPhysicalId(physicalAvrId, contexts).map((input) => [input.name.toLowerCase(), input]));
   const configuredByName = new Map(
     Object.entries(avrConfig.idInputSources ?? {}).flatMap(([id, entry]) => [
       [entry.name.toLowerCase(), [id, entry] as const],
@@ -37,9 +38,9 @@ export function presentInputSourceOptions(avrConfig: AvrConfig, physicalAvrId: s
   return decorated.map(({ option, network }) => (network && marker !== "none" ? `${marker} ${option}` : option));
 }
 
-export function displayInputSourceOption(avrConfig: AvrConfig, physicalAvrId: string, option: string): string {
+export function displayInputSourceOption(avrConfig: AvrConfig, physicalAvrId: string, option: string, contexts: AvrContextRegistry): string {
   const cleanOption = stripInputSourceMarker(option).toLowerCase();
-  const reportedInput = getAvrSourcesByPhysicalId(physicalAvrId).find((input) => input.name.toLowerCase() === cleanOption);
+  const reportedInput = getAvrSourcesByPhysicalId(physicalAvrId, contexts).find((input) => input.name.toLowerCase() === cleanOption);
   const configured = Object.entries(avrConfig.idInputSources ?? {}).find(([, entry]) => entry.name.toLowerCase() === cleanOption || entry.setting.toLowerCase() === cleanOption);
   const mappings = eiscpMappings.value_mappings.SLI as Record<string, { value: string }>;
   const id = reportedInput?.id ?? configured?.[0] ?? mappings[cleanOption]?.value.toLowerCase() ?? "";
@@ -49,9 +50,9 @@ export function displayInputSourceOption(avrConfig: AvrConfig, physicalAvrId: st
   return isNetwork && marker !== "none" ? `${marker} ${stripInputSourceMarker(option)}` : stripInputSourceMarker(option);
 }
 
-function getInputSourceOptions(avrConfig: AvrConfig, physicalAvrId: string, builtInOptions: string[]): string[] {
+function getInputSourceOptions(avrConfig: AvrConfig, physicalAvrId: string, builtInOptions: string[], contexts: AvrContextRegistry): string[] {
   if (avrConfig.idInputSources && Object.keys(avrConfig.idInputSources).length > 0) return resolveConfiguredInputSources(avrConfig.idInputSources);
   if (!avrConfig.useAvrReportedInputs) return builtInOptions;
-  const reported = getAvrSourcesByPhysicalId(physicalAvrId);
+  const reported = getAvrSourcesByPhysicalId(physicalAvrId, contexts);
   return reported.length > 0 ? reported.map((input) => input.name) : builtInOptions;
 }

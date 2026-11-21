@@ -54,7 +54,7 @@ const h = vi.hoisted(() => {
       isEntityOn: vi.fn(() => true)
     },
     mockEntityRegistrar: {
-      createMediaPlayerEntity: vi.fn(() => ({ id: "mp_entity" })),
+      createMediaPlayerEntity: vi.fn((..._args: unknown[]) => ({ id: "mp_entity" })),
       createSensorEntities: vi.fn(() => [{ id: "sensor_1" }]),
       createListeningModeSelectEntity: vi.fn(() => ({ id: "lm_entity" })),
       createInputSelectorSelectEntity: vi.fn(() => ({ id: "is_entity" })),
@@ -66,7 +66,7 @@ const h = vi.hoisted(() => {
       getTunerPresetOptions: vi.fn(() => ["R10 80s", "NPO FunX", "STRKSTAD"])
     },
     mockConnectionManager: {
-      getPhysicalConnection: vi.fn(() => undefined),
+      getPhysicalConnection: vi.fn((_physicalAVR?: string): unknown => undefined),
       disconnectAll: vi.fn(),
       clearAllConnections: vi.fn(),
       cancelAllScheduledReconnections: vi.fn(),
@@ -74,17 +74,27 @@ const h = vi.hoisted(() => {
     },
     mockConnectCoordinator: {
       connect: vi.fn(),
-      reconcile: vi.fn(() => [])
+      reconcile: vi.fn((..._args: unknown[]): string[] => [])
     },
     mockCommandSender: {
       sharedCmdHandler: vi.fn()
     },
     mockResolveAutoVolumeScale: vi.fn(),
     mockResolveInputSourceList: vi.fn(),
-    mockSetAvrInputs: vi.fn(() => true),
-    mockClearAvrInputs: vi.fn(),
+    mockSetAvrInputs: vi.fn((_inputs?: unknown) => true),
+    mockClearAvrInputs: vi.fn(() => undefined),
     mockHasAvrInputs: vi.fn(() => false),
     mockSetupHost: { current: undefined as any },
+    // The store the driver constructs (the mocked ConfigStore constructor returns it).
+    mockConfigStore: {
+      path: "/tmp/config.json",
+      load: vi.fn((): any => ({ avrs: [], logLevel: "info" })),
+      patchAvr: vi.fn((..._args: unknown[]) => true),
+      clear: vi.fn(),
+      get: vi.fn((): any => ({})),
+      save: vi.fn(),
+      addAvr: vi.fn()
+    },
     mockLog: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() }
   };
 });
@@ -103,7 +113,8 @@ const {
   mockResolveInputSourceList,
   mockSetAvrInputs,
   mockClearAvrInputs,
-  mockHasAvrInputs
+  mockHasAvrInputs,
+  mockConfigStore
 } = h;
 
 vi.mock("@unfoldedcircle/integration-api", () => ({
@@ -132,9 +143,11 @@ vi.mock("../src/configManager.js", () => {
   const mockBuildId = vi.fn((m: string, ip: string, z: string) => `${m}_${ip}_${z}`);
   const mockBuildPhys = vi.fn((m: string, ip: string) => `${m}_${ip}`);
   return {
-    ConfigManager: { load: vi.fn(() => ({ avrs: [], logLevel: "info" })), patchAvr: vi.fn(() => true) },
-    setConfigDir: vi.fn(),
-    getConfigPath: vi.fn(() => "/tmp/config.json"),
+    ConfigStore: vi.fn(function () {
+      return h.mockConfigStore;
+    }),
+    configPathFor: vi.fn(() => "/tmp/config.json"),
+    EMPTY_CONFIG_SOURCE: { get: () => ({}) },
     buildEntityId: mockBuildId,
     buildPhysicalAvrId: mockBuildPhys,
     physicalAvrIdFromEntityId: vi.fn((id: string) => id.split("_").slice(0, 2).join("_")),
@@ -203,7 +216,14 @@ vi.mock("../src/avrStateQuery.js", () => {
     }
   };
 });
-vi.mock("../src/mediaBrowser.js", () => ({ initMediaBrowser: vi.fn() }));
+// The driver creates its own MediaBrowser; a stub is enough here (browsing has its own tests).
+vi.mock("../src/mediaBrowser.js", () => ({
+  MediaBrowser: function (this: Record<string, unknown>, _avrStateApi: unknown, services: unknown) {
+    this.services = services;
+    this.browseMedia = vi.fn();
+    this.isMediaBrowsingAvailable = vi.fn(() => false);
+  }
+}));
 vi.mock("../src/setupHandler.js", () => ({
   default: function (host: any) {
     mockSetupHost.current = host;
@@ -267,8 +287,7 @@ describe("OnkyoDriver", () => {
     });
 
     it("loads config with AVRs and calls registerAvailableEntities", async () => {
-      const configModule = await import("../src/configManager.js");
-      (configModule.ConfigManager.load as any).mockReturnValueOnce({
+      mockConfigStore.load.mockReturnValueOnce({
         avrs: [{ model: "TX-RZ50", ip: "1.2.3.4", zone: "main", createSensors: true, listeningModeOptions: ["mode1"], inputSelectorOptions: ["input1"] }],
         logLevel: "debug"
       });
@@ -417,7 +436,13 @@ describe("OnkyoDriver", () => {
       await driver.queryAvrState(avrEntry, eiscp, "test");
 
       const avrStateQuery = await import("../src/avrStateQuery.js");
-      expect(avrStateQuery.avrStateQueryService.queryAvrState).toHaveBeenCalledWith(avrEntry, eiscp, "zone2", "test", 200);
+      expect((avrStateQuery as unknown as { avrStateQueryService: Record<string, ReturnType<typeof vi.fn>> }).avrStateQueryService.queryAvrState).toHaveBeenCalledWith(
+        avrEntry,
+        eiscp,
+        "zone2",
+        "test",
+        200
+      );
     });
 
     it("uses defaults when instance config lacks values", async () => {
@@ -429,7 +454,13 @@ describe("OnkyoDriver", () => {
       await driver.queryAvrState(avrEntry, eiscp, "test");
 
       const avrStateQuery = await import("../src/avrStateQuery.js");
-      expect(avrStateQuery.avrStateQueryService.queryAvrState).toHaveBeenCalledWith(avrEntry, eiscp, "main", "test", 100);
+      expect((avrStateQuery as unknown as { avrStateQueryService: Record<string, ReturnType<typeof vi.fn>> }).avrStateQueryService.queryAvrState).toHaveBeenCalledWith(
+        avrEntry,
+        eiscp,
+        "main",
+        "test",
+        100
+      );
     });
   });
 
@@ -451,7 +482,7 @@ describe("OnkyoDriver", () => {
       expect(querySpy).toHaveBeenCalledWith("z2", eiscp, "after connection");
 
       const avrStateQuery = await import("../src/avrStateQuery.js");
-      expect(avrStateQuery.avrStateQueryService.recordQueries).toHaveBeenCalledWith(["z1", "z2"]);
+      expect((avrStateQuery as unknown as { avrStateQueryService: Record<string, ReturnType<typeof vi.fn>> }).avrStateQueryService.recordQueries).toHaveBeenCalledWith(["z1", "z2"]);
     });
 
     it("skips zones in standby for non-initial queries", async () => {
@@ -486,8 +517,7 @@ describe("OnkyoDriver", () => {
 
   describe("registerAvailableEntities with AVRs in config", () => {
     it("registers all enabled entity types", async () => {
-      const configModule = await import("../src/configManager.js");
-      (configModule.ConfigManager.load as any).mockReturnValueOnce({
+      mockConfigStore.load.mockReturnValueOnce({
         avrs: [{ model: "TX-RZ50", ip: "1.2.3.4", zone: "main", createSensors: true, listeningModeOptions: ["mode1"], inputSelectorOptions: ["input1"] }],
         logLevel: "info"
       });
@@ -500,8 +530,7 @@ describe("OnkyoDriver", () => {
     });
 
     it("skips disabled entity types", async () => {
-      const configModule = await import("../src/configManager.js");
-      (configModule.ConfigManager.load as any).mockReturnValueOnce({
+      mockConfigStore.load.mockReturnValueOnce({
         avrs: [{ model: "TX-RZ50", ip: "1.2.3.4", zone: "main", createSensors: false, listeningModeOptions: null, inputSelectorOptions: null }],
         logLevel: "info"
       });
@@ -516,8 +545,7 @@ describe("OnkyoDriver", () => {
     });
 
     it("registers remote entity when createRemoteEntity is true", async () => {
-      const configModule = await import("../src/configManager.js");
-      (configModule.ConfigManager.load as any).mockReturnValueOnce({
+      mockConfigStore.load.mockReturnValueOnce({
         avrs: [{ model: "TX-RZ50", ip: "1.2.3.4", zone: "main", createRemoteEntity: true }],
         logLevel: "info"
       });
@@ -529,8 +557,7 @@ describe("OnkyoDriver", () => {
     });
 
     it("skips remote entity when createRemoteEntity is false or absent", async () => {
-      const configModule = await import("../src/configManager.js");
-      (configModule.ConfigManager.load as any).mockReturnValueOnce({
+      mockConfigStore.load.mockReturnValueOnce({
         avrs: [{ model: "TX-RZ50", ip: "1.2.3.4", zone: "main", createRemoteEntity: false }],
         logLevel: "info"
       });
@@ -541,8 +568,7 @@ describe("OnkyoDriver", () => {
     });
 
     it("replaces an already registered entity so updated definitions take effect", async () => {
-      const configModule = await import("../src/configManager.js");
-      (configModule.ConfigManager.load as any).mockReturnValueOnce({
+      mockConfigStore.load.mockReturnValueOnce({
         avrs: [{ model: "TX-RZ50", ip: "1.2.3.4", zone: "main", createRemoteEntity: true }],
         logLevel: "info"
       });
@@ -564,8 +590,7 @@ describe("OnkyoDriver", () => {
     };
 
     async function createDriverWithAutoScale() {
-      const configModule = await import("../src/configManager.js");
-      (configModule.ConfigManager.load as any).mockReturnValue(autoConfig);
+      mockConfigStore.load.mockReturnValue(autoConfig);
       return createDriver();
     }
 
@@ -574,9 +599,8 @@ describe("OnkyoDriver", () => {
       (resolveAutoVolumeScale as any).mockReturnValue({ scale: 80, reason: "AVR reports a maximum display volume of 80" });
 
       const driver = await createDriverWithAutoScale();
-      const configModule = await import("../src/configManager.js");
-      (configModule.ConfigManager.patchAvr as any).mockReturnValue(true);
-      (configModule.ConfigManager.load as any).mockReturnValue({
+      mockConfigStore.patchAvr.mockReturnValue(true);
+      mockConfigStore.load.mockReturnValue({
         ...autoConfig,
         avrs: [{ ...autoConfig.avrs[0], volumeScale: 80 }]
       });
@@ -588,7 +612,7 @@ describe("OnkyoDriver", () => {
 
       driver.handleAvrInfo("TX-RZ50_1.2.3.4_main");
 
-      expect(configModule.ConfigManager.patchAvr).toHaveBeenCalledWith("1.2.3.4", "main", { volumeScale: 80 });
+      expect(mockConfigStore.patchAvr).toHaveBeenCalledWith("1.2.3.4", "main", { volumeScale: 80 });
       expect(mockLog.debug).toHaveBeenCalledWith(expect.stringContaining("Volume scale 'auto' resolved"), "driver:", "TX-RZ50_1.2.3.4_main", 80, "AVR reports a maximum display volume of 80");
       // The media player is rebuilt with the resolved scale, the other entities are not touched.
       expect(mockEntityRegistrar.createMediaPlayerEntity).toHaveBeenCalledTimes(1);
@@ -618,11 +642,10 @@ describe("OnkyoDriver", () => {
             : undefined
       );
 
-      const configModule = await import("../src/configManager.js");
-      (configModule.ConfigManager.load as any).mockReturnValue(multiZoneConfig);
+      mockConfigStore.load.mockReturnValue(multiZoneConfig);
       const driver = await createDriver();
-      (configModule.ConfigManager.patchAvr as any).mockReturnValue(true);
-      (configModule.ConfigManager.load as any).mockReturnValue({
+      mockConfigStore.patchAvr.mockReturnValue(true);
+      mockConfigStore.load.mockReturnValue({
         ...multiZoneConfig,
         avrs: multiZoneConfig.avrs.map((avr) => (avr.zone === "zone2" ? { ...avr, volumeScale: 80 } : avr.zone === "main" ? { ...avr, volumeScale: 100 } : avr))
       });
@@ -630,10 +653,10 @@ describe("OnkyoDriver", () => {
 
       driver.handleAvrInfo("TX-RZ50_1.2.3.4_main");
 
-      expect(configModule.ConfigManager.patchAvr).toHaveBeenCalledWith("1.2.3.4", "main", { volumeScale: 100 });
-      expect(configModule.ConfigManager.patchAvr).toHaveBeenCalledWith("1.2.3.4", "zone2", { volumeScale: 80 });
+      expect(mockConfigStore.patchAvr).toHaveBeenCalledWith("1.2.3.4", "main", { volumeScale: 100 });
+      expect(mockConfigStore.patchAvr).toHaveBeenCalledWith("1.2.3.4", "zone2", { volumeScale: 80 });
       // The manual zone3 scale is left untouched, so only the two resolved zones are re-registered.
-      expect(configModule.ConfigManager.patchAvr).not.toHaveBeenCalledWith("1.2.3.4", "zone3", expect.anything());
+      expect(mockConfigStore.patchAvr).not.toHaveBeenCalledWith("1.2.3.4", "zone3", expect.anything());
       expect(mockEntityRegistrar.createMediaPlayerEntity).toHaveBeenCalledTimes(2);
       expect(mockEntityRegistrar.createMediaPlayerEntity.mock.calls.map((call) => call[1])).toEqual([100, 80]);
     });
@@ -643,12 +666,11 @@ describe("OnkyoDriver", () => {
       (resolveAutoVolumeScale as any).mockReturnValue(undefined);
 
       const driver = await createDriverWithAutoScale();
-      const configModule = await import("../src/configManager.js");
       mockEntityRegistrar.createMediaPlayerEntity.mockClear();
 
       driver.handleAvrInfo("TX-RZ50_1.2.3.4_main");
 
-      expect(configModule.ConfigManager.patchAvr).not.toHaveBeenCalled();
+      expect(mockConfigStore.patchAvr).not.toHaveBeenCalled();
       expect(mockEntityRegistrar.createMediaPlayerEntity).not.toHaveBeenCalled();
     });
 
@@ -657,8 +679,7 @@ describe("OnkyoDriver", () => {
       (resolveAutoVolumeScale as any).mockReturnValue({ scale: 100, reason: "AVR does not report a maximum display volume" });
 
       const driver = await createDriverWithAutoScale();
-      const configModule = await import("../src/configManager.js");
-      (configModule.ConfigManager.patchAvr as any).mockReturnValue(false);
+      mockConfigStore.patchAvr.mockReturnValue(false);
       mockEntityRegistrar.createMediaPlayerEntity.mockClear();
 
       driver.handleAvrInfo("TX-RZ50_1.2.3.4_main");
@@ -669,11 +690,10 @@ describe("OnkyoDriver", () => {
 
     it("ignores AVR info for an entity that is not configured", async () => {
       const driver = await createDriverWithAutoScale();
-      const configModule = await import("../src/configManager.js");
 
       driver.handleAvrInfo("TX-NR860 5.6.7.8_main");
 
-      expect(configModule.ConfigManager.patchAvr).not.toHaveBeenCalled();
+      expect(mockConfigStore.patchAvr).not.toHaveBeenCalled();
     });
   });
 
@@ -688,8 +708,7 @@ describe("OnkyoDriver", () => {
     ];
 
     async function createDriverWithAutoInputList(saved = autoConfig) {
-      const configModule = await import("../src/configManager.js");
-      (configModule.ConfigManager.load as any).mockReturnValue(saved);
+      mockConfigStore.load.mockReturnValue(saved);
       return createDriver();
     }
 
@@ -702,7 +721,6 @@ describe("OnkyoDriver", () => {
       mockResolveInputSourceList.mockReturnValue({ inputs: collectedInputs, reason: "AVR reports 2 input(s)" });
       mockSetAvrInputs.mockReturnValue(true);
       const driver = await createDriverWithAutoInputList();
-      const configModule = await import("../src/configManager.js");
       mockEntityRegistrar.createMediaPlayerEntity.mockClear();
       mockEntityRegistrar.createInputSelectorSelectEntity.mockClear();
 
@@ -710,7 +728,7 @@ describe("OnkyoDriver", () => {
 
       // The setting itself stays "auto": the collected inputs are kept in memory only.
       expect(mockSetAvrInputs).toHaveBeenCalledWith(collectedInputs);
-      expect(configModule.ConfigManager.patchAvr).not.toHaveBeenCalled();
+      expect(mockConfigStore.patchAvr).not.toHaveBeenCalled();
       expect(mockEntityRegistrar.createInputSelectorSelectEntity).toHaveBeenCalledTimes(1);
       expect(mockEntityRegistrar.createMediaPlayerEntity).toHaveBeenCalledTimes(1);
       expect(mockLog.debug).toHaveBeenCalledWith(expect.stringContaining("Input source list 'auto' resolved"), "driver:", "TX-RZ50_1.2.3.4_main", "AVR reports 2 input(s)");
@@ -754,13 +772,12 @@ describe("OnkyoDriver", () => {
       mockResolveInputSourceList.mockReturnValue({ reason: "AVR reports no input sources, so integration mappings are used" });
       mockHasAvrInputs.mockReturnValue(true);
       const driver = await createDriverWithAutoInputList();
-      const configModule = await import("../src/configManager.js");
-      (configModule.ConfigManager.patchAvr as any).mockReturnValue(true);
+      mockConfigStore.patchAvr.mockReturnValue(true);
       mockEntityRegistrar.createInputSelectorSelectEntity.mockClear();
 
       driver.handleAvrInfo("TX-RZ50_1.2.3.4_main");
 
-      expect(configModule.ConfigManager.patchAvr).toHaveBeenCalledWith("1.2.3.4", "main", { useAvrReportedInputs: false });
+      expect(mockConfigStore.patchAvr).toHaveBeenCalledWith("1.2.3.4", "main", { useAvrReportedInputs: false });
       expect(mockClearAvrInputs).toHaveBeenCalledTimes(1);
       expect(mockLog.debug).toHaveBeenCalledWith("%s [%s] AVR-reported input names disabled: %s", "driver:", "TX-RZ50_1.2.3.4_main", "AVR reports no input sources, so integration mappings are used");
       expect(mockEntityRegistrar.createInputSelectorSelectEntity).toHaveBeenCalledTimes(1);
@@ -769,12 +786,11 @@ describe("OnkyoDriver", () => {
     it("leaves a manual input source list alone", async () => {
       mockResolveInputSourceList.mockReturnValue(undefined);
       const driver = await createDriverWithAutoInputList({ ...autoConfig, avrs: [{ ...autoConfig.avrs[0], useAvrReportedInputs: false }] });
-      const configModule = await import("../src/configManager.js");
       mockEntityRegistrar.createInputSelectorSelectEntity.mockClear();
 
       driver.handleAvrInfo("TX-RZ50_1.2.3.4_main");
 
-      expect(configModule.ConfigManager.patchAvr).not.toHaveBeenCalled();
+      expect(mockConfigStore.patchAvr).not.toHaveBeenCalled();
       expect(mockClearAvrInputs).not.toHaveBeenCalled();
       expect(mockEntityRegistrar.createInputSelectorSelectEntity).not.toHaveBeenCalled();
     });
@@ -802,13 +818,12 @@ describe("OnkyoDriver", () => {
     ].join("");
 
     async function createDriverWithPresets(saved = presetsConfig) {
-      const configModule = await import("../src/configManager.js");
-      (configModule.ConfigManager.load as any).mockReturnValue(saved);
-      const { sharedAvrContexts } = await import("../src/avrContext.js");
-      sharedAvrContexts.clear();
-      const avrInfoStore = { ...(await import("../src/avrInfoStore.js")), ...(await import("./helpers/avrInfo.js")) } as any;
-      avrInfoStore.setAvrInfo("TX-RZ50_1.2.3.4_main", avrInfoStore.parseAvrInfo(presetPayload));
-      return createDriver();
+      mockConfigStore.load.mockReturnValue(saved);
+      const { parseAvrInfo } = await import("../src/avrInfoStore.js");
+      const driver = await createDriver();
+      // The driver owns its registry; seed the AVR info there, as an NRI reply would.
+      (driver as any).avrContexts.forEntity("TX-RZ50_1.2.3.4_main").avrInfo.set(parseAvrInfo(presetPayload));
+      return driver;
     }
 
     beforeEach(() => {
@@ -883,8 +898,7 @@ describe("OnkyoDriver", () => {
     it("sends PRS with the slot of the selected station", async () => {
       const driver = await createDriverWithPresets();
       const raw = vi.fn().mockResolvedValue(undefined);
-      const { sharedAvrContexts } = await import("../src/avrContext.js");
-      sharedAvrContexts.get("TX-RZ50_1.2.3.4").tunerPresets.set([
+      (driver as any).avrContexts.get("TX-RZ50_1.2.3.4").tunerPresets.set([
         { slot: 1, name: "R10 80s", band: "2", freq: "0" },
         { slot: 12, name: "NPO FunX", band: "2", freq: "0" },
         { slot: 28, name: "STRKSTAD", band: "1", freq: "107.20" }
@@ -916,13 +930,12 @@ describe("OnkyoDriver", () => {
     };
 
     it("collects the AVR info again for every AVR", async () => {
-      const configModule = await import("../src/configManager.js");
-      (configModule.ConfigManager.load as any).mockReturnValue(savedConfig);
+      mockConfigStore.load.mockReturnValue(savedConfig);
       const driver = await createDriver();
       await driver.handleDriverSetup({ command: "start" } as any);
 
       const command = vi.fn();
-      mockConnectionManager.getPhysicalConnection.mockImplementation((physicalAVR: string) => ({ eiscp: { command, connected: true } }));
+      mockConnectionManager.getPhysicalConnection.mockImplementation((_physicalAVR?: string) => ({ eiscp: { command, connected: true } }));
 
       await mockSetupHost.current.onConfigSaved();
 
@@ -932,8 +945,7 @@ describe("OnkyoDriver", () => {
     });
 
     it("does not fail when an AVR is not connected", async () => {
-      const configModule = await import("../src/configManager.js");
-      (configModule.ConfigManager.load as any).mockReturnValue(savedConfig);
+      mockConfigStore.load.mockReturnValue(savedConfig);
       const driver = await createDriver();
       await driver.handleDriverSetup({ command: "start" } as any);
       mockConnectionManager.getPhysicalConnection.mockReturnValue(undefined);
@@ -942,22 +954,21 @@ describe("OnkyoDriver", () => {
     });
 
     it("removes stale zone entities from the available entity pool", async () => {
-      const configModule = await import("../src/configManager.js");
       const oldZone = "TX-RZ50_1.2.3.4_zone2";
       const staleIds = [oldZone, `${oldZone}_source_sensor`, `${oldZone}_input_selector`, `${oldZone}_remote`];
       staleIds.forEach((id) => h.availableEntityIds.add(id));
       mockDriver.getAvailableEntities.mockImplementation(() => ({
-        contains: (id: string) => h.availableEntityIds.has(id),
-        removeEntity: (id: string) => h.availableEntityIds.delete(id)
+        contains: vi.fn((id: string) => h.availableEntityIds.has(id)),
+        removeEntity: vi.fn((id: string) => h.availableEntityIds.delete(id))
       }));
 
-      (configModule.ConfigManager.load as any).mockReturnValueOnce({
+      mockConfigStore.load.mockReturnValueOnce({
         avrs: [{ model: "TX-RZ50", ip: "1.2.3.4", zone: "zone2" }],
         logLevel: "info"
       });
       const driver = await createDriver();
       mockConnectCoordinator.reconcile.mockReset().mockReturnValue([oldZone]);
-      (configModule.ConfigManager.load as any).mockReturnValue({
+      mockConfigStore.load.mockReturnValue({
         avrs: [{ model: "TX-RZ50", ip: "1.2.3.4", zone: "main" }],
         logLevel: "info"
       });
@@ -980,8 +991,7 @@ describe("OnkyoDriver", () => {
     });
 
     it("connects persisted AVRs during initialization", async () => {
-      const configModule = await import("../src/configManager.js");
-      (configModule.ConfigManager.load as any).mockReturnValue({
+      mockConfigStore.load.mockReturnValue({
         avrs: [{ model: "TX-RZ50", ip: "1.2.3.4", zone: "main" }],
         logLevel: "info"
       });

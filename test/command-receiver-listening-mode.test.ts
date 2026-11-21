@@ -1,10 +1,13 @@
 /// <reference types="node" />
+import { testMediaBrowser, testMediaBrowserServices } from "./helpers/mediaBrowserServices.js";
+import { testAvrContexts } from "./helpers/contexts.js";
 import { describe, it, expect } from "vitest";
 import type { IntegrationAPI } from "@unfoldedcircle/integration-api";
 import * as uc from "@unfoldedcircle/integration-api";
 import fs from "fs";
 import os from "os";
 import path from "path";
+import { testConfigStore } from "./helpers/configStore.js";
 
 function mkTmpDir(prefix = "onkyo-test-") {
   return fs.mkdtempSync(path.join(os.tmpdir(), prefix));
@@ -15,17 +18,15 @@ it("CommandReceiver preserves user-configured listeningModeOptions across IFA/so
   try {
     const crModule = (await import("../src/commandReceiver.js")) as any;
     const ConfigModule = (await import("../src/configManager.js")) as any;
-    const avrStateModule = (await import("../src/avrState.js")) as any;
     const { CommandReceiver } = crModule;
-    const { ConfigManager, setConfigDir } = ConfigModule;
-    const { avrStateManager } = avrStateModule;
-    if (typeof setConfigDir === "function") setConfigDir(tmp);
+    const { avrStateManager } = await import("./helpers/avrState.js");
+    const configStore = new ConfigModule.ConfigStore(ConfigModule.configPathFor(tmp));
 
     // Prepare config with user-specified listeningModeOptions
     const cfg = {
       avrs: [{ model: "M", ip: "1.2.3.4", port: 60128, zone: "main", listeningModes: { "00": { name: "stereo", setting: "stereo" }, "40": { name: "straight-decode", setting: "straight-decode" } } }]
     };
-    ConfigManager.save(cfg);
+    configStore.save(cfg);
 
     // Capture attribute updates from the driver
     const updates: Array<{ id: string; attrs: { [key: string]: string | number | boolean } }> = [];
@@ -53,8 +54,8 @@ it("CommandReceiver preserves user-configured listeningModeOptions across IFA/so
     const mockEiscp = new MockEiscp();
 
     // Construct CommandReceiver with the persisted config
-    const onkyoCfg = ConfigManager.load();
-    const receiver = new CommandReceiver(mockDriver, onkyoCfg, mockEiscp as any, avrStateManager, "v-test");
+    const onkyoCfg = configStore.load();
+    const receiver = new CommandReceiver(mockDriver, onkyoCfg, mockEiscp as any, avrStateManager, testAvrContexts, testMediaBrowser(avrStateManager), configStore, "v-test");
     receiver.setupEiscpListener();
 
     // Emit an IFA event that would normally trigger listening-mode option filtering
@@ -88,9 +89,8 @@ it("CommandReceiver uses user-configured listening mode when it matches a report
     const ConfigModule = (await import("../src/configManager.js")) as any;
     const avrStateModule = (await import("../src/avrState.js")) as any;
     const { CommandReceiver } = crModule;
-    const { ConfigManager, setConfigDir } = ConfigModule;
-    const { avrStateManager } = avrStateModule;
-    if (typeof setConfigDir === "function") setConfigDir(tmp);
+    const { avrStateManager } = await import("./helpers/avrState.js");
+    const configStore = new ConfigModule.ConfigStore(ConfigModule.configPathFor(tmp));
 
     // User configured a specific list: dolby-surround must win over the first alias pliix-movie when LMD80 is reported.
     const cfg = {
@@ -104,7 +104,7 @@ it("CommandReceiver uses user-configured listening mode when it matches a report
         }
       ]
     };
-    ConfigManager.save(cfg);
+    configStore.save(cfg);
 
     const updates: Array<{ id: string; attrs: { [key: string]: string | number | boolean } }> = [];
     const mockDriver: Partial<IntegrationAPI> = {
@@ -128,8 +128,8 @@ it("CommandReceiver uses user-configured listening mode when it matches a report
     }
 
     const mockEiscp = new MockEiscp();
-    const onkyoCfg = ConfigManager.load();
-    const receiver = new CommandReceiver(mockDriver, onkyoCfg, mockEiscp as any, avrStateManager, "v-test");
+    const onkyoCfg = configStore.load();
+    const receiver = new CommandReceiver(mockDriver, onkyoCfg, mockEiscp as any, avrStateManager, testAvrContexts, testMediaBrowser(avrStateManager), configStore, "v-test");
     receiver.setupEiscpListener();
 
     // AVR reports LMD80 -> aliases ["pliix-movie", "dolby-surround", "Dolby PLIIx Movie"]
@@ -158,9 +158,8 @@ it("CommandReceiver applies listeningModeOptions to non-main zones (per-AVR conf
     const ConfigModule = (await import("../src/configManager.js")) as any;
     const avrStateModule = (await import("../src/avrState.js")) as any;
     const { CommandReceiver } = crModule;
-    const { ConfigManager, setConfigDir } = ConfigModule;
-    const { avrStateManager } = avrStateModule;
-    if (typeof setConfigDir === "function") setConfigDir(tmp);
+    const { avrStateManager } = await import("./helpers/avrState.js");
+    const configStore = new ConfigModule.ConfigStore(ConfigModule.configPathFor(tmp));
 
     // Options are configured per AVR and spread across all zones of the same physical AVR.
     const cfg = {
@@ -181,7 +180,7 @@ it("CommandReceiver applies listeningModeOptions to non-main zones (per-AVR conf
         }
       ]
     };
-    ConfigManager.save(cfg);
+    configStore.save(cfg);
 
     const updates: Array<{ id: string; attrs: { [key: string]: string | number | boolean } }> = [];
     const mockDriver: Partial<IntegrationAPI> = {
@@ -205,8 +204,8 @@ it("CommandReceiver applies listeningModeOptions to non-main zones (per-AVR conf
     }
 
     const mockEiscp = new MockEiscp();
-    const onkyoCfg = ConfigManager.load();
-    const receiver = new CommandReceiver(mockDriver, onkyoCfg, mockEiscp as any, avrStateManager, "v-test");
+    const onkyoCfg = configStore.load();
+    const receiver = new CommandReceiver(mockDriver, onkyoCfg, mockEiscp as any, avrStateManager, testAvrContexts, testMediaBrowser(avrStateManager), configStore, "v-test");
     receiver.setupEiscpListener();
 
     // AVR reports LMD80 for zone2
@@ -236,9 +235,8 @@ it("CommandReceiver falls back to first alias when no configured listening mode 
     const ConfigModule = (await import("../src/configManager.js")) as any;
     const avrStateModule = (await import("../src/avrState.js")) as any;
     const { CommandReceiver } = crModule;
-    const { ConfigManager, setConfigDir } = ConfigModule;
-    const { avrStateManager } = avrStateModule;
-    if (typeof setConfigDir === "function") setConfigDir(tmp);
+    const { avrStateManager } = await import("./helpers/avrState.js");
+    const configStore = new ConfigModule.ConfigStore(ConfigModule.configPathFor(tmp));
 
     // pure-direct is not in the configured list, so the first alias (pure-audio) is used.
     const cfg = {
@@ -252,7 +250,7 @@ it("CommandReceiver falls back to first alias when no configured listening mode 
         }
       ]
     };
-    ConfigManager.save(cfg);
+    configStore.save(cfg);
 
     const updates: Array<{ id: string; attrs: { [key: string]: string | number | boolean } }> = [];
     const mockDriver: Partial<IntegrationAPI> = {
@@ -276,8 +274,8 @@ it("CommandReceiver falls back to first alias when no configured listening mode 
     }
 
     const mockEiscp = new MockEiscp();
-    const onkyoCfg = ConfigManager.load();
-    const receiver = new CommandReceiver(mockDriver, onkyoCfg, mockEiscp as any, avrStateManager, "v-test");
+    const onkyoCfg = configStore.load();
+    const receiver = new CommandReceiver(mockDriver, onkyoCfg, mockEiscp as any, avrStateManager, testAvrContexts, testMediaBrowser(avrStateManager), configStore, "v-test");
     receiver.setupEiscpListener();
 
     // AVR reports LMD11 -> aliases ["pure-audio", "pure-direct"]
@@ -306,11 +304,10 @@ it("CommandReceiver sets media player state to Playing only for ON+NET+album-art
     const ConfigModule = (await import("../src/configManager.js")) as any;
     const avrStateModule = (await import("../src/avrState.js")) as any;
     const { CommandReceiver } = crModule;
-    const { ConfigManager, setConfigDir } = ConfigModule;
-    const { avrStateManager } = avrStateModule;
-    if (typeof setConfigDir === "function") setConfigDir(tmp);
+    const { avrStateManager } = await import("./helpers/avrState.js");
+    const configStore = new ConfigModule.ConfigStore(ConfigModule.configPathFor(tmp));
 
-    ConfigManager.save({ avrs: [{ model: "M", ip: "1.2.3.4", port: 60128, zone: "main" }] });
+    configStore.save({ avrs: [{ model: "M", ip: "1.2.3.4", port: 60128, zone: "main" }] });
 
     const statesByEntity = new Map<string, uc.MediaPlayerStates>();
     const mockDriver: Partial<IntegrationAPI> = {
@@ -336,8 +333,8 @@ it("CommandReceiver sets media player state to Playing only for ON+NET+album-art
     }
 
     const mockEiscp = new MockEiscp();
-    const onkyoCfg = ConfigManager.load();
-    const receiver = new CommandReceiver(mockDriver, onkyoCfg, mockEiscp as any, avrStateManager, "v-test");
+    const onkyoCfg = configStore.load();
+    const receiver = new CommandReceiver(mockDriver, onkyoCfg, mockEiscp as any, avrStateManager, testAvrContexts, testMediaBrowser(avrStateManager), configStore, "v-test");
     receiver.setupEiscpListener();
 
     const entityId = "M 1.2.3.4 main";

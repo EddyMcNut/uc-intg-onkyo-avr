@@ -1,3 +1,4 @@
+import { validateAvrPayload } from "../src/configValidation.js";
 import { describe, it, expect } from "vitest";
 import fs from "fs";
 import os from "os";
@@ -7,12 +8,11 @@ function mkTmpDir(prefix = "onkyo-test-") {
   return fs.mkdtempSync(path.join(os.tmpdir(), prefix));
 }
 
-it("ConfigManager validates and normalizes listening modes", async () => {
+it("ConfigStore validates and normalizes listening modes", async () => {
   const tmp = mkTmpDir();
   try {
     const cfgModule = await import("../src/configManager.js");
-    const { ConfigManager, setConfigDir } = cfgModule as any;
-    if (typeof setConfigDir === "function") setConfigDir(tmp);
+    const configStore = new (cfgModule as any).ConfigStore((cfgModule as any).configPathFor(tmp));
 
     const payload = {
       model: "TX-RZ50",
@@ -27,14 +27,14 @@ it("ConfigManager validates and normalizes listening modes", async () => {
       }
     };
 
-    const res = ConfigManager.validateAvrPayload(payload);
+    const res = validateAvrPayload(payload);
     expect(res.errors.length === 0).toBe(true);
     expect(res.normalized).toBeTruthy();
-    expect(Object.keys(res.normalized!.listeningModes)).toHaveLength(4);
+    expect(Object.keys(res.normalized!.listeningModes!)).toHaveLength(4);
 
     // Save and reload to ensure persistence
-    ConfigManager.save({ avrs: [res.normalized] });
-    const loaded = ConfigManager.load();
+    configStore.save({ avrs: [res.normalized] });
+    const loaded = configStore.load();
     expect(loaded.avrs && loaded.avrs[0].listeningModes).toBeTruthy();
     expect(Object.keys(loaded.avrs![0].listeningModes!)).toHaveLength(4);
   } finally {

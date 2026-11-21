@@ -1,3 +1,4 @@
+import { testAvrContexts } from "./helpers/contexts.js";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 describe("tidalBrowserStore", () => {
@@ -9,104 +10,104 @@ describe("tidalBrowserStore", () => {
     store = await import("../src/tidalBrowserStore.js");
   });
 
-  it("getTidalBrowseState returns null for invalid entityId", () => {
-    expect(store.getTidalBrowseState(invalidEntityId)).toBeNull();
+  it("getBrowseState returns null for invalid entityId", () => {
+    expect(store.tidalStore.getBrowseState(invalidEntityId, testAvrContexts)).toBeNull();
   });
 
-  it("getTidalBrowseState creates state for valid entityId", () => {
-    const state = store.getTidalBrowseState(validEntityId);
+  it("getBrowseState creates state for valid entityId", () => {
+    const state = store.tidalStore.getBrowseState(validEntityId, testAvrContexts);
     expect(state).not.toBeNull();
     expect(state.optionsByMenuIndex).toBeInstanceOf(Map);
   });
 
-  it("getTidalBrowseState returns same state for same entityId", () => {
-    const s1 = store.getTidalBrowseState(validEntityId);
-    const s2 = store.getTidalBrowseState(validEntityId);
+  it("getBrowseState returns same state for same entityId", () => {
+    const s1 = store.tidalStore.getBrowseState(validEntityId, testAvrContexts);
+    const s2 = store.tidalStore.getBrowseState(validEntityId, testAvrContexts);
     expect(s1).toBe(s2);
   });
 
-  it("addTidalMenuOption does nothing for invalid entityId", () => {
-    expect(() => store.addTidalMenuOption(invalidEntityId, 1, "test")).not.toThrow();
+  it("addMenuOption does nothing for invalid entityId", () => {
+    expect(() => store.tidalStore.addMenuOption(invalidEntityId, 1, "test", testAvrContexts)).not.toThrow();
   });
 
-  it("addTidalMenuOption adds option to state", () => {
-    const state = store.getTidalBrowseState(validEntityId);
-    store.addTidalMenuOption(validEntityId, 1, "Test Song");
+  it("addMenuOption adds option to state", () => {
+    const state = store.tidalStore.getBrowseState(validEntityId, testAvrContexts);
+    store.tidalStore.addMenuOption(validEntityId, 1, "Test Song", testAvrContexts);
     expect(state.optionsByMenuIndex.size).toBe(1);
   });
 
-  it("addTidalMenuOption sets isBrowsable based on title", () => {
-    const state = store.getTidalBrowseState(validEntityId);
-    store.addTidalMenuOption(validEntityId, 1, "Folder");
-    store.addTidalMenuOption(validEntityId, 2, "Track - Artist");
+  it("addMenuOption sets isBrowsable based on title", () => {
+    const state = store.tidalStore.getBrowseState(validEntityId, testAvrContexts);
+    store.tidalStore.addMenuOption(validEntityId, 1, "Folder", testAvrContexts);
+    store.tidalStore.addMenuOption(validEntityId, 2, "Track - Artist", testAvrContexts);
     const opt1 = state.optionsByMenuIndex.get(1);
     const opt2 = state.optionsByMenuIndex.get(2);
     expect(opt1.isBrowsable).toBe(true);
     expect(opt2.isBrowsable).toBe(false);
   });
 
-  it("addTidalMenuOption uses thumbnailResolver when provided", () => {
-    const state = store.getTidalBrowseState(validEntityId);
+  it("addMenuOption uses thumbnailResolver when provided", () => {
+    const state = store.tidalStore.getBrowseState(validEntityId, testAvrContexts);
     const resolver = vi.fn(() => "thumb://test");
-    store.addTidalMenuOption(validEntityId, 1, "Test", resolver);
+    store.tidalStore.addMenuOption(validEntityId, 1, "Test", testAvrContexts, { thumbnailResolver: resolver });
     expect(resolver).toHaveBeenCalledWith(state, "Test");
   });
 
-  it("listTidalMenuOptions returns [] for invalid entityId", () => {
-    expect(store.listTidalMenuOptions(invalidEntityId)).toEqual([]);
+  it("listOptions returns [] for invalid entityId", () => {
+    expect(store.tidalStore.listOptions(invalidEntityId, testAvrContexts)).toEqual([]);
   });
 
-  it("listTidalMenuOptions returns options from state", () => {
-    store.addTidalMenuOption(validEntityId, 1, "Album");
-    const options = store.listTidalMenuOptions(validEntityId);
+  it("listOptions returns options from state", () => {
+    store.tidalStore.addMenuOption(validEntityId, 1, "Album", testAvrContexts);
+    const options = store.tidalStore.listOptions(validEntityId, testAvrContexts);
     expect(options).toHaveLength(1);
     expect(options[0].title).toBe("Album");
   });
 
   it("getContiguousItemCount returns 0 for invalid entityId", () => {
-    expect(store.getContiguousItemCount(invalidEntityId)).toBe(0);
+    expect(store.tidalStore.getContiguousItemCount(invalidEntityId, testAvrContexts)).toBe(0);
   });
 
   it("getContiguousItemCount returns 0 for empty state", () => {
     const otherId = "TX-RZ50 1.2.3.4 zone2";
-    store.resetTidalBrowseState(otherId);
-    expect(store.getContiguousItemCount(otherId)).toBe(0);
+    store.tidalStore.resetState(otherId, testAvrContexts);
+    expect(store.tidalStore.getContiguousItemCount(otherId, testAvrContexts)).toBe(0);
   });
 
-  it("resetTidalBrowseState does nothing for invalid entityId", () => {
-    expect(() => store.resetTidalBrowseState(invalidEntityId)).not.toThrow();
+  it("resetState does nothing for invalid entityId", () => {
+    expect(() => store.tidalStore.resetState(invalidEntityId, testAvrContexts)).not.toThrow();
   });
 
-  it("resetTidalBrowseState clears state", () => {
-    const state = store.getTidalBrowseState(validEntityId);
-    store.addTidalMenuOption(validEntityId, 1, "X");
-    store.resetTidalBrowseState(validEntityId);
+  it("resetState clears state", () => {
+    const state = store.tidalStore.getBrowseState(validEntityId, testAvrContexts);
+    store.tidalStore.addMenuOption(validEntityId, 1, "X", testAvrContexts);
+    store.tidalStore.resetState(validEntityId, testAvrContexts);
     expect(state.optionsByMenuIndex.size).toBe(0);
   });
 
-  it("consumeTraceNextTidalSelectionAfterMainMenu returns false for invalid", () => {
-    expect(store.consumeTraceNextTidalSelectionAfterMainMenu(invalidEntityId)).toBe(false);
+  it("consumeTraceNextSelectionAfterMainMenu returns false for invalid", () => {
+    expect(store.tidalStore.consumeTraceNextSelectionAfterMainMenu(invalidEntityId, testAvrContexts)).toBe(false);
   });
 
-  it("consumeTraceNextTidalSelectionAfterMainMenu returns true when set", () => {
-    const state = store.getTidalBrowseState(validEntityId);
+  it("consumeTraceNextSelectionAfterMainMenu returns true when set", () => {
+    const state = store.tidalStore.getBrowseState(validEntityId, testAvrContexts);
     state.traceNextSelectionAfterMainMenu = true;
-    expect(store.consumeTraceNextTidalSelectionAfterMainMenu(validEntityId)).toBe(true);
-    expect(store.consumeTraceNextTidalSelectionAfterMainMenu(validEntityId)).toBe(false);
+    expect(store.tidalStore.consumeTraceNextSelectionAfterMainMenu(validEntityId, testAvrContexts)).toBe(true);
+    expect(store.tidalStore.consumeTraceNextSelectionAfterMainMenu(validEntityId, testAvrContexts)).toBe(false);
   });
 
-  it("consumeTidalListModeActive returns false for invalid entityId", () => {
-    expect(store.consumeTidalListModeActive(invalidEntityId)).toBe(false);
+  it("consumeListModeActive returns false for invalid entityId", () => {
+    expect(store.tidalStore.consumeListModeActive(invalidEntityId, testAvrContexts)).toBe(false);
   });
 
-  it("getTidalThumbnailForTitle returns '' for invalid entityId", () => {
-    expect(store.getTidalThumbnailForTitle(invalidEntityId, "test", vi.fn())).toBe("");
+  it("thumbnailForTitle returns '' for invalid entityId", () => {
+    expect(store.tidalStore.thumbnailForTitle(invalidEntityId, "test", vi.fn(), testAvrContexts)).toBe("");
   });
 
-  it("getTidalThumbnailForTitle calls resolver with state", () => {
-    const state = store.getTidalBrowseState(validEntityId);
+  it("thumbnailForTitle calls resolver with state", () => {
+    const state = store.tidalStore.getBrowseState(validEntityId, testAvrContexts);
     const resolver = vi.fn(() => "thumb://xyz");
-    const result = store.getTidalThumbnailForTitle(validEntityId, "test", resolver);
+    const result = store.tidalStore.thumbnailForTitle(validEntityId, "test", resolver, testAvrContexts);
     expect(result).toBe("thumb://xyz");
     expect(resolver).toHaveBeenCalledWith(state, "test");
   });

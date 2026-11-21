@@ -1,8 +1,8 @@
-import { sharedAvrContexts, type AvrContextRegistry } from "./avrContext.js";
+import type { MediaBrowserServices } from "./mediaBrowserServices.js";
+import type { AvrContextRegistry } from "./avrContext.js";
 import { EiscpDriver } from "./eiscp.js";
 import log from "./loggers.js";
 import { delay, toHex } from "./utils.js";
-import { getTuneInPresetCount, hasTuneInPresets, setTuneInBrowseContext } from "./mediaBrowser.js";
 import { getTuneInMenuBrowseState } from "./tuneInMenuStore.js";
 
 const logSource = "tuneInPreloader:";
@@ -16,7 +16,8 @@ export class TuneInPreloader {
   constructor(
     private readonly eiscpInstance: EiscpDriver,
     private readonly resolvePhysicalAvrId: PhysicalAvrIdResolver,
-    private readonly avrContexts: AvrContextRegistry = sharedAvrContexts
+    private readonly avrContexts: AvrContextRegistry,
+    private readonly mediaServices: MediaBrowserServices
   ) {}
 
   private nextTuneInListSequence(): string {
@@ -43,14 +44,14 @@ export class TuneInPreloader {
     // Legacy NLS only contains the ten visible rows. Continue with NLAL from
     // the number already collected, just like the legacy full-menu browser.
     for (let attempt = 0; attempt < 10; attempt++) {
-      const count = getTuneInPresetCount(entityId);
+      const count = this.mediaServices.getTuneInPresetCount(entityId);
       if (count === previousCount) break;
       previousCount = count;
 
       for (const layer of layers) {
         await this.eiscpInstance.raw(`NLAL${this.nextTuneInListSequence()}${layer}${toHex(count, 4)}03E7`);
         await delay(scanDelay);
-        const updatedCount = getTuneInPresetCount(entityId);
+        const updatedCount = this.mediaServices.getTuneInPresetCount(entityId);
         if (updatedCount > count) break;
       }
     }
@@ -58,7 +59,7 @@ export class TuneInPreloader {
 
   async preloadTuneInPresets(entityId: string): Promise<void> {
     const physicalAvrId = this.resolvePhysicalAvrId(entityId);
-    if (this.tuneInPreloadInFlight.has(physicalAvrId) || hasTuneInPresets(entityId)) {
+    if (this.tuneInPreloadInFlight.has(physicalAvrId) || this.mediaServices.hasTuneInPresets(entityId)) {
       return;
     }
 
@@ -70,7 +71,7 @@ export class TuneInPreloader {
     try {
       const navigationMode = this.eiscpInstance.eiscpConfig?.networkNavigationMode ?? "modern";
       log.info("%s [%s] preloading TuneIn My Presets (mode=%s, position %s)", logSource, entityId, navigationMode, myPresetsPosition);
-      setTuneInBrowseContext(entityId, "My Presets");
+      this.mediaServices.setTuneInBrowseContext(entityId, "My Presets");
       const legacy = this.eiscpInstance.eiscpConfig?.networkNavigationMode === "legacy";
       if (!legacy) {
         await this.eiscpInstance.raw("NTCTOP");
@@ -89,7 +90,7 @@ export class TuneInPreloader {
       else await this.requestTuneInPresetXml();
       await delay(scanDelay);
 
-      const lastCount = getTuneInPresetCount(entityId);
+      const lastCount = this.mediaServices.getTuneInPresetCount(entityId);
       if (lastCount > 0) {
         log.info("%s [%s] harvested %d TuneIn preset(s) from NLAL", logSource, entityId, lastCount);
       }

@@ -1,0 +1,290 @@
+// Pure validation and normalization of AVR config values: no file access, no state.
+// Used for the stored config (ConfigStore.load), setup saves and restored backups.
+import {
+  MAX_LENGTHS,
+  PATTERNS,
+  parseTunerPresetMode,
+  normalizeAvrConfig,
+  type AvrZone,
+  type AvrConfig,
+  type IntegrationConfig,
+  type LogLevel,
+  AVR_DEFAULTS,
+  VOLUME_SCALE_AUTO,
+  NETWORK_INPUT_MARKERS,
+  TUNEIN_PRESET_POSITION_MIN,
+  TUNEIN_PRESET_POSITION_MAX
+} from "./configConstants.js";
+import { normalizeListeningModes } from "./listeningModePreferences.js";
+
+// An empty form field or a null in a payload means "not set": the field then gets its default.
+function isUnset(value: unknown): boolean {
+  return value === undefined || value === null || value === "";
+}
+
+function parseStrictInteger(value: unknown): number | undefined {
+  if (typeof value === "number") return Number.isSafeInteger(value) ? value : undefined;
+  if (typeof value !== "string" || !/^[+-]?\d+$/.test(value.trim())) return undefined;
+  const parsed = Number(value.trim());
+  return Number.isSafeInteger(parsed) ? parsed : undefined;
+}
+
+// Apply defaults and coerce every field through the shared parsers (see normalizeAvrConfig), so the in-memory
+// config only ever holds valid values. Used on load, for setup saves and for restored payloads.
+export function applyAvrDefaults(avr: Partial<AvrConfig>): AvrConfig {
+  const normalized = normalizeAvrConfig({ ...avr, model: avr.model ?? "", ip: avr.ip ?? "", zone: avr.zone ?? "main" } as AvrConfig);
+  return {
+    ...normalized,
+    // Legacy boolean values are kept as stored (true = alphabetical, false = none); every reader goes through
+    // parseTunerPresetMode / isTunerPresetModeEnabled, so they behave exactly like the explicit modes.
+    createTunerPresets: typeof avr.createTunerPresets === "boolean" ? avr.createTunerPresets : normalized.createTunerPresets,
+    listeningModes: normalizeListeningModes(avr.listeningModes)
+  };
+}
+
+// Validate zone string and return typed zone or default
+export function validateZone(zone: string | undefined): AvrZone {
+  if (zone === "main" || zone === "zone2" || zone === "zone3" || zone === "zone4") {
+    return zone;
+  }
+  return "main";
+}
+
+// Validate a single AVR object from a restored payload. Returns an object with errors (if any) and a normalized AvrConfig when valid.
+export function validateAvrPayload(avr: unknown): { errors: string[]; normalized?: AvrConfig } {
+  const errors: string[] = [];
+
+  if (!avr || typeof avr !== "object") {
+    errors.push("AVR entry must be an object");
+    return { errors };
+  }
+  const value = avr as Record<string, unknown>;
+
+  // model
+  if (!value.model || typeof value.model !== "string" || value.model.trim() === "") {
+    errors.push("model is required and must be a non-empty string");
+  } else if (value.model.length > MAX_LENGTHS.MODEL_NAME) {
+    errors.push(`model too long (max ${MAX_LENGTHS.MODEL_NAME})`);
+  } else if (!PATTERNS.MODEL_NAME.test(value.model)) {
+    errors.push("model contains invalid characters");
+  }
+
+  // ip
+  if (!value.ip || typeof value.ip !== "string" || value.ip.trim() === "") {
+    errors.push("ip is required and must be a non-empty string");
+  } else {
+    const trimmed = value.ip.trim();
+    if (trimmed.length > MAX_LENGTHS.IP_ADDRESS) {
+      errors.push(`ip address too long (max ${MAX_LENGTHS.IP_ADDRESS})`);
+    } else if (!PATTERNS.IP_ADDRESS.test(trimmed)) {
+      errors.push("ip address has invalid format");
+    } else {
+      const octets = trimmed.split(".").map(Number);
+      if (!octets.every((o: number) => o >= 0 && o <= 255)) {
+        errors.push("ip address octets out of range");
+      }
+    }
+  }
+
+  // port
+  const portNum = parseStrictInteger(value.port);
+  if (portNum === undefined || portNum < 1 || portNum > 65535) {
+    errors.push("port must be a valid number between 1 and 65535");
+  }
+
+  // zone
+  const zone = String(value.zone ?? "main");
+  if (!["main", "zone2", "zone3", "zone4"].includes(zone)) {
+    errors.push('zone must be one of "main", "zone2", "zone3", "zone4"');
+  }
+
+  // albumArtURL
+  // Surrounding whitespace is ignored and an empty value means "use the default", like everywhere else.
+  const albumArtURL = typeof value.albumArtURL === "string" ? value.albumArtURL.trim() : "";
+  if (albumArtURL) {
+    if (albumArtURL.length > MAX_LENGTHS.ALBUM_ART_URL) {
+      errors.push(`albumArtURL too long (max ${MAX_LENGTHS.ALBUM_ART_URL})`);
+    } else if (!PATTERNS.ALBUM_ART_URL.test(albumArtURL)) {
+      errors.push("albumArtURL contains invalid characters");
+    }
+  }
+
+  // queueThreshold
+  const queueThreshold = parseStrictInteger(value.queueThreshold);
+  if (!isUnset(value.queueThreshold)) {
+    if (queueThreshold === undefined || queueThreshold < 0) {
+      errors.push("queueThreshold must be a non-negative integer");
+    }
+  }
+
+  // volumeScale
+  if (value.volumeScale !== undefined) {
+    const raw = String(value.volumeScale).trim().toLowerCase();
+    if (raw !== VOLUME_SCALE_AUTO && raw !== "80" && raw !== "100") {
+      errors.push('volumeScale must be 80, 100 or "auto"');
+    }
+  }
+
+  // useAvrReportedInputs
+  if (value.useAvrReportedInputs !== undefined && typeof value.useAvrReportedInputs !== "boolean" && typeof value.useAvrReportedInputs !== "string") {
+    errors.push("useAvrReportedInputs must be boolean");
+  }
+
+  // volumeDisplay
+  if (value.volumeDisplay !== undefined) {
+    const vd = String(value.volumeDisplay).toLowerCase();
+    if (vd !== "absolute" && vd !== "relative") {
+      errors.push('volumeDisplay must be "absolute" or "relative"');
+    }
+  }
+
+  // adjustVolumeDispl
+  if (value.adjustVolumeDispl !== undefined && typeof value.adjustVolumeDispl !== "boolean" && !(typeof value.adjustVolumeDispl === "string")) {
+    errors.push("adjustVolumeDispl must be boolean");
+  }
+
+  // entityNameStyle
+  if (value.entityNameStyle !== undefined) {
+    const style = String(value.entityNameStyle).toLowerCase();
+    if (style !== "long" && style !== "short") {
+      errors.push('entityNameStyle must be "long" or "short"');
+    }
+  }
+
+  // createSensors
+  if (value.createSensors !== undefined && typeof value.createSensors !== "boolean" && !(typeof value.createSensors === "string")) {
+    errors.push("createSensors must be boolean");
+  }
+
+  // createTunerPresets
+  if (value.createTunerPresets !== undefined) {
+    const mode = String(value.createTunerPresets).toLowerCase();
+    if (typeof value.createTunerPresets !== "boolean" && !["true", "false", "yes", "no", "alphabetical", "preset-order", "preset_order", "presetorder", "none"].includes(mode)) {
+      errors.push('createTunerPresets must be "alphabetical", "preset-order", or "none"');
+    }
+  }
+
+  // createRemoteEntity
+  if (value.createRemoteEntity !== undefined && typeof value.createRemoteEntity !== "boolean" && !(typeof value.createRemoteEntity === "string")) {
+    errors.push("createRemoteEntity must be boolean");
+  }
+
+  // createDiracSelectEntity
+  if (value.createDiracSelectEntity !== undefined && typeof value.createDiracSelectEntity !== "boolean" && !(typeof value.createDiracSelectEntity === "string")) {
+    errors.push("createDiracSelectEntity must be boolean");
+  }
+
+  // netMenuDelay
+  const netMenuDelay = parseStrictInteger(value.netMenuDelay);
+  if (!isUnset(value.netMenuDelay)) {
+    if (netMenuDelay === undefined || netMenuDelay < 0) {
+      errors.push("netMenuDelay must be a non-negative integer");
+    }
+  }
+
+  // tuneinPresetPosition
+  const tuneinPresetPosition = parseStrictInteger(value.tuneinPresetPosition);
+  if (!isUnset(value.tuneinPresetPosition)) {
+    if (tuneinPresetPosition === undefined || tuneinPresetPosition < TUNEIN_PRESET_POSITION_MIN || tuneinPresetPosition > TUNEIN_PRESET_POSITION_MAX) {
+      errors.push(`tuneinPresetPosition must be an integer between ${TUNEIN_PRESET_POSITION_MIN} and ${TUNEIN_PRESET_POSITION_MAX}`);
+    }
+  }
+
+  // tuneinMenuStyle
+  if (value.tuneinMenuStyle !== undefined) {
+    const style = String(value.tuneinMenuStyle).toLowerCase();
+    if (!["mypresets", "mypresets-alphabetical", "mypresets-preset-order", "preset-order", "full"].includes(style)) {
+      errors.push('tuneinMenuStyle must be "mypresets-alphabetical", "mypresets-preset-order", or "full"');
+    }
+  }
+
+  if (value.inputSourceLayout !== undefined && !["combined", "network-first", "network-last", "separate"].includes(String(value.inputSourceLayout).toLowerCase())) {
+    errors.push('inputSourceLayout must be "combined", "network-first" or "network-last"');
+  }
+  if (value.networkInputMarker !== undefined && !(NETWORK_INPUT_MARKERS as readonly string[]).includes(String(value.networkInputMarker))) {
+    errors.push("networkInputMarker is not supported");
+  }
+  if (value.networkNavigationMode !== undefined && !["modern", "legacy"].includes(String(value.networkNavigationMode).toLowerCase())) {
+    errors.push('networkNavigationMode must be "modern" or "legacy"');
+  }
+
+  if (errors.length > 0) {
+    return { errors };
+  }
+
+  // Build the normalized AVR: every field goes through the shared parsers in applyDefaults / normalizeAvrConfig.
+  const normalized: AvrConfig = applyAvrDefaults({
+    ...(value as Partial<AvrConfig>),
+    model: String(value.model).trim(),
+    ip: String(value.ip).trim(),
+    port: portNum!,
+    zone: validateZone(zone),
+    // Setup and restored payloads are always stored as an explicit mode, never as a legacy boolean.
+    createTunerPresets: parseTunerPresetMode(value.createTunerPresets ?? AVR_DEFAULTS.createTunerPresets)
+  });
+
+  return { errors: [], normalized };
+}
+
+// Validate an entire restored config payload. Returns errors if any and a normalized IntegrationConfig when valid.
+export function validateConfigPayload(payload: unknown): { errors: string[]; normalized?: IntegrationConfig } {
+  const errors: string[] = [];
+  if (!payload || typeof payload !== "object") {
+    errors.push("Payload must be an object");
+    return { errors };
+  }
+
+  // Allow either full payload {config: {...}} or bare config
+  const cfg = (payload as Record<string, unknown>).config ?? payload;
+
+  if (!cfg) {
+    errors.push("No config object found in payload");
+    return { errors };
+  }
+
+  const normalizedConfig: IntegrationConfig = {};
+
+  // Learned modes are stored on their corresponding AVR configuration.
+
+  // Preserve global logLevel if present
+  const validLogLevels = ["debug", "info", "warn", "error"];
+  const config = cfg as Record<string, unknown>;
+  if (config.logLevel !== undefined) {
+    const level = String(config.logLevel).toLowerCase();
+    if (validLogLevels.includes(level)) {
+      normalizedConfig.logLevel = level as LogLevel;
+    }
+  }
+
+  if (Array.isArray(config.avrs)) {
+    const normalizedAvrs: AvrConfig[] = [];
+    for (let i = 0; i < config.avrs.length; i++) {
+      const avr = { ...(config.avrs[i] as Record<string, unknown>) };
+      const res = validateAvrPayload(avr);
+      if (res.errors.length > 0) {
+        errors.push(`avrs[${i}]: ${res.errors.join("; ")}`);
+      } else {
+        normalizedAvrs.push(res.normalized!);
+      }
+    }
+
+    if (errors.length > 0) {
+      return { errors };
+    }
+
+    normalizedConfig.avrs = normalizedAvrs;
+  } else if (config.model && config.ip) {
+    // Legacy single-model payload
+    const res = validateAvrPayload({ model: config.model, ip: config.ip, port: config.port ?? AVR_DEFAULTS.port, zone: config.zone ?? "main" });
+    if (res.errors.length > 0) {
+      errors.push(...res.errors.map((e) => `legacy avrs: ${e}`));
+      return { errors };
+    }
+    normalizedConfig.avrs = [res.normalized!];
+  } else {
+    errors.push("No avrs array or legacy model/ip fields found");
+    return { errors };
+  }
+
+  return { errors: [], normalized: normalizedConfig };
+}

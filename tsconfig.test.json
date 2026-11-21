@@ -1,0 +1,9 @@
+{
+  // Type-checks src and test together (tsconfig.json only covers src, for the build). Run with `npm run typecheck`.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    "noEmit": true
+  },
+  "include": ["src/**/*", "types/**/*", "test/**/*"]
+}

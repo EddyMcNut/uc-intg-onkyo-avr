@@ -1,5 +1,5 @@
 import { buildPhysicalAvrId } from "./configManager.js";
-import { sharedAvrContexts, type AvrContextRegistry } from "./avrContext.js";
+import type { AvrContextRegistry } from "./avrContext.js";
 import { delay } from "./utils.js";
 import type { EiscpConfig } from "./eiscpTypes.js";
 import { getZonePrefix } from "./zoneMappings.js";
@@ -27,8 +27,7 @@ export interface EiscpCommandWorkflowDependencies {
   getConfig: () => Readonly<EiscpConfig>;
   raw: (command: string) => Promise<void>;
   publishMetadata: (metadata: WorkflowMetadata, command: string) => void;
-  // Per-AVR state; defaults to the shared registry during the item-10 migration (see avrContext.ts).
-  avrContexts?: AvrContextRegistry;
+  avrContexts: AvrContextRegistry;
 }
 
 export function isTuneInPresetCommand(command: string): boolean {
@@ -88,9 +87,7 @@ export class EiscpCommandWorkflow {
     const zonePrefix = getZonePrefix("SLI", zone);
     const queryCommand = `${zonePrefix}QSTN`;
     const directService =
-      config.model && config.host
-        ? (this.dependencies.avrContexts ?? sharedAvrContexts).get(buildPhysicalAvrId(config.model, config.host)).avrInfo.findNetServiceByName(NSS_SERVICE_NAMES[code] ?? [])
-        : undefined;
+      config.model && config.host ? this.dependencies.avrContexts.get(buildPhysicalAvrId(config.model, config.host)).avrInfo.findNetServiceByName(NSS_SERVICE_NAMES[code] ?? []) : undefined;
 
     await this.dependencies.raw(`${zonePrefix}2B`);
     await delay(menuDelay);

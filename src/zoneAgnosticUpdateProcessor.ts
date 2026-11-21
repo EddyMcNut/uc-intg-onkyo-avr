@@ -1,5 +1,6 @@
+import type { MediaBrowserServices } from "./mediaBrowserServices.js";
 import * as uc from "@unfoldedcircle/integration-api";
-import { ConfigManager, IntegrationConfig, buildEntityId } from "./configManager.js";
+import { IntegrationConfig, findAvrConfig, type ConfigSource } from "./configManager.js";
 import { EiscpDriver } from "./eiscp.js";
 import log from "./loggers.js";
 import { SONG_INFO } from "./constants.js";
@@ -13,7 +14,7 @@ import { ZoneAgnosticServiceCommandRouter } from "./zoneAgnosticServiceCommandRo
 import { ZoneAgnosticFrontPanelRouter } from "./zoneAgnosticFrontPanelRouter.js";
 import { TUNEIN_SERVICE_ID } from "./browseServiceContract.js";
 import type { AvrStateApi } from "./types.js";
-import { sharedAvrContexts, type AvrContextRegistry } from "./avrContext.js";
+import type { AvrContextRegistry } from "./avrContext.js";
 import type { NetworkNavigationMode } from "./configConstants.js";
 
 const logSource = "zoneAgnosticUpdateProcessor:";
@@ -34,32 +35,41 @@ export class ZoneAgnosticUpdateProcessor {
     config: IntegrationConfig,
     private readonly eiscpInstance: EiscpDriver,
     private readonly state: AvrStateApi,
-    private readonly avrContexts: AvrContextRegistry = sharedAvrContexts
+    private readonly avrContexts: AvrContextRegistry,
+    private readonly mediaServices: MediaBrowserServices,
+    private readonly configSource: ConfigSource
   ) {
     this.config = config;
-    this.tuneInPreloader = new TuneInPreloader(eiscpInstance, (entityId) => this.mediaStateStore.getPhysicalAvrId(entityId), this.avrContexts);
+    this.tuneInPreloader = new TuneInPreloader(eiscpInstance, (entityId) => this.mediaStateStore.getPhysicalAvrId(entityId), this.avrContexts, this.mediaServices);
     this.mediaRenderer = new ZoneMediaRenderer(driver, config, this.mediaStateStore, this.state);
     this.serviceAdapters = [
       new TuneInZoneAgnosticAdapter({
         avrContexts: this.avrContexts,
         state: this.state,
+        mediaBrowserServices: this.mediaServices,
         getPhysicalAvrId: (entityId) => this.getPhysicalAvrId(entityId),
         getNetworkNavigationMode: (entityId) => this.getNetworkNavigationMode(entityId),
         isTuneInFullMenu: (zoneEntityId) => this.isTuneInFullMenu(zoneEntityId),
         preloadTuneInPresets: (sourceEntityId) => this.preloadTuneInPresets(sourceEntityId)
       }),
       new TidalZoneAgnosticAdapter({
+        avrContexts: this.avrContexts,
         state: this.state,
+        mediaBrowserServices: this.mediaServices,
         getPhysicalAvrId: (entityId) => this.getPhysicalAvrId(entityId),
         getNetworkNavigationMode: (entityId) => this.getNetworkNavigationMode(entityId)
       }),
       new DeezerZoneAgnosticAdapter({
+        avrContexts: this.avrContexts,
         state: this.state,
+        mediaBrowserServices: this.mediaServices,
         getPhysicalAvrId: (entityId) => this.getPhysicalAvrId(entityId),
         getNetworkNavigationMode: (entityId) => this.getNetworkNavigationMode(entityId)
       }),
       new MusicServerZoneAgnosticAdapter({
+        avrContexts: this.avrContexts,
         state: this.state,
+        mediaBrowserServices: this.mediaServices,
         getPhysicalAvrId: (entityId) => this.getPhysicalAvrId(entityId),
         getNetworkNavigationMode: (entityId) => this.getNetworkNavigationMode(entityId)
       })
@@ -147,15 +157,11 @@ export class ZoneAgnosticUpdateProcessor {
   }
 
   private async isTuneInFullMenu(zoneEntityId: string): Promise<boolean> {
-    const cfg = ConfigManager.get();
-    const avr = cfg?.avrs?.find((a) => buildEntityId(a.model, a.ip, a.zone) === zoneEntityId);
-    return String(avr?.tuneinMenuStyle ?? "").toLowerCase() === "full";
+    return String(findAvrConfig(this.configSource, zoneEntityId)?.tuneinMenuStyle ?? "").toLowerCase() === "full";
   }
 
   private getNetworkNavigationMode(zoneEntityId: string): NetworkNavigationMode {
-    const cfg = ConfigManager.get();
-    const avr = cfg?.avrs?.find((a) => buildEntityId(a.model, a.ip, a.zone) === zoneEntityId);
-    return avr?.networkNavigationMode ?? "modern";
+    return findAvrConfig(this.configSource, zoneEntityId)?.networkNavigationMode ?? "modern";
   }
 
   private async preloadTuneInPresets(entityId: string): Promise<void> {

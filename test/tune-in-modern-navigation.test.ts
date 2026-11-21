@@ -1,18 +1,19 @@
+import { testMediaBrowser, testMediaBrowserServices } from "./helpers/mediaBrowserServices.js";
+import { testAvrContexts } from "./helpers/contexts.js";
 import { createParserEffects } from "../src/parserEffects.js";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import * as uc from "@unfoldedcircle/integration-api";
-import { ConfigManager } from "../src/configManager.js";
-import { avrStateManager } from "../src/avrState.js";
+import { avrStateManager } from "./helpers/avrState.js";
 import { EiscpDriver } from "../src/eiscp.js";
 import { IscpCommandParser } from "../src/eiscp-command-parser.js";
 import { CommandSender } from "../src/commandSender.js";
 import { TuneInBrowseHandler } from "../src/tuneInBrowseHandler.js";
 import { TuneInZoneAgnosticAdapter } from "../src/zoneAgnosticServiceAdapters.js";
-import { initMediaBrowser, TUNEIN_MENU_ROOT_ID, TUNEIN_MENU_ROOT_TYPE } from "../src/mediaBrowser.js";
+import { TUNEIN_MENU_ROOT_ID, TUNEIN_MENU_ROOT_TYPE } from "../src/mediaBrowser.js";
 import { getTuneInMenuBrowseState, resetTuneInMenuBrowseState } from "../src/tuneInMenuStore.js";
 import { resetAvrInfo, setAvrInfo } from "./helpers/avrInfo.js";
-import { sharedAvrContexts } from "../src/avrContext.js";
 import { NETWORK_INPUT_MARKERS } from "../src/configConstants.js";
+import { testConfigStore } from "./helpers/configStore.js";
 
 const entityId = "TX-RZ50 192.0.2.104 main";
 const rootNlt = "0E01000000090100FF0E00TuneIn Radio";
@@ -28,7 +29,7 @@ function setup(delayedMenu = false, xmlDelay = 0) {
   const config = {
     avrs: [{ model: "TX-RZ50", ip: "192.0.2.104", zone: "main", networkNavigationMode: "modern", tuneinMenuStyle: "full", netMenuDelay: 0 }]
   } as any;
-  vi.spyOn(ConfigManager, "get").mockReturnValue(config);
+  testConfigStore.get.mockReturnValue(config);
   setAvrInfo(entityId, {
     model: "TX-RZ50",
     friendlyName: "",
@@ -41,16 +42,17 @@ function setup(delayedMenu = false, xmlDelay = 0) {
     tunerBands: [],
     netServices: [{ id: "0e", name: "TuneIn Radio", enabled: true, hasAccount: true }]
   });
-  sharedAvrContexts.get("TX-RZ50 192.0.2.104").inputs.set([{ id: "0e", name: "TuneIn Radio", network: true }]);
+  testAvrContexts.get("TX-RZ50 192.0.2.104").inputs.set([{ id: "0e", name: "TuneIn Radio", network: true }]);
   avrStateManager.setSource(entityId, "net");
   avrStateManager.setSubSource(entityId, "spotify");
-  initMediaBrowser(avrStateManager);
-  const driver = new EiscpDriver({ model: "TX-RZ50", host: "192.0.2.104", networkNavigationMode: "modern", netMenuDelay: 0 }, avrStateManager);
+  const driver = new EiscpDriver({ model: "TX-RZ50", host: "192.0.2.104", networkNavigationMode: "modern", netMenuDelay: 0 }, testAvrContexts, testConfigStore, avrStateManager);
   vi.spyOn(driver, "connected", "get").mockReturnValue(true);
   vi.spyOn(driver, "waitForConnect").mockResolvedValue(undefined);
-  const sender = new CommandSender({ updateEntityAttributes: vi.fn() } as any, config, driver, avrStateManager, undefined);
-  const browser = new TuneInBrowseHandler(avrStateManager);
+  const sender = new CommandSender({ updateEntityAttributes: vi.fn() } as any, config, driver, avrStateManager, undefined, testAvrContexts, testMediaBrowser(avrStateManager));
+  const browser = new TuneInBrowseHandler(avrStateManager, testAvrContexts, testMediaBrowser(avrStateManager), testConfigStore);
   const adapter = new TuneInZoneAgnosticAdapter({
+    avrContexts: testAvrContexts,
+    mediaBrowserServices: testMediaBrowserServices,
     state: avrStateManager,
     getPhysicalAvrId: () => "TX-RZ50 192.0.2.104",
     getNetworkNavigationMode: () => "modern",
@@ -60,7 +62,11 @@ function setup(delayedMenu = false, xmlDelay = 0) {
   const parser = new IscpCommandParser(
     () => entityId,
     avrStateManager,
-    createParserEffects({ deezer: { getBrowseState: () => null }, tidal: { getBrowseState: () => null }, tuneInMenu: { getBrowseState: getTuneInMenuBrowseState } })
+    createParserEffects(
+      { deezer: { getBrowseState: () => null }, tidal: { getBrowseState: () => null }, tuneInMenu: { getBrowseState: (id) => getTuneInMenuBrowseState(id, testAvrContexts) } },
+      testAvrContexts
+    ),
+    testAvrContexts
   );
   const commands: string[] = [];
   let menuReady = false;
@@ -111,14 +117,14 @@ function setup(delayedMenu = false, xmlDelay = 0) {
 
 beforeEach(() => {
   vi.useFakeTimers();
-  resetTuneInMenuBrowseState(entityId);
+  resetTuneInMenuBrowseState(entityId, testAvrContexts);
 });
 
 afterEach(() => {
   vi.restoreAllMocks();
   vi.useRealTimers();
   resetAvrInfo(entityId);
-  sharedAvrContexts.get("TX-RZ50 192.0.2.104").inputs.clear();
+  testAvrContexts.get("TX-RZ50 192.0.2.104").inputs.clear();
   avrStateManager.clearState(entityId);
 });
 
@@ -130,7 +136,7 @@ it.each(["tunein", "TuneIn Radio", ...NETWORK_INPUT_MARKERS.filter((marker) => m
     expect(avrStateManager.getSubSource(entityId)).toBe("tunein");
     expect(avr.commands).toEqual(["SLI2B", "NSV0E0", "SLIQSTN"]);
     const result = (await avr.browse()) as uc.BrowseResult;
-    expect(result.media.items?.map((item) => item.title)).toEqual(rootRows.slice(0, -1));
+    expect(result.media!.items?.map((item) => item.title)).toEqual(rootRows.slice(0, -1));
   }
 );
 
@@ -139,12 +145,12 @@ it("waits for the TuneIn menu metadata rather than harvesting the intermediate N
   await avr.select("tunein");
   const result = (await avr.browse()) as uc.BrowseResult;
   expect(avr.getPrematureXmlRequests()).toBe(0);
-  expect(result.media.items?.map((item) => item.title)).toEqual(rootRows.slice(0, -1));
+  expect(result.media!.items?.map((item) => item.title)).toEqual(rootRows.slice(0, -1));
 });
 
 it("waits for a delayed XML reply before returning the Full Menu result", async () => {
   const avr = setup(false, 700);
   await avr.select("tunein");
   const result = (await avr.browse()) as uc.BrowseResult;
-  expect(result.media.items?.map((item) => item.title)).toEqual(rootRows.slice(0, -1));
+  expect(result.media!.items?.map((item) => item.title)).toEqual(rootRows.slice(0, -1));
 });

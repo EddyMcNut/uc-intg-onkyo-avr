@@ -1,3 +1,4 @@
+import type { ConfigSource } from "./configManager.js";
 import net from "net";
 import dgram from "dgram";
 import log from "./loggers.js";
@@ -9,7 +10,7 @@ import { delay } from "./utils.js";
 import { IscpCommandParser, type CommandResult } from "./eiscp-command-parser.js";
 import { createDefaultParserEffects } from "./parserEffects.js";
 import { resolveIscpCommand } from "./iscpCommandResolver.js";
-import { sharedAvrContexts, type AvrContextRegistry } from "./avrContext.js";
+import type { AvrContextRegistry } from "./avrContext.js";
 import { createEiscpPacket, extractIscpMessage, extractAllIscpMessages } from "./eiscp-packet.js";
 import { buildMultiZoneVolumeCommands, buildMultiZoneMuteCommands } from "./eiscp-multi-zone.js";
 import { WAIT_FOR_CONNECT_TIMEOUT, CONNECTION_TIMEOUT } from "./constants.js";
@@ -95,9 +96,10 @@ export class EiscpDriver extends EventEmitter {
   private readonly commandWorkflow: EiscpCommandWorkflow;
 
   constructor(
-    config?: EiscpConfig,
-    private readonly stateReader: AvrStateReader = NOOP_STATE_READER,
-    private readonly avrContexts: AvrContextRegistry = sharedAvrContexts
+    config: EiscpConfig | undefined,
+    private readonly avrContexts: AvrContextRegistry,
+    private readonly configSource: ConfigSource,
+    private readonly stateReader: AvrStateReader = NOOP_STATE_READER
   ) {
     super();
     this.config = {
@@ -553,7 +555,7 @@ export class EiscpDriver extends EventEmitter {
   }
 
   private commandToIscp(command: string, args: string | number | undefined, zone: string): string {
-    return resolveIscpCommand(command, args, zone, { config: this.config, stateReader: this.stateReader, avrContexts: this.avrContexts });
+    return resolveIscpCommand(command, args, zone, { config: this.config, stateReader: this.stateReader, avrContexts: this.avrContexts, configSource: this.configSource });
   }
 
   // Get all available commands

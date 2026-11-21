@@ -1,3 +1,6 @@
+import { AvrStateManager } from "../src/avrState.js";
+import { testMediaBrowser, testMediaBrowserServices } from "./helpers/mediaBrowserServices.js";
+import { testAvrContexts } from "./helpers/contexts.js";
 import { describe, it, expect, vi } from "vitest";
 import * as uc from "@unfoldedcircle/integration-api";
 
@@ -81,7 +84,7 @@ it("CommandSender rejects malformed entity ids and unknown AVR targets", async (
     refreshAvrState: async () => undefined
   } as any;
 
-  const sender = new CommandSender(mockDriver, makeConfig(), mockEiscp as any, mockAvrState, undefined);
+  const sender = new CommandSender(mockDriver, makeConfig(), mockEiscp as any, mockAvrState, undefined, testAvrContexts, testMediaBrowser(new AvrStateManager()));
 
   const malformed = await sender.sharedCmdHandler({ id: "invalid" } as any, uc.MediaPlayerCommands.On);
   expect(malformed).toBe(uc.StatusCodes.BadRequest);
@@ -104,7 +107,7 @@ it("CommandSender executes core command branches and zone-specific routing", asy
     }
   } as any;
 
-  const sender = new CommandSender(mockDriver, makeConfig(), mockEiscp as any, mockAvrState, undefined);
+  const sender = new CommandSender(mockDriver, makeConfig(), mockEiscp as any, mockAvrState, undefined, testAvrContexts, testMediaBrowser(new AvrStateManager()));
 
   const mainEntity = { id: "TX-RZ50 192.168.2.103 main", attributes: { state: uc.MediaPlayerStates.Off } } as any;
   const zone2Entity = { id: "TX-RZ50 192.168.2.103 zone2", attributes: { state: uc.MediaPlayerStates.On } } as any;
@@ -175,7 +178,15 @@ it("strips network markers from Web Configurator source selections", async () =>
   const commandSenderModule = await import("../src/commandSender.js");
   const { CommandSender } = commandSenderModule as { CommandSender: new (...deps: any[]) => any };
   const mockEiscp = makeMockEiscp(true);
-  const sender = new CommandSender({}, makeConfig(), mockEiscp as any, { getSubSource: () => "spotify" } as any, undefined);
+  const sender = new CommandSender(
+    {},
+    makeConfig(),
+    mockEiscp as any,
+    { getSubSource: () => "spotify" } as any,
+    undefined,
+    testAvrContexts,
+    testMediaBrowser({ getSubSource: () => "spotify" } as any)
+  );
 
   const result = await sender.sharedCmdHandler({ id: "TX-RZ50 192.168.2.103 main", attributes: { state: uc.MediaPlayerStates.On } } as any, uc.MediaPlayerCommands.SelectSource, {
     source: "📡 TuneIn Radio"
@@ -200,7 +211,7 @@ it("CommandSender handles relative volume ignore and throttle", async () => {
     refreshAvrState: async () => undefined
   } as any;
 
-  const sender = new CommandSender(mockDriver, config, mockEiscp as any, mockAvrState, undefined);
+  const sender = new CommandSender(mockDriver, config, mockEiscp as any, mockAvrState, undefined, testAvrContexts, testMediaBrowser(new AvrStateManager()));
 
   const mainEntity = { id: "TX-RZ50 192.168.2.103 main", attributes: { state: uc.MediaPlayerStates.On } } as any;
 
@@ -228,7 +239,7 @@ it("CommandSender handles known simple commands via handleSimpleCommand fallthro
     refreshAvrState: async () => undefined
   } as any;
 
-  const sender = new CommandSender(mockDriver, makeConfig(), mockEiscp as any, mockAvrState, undefined);
+  const sender = new CommandSender(mockDriver, makeConfig(), mockEiscp as any, mockAvrState, undefined, testAvrContexts, testMediaBrowser(new AvrStateManager()));
 
   const mainEntity = { id: "TX-RZ50 192.168.2.103 main", attributes: { state: uc.MediaPlayerStates.On } } as any;
   const zone2Entity = { id: "TX-RZ50 192.168.2.103 zone2", attributes: { state: uc.MediaPlayerStates.On } } as any;
@@ -261,6 +272,9 @@ it("CommandSender covers connection-failure, queueThreshold-fallback, main-zone 
       eiscpConfig: { sendDelay: 50 },
       commands: [],
       raws: [],
+      async rawIfAvailable(): Promise<boolean> {
+        return true;
+      },
       async command(cmd: string): Promise<void> {
         this.commands.push(cmd);
       },
@@ -283,7 +297,7 @@ it("CommandSender covers connection-failure, queueThreshold-fallback, main-zone 
 
     const mockDriver = {} as any;
     const mockAvrState = { getSubSource: () => "spotify", refreshAvrState: async () => undefined } as any;
-    const sender = new CommandSender(mockDriver, cfg, failEiscp as any, mockAvrState, undefined);
+    const sender = new CommandSender(mockDriver, cfg, failEiscp as any, mockAvrState, undefined, testAvrContexts, testMediaBrowser(new AvrStateManager()));
 
     const mainEntity = { id: "TX-RZ50 192.168.2.103 main", attributes: { state: uc.MediaPlayerStates.Off } } as any;
 
@@ -330,7 +344,7 @@ it("CommandSender routes main-zone VolumeUp/Down and Volume with fallback settin
 
   const mockDriver = {} as any;
   const mockAvrState = { getSubSource: () => "spotify", refreshAvrState: async () => undefined } as any;
-  const sender = new CommandSender(mockDriver, cfg, eiscp as any, mockAvrState, undefined);
+  const sender = new CommandSender(mockDriver, cfg, eiscp as any, mockAvrState, undefined, testAvrContexts, testMediaBrowser(new AvrStateManager()));
 
   const mainEntity = { id: "TX-RZ50 192.168.2.103 main", attributes: { state: uc.MediaPlayerStates.On } } as any;
 
@@ -361,6 +375,9 @@ it("CommandSender covers SelectSource edge branches", async () => {
     eiscpConfig: { sendDelay: 1 },
     commands: [],
     raws: [],
+    async rawIfAvailable(): Promise<boolean> {
+      return true;
+    },
     async command(cmd: string): Promise<void> {
       this.commands.push(cmd);
     },
@@ -379,7 +396,7 @@ it("CommandSender covers SelectSource edge branches", async () => {
 
   const mockDriver = {} as any;
   const mockAvrState = { getSubSource: () => "spotify", refreshAvrState: async () => undefined } as any;
-  const sender = new CommandSender(mockDriver, cfg, eiscp as any, mockAvrState, undefined);
+  const sender = new CommandSender(mockDriver, cfg, eiscp as any, mockAvrState, undefined, testAvrContexts, testMediaBrowser(new AvrStateManager()));
 
   const mainEntity = { id: "TX-RZ50 192.168.2.103 main", attributes: { state: uc.MediaPlayerStates.On } } as any;
 

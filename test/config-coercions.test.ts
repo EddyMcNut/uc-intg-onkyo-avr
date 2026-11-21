@@ -1,3 +1,5 @@
+import { testMediaBrowser, testMediaBrowserServices } from "./helpers/mediaBrowserServices.js";
+import { testAvrContexts } from "./helpers/contexts.js";
 import { describe, it, expect } from "vitest";
 import type { IntegrationAPI } from "@unfoldedcircle/integration-api";
 import path from "path";
@@ -64,9 +66,8 @@ class MockEiscp {
 import * as uc from "@unfoldedcircle/integration-api";
 it("CommandSender volume conversion respects adjustVolumeDispl", async () => {
   const senderModule = await import("../src/commandSender.js");
-  const avrStateModule = await import("../src/avrState.js");
   const CommandSender = senderModule.CommandSender as any;
-  const { avrStateManager } = avrStateModule as any;
+  const { avrStateManager } = await import("./helpers/avrState.js");
 
   const eiscp = new MockEiscp();
   // mock driver only needs updateEntityAttributes; use IntegrationAPI type for clarity
@@ -76,12 +77,12 @@ it("CommandSender volume conversion respects adjustVolumeDispl", async () => {
   const configAdjTrue = { avrs: baseAvrConfig, volumeScale: 100, adjustVolumeDispl: true };
   const configAdjFalse = { avrs: baseAvrConfig, volumeScale: 100, adjustVolumeDispl: false };
 
-  const senderTrue = new CommandSender(drv as any, configAdjTrue, eiscp as any, avrStateManager, null);
+  const senderTrue = new CommandSender(drv as any, configAdjTrue, eiscp as any, avrStateManager, null, testAvrContexts, testMediaBrowser(avrStateManager));
   await senderTrue.sharedCmdHandler(new uc.MediaPlayer(entityId, { en: entityId }, {}), uc.MediaPlayerCommands.Volume, { volume: 50 });
   expect(eiscp.lastRaw).toBe("MVL64"); // 50 -> 50 *2 = 100 -> 0x64
 
   const eiscp2 = new MockEiscp();
-  const senderFalse = new CommandSender(drv as any, configAdjFalse, eiscp2 as any, avrStateManager, null);
+  const senderFalse = new CommandSender(drv as any, configAdjFalse, eiscp2 as any, avrStateManager, null, testAvrContexts, testMediaBrowser(avrStateManager));
   await senderFalse.sharedCmdHandler(new uc.MediaPlayer(entityId, { en: entityId }, {}), uc.MediaPlayerCommands.Volume, { volume: 50 });
   expect(eiscp2.lastRaw).toBe("MVL32"); // 50 -> 50 -> 0x32
 });

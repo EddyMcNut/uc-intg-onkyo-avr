@@ -49,7 +49,7 @@ export interface ICommandReceiver {
   maybeUpdateImage(entityId: string, force?: boolean): Promise<void>;
 }
 
-// DIP: AvrStateApi interface for per-entity state management. Injected instead of using avrStateManager singleton.
+// DIP: AvrStateApi interface for per-entity state management. The driver creates one AvrStateManager and injects it.
 export interface AvrStateApi {
   // Query methods
   getSource(entityId: string): string;

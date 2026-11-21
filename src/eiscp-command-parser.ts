@@ -4,7 +4,7 @@ import { diracResponseToCommandValue } from "./diracSelect.js";
 import { detectServiceFromText, detectServiceFromAsciiPrefix, getCanonicalServiceName } from "./serviceDetector.js";
 import { hasServiceCapability, toServiceId } from "./networkServices.js";
 import { parseAvrInfo } from "./avrInfoStore.js";
-import { sharedAvrContexts, type AvrContextRegistry } from "./avrContext.js";
+import type { AvrContextRegistry } from "./avrContext.js";
 import { physicalAvrIdFromEntityId } from "./configManager.js";
 import log, { getLogLevel } from "./loggers.js";
 import type { ListHeader, ParserEffects } from "./parserEffects.js";
@@ -50,7 +50,7 @@ export class IscpCommandParser {
     private readonly getEntityId: (zone: string) => string,
     private readonly stateReader: AvrStateReader,
     private readonly effects: ParserEffects,
-    private readonly avrContexts: AvrContextRegistry = sharedAvrContexts
+    private readonly avrContexts: AvrContextRegistry
   ) {
     this.commandHandlers = {
       NTM: (value, _cmd, result) => this.handleNTM(value, result),

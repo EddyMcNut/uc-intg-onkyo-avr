@@ -315,7 +315,7 @@ export interface NormalizedAvrConfig {
 // ---------------------------------------------------------------------------------------------------------------
 // Per-field parsers: the single definition of how each AVR setting is read from untyped input (config file,
 // backup payload, setup form). They never throw; anything unusable becomes the field's default.
-// Used by normalizeAvrConfig (runtime and config load), ConfigManager.validateAvrPayload and ManualConfigParser.
+// Used by normalizeAvrConfig (runtime and config load), validateAvrPayload (configValidation.ts) and ManualConfigParser.
 // ---------------------------------------------------------------------------------------------------------------
 
 // Integer from a number or numeric string. Values that are not a number, or fall outside [min, max], give `fallback`.
@@ -372,7 +372,7 @@ export function parseNetworkNavigationMode(raw: unknown): NetworkNavigationMode 
 }
 
 // Coerce and apply defaults to a raw AvrConfig. Adding a field: add its parser above, then add it here and to
-// AvrConfig/NormalizedAvrConfig. ConfigManager.applyDefaults and validateAvrPayload build on this function.
+// AvrConfig/NormalizedAvrConfig. applyAvrDefaults and validateAvrPayload (configValidation.ts) build on this function.
 export function normalizeAvrConfig(raw: AvrConfig): NormalizedAvrConfig {
   return {
     model: raw.model,

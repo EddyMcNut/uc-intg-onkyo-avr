@@ -3,7 +3,7 @@
 // Effects are applied synchronously while parsing, so they keep their order relative to the following messages
 // (e.g. an NLT list header must be stored before the NLS/NLA rows of that list arrive).
 import { PRESET_BAND_EMPTY, type AvrInfo } from "./avrInfoStore.js";
-import { sharedAvrContexts, type AvrContextRegistry } from "./avrContext.js";
+import type { AvrContextRegistry } from "./avrContext.js";
 import { DEEZER_SERVICE_ID, MUSIC_SERVER_SERVICE_ID, TIDAL_SERVICE_ID, TUNEIN_SERVICE_ID } from "./browseServiceContract.js";
 import { getMenuBrowseService } from "./menuBrowseServices.js";
 import type { MenuBrowseOption, MenuBrowseState } from "./menuBrowseState.js";
@@ -45,7 +45,9 @@ export interface ParserEffectStores {
   tuneInMenu?: TuneInMenuStoreApi | null;
 }
 
-export function createParserEffects(stores: ParserEffectStores, storeAvrInfo: (entityId: string, info: AvrInfo) => void = storeAndLogAvrInfo(sharedAvrContexts)): ParserEffects {
+// `avrContexts` is where the AVR info (NRI) is stored.
+export function createParserEffects(stores: ParserEffectStores, avrContexts: AvrContextRegistry): ParserEffects {
+  const storeAvrInfo = storeAndLogAvrInfo(avrContexts);
   const menuStores: Record<string, MenuBrowseStoreApi | null | undefined> = {
     [DEEZER_SERVICE_ID]: stores.deezer,
     [TIDAL_SERVICE_ID]: stores.tidal,
@@ -97,7 +99,7 @@ function menuStoreIn(serviceId: string, avrContexts: AvrContextRegistry): MenuBr
 }
 
 // The effects used by the running driver: the real browse stores, and the AVR info store of the AVR's context.
-export function createDefaultParserEffects(avrContexts: AvrContextRegistry = sharedAvrContexts): ParserEffects {
+export function createDefaultParserEffects(avrContexts: AvrContextRegistry): ParserEffects {
   return createParserEffects(
     {
       deezer: menuStoreIn(DEEZER_SERVICE_ID, avrContexts),
@@ -105,7 +107,7 @@ export function createDefaultParserEffects(avrContexts: AvrContextRegistry = sha
       musicServer: menuStoreIn(MUSIC_SERVER_SERVICE_ID, avrContexts),
       tuneInMenu: { getBrowseState: (entityId) => getTuneInMenuBrowseState(entityId, avrContexts) }
     },
-    storeAndLogAvrInfo(avrContexts)
+    avrContexts
   );
 }
 

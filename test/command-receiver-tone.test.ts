@@ -1,5 +1,8 @@
+import { testMediaBrowser, testMediaBrowserServices } from "./helpers/mediaBrowserServices.js";
+import { testAvrContexts } from "./helpers/contexts.js";
 import { describe, it, expect, vi } from "vitest";
 import * as uc from "@unfoldedcircle/integration-api";
+import { testConfigStore } from "./helpers/configStore.js";
 
 function makeIntegrationConfig(overrides: Record<string, any> = {}) {
   return {
@@ -38,7 +41,7 @@ async function makeReceiver(overrides: Record<string, any> = {}) {
   const config = overrides.config ?? makeIntegrationConfig();
   const eiscpMock = overrides.eiscpMock ?? makeEiscpMock();
   const avrStateApiMock = overrides.avrStateApiMock ?? makeAvrStateApiMock();
-  const receiver = new CommandReceiver(driverMock, config, eiscpMock, avrStateApiMock);
+  const receiver = new CommandReceiver(driverMock, config, eiscpMock, avrStateApiMock, testAvrContexts, testMediaBrowser(avrStateApiMock), testConfigStore);
   return { receiver, driverMock, eiscpMock, avrStateApiMock };
 }
 

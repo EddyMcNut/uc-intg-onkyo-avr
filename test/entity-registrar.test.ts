@@ -1,7 +1,10 @@
+import { testMediaBrowser, testMediaBrowserServices } from "./helpers/mediaBrowserServices.js";
+import { testAvrContexts } from "./helpers/contexts.js";
 import { describe, it, expect } from "vitest";
 import fs from "fs";
 import os from "os";
 import path from "path";
+import { testConfigStore } from "./helpers/configStore.js";
 
 function mkTmpDir(prefix = "onkyo-test-") {
   return fs.mkdtempSync(path.join(os.tmpdir(), prefix));
@@ -11,16 +14,13 @@ it("EntityRegistrar builds entities correctly", async () => {
   const tmp = mkTmpDir();
   try {
     const cfgModule = await import("../src/configManager.js");
-    if (typeof (cfgModule as any).setConfigDir === "function") {
-      (cfgModule as any).setConfigDir(tmp);
-    }
+    const configStore = new (cfgModule as any).ConfigStore((cfgModule as any).configPathFor(tmp));
 
     // Import compiled module from dist
-    const avrStateModule = await import("../src/avrState.js");
     const module = await import("../src/entityRegistrar.js");
     const EntityRegistrar = module.default as any;
-    const { avrStateManager } = avrStateModule as any;
-    const registrar = new EntityRegistrar(avrStateManager);
+    const { avrStateManager } = await import("./helpers/avrState.js");
+    const registrar = new EntityRegistrar(avrStateManager, testAvrContexts, testMediaBrowser(avrStateManager), configStore);
 
     const avrEntry = "Model_192.168.1.2_main";
 
@@ -47,7 +47,7 @@ it("EntityRegistrar builds entities correctly", async () => {
 
     // Current configuration stores one preference per AVR listening-mode code.
     const userList = ["full-mono", "neural-thx", "stereo", "straight-decode"];
-    (cfgModule as any).ConfigManager.save({
+    configStore.save({
       avrs: [
         {
           model: "Model",
@@ -67,8 +67,9 @@ it("EntityRegistrar builds entities correctly", async () => {
     const avrStateModule2 = await import("../src/avrState.js");
     const registrar2Module = await import("../src/entityRegistrar.js");
     const Registrar2 = registrar2Module.default as any;
-    const { avrStateManager: avrStateManager2 } = avrStateModule2 as any;
-    const registrar2 = new Registrar2(avrStateManager2);
+    // A second, independent state manager.
+    const avrStateManager2 = new (avrStateModule2 as any).AvrStateManager();
+    const registrar2 = new Registrar2(avrStateManager2, testAvrContexts, testMediaBrowser(avrStateManager2), configStore);
     const select2 = registrar2.createListeningModeSelectEntity("Model 192.168.1.2 main", async () => {});
     const attrs2 = (select2 as any).attributes || {};
     expect(attrs2.options).toEqual(userList);
@@ -81,15 +82,13 @@ it("EntityRegistrar sensor names omit host from display name", async () => {
   const tmp = mkTmpDir();
   try {
     const cfgModule = await import("../src/configManager.js");
-    if (typeof (cfgModule as any).setConfigDir === "function") {
-      (cfgModule as any).setConfigDir(tmp);
-    }
-    (cfgModule as any).ConfigManager.save({ avrs: [{ model: "TX-RZ50", ip: "192.168.1.2", port: 60128, zone: "main", entityNameStyle: "short" }] });
+    const configStore = new (cfgModule as any).ConfigStore((cfgModule as any).configPathFor(tmp));
+    configStore.save({ avrs: [{ model: "TX-RZ50", ip: "192.168.1.2", port: 60128, zone: "main", entityNameStyle: "short" }] });
     const module = await import("../src/entityRegistrar.js");
     const avrStateModule = await import("../src/avrState.js");
     const EntityRegistrar = module.default as any;
-    const { avrStateManager } = avrStateModule as any;
-    const registrar = new EntityRegistrar(avrStateManager);
+    const { avrStateManager } = await import("./helpers/avrState.js");
+    const registrar = new EntityRegistrar(avrStateManager, testAvrContexts, testMediaBrowser(avrStateManager), configStore);
 
     const avrEntry = "TX-RZ50 192.168.1.2 main";
     const sensors = registrar.createSensorEntities(avrEntry);
@@ -116,16 +115,14 @@ it("EntityRegistrar long entity names include host when configured", async () =>
   const tmp = mkTmpDir();
   try {
     const cfgModule = await import("../src/configManager.js");
-    if (typeof (cfgModule as any).setConfigDir === "function") {
-      (cfgModule as any).setConfigDir(tmp);
-    }
-    (cfgModule as any).ConfigManager.save({ avrs: [{ model: "TX-RZ50", ip: "192.168.1.2", port: 60128, zone: "main", entityNameStyle: "long" }] });
+    const configStore = new (cfgModule as any).ConfigStore((cfgModule as any).configPathFor(tmp));
+    configStore.save({ avrs: [{ model: "TX-RZ50", ip: "192.168.1.2", port: 60128, zone: "main", entityNameStyle: "long" }] });
 
     const module = await import("../src/entityRegistrar.js");
     const EntityRegistrar = module.default as any;
     const avrStateModule = await import("../src/avrState.js");
-    const { avrStateManager } = avrStateModule as any;
-    const registrar = new EntityRegistrar(avrStateManager);
+    const { avrStateManager } = await import("./helpers/avrState.js");
+    const registrar = new EntityRegistrar(avrStateManager, testAvrContexts, testMediaBrowser(avrStateManager), configStore);
     const avrEntry = "TX-RZ50 192.168.1.2 main";
 
     const mp = registrar.createMediaPlayerEntity(avrEntry, 100, async () => {});
@@ -142,16 +139,14 @@ it("EntityRegistrar builds remote entity with features, buttons, pages and simpl
   const tmp = mkTmpDir();
   try {
     const cfgModule = await import("../src/configManager.js");
-    if (typeof (cfgModule as any).setConfigDir === "function") {
-      (cfgModule as any).setConfigDir(tmp);
-    }
-    (cfgModule as any).ConfigManager.save({ avrs: [{ model: "TX-RZ50", ip: "192.168.1.2", port: 60128, zone: "main", entityNameStyle: "short" }] });
+    const configStore = new (cfgModule as any).ConfigStore((cfgModule as any).configPathFor(tmp));
+    configStore.save({ avrs: [{ model: "TX-RZ50", ip: "192.168.1.2", port: 60128, zone: "main", entityNameStyle: "short" }] });
 
     const module = await import("../src/entityRegistrar.js");
     const EntityRegistrar = module.default as any;
     const avrStateModule = await import("../src/avrState.js");
-    const { avrStateManager } = avrStateModule as any;
-    const registrar = new EntityRegistrar(avrStateManager);
+    const { avrStateManager } = await import("./helpers/avrState.js");
+    const registrar = new EntityRegistrar(avrStateManager, testAvrContexts, testMediaBrowser(avrStateManager), configStore);
     const avrEntry = "TX-RZ50 192.168.1.2 main";
 
     const remote = registrar.createRemoteEntity(avrEntry, async () => 0);
@@ -179,20 +174,18 @@ it("Remote entity UI is a static set of command pages", async () => {
   const tmp = mkTmpDir();
   try {
     const cfgModule = await import("../src/configManager.js");
-    if (typeof (cfgModule as any).setConfigDir === "function") {
-      (cfgModule as any).setConfigDir(tmp);
-    }
+    const configStore = new (cfgModule as any).ConfigStore((cfgModule as any).configPathFor(tmp));
     const inputOptions = ["bd", "tv", "net"];
     const lmdOptions = ["stereo", "direct"];
-    (cfgModule as any).ConfigManager.save({
+    configStore.save({
       avrs: [{ model: "TX-RZ50", ip: "192.168.1.2", port: 60128, zone: "main", inputSelectorOptions: inputOptions, listeningModeOptions: lmdOptions, entityNameStyle: "short" }]
     });
 
     const module = await import("../src/entityRegistrar.js");
     const avrStateModule = await import("../src/avrState.js");
     const EntityRegistrar = module.default as any;
-    const { avrStateManager } = avrStateModule as any;
-    const registrar = new EntityRegistrar(avrStateManager);
+    const { avrStateManager } = await import("./helpers/avrState.js");
+    const registrar = new EntityRegistrar(avrStateManager, testAvrContexts, testMediaBrowser(avrStateManager), configStore);
     const avrEntry = "TX-RZ50 192.168.1.2 main";
 
     const remote = registrar.createRemoteEntity(avrEntry, async () => 0);
@@ -215,20 +208,18 @@ it("Remote entity UI stays static regardless of configured options", async () =>
   const tmp = mkTmpDir();
   try {
     const cfgModule = await import("../src/configManager.js");
-    if (typeof (cfgModule as any).setConfigDir === "function") {
-      (cfgModule as any).setConfigDir(tmp);
-    }
+    const configStore = new (cfgModule as any).ConfigStore((cfgModule as any).configPathFor(tmp));
     const inputOptions = ["bd", "tv", "net", "game", "pc", "cbl", "aux"];
     const lmdOptions = ["stereo", "direct", "movie", "music", "game", "thx", "straight-decode", "pure-audio", "neural-thx"];
-    (cfgModule as any).ConfigManager.save({
+    configStore.save({
       avrs: [{ model: "TX-RZ50", ip: "192.168.1.2", port: 60128, zone: "main", inputSelectorOptions: inputOptions, listeningModeOptions: lmdOptions, entityNameStyle: "short" }]
     });
 
     const module = await import("../src/entityRegistrar.js");
     const avrStateModule = await import("../src/avrState.js");
     const EntityRegistrar = module.default as any;
-    const { avrStateManager } = avrStateModule as any;
-    const registrar = new EntityRegistrar(avrStateManager);
+    const { avrStateManager } = await import("./helpers/avrState.js");
+    const registrar = new EntityRegistrar(avrStateManager, testAvrContexts, testMediaBrowser(avrStateManager), configStore);
     const avrEntry = "TX-RZ50 192.168.1.2 main";
 
     const remote = registrar.createRemoteEntity(avrEntry, async () => 0);
@@ -248,14 +239,13 @@ it("EntityRegistrar creates treble, bass, vocal, center and subwoofer sensors", 
   const tmp = mkTmpDir();
   try {
     const cfgModule = await import("../src/configManager.js");
-    if (typeof (cfgModule as any).setConfigDir === "function") {
-      (cfgModule as any).setConfigDir(tmp);
-    }
+    const configStore = new (cfgModule as any).ConfigStore((cfgModule as any).configPathFor(tmp));
+    configStore.save({ avrs: [{ model: "TX-RZ50", ip: "192.168.1.2", port: 60128, zone: "main", entityNameStyle: "short" }] });
     const module = await import("../src/entityRegistrar.js");
     const avrStateModule = await import("../src/avrState.js");
     const EntityRegistrar = module.default as any;
-    const { avrStateManager } = avrStateModule as any;
-    const registrar = new EntityRegistrar(avrStateManager);
+    const { avrStateManager } = await import("./helpers/avrState.js");
+    const registrar = new EntityRegistrar(avrStateManager, testAvrContexts, testMediaBrowser(avrStateManager), configStore);
 
     const avrEntry = "TX-RZ50 192.168.1.2 main";
     const sensors = registrar.createSensorEntities(avrEntry) as any[];

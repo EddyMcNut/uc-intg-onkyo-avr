@@ -1,12 +1,13 @@
 /*jslint node:true nomen:true*/
 "use strict";
+import type { ConfigSource } from "./configManager.js";
 import log from "./loggers.js";
 import { ReconnectionManager } from "./reconnectionManager.js";
 import { AvrConfig, IntegrationConfig, DEFAULT_QUEUE_THRESHOLD } from "./configManager.js";
 import EiscpDriver from "./eiscp.js";
 import { PhysicalConnection, CreateCommandReceiverFn, QueryAllZonesStateFn, EiscpDriverFactory, type AvrStateApi } from "./types.js";
 import { CONNECTION_TIMEOUT } from "./constants.js";
-import { sharedAvrContexts, type AvrContextRegistry } from "./avrContext.js";
+import type { AvrContextRegistry } from "./avrContext.js";
 
 const logSource = "connectionManager:";
 
@@ -23,18 +24,19 @@ export default class ConnectionManager {
   constructor(
     reconnectionManager: ReconnectionManager,
     queryAllZonesState: (physicalAvr: string, eiscp: EiscpDriver, context: string) => Promise<void>,
+    private readonly avrContexts: AvrContextRegistry,
+    private readonly configSource: ConfigSource,
     createEiscpDriver?: EiscpDriverFactory,
     stateReader?: AvrStateApi,
     // Called with false when the TCP connection to an AVR is lost and with true when it is (re)established.
-    onAvailabilityChange?: AvailabilityChangeFn,
-    private readonly avrContexts: AvrContextRegistry = sharedAvrContexts
+    onAvailabilityChange?: AvailabilityChangeFn
   ) {
     this.onAvailabilityChange = onAvailabilityChange;
     this.reconnectionManager = reconnectionManager;
     this.queryAllZonesState = queryAllZonesState;
     this.stateReader = stateReader;
     // Default to the concrete EiscpDriver so production callers need no change. Tests can inject a fake factory to avoid opening real TCP sockets.
-    this.createEiscpDriver = createEiscpDriver ?? ((config) => new EiscpDriver(config, this.stateReader, this.avrContexts));
+    this.createEiscpDriver = createEiscpDriver ?? ((config) => new EiscpDriver(config, this.avrContexts, this.configSource, this.stateReader));
   }
 
   getPhysicalConnection(physicalAVR: string): PhysicalConnection | undefined {

@@ -8,14 +8,14 @@ import { SIMPLE_COMMANDS_MAP, ALL_INPUT_SELECTOR_NAMES } from "./simpleCommands.
 const INPUT_NAMES_SET = new Set(ALL_INPUT_SELECTOR_NAMES);
 import log from "./loggers.js";
 import { toHex, ensureEiscpConnected } from "./utils.js";
-import { browseMedia, isMediaBrowsingAvailable } from "./mediaBrowser.js";
+import type { MediaBrowser } from "./mediaBrowser.js";
 import { PlayMediaCommandHandler } from "./playMediaCommandHandler.js";
 import { findAvrSourceId, getAvrSourcesByPhysicalId } from "./avrSourceCatalog.js";
 import { stripInputSourceMarker } from "./inputSourcePresentation.js";
 import { isNetworkInputSource } from "./inputSourcePreferences.js";
 import { resetTuneInMenuBrowseState } from "./tuneInMenuStore.js";
 import { toServiceId } from "./networkServices.js";
-import { sharedAvrContexts, type AvrContextRegistry } from "./avrContext.js";
+import type { AvrContextRegistry } from "./avrContext.js";
 import { getMenuBrowseService } from "./menuBrowseServices.js";
 import { DEEZER_SERVICE_ID, MUSIC_SERVER_SERVICE_ID, TIDAL_SERVICE_ID, TUNEIN_SERVICE_ID } from "./browseServiceContract.js";
 
@@ -37,14 +37,15 @@ export class CommandSender {
     eiscp: EiscpDriver,
     avrStateApi: AvrStateApi,
     commandReceiver: ICommandReceiver | undefined,
-    private readonly avrContexts: AvrContextRegistry = sharedAvrContexts
+    private readonly avrContexts: AvrContextRegistry,
+    private readonly mediaBrowser: MediaBrowser
   ) {
     this.driver = driver;
     this.config = config;
     this.eiscp = eiscp;
     this.avrStateApi = avrStateApi;
     this.commandReceiver = commandReceiver;
-    this.playMediaCommandHandler = new PlayMediaCommandHandler(this.eiscp, this.avrStateApi, this.commandReceiver, this.avrContexts);
+    this.playMediaCommandHandler = new PlayMediaCommandHandler(this.eiscp, this.avrStateApi, this.commandReceiver, this.avrContexts, this.mediaBrowser.services);
   }
 
   public updateConfig(config: IntegrationConfig): void {
@@ -256,8 +257,8 @@ export class CommandSender {
       "browse",
       async (entity) => {
         const subSource = this.avrStateApi.getSubSource(entity.id);
-        if (isMediaBrowsingAvailable(entity.id, subSource)) {
-          await browseMedia(entity.id, { paging: new uc.Paging(1, 50) } as uc.BrowseOptions);
+        if (this.mediaBrowser.isMediaBrowsingAvailable(entity.id, subSource)) {
+          await this.mediaBrowser.browseMedia(entity.id, { paging: new uc.Paging(1, 50) } as uc.BrowseOptions);
         }
         return uc.StatusCodes.Ok;
       }
@@ -271,6 +272,7 @@ export class CommandSender {
           mediaType: typeof params?.media_type === "string" ? params.media_type : undefined,
           netMenuDelay: targetAvr.netMenuDelay,
           networkNavigationMode: targetAvr.networkNavigationMode,
+          tuneinPresetPosition: targetAvr.tuneinPresetPosition,
           setZonePrefix: sz
         });
         return status;

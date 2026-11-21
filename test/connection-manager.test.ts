@@ -1,5 +1,7 @@
+import { testAvrContexts } from "./helpers/contexts.js";
 import { describe, it, expect } from "vitest";
 import path from "path";
+import { testConfigStore } from "./helpers/configStore.js";
 
 // Helpers
 function mkConn(connected = false) {
@@ -24,6 +26,8 @@ it("schedule and cancel scheduled reconnection", async () => {
   const cm = new ConnectionManager(
     reconMgr,
     async () => {},
+    testAvrContexts,
+    testConfigStore,
     () => "v"
   );
 
@@ -58,6 +62,8 @@ it("attemptReconnection delegates to reconnection manager and returns result", a
   const cm = new ConnectionManager(
     stub as any,
     async () => {},
+    testAvrContexts,
+    testConfigStore,
     () => "v"
   );
 
@@ -80,6 +86,8 @@ it("clearAllConnections removes stored connections", async () => {
   const cm = new ConnectionManager(
     reconMgr,
     async () => {},
+    testAvrContexts,
+    testConfigStore,
     () => "v"
   );
 

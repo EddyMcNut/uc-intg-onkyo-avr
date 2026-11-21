@@ -3,8 +3,7 @@ import * as uc from "@unfoldedcircle/integration-api";
 import path from "path";
 
 it("AvrStateManager maps NET playbackStatus paused to MediaPlayerStates.Paused", async () => {
-  const avrStateModule = await import("../src/avrState.js");
-  const { avrStateManager } = avrStateModule as any;
+  const { avrStateManager } = await import("./helpers/avrState.js");
 
   const statesByEntity = new Map<string, uc.MediaPlayerStates>();
   const mockDriver = {
@@ -31,8 +30,7 @@ it("AvrStateManager maps NET playbackStatus paused to MediaPlayerStates.Paused",
 });
 
 it("AvrStateManager syncs remote entity state on power changes", async () => {
-  const avrStateModule = await import("../src/avrState.js");
-  const { avrStateManager } = avrStateModule as any;
+  const { avrStateManager } = await import("./helpers/avrState.js");
 
   const statesByEntity = new Map<string, string>();
   const mockDriver = {

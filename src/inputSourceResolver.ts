@@ -2,7 +2,7 @@
 import { eiscpMappings } from "./eiscp-mappings.js";
 import { type AvrConfig } from "./configManager.js";
 import { normalizeAvrInputs, type AvrInput } from "./inputSourceStore.js";
-import { sharedAvrContexts, type AvrContextRegistry } from "./avrContext.js";
+import type { AvrContextRegistry } from "./avrContext.js";
 import { getAvrSourcesByPhysicalId } from "./avrSourceCatalog.js";
 import { getInputSourceAliases } from "./inputSourcePreferences.js";
 import { presentInputSourceOptions, stripInputSourceMarker } from "./inputSourcePresentation.js";
@@ -32,26 +32,25 @@ export function getInputSourceId(option: string): string | undefined {
 }
 
 // Resolve a displayed option to an AVR-reported ID, then fall back to the built-in alias mapping.
-export function resolveInputSourceId(physicalAvrId: string, option: string): string | undefined {
+export function resolveInputSourceId(physicalAvrId: string, option: string, contexts: AvrContextRegistry): string | undefined {
   const cleanOption = stripInputSourceMarker(option);
-  return getAvrSourcesByPhysicalId(physicalAvrId).find((input) => input.name.toLowerCase() === cleanOption.trim().toLowerCase())?.id ?? getInputSourceId(cleanOption);
+  return getAvrSourcesByPhysicalId(physicalAvrId, contexts).find((input) => input.name.toLowerCase() === cleanOption.trim().toLowerCase())?.id ?? getInputSourceId(cleanOption);
 }
 
 // Convert a displayed/configured source name to the stable integration name used by internal state comparisons. AVR-learned names remain suitable for display, but must not replace values such as `net`, `fm`, or `dab` in the state model.
-export function resolveCanonicalInputSource(physicalAvrId: string, option: string): string {
-  const inputId = resolveInputSourceId(physicalAvrId, option);
+export function resolveCanonicalInputSource(physicalAvrId: string, option: string, contexts: AvrContextRegistry): string {
+  const inputId = resolveInputSourceId(physicalAvrId, option, contexts);
   const aliases = inputId ? getInputSourceAliases(inputId) : [];
   return aliases[0] ?? stripInputSourceMarker(option).trim().toLowerCase().replace(/\s+/g, "-");
 }
 
 // Build the options shown by the input selector for one configured AVR zone.
-export function getEffectiveInputSourceOptions(avrConfig: AvrConfig, physicalAvrId: string, builtInOptions: string[]): string[] {
-  return presentInputSourceOptions(avrConfig, physicalAvrId, builtInOptions);
+export function getEffectiveInputSourceOptions(avrConfig: AvrConfig, physicalAvrId: string, builtInOptions: string[], contexts: AvrContextRegistry): string[] {
+  return presentInputSourceOptions(avrConfig, physicalAvrId, builtInOptions, contexts);
 }
 
 // Resolve the AVR's input list when AVR-reported names are enabled.
-// `contexts` defaults to the shared registry during the item-10 migration (see avrContext.ts).
-export function resolveInputSourceList(avrConfig: AvrConfig, entityId: string, contexts: AvrContextRegistry = sharedAvrContexts): InputSourceListResolution | undefined {
+export function resolveInputSourceList(avrConfig: AvrConfig, entityId: string, contexts: AvrContextRegistry): InputSourceListResolution | undefined {
   if (!avrConfig.useAvrReportedInputs) {
     return undefined;
   }

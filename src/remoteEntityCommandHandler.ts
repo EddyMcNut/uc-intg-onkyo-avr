@@ -10,7 +10,7 @@ import { SIMPLE_COMMANDS_MAP, ALL_INPUT_SELECTOR_NAMES } from "./simpleCommands.
 import { MAX_LENGTHS, PATTERNS } from "./configConstants.js";
 import { REPORTED_INPUT_COMMAND_PREFIX, UC_REMOTE_COMMANDS } from "./remoteEntity.js";
 import { findAvrSourceId } from "./avrSourceCatalog.js";
-import { sharedAvrContexts, type AvrContextRegistry } from "./avrContext.js";
+import type { AvrContextRegistry } from "./avrContext.js";
 import { REMOTE_SUFFIX } from "./sensorSuffixes.js";
 import log from "./loggers.js";
 import { EiscpDriver } from "./eiscp.js";
@@ -33,10 +33,11 @@ export class remoteEntityCommandHandler {
     private readonly connectionManager: IPhysicalConnectionLookup,
     private readonly avrInstanceManager: IAvrInstanceLookup,
     private readonly avrStateApi: AvrStateApi,
-    private readonly avrContexts: AvrContextRegistry = sharedAvrContexts
+    private readonly avrContexts: AvrContextRegistry
   ) {}
 
-  public async handle(entity: uc.Entity, cmdId: string, params?: { [key: string]: string | number | boolean }): Promise<uc.StatusCodes> {
+  // send_cmd_sequence carries its commands as a string array, so the params can hold string[] values.
+  public async handle(entity: uc.Entity, cmdId: string, params?: RemoteParams): Promise<uc.StatusCodes> {
     const avrEntry = entity.id.replace(REMOTE_SUFFIX, "");
     const instance = this.avrInstanceManager.get(avrEntry);
 

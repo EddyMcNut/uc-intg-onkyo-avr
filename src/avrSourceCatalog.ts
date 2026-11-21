@@ -3,9 +3,7 @@
 // by entities that can render AVR-specific source names.
 import { physicalAvrIdFromEntityId } from "./configManager.js";
 import type { AvrInput } from "./inputSourceStore.js";
-import { sharedAvrContexts, type AvrContextRegistry } from "./avrContext.js";
-
-// The `contexts` parameters default to the shared registry during the item-10 migration (see avrContext.ts).
+import type { AvrContextRegistry } from "./avrContext.js";
 
 export type AvrSourceCatalog = {
   // Normalized, alphabetically sorted selector and enabled network-service entries.
@@ -14,7 +12,7 @@ export type AvrSourceCatalog = {
   complete: boolean;
 };
 
-export function getAvrSourceCatalog(entityId: string, contexts: AvrContextRegistry = sharedAvrContexts): AvrSourceCatalog {
+export function getAvrSourceCatalog(entityId: string, contexts: AvrContextRegistry): AvrSourceCatalog {
   const physicalAvrId = physicalAvrIdFromEntityId(entityId);
   return {
     sources: physicalAvrId ? contexts.get(physicalAvrId).inputs.list() : [],
@@ -22,10 +20,10 @@ export function getAvrSourceCatalog(entityId: string, contexts: AvrContextRegist
   };
 }
 
-export function getAvrSourcesByPhysicalId(physicalAvrId: string, contexts: AvrContextRegistry = sharedAvrContexts): AvrInput[] {
+export function getAvrSourcesByPhysicalId(physicalAvrId: string, contexts: AvrContextRegistry): AvrInput[] {
   return contexts.get(physicalAvrId).inputs.list();
 }
 
-export function findAvrSourceId(physicalAvrId: string, name: string, contexts: AvrContextRegistry = sharedAvrContexts): string | undefined {
+export function findAvrSourceId(physicalAvrId: string, name: string, contexts: AvrContextRegistry): string | undefined {
   return contexts.get(physicalAvrId).inputs.findId(name);
 }

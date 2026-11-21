@@ -1,16 +1,18 @@
+import { testMediaBrowser, testMediaBrowserServices } from "./helpers/mediaBrowserServices.js";
+import { testAvrContexts } from "./helpers/contexts.js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as uc from "@unfoldedcircle/integration-api";
-import { ConfigManager } from "../src/configManager.js";
-import { avrStateManager } from "../src/avrState.js";
+import { avrStateManager } from "./helpers/avrState.js";
 import { EiscpDriver } from "../src/eiscp.js";
 import { PlayMediaCommandHandler } from "../src/playMediaCommandHandler.js";
 import { TuneInBrowseHandler } from "../src/tuneInBrowseHandler.js";
 import { TuneInPreloader } from "../src/tuneInPreloader.js";
 import { TuneInZoneAgnosticAdapter } from "../src/zoneAgnosticServiceAdapters.js";
-import { initMediaBrowser, TUNEIN_MENU_ROOT_ID, TUNEIN_MENU_ROOT_TYPE, TUNEIN_MENU_BACK_ID } from "../src/mediaBrowser.js";
+import { TUNEIN_MENU_ROOT_ID, TUNEIN_MENU_ROOT_TYPE, TUNEIN_MENU_BACK_ID } from "../src/mediaBrowser.js";
 import { getTuneInMenuBrowseState, listTuneInMenuOptions, resetTuneInMenuBrowseState } from "../src/tuneInMenuStore.js";
 import { clearTuneInPresets, getTuneInBrowseState, listTuneInPresets } from "./helpers/tuneInPresets.js";
 import { resetAvrInfo, setAvrInfo } from "./helpers/avrInfo.js";
+import { testConfigStore } from "./helpers/configStore.js";
 
 const entityId = "TX-RZ50 192.0.2.103 main";
 const physicalId = "TX-RZ50 192.0.2.103";
@@ -27,7 +29,7 @@ async function finish<T>(promise: Promise<T>): Promise<T> {
 // ingestion against a stateful AVR: an index always applies to its CURRENT
 // menu. A wrong TOP/SELECT/RETURN therefore changes the result, not just a spy.
 function setup(mode: "legacy" | "modern" = "legacy", style: "full" | "mypresets" = "full", presetPosition = 1) {
-  vi.spyOn(ConfigManager, "get").mockReturnValue({
+  testConfigStore.get.mockReturnValue({
     avrs: [{ model: "TX-RZ50", ip: "192.0.2.103", zone: "main", networkNavigationMode: mode, tuneinMenuStyle: style, tuneinPresetPosition: presetPosition, netMenuDelay: 0 }]
   } as any);
   setAvrInfo(entityId, {
@@ -44,18 +46,24 @@ function setup(mode: "legacy" | "modern" = "legacy", style: "full" | "mypresets"
   });
   avrStateManager.setSource(entityId, "net");
   avrStateManager.setSubSource(entityId, "tunein");
-  initMediaBrowser(avrStateManager);
-  const driver = new EiscpDriver({ model: "TX-RZ50", host: "192.0.2.103", networkNavigationMode: mode, netMenuDelay: 0, tuneinPresetPosition: presetPosition }, avrStateManager);
-  const preloader = new TuneInPreloader(driver, () => physicalId);
+  const driver = new EiscpDriver(
+    { model: "TX-RZ50", host: "192.0.2.103", networkNavigationMode: mode, netMenuDelay: 0, tuneinPresetPosition: presetPosition },
+    testAvrContexts,
+    testConfigStore,
+    avrStateManager
+  );
+  const preloader = new TuneInPreloader(driver, () => physicalId, testAvrContexts, testMediaBrowserServices);
   const adapter = new TuneInZoneAgnosticAdapter({
+    avrContexts: testAvrContexts,
+    mediaBrowserServices: testMediaBrowserServices,
     state: avrStateManager,
     getPhysicalAvrId: () => physicalId,
     getNetworkNavigationMode: () => mode,
     isTuneInFullMenu: async () => style === "full",
     preloadTuneInPresets: (id) => preloader.preloadTuneInPresets(id)
   });
-  const play = new PlayMediaCommandHandler(driver, avrStateManager, undefined);
-  const browser = new TuneInBrowseHandler(avrStateManager);
+  const play = new PlayMediaCommandHandler(driver, avrStateManager, undefined, testAvrContexts, testMediaBrowserServices);
+  const browser = new TuneInBrowseHandler(avrStateManager, testAvrContexts, testMediaBrowser(avrStateManager), testConfigStore);
   const commands: string[] = [];
   let menu = "net";
   let playing = "";
@@ -64,7 +72,7 @@ function setup(mode: "legacy" | "modern" = "legacy", style: "full" | "mypresets"
 
   function emitMenu(next: string) {
     menu = next;
-    const state = getTuneInMenuBrowseState(entityId)!;
+    const state = getTuneInMenuBrowseState(entityId, testAvrContexts)!;
     state.totalListItemCount = rows().length;
     state.nlsCursorOffset = 0;
     state.nlsLayerNumber = next === "root" ? 1 : next === "country" ? 3 : 2;
@@ -123,7 +131,7 @@ function setup(mode: "legacy" | "modern" = "legacy", style: "full" | "mypresets"
 
 beforeEach(() => {
   vi.useFakeTimers();
-  resetTuneInMenuBrowseState(entityId);
+  resetTuneInMenuBrowseState(entityId, testAvrContexts);
   clearTuneInPresets(entityId);
   getTuneInBrowseState(entityId)!.contextTitle = "";
 });
@@ -150,24 +158,24 @@ describe("v0.8.10 legacy TuneIn navigation", () => {
     expect(avr.commands.slice(0, 4)).toEqual(["SLI2B", "NTCTOP", "NLSI00001", "SLIQSTN"]);
     expect(avr.commands).not.toContain("NTCSELECT");
     expect(avr.getMenu()).toBe("root");
-    expect(rootResult.media.items?.map((item) => item.title)).toContain("By Location");
+    expect(rootResult.media!.items?.map((item) => item.title)).toContain("By Location");
     avr.commands.length = 0;
 
     const location = (await avr.browse("tunein:menu:6:By%20Location")) as uc.BrowseResult;
     expect(avr.commands[0]).toBe("NLSI00006");
     expect(avr.commands.some((cmd) => /^NLAL....02000A03E7$/.test(cmd))).toBe(true);
-    expect(location.media.items?.slice(2).map((item) => item.title)).toEqual(countries);
+    expect(location.media!.items?.slice(2).map((item) => item.title)).toEqual(countries);
     expect(avr.getMenu()).toBe("location");
     expect(avr.getPlaying()).toBe("");
     avr.commands.length = 0;
 
     const country = (await avr.browse("tunein:menu:3:Europe")) as uc.BrowseResult;
     expect(avr.commands).toEqual(["NLSI00003"]);
-    expect(country.media.items?.slice(2).map((item) => item.can_play)).toEqual([true, true]);
+    expect(country.media!.items?.slice(2).map((item) => item.can_play)).toEqual([true, true]);
     expect(avr.getPlaying()).toBe("");
     await avr.browse(TUNEIN_MENU_BACK_ID);
     expect(avr.getMenu()).toBe("location");
-    expect(listTuneInMenuOptions(entityId).map((item) => item.title)).toEqual(countries);
+    expect(listTuneInMenuOptions(entityId, testAvrContexts).map((item) => item.title)).toEqual(countries);
   });
 
   it("shows and plays stations inside Full Menu's My Presets instead of preserving stale root rows", async () => {
@@ -176,9 +184,9 @@ describe("v0.8.10 legacy TuneIn navigation", () => {
     avr.commands.length = 0;
     const presets = (await avr.browse("tunein:menu:1:My%20Presets")) as uc.BrowseResult;
     expect(avr.commands).toEqual(["NLSI00001"]);
-    expect(presets.media.items?.slice(2).map((item) => item.title)).toEqual([stations[0], "4EVER49 Radio (Adult Hits)"]);
-    expect(listTuneInMenuOptions(entityId).some((item) => item.title === "By Location")).toBe(false);
-    const station = listTuneInMenuOptions(entityId)[1];
+    expect(presets.media!.items?.slice(2).map((item) => item.title)).toEqual([stations[0], "4EVER49 Radio (Adult Hits)"]);
+    expect(listTuneInMenuOptions(entityId, testAvrContexts).some((item) => item.title === "By Location")).toBe(false);
+    const station = listTuneInMenuOptions(entityId, testAvrContexts)[1];
     avr.commands.length = 0;
     await avr.browse(station.mediaId);
     expect(avr.commands).toEqual(["NLSI00002"]);

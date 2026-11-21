@@ -1,12 +1,18 @@
+import { testAvrContexts } from "./helpers/contexts.js";
 import { describe, it, expect, vi, beforeEach, beforeAll } from "vitest";
 import * as uc from "@unfoldedcircle/integration-api";
+import { testConfigStore } from "./helpers/configStore.js";
 
-vi.mock("../src/mediaBrowser.js", () => ({
-  browseMedia: vi.fn(),
-  TUNEIN_MENU_BACK_ID: "tunein:menu-back",
-  TUNEIN_MENU_ROOT_ID: "tunein:root",
-  TUNEIN_MENU_ROOT_TYPE: "tunein://menu"
-}));
+vi.mock("../src/mediaBrowser.js", () => {
+  // The handler gets a media browser stub below that uses this browseMedia spy.
+  const browseMedia = vi.fn();
+  return {
+    browseMedia,
+    TUNEIN_MENU_BACK_ID: "tunein:menu-back",
+    TUNEIN_MENU_ROOT_ID: "tunein:root",
+    TUNEIN_MENU_ROOT_TYPE: "tunein://menu"
+  };
+});
 
 vi.mock("../src/tuneInMenuStore.js", () => ({
   listTuneInMenuOptions: vi.fn(() => []),
@@ -19,21 +25,9 @@ vi.mock("../src/tuneInFilters.js", () => ({
 }));
 
 vi.mock("../src/configManager.js", () => ({
-  ConfigManager: {
-    get: vi.fn(() => ({
-      avrs: [
-        {
-          model: "M",
-          ip: "1.2.3.4",
-          zone: "main",
-          netMenuDelay: 200,
-          tuneinMenuStyle: "full"
-        }
-      ]
-    }))
-  },
   AVR_DEFAULTS: { netMenuDelay: 300 },
   buildEntityId: vi.fn(() => "test-avr main"),
+  findAvrConfig: (config: { get: () => { avrs?: unknown[] } }) => config.get()?.avrs?.[0],
   physicalAvrIdFromEntityId: vi.fn(() => "test-avr 1.2.3.4")
 }));
 
@@ -43,7 +37,6 @@ vi.mock("../src/loggers.js", () => ({
 
 let mediaBrowser: any;
 let tuneInStore: any;
-let configManager: any;
 
 describe("TuneInBrowseHandler", () => {
   let TuneInBrowseHandler: any;
@@ -57,7 +50,6 @@ describe("TuneInBrowseHandler", () => {
   beforeAll(async () => {
     mediaBrowser = await import("../src/mediaBrowser.js");
     tuneInStore = await import("../src/tuneInMenuStore.js");
-    configManager = await import("../src/configManager.js");
     const mod = await import("../src/tuneInBrowseHandler.js");
     TuneInBrowseHandler = mod.TuneInBrowseHandler;
   });
@@ -66,13 +58,13 @@ describe("TuneInBrowseHandler", () => {
     mediaBrowser.browseMedia.mockReturnValue("browse-result");
     tuneInStore.getTuneInMenuBrowseState.mockReturnValue(null);
     tuneInStore.listTuneInMenuOptions.mockReturnValue([]);
-    configManager.ConfigManager.get.mockReturnValue({
-      avrs: [{ model: "M", ip: "1.2.3.4", zone: "main", netMenuDelay: 200, tuneinMenuStyle: "full" }]
+    testConfigStore.get.mockReturnValue({
+      avrs: [{ model: "M", ip: "1.2.3.4", port: 60128, zone: "main", netMenuDelay: 200, tuneinMenuStyle: "full" }]
     });
     avrStateApi = { getSubSource: vi.fn(() => "tunein") };
     cmdHandler = vi.fn().mockResolvedValue(uc.StatusCodes.Ok);
     rawSend = vi.fn().mockResolvedValue(undefined);
-    handler = new TuneInBrowseHandler(avrStateApi);
+    handler = new TuneInBrowseHandler(avrStateApi, testAvrContexts, { browseMedia: mediaBrowser.browseMedia } as never, testConfigStore);
     vi.spyOn(handler, "waitForListMetadata" as any).mockResolvedValue(undefined);
     vi.spyOn(handler, "harvestListItems" as any).mockResolvedValue(undefined);
   });
@@ -83,8 +75,8 @@ describe("TuneInBrowseHandler", () => {
   });
 
   it("returns undefined when not full menu entity", async () => {
-    configManager.ConfigManager.get.mockReturnValue({
-      avrs: [{ model: "M", ip: "1.2.3.4", zone: "main", netMenuDelay: 200, tuneinMenuStyle: "simple" }]
+    testConfigStore.get.mockReturnValue({
+      avrs: [{ model: "M", ip: "1.2.3.4", port: 60128, zone: "main", netMenuDelay: 200, tuneinMenuStyle: "mypresets-alphabetical" }]
     });
     const result = await handler.browse(entityId, { media_id: "tunein:root", media_type: "tunein://menu" }, mediaPlayerEntity, cmdHandler, rawSend);
     expect(result).toBeUndefined();

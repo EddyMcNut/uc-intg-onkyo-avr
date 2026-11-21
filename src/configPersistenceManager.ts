@@ -1,6 +1,8 @@
 // Focused responsibility: Handle auto-discovery and configuration persistence
+import { validateAvrPayload } from "./configValidation.js";
+import { AvrContextRegistry } from "./avrContext.js";
 import EiscpDriver from "./eiscp.js";
-import { ConfigManager, type AvrConfig, type AvrZone, AVR_DEFAULTS, type IntegrationConfig } from "./configManager.js";
+import { EMPTY_CONFIG_SOURCE, type ConfigStore, type AvrConfig, type AvrZone, AVR_DEFAULTS, type IntegrationConfig } from "./configManager.js";
 import { DISCOVER_LISTENING_MODE, INTEGRATION_PREFERRED_LISTENING_MODE, getKnownListeningModes } from "./listeningModePreferences.js";
 import log, { setLogLevel } from "./loggers.js";
 import { type ParsedManualConfig } from "./manualConfigParser.js";
@@ -14,11 +16,15 @@ export interface OnConfigSavedCallback {
 }
 
 export class ConfigPersistenceManager {
-  constructor(private onConfigSaved: OnConfigSavedCallback) {}
+  constructor(
+    private onConfigSaved: OnConfigSavedCallback,
+    private readonly configStore: Pick<ConfigStore, "get" | "save" | "addAvr">
+  ) {}
 
   async performAutoDiscovery(): Promise<{ success: boolean; model?: string; host?: string; port?: number }> {
     try {
-      const e = new EiscpDriver();
+      // Discovery only: its own registry, so nothing it parses reaches the running driver's state.
+      const e = new EiscpDriver(undefined, new AvrContextRegistry(), EMPTY_CONFIG_SOURCE);
       const hosts = await e.discover({ address: "255.255.255.255", timeout: 3, devices: 1 });
       if (!hosts || hosts.length === 0) {
         return { success: false };
@@ -59,8 +65,8 @@ export class ConfigPersistenceManager {
     // Use parseSelectOptions which handles the 'none' sentinel (-> null = don't create entity) and 'all'/empty (-> "all" = show all)
     discoveredAvr.listeningModes = this.buildListeningModes(listeningModePreferences, parsedConfig.listeningModeNames);
 
-    ConfigManager.addAvr(discoveredAvr);
-    ConfigManager.save({ logLevel: parsedConfig.logLevelValue });
+    this.configStore.addAvr(discoveredAvr);
+    this.configStore.save({ logLevel: parsedConfig.logLevelValue });
     setLogLevel(parsedConfig.logLevelValue);
     await this.onConfigSaved();
   }
@@ -102,7 +108,7 @@ export class ConfigPersistenceManager {
     const normalizedAvrs: AvrConfig[] = [];
 
     for (const zone of zones) {
-      const res = ConfigManager.validateAvrPayload({ ...basePayload, zone });
+      const res = validateAvrPayload({ ...basePayload, zone });
       if (res.errors.length > 0) {
         errors.push(`zone ${zone}: ${res.errors.join("; ")}`);
       } else {
@@ -115,10 +121,10 @@ export class ConfigPersistenceManager {
     }
 
     for (const avrCfg of normalizedAvrs) {
-      ConfigManager.addAvr(avrCfg);
+      this.configStore.addAvr(avrCfg);
     }
 
-    ConfigManager.save({ logLevel: parsedConfig.logLevelValue });
+    this.configStore.save({ logLevel: parsedConfig.logLevelValue });
     setLogLevel(parsedConfig.logLevelValue);
     await this.onConfigSaved();
     return { errors: [], success: true };
@@ -130,7 +136,7 @@ export class ConfigPersistenceManager {
     model?: string,
     ip?: string
   ): Record<string, { name: string; setting: string; contexts?: import("./configConstants.js").ListeningModeContext[] }> {
-    const existing = ConfigManager.get().avrs?.find((avr) => avr.model === model && avr.ip === ip)?.listeningModes ?? {};
+    const existing = this.configStore.get().avrs?.find((avr) => avr.model === model && avr.ip === ip)?.listeningModes ?? {};
     const rebuilt = Object.fromEntries(
       getKnownListeningModes().map((mode) => {
         const existingMode = existing[mode.code];
@@ -156,7 +162,7 @@ export class ConfigPersistenceManager {
   }
 
   private buildInputSources(parsed: ParsedManualConfig, model?: string, ip?: string): InputSourceSettings {
-    const existing = ConfigManager.get().avrs?.find((avr) => avr.model === model && avr.ip === ip)?.idInputSources ?? {};
+    const existing = this.configStore.get().avrs?.find((avr) => avr.model === model && avr.ip === ip)?.idInputSources ?? {};
     const reported = new Map((parsed.inputSources ?? []).map((input) => [input.id.toUpperCase(), input.name]));
     const ids = new Set([...getKnownInputSources().map((source) => source.id), ...Object.keys(parsed.idInputSources ?? {}), ...reported.keys()]);
     const result: InputSourceSettings = {};
@@ -182,7 +188,7 @@ export class ConfigPersistenceManager {
   }
 
   async restoreConfiguration(normalizedConfig: Partial<IntegrationConfig>): Promise<void> {
-    ConfigManager.save(normalizedConfig);
+    this.configStore.save(normalizedConfig);
     await this.onConfigSaved();
   }
 

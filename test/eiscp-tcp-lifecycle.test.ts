@@ -1,7 +1,9 @@
+import { testAvrContexts } from "./helpers/contexts.js";
 import net from "node:net";
 import { describe, expect, it } from "vitest";
 import EiscpDriver from "../src/eiscp.js";
 import { createEiscpPacket } from "../src/eiscp-packet.js";
+import { testConfigStore } from "./helpers/configStore.js";
 
 async function startServer(onConnection: (socket: net.Socket) => void): Promise<{ server: net.Server; port: number }> {
   const server = net.createServer(onConnection);
@@ -21,7 +23,7 @@ describe("EiscpDriver TCP lifecycle", () => {
     const { server, port } = await startServer((socket) => {
       peer = socket;
     });
-    const driver = new EiscpDriver({ model: "TX-RZ50", host: "127.0.0.1", port });
+    const driver = new EiscpDriver({ model: "TX-RZ50", host: "127.0.0.1", port }, testAvrContexts, testConfigStore);
     const closed = new Promise<void>((resolve) => driver.once("close", resolve));
 
     await driver.connect();
@@ -35,7 +37,7 @@ describe("EiscpDriver TCP lifecycle", () => {
 
   it("destroys an active socket when disconnect is called", async () => {
     const { server, port } = await startServer(() => {});
-    const driver = new EiscpDriver({ model: "TX-RZ50", host: "127.0.0.1", port });
+    const driver = new EiscpDriver({ model: "TX-RZ50", host: "127.0.0.1", port }, testAvrContexts, testConfigStore);
     const closed = new Promise<void>((resolve) => driver.once("close", resolve));
 
     await driver.connect();
@@ -53,7 +55,7 @@ describe("EiscpDriver TCP lifecycle", () => {
       socket.write(frame.subarray(0, 7));
       setImmediate(() => socket.write(frame.subarray(7)));
     });
-    const driver = new EiscpDriver({ model: "TX-RZ50", host: "127.0.0.1", port });
+    const driver = new EiscpDriver({ model: "TX-RZ50", host: "127.0.0.1", port }, testAvrContexts, testConfigStore);
     const update = new Promise<{ command?: string; argument?: unknown }>((resolve) => driver.once("data", resolve));
 
     await driver.connect();
@@ -72,7 +74,7 @@ describe("EiscpDriver TCP lifecycle", () => {
       connectionCount++;
       accepted();
     });
-    const driver = new EiscpDriver({ model: "TX-RZ50", host: "127.0.0.1", port });
+    const driver = new EiscpDriver({ model: "TX-RZ50", host: "127.0.0.1", port }, testAvrContexts, testConfigStore);
 
     await Promise.all([driver.connect(), driver.connect(), driver.connect()]);
     await driver.waitForConnect(1000);

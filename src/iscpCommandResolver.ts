@@ -1,6 +1,7 @@
 // Resolves a user command ("input-selector Music Server", "listening-mode stereo", "volume 40") into the ISCP
 // message to send. Read-only: it looks up the AVR-reported services and inputs, configured input ids and learned
 // listening modes, but changes nothing. EiscpDriver only queues and sends the result.
+import { type ConfigSource } from "./configManager.js";
 import { eiscpMappings } from "./eiscp-mappings.js";
 import { buildEntityId, buildPhysicalAvrId } from "./configManager.js";
 import type { AvrContextRegistry } from "./avrContext.js";
@@ -23,6 +24,7 @@ export interface IscpCommandContext {
   config: Readonly<EiscpConfig>;
   stateReader: AvrStateReader;
   avrContexts: AvrContextRegistry;
+  configSource: ConfigSource;
 }
 
 export function resolveIscpCommand(command: string, args: string | number | undefined, zone: string, context: IscpCommandContext): string {
@@ -81,7 +83,7 @@ export function resolveIscpCommand(command: string, args: string | number | unde
   } else if (prefix === "LMD" && typeof args === "string") {
     const physicalAvrId = buildPhysicalAvrId(context.config.model ?? "", context.config.host ?? "");
     const entityId = buildEntityId(context.config.model ?? "", context.config.host ?? "", zone);
-    const learnedCode = findLearnedListeningModeCode(physicalAvrId, args, context.stateReader.getSource(entityId), context.stateReader.getAudioFormat?.(entityId));
+    const learnedCode = findLearnedListeningModeCode(context.configSource, physicalAvrId, args, context.stateReader.getSource(entityId), context.stateReader.getAudioFormat?.(entityId));
     if (learnedCode) {
       log.debug("%s Sending learned listening mode %s as LMD%s", logSource, args, learnedCode);
       value = learnedCode;

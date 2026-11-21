@@ -1,11 +1,12 @@
 import EiscpDriver from "./eiscp.js";
-import { buildEntityId } from "./configManager.js";
+import { EMPTY_CONFIG_SOURCE, buildEntityId } from "./configManager.js";
 import { collectAvrInputSources } from "./inputSourceResolver.js";
 import type { AvrInput } from "./inputSourceStore.js";
-import { sharedAvrContexts } from "./avrContext.js";
+import { AvrContextRegistry } from "./avrContext.js";
 import log from "./loggers.js";
 
-export type SetupEiscpDriverFactory = (config: { host?: string; port?: number; model?: string }) => EiscpDriver;
+// `avrContexts` is the probe's own registry: what the probe learns must not end up in the running driver's state.
+export type SetupEiscpDriverFactory = (config: { host?: string; port?: number; model?: string }, avrContexts: AvrContextRegistry) => EiscpDriver;
 
 export interface InputSourceProbeResult {
   inputs: AvrInput[];
@@ -17,13 +18,15 @@ export interface InputSourceProbeResult {
 
 /** Performs setup-only NRI probing without coupling setup flow to the main driver. */
 export class SetupInputSourceProbe {
-  constructor(private readonly createDriver: SetupEiscpDriverFactory = (config) => new EiscpDriver(config)) {}
+  constructor(private readonly createDriver: SetupEiscpDriverFactory = (config, avrContexts) => new EiscpDriver(config, avrContexts, EMPTY_CONFIG_SOURCE)) {}
 
   async query(model: string, ip: string, port: number): Promise<InputSourceProbeResult> {
     let resolvedModel = model;
     let resolvedIp = ip;
     let resolvedPort = port;
-    const probe = this.createDriver({ host: resolvedIp, port: resolvedPort, model: resolvedModel });
+    // A fresh registry per query, so no AVR info from an earlier probe is kept.
+    const avrContexts = new AvrContextRegistry();
+    const probe = this.createDriver({ host: resolvedIp, port: resolvedPort, model: resolvedModel }, avrContexts);
     try {
       if (!resolvedModel && !resolvedIp) {
         const found = await probe.discover({ address: "255.255.255.255", timeout: 3, devices: 1 });
@@ -48,8 +51,7 @@ export class SetupInputSourceProbe {
       });
       await probe.command({ zone: "main", command: "avr-info", args: "query" });
       await response;
-      // TRANSITIONAL (item 10): the probe's EiscpDriver writes to the shared registry; the last step gives it its own.
-      const info = sharedAvrContexts.forEntity(entityId)?.avrInfo.get();
+      const info = avrContexts.forEntity(entityId)?.avrInfo.get();
       const inputs = collectAvrInputSources(
         info?.selectors ?? [],
         (info?.netServices ?? []).filter((service) => service.enabled).map((service) => ({ id: service.id, name: service.name }))

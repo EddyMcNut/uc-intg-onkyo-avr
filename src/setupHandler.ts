@@ -1,7 +1,7 @@
 /*jslint node:true nomen:true*/
 "use strict";
 import * as uc from "@unfoldedcircle/integration-api";
-import { ConfigManager, parseBoolean, LogLevel } from "./configManager.js";
+import { parseBoolean, LogLevel, type ConfigStore } from "./configManager.js";
 import log from "./loggers.js";
 import { ManualConfigParser, type ManualConfigInput } from "./manualConfigParser.js";
 import { SetupFormBuilder } from "./setupFormBuilder.js";
@@ -13,12 +13,15 @@ import { IDLE_SETUP_PAGE, type SetupFlowPage } from "./setupFlowState.js";
 
 const logSource = "setupHandler:";
 
+type SetupConfigStore = Pick<ConfigStore, "get" | "load" | "save" | "addAvr">;
+
 type SetupHost = {
   driver: uc.IntegrationAPI;
   getConfigDirPath: () => string | undefined;
   onConfigSaved: () => Promise<void>;
   onConfigCleared: () => Promise<void>;
   log: typeof log;
+  configStore: SetupConfigStore;
   queryInputSources?: (config: { model: string; ip: string; port: number }) => Promise<{ inputs: AvrInput[]; available: boolean; model?: string; ip?: string; port?: number }>;
 };
 
@@ -28,6 +31,7 @@ export default class SetupHandler {
   private formBuilder: SetupFormBuilder;
   private backupRestoreManager: BackupRestoreManager;
   private persistenceManager: ConfigPersistenceManager;
+  private readonly configStore: SetupConfigStore;
   private setupPage: SetupFlowPage = IDLE_SETUP_PAGE;
   private pendingManualConfig: ManualConfigInput = {};
   private inputSourcePageCount = 0;
@@ -41,8 +45,9 @@ export default class SetupHandler {
     this.host = host;
     this.configParser = new ManualConfigParser();
     this.formBuilder = new SetupFormBuilder();
-    this.backupRestoreManager = new BackupRestoreManager();
-    this.persistenceManager = new ConfigPersistenceManager(host.onConfigSaved);
+    this.configStore = host.configStore;
+    this.backupRestoreManager = new BackupRestoreManager(this.configStore);
+    this.persistenceManager = new ConfigPersistenceManager(host.onConfigSaved, this.configStore);
   }
 
   async handle(msg: uc.SetupDriver): Promise<uc.SetupAction> {
@@ -108,7 +113,7 @@ export default class SetupHandler {
 
     if (this.setupPage.kind === "selectAvr") {
       const selected = typeof input.selectedAvr === "string" ? input.selectedAvr : "";
-      const configured = new Set((ConfigManager.get().avrs ?? []).map((avr) => `${avr.model} ${avr.ip}`));
+      const configured = new Set((this.configStore.get().avrs ?? []).map((avr) => `${avr.model} ${avr.ip}`));
       if (configured.has(selected)) {
         this.selectedPhysicalAvr = selected;
         if (this.setupPage.target === "integration") return this.startIntegrationConfiguration(selected);
@@ -128,10 +133,10 @@ export default class SetupHandler {
     if (this.setupPage.kind !== "idle" && this.hasManualConfigFields(input)) {
       this.pendingManualConfig = { ...this.pendingManualConfig, ...input };
       if (Object.prototype.hasOwnProperty.call(input, "volumeScale") && this.pendingManualConfig.volumeScale !== undefined) {
-        const previous = ConfigManager.load().avrs?.[0]?.volumeScale;
+        const previous = this.configStore.load().avrs?.[0]?.volumeScale;
         if (previous !== undefined && String(input.volumeScale) !== String(previous)) this.pendingManualConfig.volumeScaleDiscovered = false;
       }
-      const parsed = this.configParser.parse(this.pendingManualConfig, ConfigManager.get().logLevel ?? "warn");
+      const parsed = this.configParser.parse(this.pendingManualConfig, this.configStore.get().logLevel ?? "warn");
       if (this.setupPage.kind === "manual" && this.setupPage.page === 1) {
         const discovery = this.host.queryInputSources
           ? await this.host.queryInputSources({
@@ -144,7 +149,7 @@ export default class SetupHandler {
           this.pendingManualConfig = { ...this.pendingManualConfig, model: discovery.model, ipAddress: discovery.ip, port: discovery.port ?? 60128 };
         }
         this.pendingManualConfig = this.applyInputSourceDiscovery(this.pendingManualConfig, discovery.inputs, discovery.available);
-        const refreshed = this.configParser.parse(this.pendingManualConfig, ConfigManager.get().logLevel ?? "warn");
+        const refreshed = this.configParser.parse(this.pendingManualConfig, this.configStore.get().logLevel ?? "warn");
         this.setupPage = { kind: "manual", page: 2 };
         return this.formBuilder.buildManualConfigPage2(refreshed);
       }
@@ -284,7 +289,7 @@ export default class SetupHandler {
     this.inputSourcesOnlyConfiguration = false;
     this.integrationOnlyConfiguration = false;
     this.pendingManualConfig = {};
-    const cfg = ConfigManager.load();
+    const cfg = this.configStore.load();
     const currentAvr = physicalAvrId ? cfg.avrs?.find((avr) => `${avr.model} ${avr.ip}` === physicalAvrId) : cfg.avrs && cfg.avrs.length > 0 ? cfg.avrs[0] : undefined;
     this.selectedPhysicalAvr = currentAvr ? `${currentAvr.model} ${currentAvr.ip}` : physicalAvrId;
     const parsedConfig = this.configParser.parse(
@@ -372,7 +377,7 @@ export default class SetupHandler {
     // Reuse the normal loader to populate pendingManualConfig with every existing setting, then
     // start directly at the first listening-mode page so other configuration is preserved.
     this.requestManualConfiguration(physicalAvrId);
-    const parsed = this.configParser.parse(this.pendingManualConfig, ConfigManager.get().logLevel ?? "warn");
+    const parsed = this.configParser.parse(this.pendingManualConfig, this.configStore.get().logLevel ?? "warn");
     // Page 4 is the first listening-mode page; mark it as already displayed so the next
     // response advances to page 5 instead of showing page 4 again.
     this.inputSourcePageCount = 0;
@@ -402,7 +407,7 @@ export default class SetupHandler {
         })
       : { inputs: [], available: false };
     this.pendingManualConfig = this.applyInputSourceDiscovery(this.pendingManualConfig, discovery.inputs, discovery.available);
-    const parsed = this.configParser.parse(this.pendingManualConfig, ConfigManager.get().logLevel ?? "warn");
+    const parsed = this.configParser.parse(this.pendingManualConfig, this.configStore.get().logLevel ?? "warn");
     this.inputSourcePageCount = this.formBuilder.getInputSourcePageCount(parsed);
     this.listeningModePageCount = this.formBuilder.getListeningModePageCount();
     this.inputSourcesOnlyConfiguration = true;
@@ -413,7 +418,7 @@ export default class SetupHandler {
 
   private getPhysicalAvrChoices(): Array<{ id: string; label: string }> {
     const choices = new Map<string, { id: string; label: string }>();
-    for (const avr of ConfigManager.get().avrs ?? []) {
+    for (const avr of this.configStore.get().avrs ?? []) {
       const id = `${avr.model} ${avr.ip}`;
       if (!choices.has(id)) choices.set(id, { id, label: `${avr.model} — ${avr.ip}` });
     }
@@ -494,7 +499,7 @@ export default class SetupHandler {
   }
 
   private async handleManualConfiguration(input: ManualConfigInput): Promise<uc.SetupAction> {
-    const cfg = this.configParser.parse(input, ConfigManager.get().logLevel ?? "warn");
+    const cfg = this.configParser.parse(input, this.configStore.get().logLevel ?? "warn");
 
     // Auto-discovery: user left both model and IP blank
     if (cfg.modelName === "" && cfg.ipVal === "") {

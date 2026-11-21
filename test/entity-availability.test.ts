@@ -1,3 +1,4 @@
+import { testAvrContexts } from "./helpers/contexts.js";
 import { describe, expect, it, vi } from "vitest";
 import { EventEmitter } from "node:events";
 import * as uc from "@unfoldedcircle/integration-api";
@@ -5,6 +6,7 @@ import { setZoneEntitiesAvailability } from "../src/entityAvailability.js";
 import { SENSOR_SUFFIXES, SELECT_SUFFIXES, REMOTE_SUFFIX } from "../src/sensorSuffixes.js";
 import ConnectionManager from "../src/connectionManager.js";
 import { ReconnectionManager } from "../src/reconnectionManager.js";
+import { testConfigStore } from "./helpers/configStore.js";
 
 const ZONE = "TX-RZ50 192.0.2.60 main";
 
@@ -58,6 +60,8 @@ describe("ConnectionManager availability callback", () => {
     const cm = new ConnectionManager(
       new ReconnectionManager(),
       async () => {},
+      testAvrContexts,
+      testConfigStore,
       () => eiscp,
       undefined,
       onAvailabilityChange

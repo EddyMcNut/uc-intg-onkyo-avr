@@ -1,4 +1,6 @@
+import { testAvrContexts } from "./helpers/contexts.js";
 import { describe, it, expect, vi, afterEach } from "vitest";
+import { testConfigStore } from "./helpers/configStore.js";
 
 // The routing tests are not testing the AVR pacing delays. Keep those delays
 // asynchronous but immediate so TIP/NSS routing does not cost several seconds.
@@ -15,7 +17,7 @@ describe("commandToIscp", () => {
   async function makeDriver() {
     const mod = await import("../src/eiscp.js");
     const { EiscpDriver } = mod as any;
-    return new EiscpDriver({ model: "TX-RZ50", host: "1.2.3.4" });
+    return new EiscpDriver({ model: "TX-RZ50", host: "1.2.3.4" }, testAvrContexts, testConfigStore);
   }
 
   it("translates known command+args to ISCP using valueMap", async () => {
@@ -69,14 +71,14 @@ describe("commandToIscp", () => {
   it("keeps a displayed Music Server name on the network-service path in legacy mode", async () => {
     const mod = await import("../src/eiscp.js");
     const { EiscpDriver } = mod as any;
-    const driver = new EiscpDriver({ model: "TX-RZ50", host: "1.2.3.4", networkNavigationMode: "legacy" });
+    const driver = new EiscpDriver({ model: "TX-RZ50", host: "1.2.3.4", networkNavigationMode: "legacy" }, testAvrContexts, testConfigStore);
     expect(driver.commandToIscp("input-selector", "Music Server", "main")).toBe("NSS10");
   });
 
   it("normalizes a displayed Music Server name for modern direct selection", async () => {
     const mod = await import("../src/eiscp.js");
     const { EiscpDriver } = mod as any;
-    const driver = new EiscpDriver({ model: "TX-RZ50", host: "1.2.3.4" });
+    const driver = new EiscpDriver({ model: "TX-RZ50", host: "1.2.3.4" }, testAvrContexts, testConfigStore);
     expect(driver.commandToIscp("input-selector", "Music Server", "main")).toBe("NSV000");
   });
 });
@@ -85,7 +87,7 @@ describe("command string parsing", () => {
   async function makeDriver() {
     const mod = await import("../src/eiscp.js");
     const { EiscpDriver } = mod as any;
-    return new EiscpDriver({ model: "TX-RZ50", host: "1.2.3.4" });
+    return new EiscpDriver({ model: "TX-RZ50", host: "1.2.3.4" }, testAvrContexts, testConfigStore);
   }
 
   it("parses 3-part string (zone.command.args)", async () => {
@@ -128,7 +130,7 @@ describe("sendIscp routing through commandToIscp", () => {
   async function makeDriver() {
     const mod = await import("../src/eiscp.js");
     const { EiscpDriver } = mod as any;
-    return new EiscpDriver({ model: "TX-RZ50", host: "1.2.3.4" });
+    return new EiscpDriver({ model: "TX-RZ50", host: "1.2.3.4" }, testAvrContexts, testConfigStore);
   }
 
   it("plain ISCP command goes through raw() directly", async () => {
@@ -140,7 +142,7 @@ describe("sendIscp routing through commandToIscp", () => {
   });
 
   it("sends an AVR-reported input name as the input id the AVR gave", async () => {
-    (await import("../src/avrContext.js")).sharedAvrContexts.get("TX-RZ50 1.2.3.4").inputs.set([
+    testAvrContexts.get("TX-RZ50 1.2.3.4").inputs.set([
       { id: "10", name: "BD/DVD" },
       { id: "01", name: "CBL/SAT" }
     ]);
@@ -154,7 +156,7 @@ describe("sendIscp routing through commandToIscp", () => {
     await driver.command({ zone: "zone2", command: "input-selector", args: "cbl/sat" });
     expect(rawSpy).toHaveBeenCalledWith("SLZ01");
 
-    (await import("../src/avrContext.js")).sharedAvrContexts.clear();
+    testAvrContexts.clear();
   });
 
   it("still warns for an input that the AVR did not report and that is not in the command table", async () => {
@@ -228,7 +230,7 @@ describe("multi-zone command routing", () => {
   async function makeDriver() {
     const mod = await import("../src/eiscp.js");
     const { EiscpDriver } = mod as any;
-    return new EiscpDriver({ model: "TX-RZ50", host: "1.2.3.4" });
+    return new EiscpDriver({ model: "TX-RZ50", host: "1.2.3.4" }, testAvrContexts, testConfigStore);
   }
 
   it("routes multi-zone-volume", async () => {
@@ -250,7 +252,7 @@ describe("constructor", () => {
   it("accepts undefined config and uses defaults", async () => {
     const mod = await import("../src/eiscp.js");
     const { EiscpDriver } = mod as any;
-    const driver = new EiscpDriver();
+    const driver = new EiscpDriver(undefined, testAvrContexts, testConfigStore);
     expect(driver.eiscpConfig.port).toBe(60128);
     expect(driver.eiscpConfig.sendDelay).toBe(100);
   });
@@ -258,7 +260,7 @@ describe("constructor", () => {
   it("accepts partial config", async () => {
     const mod = await import("../src/eiscp.js");
     const { EiscpDriver } = mod as any;
-    const driver = new EiscpDriver({ host: "1.2.3.4" });
+    const driver = new EiscpDriver({ host: "1.2.3.4" }, testAvrContexts, testConfigStore);
     expect(driver.eiscpConfig.host).toBe("1.2.3.4");
     expect(driver.eiscpConfig.port).toBe(60128);
   });
@@ -266,7 +268,7 @@ describe("constructor", () => {
   it("registers default error listener", async () => {
     const mod = await import("../src/eiscp.js");
     const { EiscpDriver } = mod as any;
-    const driver = new EiscpDriver({ host: "1.2.3.4" });
+    const driver = new EiscpDriver({ host: "1.2.3.4" }, testAvrContexts, testConfigStore);
     expect(driver.listenerCount("error")).toBe(1);
   });
 });
@@ -276,7 +278,7 @@ describe("enqueueIncoming", () => {
     vi.useFakeTimers();
     const mod = await import("../src/eiscp.js");
     const { EiscpDriver } = mod as any;
-    const driver = new EiscpDriver({ host: "1.2.3.4", receiveDelay: 10 });
+    const driver = new EiscpDriver({ host: "1.2.3.4", receiveDelay: 10 }, testAvrContexts, testConfigStore);
     const dataSpy = vi.fn();
     driver.on("data", dataSpy);
 
@@ -293,14 +295,14 @@ describe("raw command validation", () => {
   it("raw throws when data is empty", async () => {
     const mod = await import("../src/eiscp.js");
     const { EiscpDriver } = mod as any;
-    const driver = new EiscpDriver({ host: "1.2.3.4" });
+    const driver = new EiscpDriver({ host: "1.2.3.4" }, testAvrContexts, testConfigStore);
     await expect(driver.raw("")).rejects.toThrow("No data provided");
   });
 
   it("raw accepts non-empty string", async () => {
     const mod = await import("../src/eiscp.js");
     const { EiscpDriver } = mod as any;
-    const driver = new EiscpDriver({ host: "1.2.3.4" });
+    const driver = new EiscpDriver({ host: "1.2.3.4" }, testAvrContexts, testConfigStore);
     const enqueueSpy = vi.spyOn(driver, "enqueueSend").mockResolvedValue(undefined);
     await driver.raw("PWR01");
     expect(enqueueSpy).toHaveBeenCalledWith("PWR01");
@@ -311,7 +313,7 @@ describe("disconnect", () => {
   it("disconnect does not throw when not connected", async () => {
     const mod = await import("../src/eiscp.js");
     const { EiscpDriver } = mod as any;
-    const driver = new EiscpDriver({ host: "1.2.3.4" });
+    const driver = new EiscpDriver({ host: "1.2.3.4" }, testAvrContexts, testConfigStore);
     expect(() => driver.disconnect()).not.toThrow();
   });
 });
@@ -320,7 +322,7 @@ describe("eiscpConfig getter", () => {
   it("returns configuredZones when set", async () => {
     const mod = await import("../src/eiscp.js");
     const { EiscpDriver } = mod as any;
-    const driver = new EiscpDriver({ model: "TX-RZ50", host: "1.2.3.4", configuredZones: ["main", "zone2"] });
+    const driver = new EiscpDriver({ model: "TX-RZ50", host: "1.2.3.4", configuredZones: ["main", "zone2"] }, testAvrContexts, testConfigStore);
     expect(driver.eiscpConfig.configuredZones).toEqual(["main", "zone2"]);
   });
 });
@@ -329,7 +331,7 @@ describe("getCommandValues", () => {
   it("handles dotted command (zone prefix)", async () => {
     const mod = await import("../src/eiscp.js");
     const { EiscpDriver } = mod as any;
-    const driver = new EiscpDriver({ model: "TX-RZ50", host: "1.2.3.4" });
+    const driver = new EiscpDriver({ model: "TX-RZ50", host: "1.2.3.4" }, testAvrContexts, testConfigStore);
     const values = driver.getCommandValues("zone2.volume");
     expect(Array.isArray(values)).toBe(true);
   });
@@ -339,7 +341,7 @@ describe("handleMultiZoneCommand", () => {
   it("logs warning for invalid format", async () => {
     const mod = await import("../src/eiscp.js");
     const { EiscpDriver } = mod as any;
-    const driver = new EiscpDriver({ model: "TX-RZ50", host: "1.2.3.4" });
+    const driver = new EiscpDriver({ model: "TX-RZ50", host: "1.2.3.4" }, testAvrContexts, testConfigStore);
     const warnSpy = vi.spyOn(driver, "enqueueSend").mockResolvedValue(undefined);
     // Single part (no action) triggers format warning and returns early
     await driver.command("multi-zone-volume");
@@ -350,7 +352,7 @@ describe("handleMultiZoneCommand", () => {
     const mod = await import("../src/eiscp.js");
     const { EiscpDriver } = mod as any;
     // Empty configuredZones causes commands.length === 0
-    const driver = new EiscpDriver({ model: "TX-RZ50", host: "1.2.3.4", configuredZones: [] });
+    const driver = new EiscpDriver({ model: "TX-RZ50", host: "1.2.3.4", configuredZones: [] }, testAvrContexts, testConfigStore);
     const warnSpy = vi.spyOn(driver, "enqueueSend").mockResolvedValue(undefined);
     await driver.command("multi-zone-volume all-up");
     expect(warnSpy).not.toHaveBeenCalled();
@@ -361,7 +363,7 @@ describe("command else-path coverage", () => {
   it("handles non-string, non-object data via fallback", async () => {
     const mod = await import("../src/eiscp.js");
     const { EiscpDriver } = mod as any;
-    const driver = new EiscpDriver({ model: "TX-RZ50", host: "1.2.3.4" });
+    const driver = new EiscpDriver({ model: "TX-RZ50", host: "1.2.3.4" }, testAvrContexts, testConfigStore);
     const rawSpy = vi.spyOn(driver, "raw").mockResolvedValue(undefined);
     // Number argument falls through to the else branch
     await driver.command(42 as any);
@@ -374,7 +376,7 @@ describe("isTIPCommand edge cases", () => {
   it("returns false for TIP without hex suffix", async () => {
     const mod = await import("../src/eiscp.js");
     const { EiscpDriver } = mod as any;
-    const driver = new EiscpDriver({ host: "1.2.3.4" });
+    const driver = new EiscpDriver({ host: "1.2.3.4" }, testAvrContexts, testConfigStore);
     expect(driver.isTIPCommand("TIP")).toBe(false);
   });
 });
@@ -383,7 +385,7 @@ describe("enqueueSend", () => {
   it("handles string data when connected", async () => {
     const mod = await import("../src/eiscp.js");
     const { EiscpDriver } = mod as any;
-    const driver = new EiscpDriver({ host: "1.2.3.4", sendDelay: 0 });
+    const driver = new EiscpDriver({ host: "1.2.3.4", sendDelay: 0 }, testAvrContexts, testConfigStore);
     driver.isConnected = true;
     driver.eiscp = { write: vi.fn() };
 
@@ -395,7 +397,7 @@ describe("enqueueSend", () => {
   it("handles array data when connected", async () => {
     const mod = await import("../src/eiscp.js");
     const { EiscpDriver } = mod as any;
-    const driver = new EiscpDriver({ host: "1.2.3.4", sendDelay: 0 });
+    const driver = new EiscpDriver({ host: "1.2.3.4", sendDelay: 0 }, testAvrContexts, testConfigStore);
     driver.isConnected = true;
     driver.eiscp = { write: vi.fn() };
 
@@ -407,7 +409,7 @@ describe("enqueueSend", () => {
   it("throws when not connected", async () => {
     const mod = await import("../src/eiscp.js");
     const { EiscpDriver } = mod as any;
-    const driver = new EiscpDriver({ host: "1.2.3.4" });
+    const driver = new EiscpDriver({ host: "1.2.3.4" }, testAvrContexts, testConfigStore);
     driver.isConnected = false;
     driver.eiscp = null;
 

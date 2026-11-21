@@ -59,8 +59,3 @@ export class AvrContextRegistry {
     this.contexts.clear();
   }
 }
-
-// TRANSITIONAL (item 10 migration): the registry used by components that are constructed without one, and by the
-// driver itself until every component receives the registry explicitly. Removed in the last migration step, after
-// which the registry parameters become required.
-export const sharedAvrContexts = new AvrContextRegistry();

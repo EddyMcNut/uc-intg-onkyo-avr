@@ -1,9 +1,11 @@
+import { testMediaBrowser } from "./helpers/mediaBrowserServices.js";
+import { testAvrContexts } from "./helpers/contexts.js";
 import { describe, it, expect } from "vitest";
 import type { IntegrationAPI } from "@unfoldedcircle/integration-api";
 import fs from "fs";
 import os from "os";
 import path from "path";
-import { setConfigDir, ConfigManager } from "../src/configManager.js";
+import { ConfigStore, configPathFor } from "../src/configManager.js";
 
 function mkTmpDir(prefix = "onkyo-test-") {
   return fs.mkdtempSync(path.join(os.tmpdir(), prefix));
@@ -13,19 +15,21 @@ function mkTmpDir(prefix = "onkyo-test-") {
 it("registerAvailableEntities refreshes listening_mode options on reconfigure", async () => {
   const tmp = mkTmpDir();
   try {
-    setConfigDir(tmp);
+    const configStore = new ConfigStore(configPathFor(tmp));
 
     // Initial config with user list A
-    ConfigManager.save({ avrs: [{ model: "M", ip: "1.2.3.4", port: 60128, zone: "main", listeningModes: { "00": { name: "stereo", setting: "stereo" } } }] });
+    configStore.save({ avrs: [{ model: "M", ip: "1.2.3.4", port: 60128, zone: "main", listeningModes: { "00": { name: "stereo", setting: "stereo" } } }] });
 
     const driverModule = await import("../src/driver.js");
     const OnkyoDriver = driverModule.default as any;
 
     // Create a driver-like object without invoking constructor
     interface DriverLike {
+      configStore?: unknown;
       driver?: Partial<IntegrationAPI>;
       config?: any;
       entityRegistrar?: any;
+      avrStateApi?: any;
       registerAvailableEntities?: () => Promise<void>;
       handleDriverSetup?: Function; // present on real driver instances
     }
@@ -44,8 +48,10 @@ it("registerAvailableEntities refreshes listening_mode options on reconfigure", 
       }
     } as unknown as Partial<IntegrationAPI>;
 
-    drv.config = ConfigManager.load();
-    drv.entityRegistrar = new (await import("../src/entityRegistrar.js")).default();
+    drv.config = configStore.load();
+
+    drv.configStore = configStore;
+    drv.entityRegistrar = new (await import("../src/entityRegistrar.js")).default(drv.avrStateApi, testAvrContexts, testMediaBrowser(drv.avrStateApi), configStore);
     drv.registerAvailableEntities = (OnkyoDriver.prototype as any).registerAvailableEntities.bind(drv);
 
     // First registration should push the initial options
@@ -55,10 +61,11 @@ it("registerAvailableEntities refreshes listening_mode options on reconfigure", 
     expect(first!.attrs.options).toContain("stereo");
 
     // Now simulate reconfigure: update config to new list B and re-register
-    ConfigManager.save({
+    configStore.save({
       avrs: [{ model: "M", ip: "1.2.3.4", port: 60128, zone: "main", listeningModes: { "00": { name: "stereo", setting: "stereo" }, "40": { name: "straight-decode", setting: "straight-decode" } } }]
     });
-    drv.config = ConfigManager.load();
+    drv.config = configStore.load();
+    drv.configStore = configStore;
 
     await drv.registerAvailableEntities?.();
     const last = updates.reverse().find((u) => u.id.endsWith("_listening_mode"));

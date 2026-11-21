@@ -1,9 +1,9 @@
 // Test helpers with the former tuneInBrowserStore function names, working on the TuneIn presets of an entity's
-// AvrContext in the shared registry (the registry components use when they are constructed without one).
-import { sharedAvrContexts } from "../../src/avrContext.js";
+// AvrContext in the test registry (testAvrContexts, which tests pass to the components they exercise).
+import { testAvrContexts } from "./contexts.js";
 import type { TuneInBrowseState, TuneInPreset } from "../../src/tuneInBrowserStore.js";
 
-const presetsOf = (entityId: string) => sharedAvrContexts.forEntity(entityId)?.tuneInPresets;
+const presetsOf = (entityId: string) => testAvrContexts.forEntity(entityId)?.tuneInPresets;
 
 export const getTuneInBrowseState = (entityId: string): TuneInBrowseState | null => presetsOf(entityId)?.state() ?? null;
 export const setTuneInBrowseContextState = (entityId: string, title: string): void => presetsOf(entityId)?.setContext(title);

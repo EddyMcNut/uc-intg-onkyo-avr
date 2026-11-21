@@ -17,14 +17,6 @@ vi.mock("../src/tidalBrowserStore.js", () => ({
   getTidalBrowseState: vi.fn(() => null)
 }));
 
-vi.mock("../src/configManager.js", () => ({
-  ConfigManager: {
-    get: vi.fn(() => ({ avrs: [{ model: "M", ip: "1.2.3.4", zone: "main", netMenuDelay: 200 }] }))
-  },
-  AVR_DEFAULTS: { netMenuDelay: 300 },
-  buildEntityId: vi.fn(() => "test-avr main")
-}));
-
 vi.mock("../src/loggers.js", () => ({
   default: { info: vi.fn(), error: vi.fn(), warn: vi.fn(), debug: vi.fn() }
 }));
@@ -55,7 +47,8 @@ describe("TidalBrowseHandler", () => {
       resolveMenuOption: mediaBrowser.resolveTidalMenuOption,
       resetState: tidalStore.resetTidalBrowseState,
       getBrowseState: tidalStore.getTidalBrowseState,
-      listMenuItems: tidalStore.listTidalMenuOptions
+      listMenuItems: tidalStore.listTidalMenuOptions,
+      getMenuDelay: () => 200
     });
   });
 

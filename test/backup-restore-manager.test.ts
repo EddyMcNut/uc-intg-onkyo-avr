@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeAll } from "vitest";
+import { testConfigStore } from "./helpers/configStore.js";
 
 vi.mock("node:fs", () => {
   const mockReadFileSync = vi.fn();
@@ -26,14 +27,14 @@ describe("BackupRestoreManager", () => {
 
   describe("parseRestorePayload", () => {
     it("returns isValid true for valid JSON", () => {
-      const mgr = new BackupRestoreManager();
+      const mgr = new BackupRestoreManager(testConfigStore);
       const result = mgr.parseRestorePayload('{"meta":{"driver_id":"test","version":"1.0"},"config":{}}');
       expect(result.isValid).toBe(true);
       expect(result.payload.meta.driver_id).toBe("test");
     });
 
     it("returns isValid false and errors for invalid JSON", () => {
-      const mgr = new BackupRestoreManager();
+      const mgr = new BackupRestoreManager(testConfigStore);
       const result = mgr.parseRestorePayload("{invalid}");
       expect(result.isValid).toBe(false);
       expect(result.errors).toBeDefined();
@@ -44,7 +45,7 @@ describe("BackupRestoreManager", () => {
 
   describe("validateAndNormalizeRestorePayload", () => {
     it("returns errors for invalid JSON", () => {
-      const mgr = new BackupRestoreManager();
+      const mgr = new BackupRestoreManager(testConfigStore);
       const result = mgr.validateAndNormalizeRestorePayload("{bad}");
       expect(result.isValid).toBe(false);
       expect(result.normalized).toBeNull();
@@ -52,7 +53,7 @@ describe("BackupRestoreManager", () => {
     });
 
     it("returns errors when payload config is invalid", () => {
-      const mgr = new BackupRestoreManager();
+      const mgr = new BackupRestoreManager(testConfigStore);
       // Empty object JSON → no avrs, no model/ip → validation error
       const result = mgr.validateAndNormalizeRestorePayload("{}");
       expect(result.isValid).toBe(false);
@@ -61,7 +62,7 @@ describe("BackupRestoreManager", () => {
     });
 
     it("returns normalized config for valid payload with config wrapper", () => {
-      const mgr = new BackupRestoreManager();
+      const mgr = new BackupRestoreManager(testConfigStore);
       const payload = {
         config: {
           avrs: [{ model: "TX-RZ50", ip: "1.2.3.4", port: 60128, zone: "main" }]
@@ -82,7 +83,7 @@ describe("BackupRestoreManager", () => {
       });
       fsMock.existsSync.mockReturnValue(false);
 
-      const mgr = new BackupRestoreManager();
+      const mgr = new BackupRestoreManager(testConfigStore);
       const result = await mgr.buildBackupString(() => undefined);
 
       const parsed = JSON.parse(result);
@@ -99,7 +100,7 @@ describe("BackupRestoreManager", () => {
       });
       fsMock.existsSync.mockReturnValue(false);
 
-      const mgr = new BackupRestoreManager();
+      const mgr = new BackupRestoreManager(testConfigStore);
       const result = await mgr.buildBackupString(() => undefined);
 
       const parsed = JSON.parse(result);
@@ -116,7 +117,7 @@ describe("BackupRestoreManager", () => {
       });
       fsMock.existsSync.mockReturnValue(true);
 
-      const mgr = new BackupRestoreManager();
+      const mgr = new BackupRestoreManager(testConfigStore);
       const result = await mgr.buildBackupString(() => "/tmp/uc-test");
       const parsed = JSON.parse(result);
 
@@ -133,7 +134,7 @@ describe("BackupRestoreManager", () => {
       });
       fsMock.existsSync.mockReturnValue(false);
 
-      const mgr = new BackupRestoreManager();
+      const mgr = new BackupRestoreManager(testConfigStore);
       const result = await mgr.buildBackupString(() => undefined);
 
       const parsed = JSON.parse(result);

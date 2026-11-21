@@ -1,9 +1,12 @@
 /// <reference types="node" />
+import { testMediaBrowser, testMediaBrowserServices } from "./helpers/mediaBrowserServices.js";
+import { testAvrContexts } from "./helpers/contexts.js";
 import { it, expect } from "vitest";
 import type { IntegrationAPI } from "@unfoldedcircle/integration-api";
 import fs from "fs";
 import os from "os";
 import path from "path";
+import { testConfigStore } from "./helpers/configStore.js";
 
 function mkTmpDir(prefix = "onkyo-test-") {
   return fs.mkdtempSync(path.join(os.tmpdir(), prefix));
@@ -13,14 +16,12 @@ function makeReceiver(mockDriver: Partial<IntegrationAPI>, tmp: string, cfg: any
   return (async () => {
     const crModule = (await import("../src/commandReceiver.js")) as any;
     const ConfigModule = (await import("../src/configManager.js")) as any;
-    const avrStateModule = (await import("../src/avrState.js")) as any;
     const { CommandReceiver } = crModule;
-    const { ConfigManager, setConfigDir } = ConfigModule;
-    const { avrStateManager } = avrStateModule;
-    if (typeof setConfigDir === "function") setConfigDir(tmp);
-    ConfigManager.save(cfg);
-    const onkyoCfg = ConfigManager.load();
-    const receiver = new CommandReceiver(mockDriver, onkyoCfg, mockEiscp as any, avrStateManager, "v-test");
+    const { avrStateManager } = await import("./helpers/avrState.js");
+    const configStore = new ConfigModule.ConfigStore(ConfigModule.configPathFor(tmp));
+    configStore.save(cfg);
+    const onkyoCfg = configStore.load();
+    const receiver = new CommandReceiver(mockDriver, onkyoCfg, mockEiscp as any, avrStateManager, testAvrContexts, testMediaBrowser(avrStateManager), configStore, "v-test");
     receiver.setupEiscpListener();
   })();
 }
@@ -207,7 +208,7 @@ it("CommandReceiver uses the AVR-reported input name and ignores a manual input 
     // must not be applied on top of them.
     const cfg = { avrs: [{ model: "M", ip: "1.2.3.4", port: 60128, zone: "main", useAvrReportedInputs: true, inputSelectorOptions: ["cd", "dvd", "tv"] }] };
     await makeReceiver(mockDriver, tmp, cfg, mockEiscp);
-    (await import("../src/avrContext.js")).sharedAvrContexts.get("M 1.2.3.4").inputs.set([
+    testAvrContexts.get("M 1.2.3.4").inputs.set([
       { id: "33", name: "DAB" },
       { id: "10", name: "BD/DVD" }
     ]);
@@ -231,7 +232,7 @@ it("CommandReceiver uses the AVR-reported input name and ignores a manual input 
     // The DAB presets are still queried, identified by the input id the AVR reported.
     expect(raws).toContain("DSNQSTN");
   } finally {
-    (await import("../src/avrContext.js")).sharedAvrContexts.clear();
+    testAvrContexts.clear();
     fs.rmSync(tmp, { recursive: true, force: true });
   }
 });
@@ -264,7 +265,7 @@ it("CommandReceiver ignores collected inputs once the input source list is manua
 
     const cfg = { avrs: [{ model: "M", ip: "1.2.3.4", port: 60128, zone: "main", useAvrReportedInputs: false, inputSelectorOptions: ["dvd"] }] };
     await makeReceiver(mockDriver, tmp, cfg, mockEiscp);
-    (await import("../src/avrContext.js")).sharedAvrContexts.get("M 1.2.3.4").inputs.set([{ id: "33", name: "DAB" }]);
+    testAvrContexts.get("M 1.2.3.4").inputs.set([{ id: "33", name: "DAB" }]);
 
     mockEiscp.emit("data", {
       command: "input-selector",
@@ -279,7 +280,7 @@ it("CommandReceiver ignores collected inputs once the input source list is manua
     const isoUpdates = updates.filter((u) => u.id.endsWith("_input_selector") && u.attrs && u.attrs.current_option);
     expect(isoUpdates[isoUpdates.length - 1].attrs.current_option).toBe("bd");
   } finally {
-    (await import("../src/avrContext.js")).sharedAvrContexts.clear();
+    testAvrContexts.clear();
     fs.rmSync(tmp, { recursive: true, force: true });
   }
 });

@@ -1,5 +1,8 @@
+import { testMediaBrowser, testMediaBrowserServices } from "./helpers/mediaBrowserServices.js";
+import { testAvrContexts } from "./helpers/contexts.js";
 import { describe, it, expect, vi, afterEach } from "vitest";
 import * as uc from "@unfoldedcircle/integration-api";
+import { testConfigStore } from "./helpers/configStore.js";
 
 function makeIntegrationConfig(overrides: Record<string, any> = {}) {
   return {
@@ -19,6 +22,7 @@ function makeEiscpMock() {
 
 function makeAvrStateApiMock(overrides: Record<string, any> = {}) {
   return {
+    getSubSource: vi.fn(() => "unknown"),
     setPowerState: vi.fn(),
     setSource: vi.fn(),
     setVolume: vi.fn(),
@@ -38,7 +42,7 @@ async function makeReceiver(overrides: Record<string, any> = {}) {
   const config = overrides.config ?? makeIntegrationConfig();
   const eiscpMock = overrides.eiscpMock ?? makeEiscpMock();
   const avrStateApiMock = overrides.avrStateApiMock ?? makeAvrStateApiMock();
-  const receiver = new CommandReceiver(driverMock, config, eiscpMock, avrStateApiMock);
+  const receiver = new CommandReceiver(driverMock, config, eiscpMock, avrStateApiMock, testAvrContexts, testMediaBrowser(avrStateApiMock), testConfigStore);
   return { receiver, driverMock, eiscpMock, avrStateApiMock };
 }
 
@@ -250,7 +254,17 @@ describe("dispatchZoneAgnosticCommand", () => {
     const onAvrInfo = vi.fn();
     const mod = await import("../src/commandReceiver.js");
     const { CommandReceiver } = mod as any;
-    const receiver = new CommandReceiver({ updateEntityAttributes: vi.fn() }, makeIntegrationConfig(), makeEiscpMock(), makeAvrStateApiMock(), "v-test", onAvrInfo);
+    const receiver = new CommandReceiver(
+      { updateEntityAttributes: vi.fn() },
+      makeIntegrationConfig(),
+      makeEiscpMock(),
+      makeAvrStateApiMock(),
+      testAvrContexts,
+      testMediaBrowser(makeAvrStateApiMock()),
+      testConfigStore,
+      "v-test",
+      onAvrInfo
+    );
 
     const avrUpdates = { command: "avr-info", argument: "40", zone: "main", iscpCommand: "NRI", host: "1.2.3.4", port: 60128, model: "TX-RZ50" };
     expect(await receiver.dispatchZoneAgnosticCommand(avrUpdates, "TX-RZ50 1.2.3.4 main", "main")).toBe(true);

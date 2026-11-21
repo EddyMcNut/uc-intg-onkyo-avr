@@ -1,7 +1,10 @@
+import { testMediaBrowser, testMediaBrowserServices } from "./helpers/mediaBrowserServices.js";
+import { testAvrContexts } from "./helpers/contexts.js";
 import { describe, it, expect } from "vitest";
 import fs from "fs";
 import os from "os";
 import path from "path";
+import { testConfigStore } from "./helpers/configStore.js";
 
 function mkTmpDir(prefix = "onkyo-test-") {
   return fs.mkdtempSync(path.join(os.tmpdir(), prefix));
@@ -13,19 +16,17 @@ it("EntityRegistrar returns user-configured listeningModeOptions from config", a
     const module = (await import("../src/entityRegistrar.js")) as any;
     const cfgModule = (await import("../src/configManager.js")) as any;
 
-    const { ConfigManager, setConfigDir } = cfgModule;
-    if (typeof setConfigDir === "function") setConfigDir(tmp);
+    const configStore = new (cfgModule as any).ConfigStore((cfgModule as any).configPathFor(tmp));
 
-    const avrStateModule = (await import("../src/avrState.js")) as any;
     const EntityRegistrar = module.default as any;
-    const { avrStateManager } = avrStateModule;
-    const registrar = new EntityRegistrar(avrStateManager);
+    const { avrStateManager } = await import("./helpers/avrState.js");
+    const registrar = new EntityRegistrar(avrStateManager, testAvrContexts, testMediaBrowser(avrStateManager), configStore);
 
     // Save the current per-code listening-mode representation and reload.
-    ConfigManager.save({
+    configStore.save({
       avrs: [{ model: "M", ip: "1.2.3.4", port: 60128, zone: "main", listeningModes: { "00": { name: "stereo", setting: "stereo" }, "40": { name: "straight-decode", setting: "straight-decode" } } }]
     });
-    const cfg = ConfigManager.load();
+    const cfg = configStore.load();
     expect(cfg.avrs && cfg.avrs[0].listeningModes).toBeTruthy();
 
     const avrEntry = `${cfg.avrs[0].model} ${cfg.avrs[0].ip} ${cfg.avrs[0].zone}`;
@@ -42,17 +43,16 @@ it("EntityRegistrar returns the configured listening modes", async () => {
     const module = (await import("../src/entityRegistrar.js")) as any;
     const cfgModule = (await import("../src/configManager.js")) as any;
 
-    const { ConfigManager, setConfigDir } = cfgModule;
-    if (typeof setConfigDir === "function") setConfigDir(tmp);
+    const configStore = new (cfgModule as any).ConfigStore((cfgModule as any).configPathFor(tmp));
 
     const avrStateModule = (await import("../src/avrState.js")) as any;
     const EntityRegistrar = module.default as any;
-    const { avrStateManager } = avrStateModule;
-    const registrar = new EntityRegistrar(avrStateManager);
+    const { avrStateManager } = await import("./helpers/avrState.js");
+    const registrar = new EntityRegistrar(avrStateManager, testAvrContexts, testMediaBrowser(avrStateManager), configStore);
 
     for (const stored of [{}, { "00": { name: "stereo", setting: "stereo" } }]) {
-      ConfigManager.save({ avrs: [{ model: "M", ip: "1.2.3.4", port: 60128, zone: "main", listeningModes: stored }] });
-      const cfg = ConfigManager.load();
+      configStore.save({ avrs: [{ model: "M", ip: "1.2.3.4", port: 60128, zone: "main", listeningModes: stored }] });
+      const cfg = configStore.load();
       const avrEntry = `${cfg.avrs[0].model} ${cfg.avrs[0].ip} ${cfg.avrs[0].zone}`;
       const opts = registrar.getListeningModeOptions(undefined, avrEntry);
       expect(Array.isArray(opts)).toBe(true);
@@ -69,16 +69,15 @@ it("EntityRegistrar treats 'all' sentinel as showing all input sources", async (
     const module = (await import("../src/entityRegistrar.js")) as any;
     const cfgModule = (await import("../src/configManager.js")) as any;
 
-    const { ConfigManager, setConfigDir } = cfgModule;
-    if (typeof setConfigDir === "function") setConfigDir(tmp);
+    const configStore = new (cfgModule as any).ConfigStore((cfgModule as any).configPathFor(tmp));
 
     const avrStateModule = (await import("../src/avrState.js")) as any;
     const EntityRegistrar = module.default as any;
-    const { avrStateManager } = avrStateModule;
-    const registrar = new EntityRegistrar(avrStateManager);
+    const { avrStateManager } = await import("./helpers/avrState.js");
+    const registrar = new EntityRegistrar(avrStateManager, testAvrContexts, testMediaBrowser(avrStateManager), configStore);
 
-    ConfigManager.save({ avrs: [{ model: "M", ip: "1.2.3.4", port: 60128, zone: "main", useAvrReportedInputs: false }] });
-    const cfg = ConfigManager.load();
+    configStore.save({ avrs: [{ model: "M", ip: "1.2.3.4", port: 60128, zone: "main", useAvrReportedInputs: false }] });
+    const cfg = configStore.load();
     const avrEntry = `${cfg.avrs[0].model} ${cfg.avrs[0].ip} ${cfg.avrs[0].zone}`;
     const opts = registrar.getInputSelectorOptions(avrEntry);
     expect(Array.isArray(opts)).toBe(true);
@@ -94,31 +93,30 @@ it("EntityRegistrar uses AVR-reported input names when enabled", async () => {
     const module = (await import("../src/entityRegistrar.js")) as any;
     const cfgModule = (await import("../src/configManager.js")) as any;
 
-    const { ConfigManager, setConfigDir } = cfgModule;
-    if (typeof setConfigDir === "function") setConfigDir(tmp);
+    const configStore = new (cfgModule as any).ConfigStore((cfgModule as any).configPathFor(tmp));
 
     const avrStateModule = (await import("../src/avrState.js")) as any;
     const EntityRegistrar = module.default as any;
-    const { avrStateManager } = avrStateModule;
-    const registrar = new EntityRegistrar(avrStateManager);
+    const { avrStateManager } = await import("./helpers/avrState.js");
+    const registrar = new EntityRegistrar(avrStateManager, testAvrContexts, testMediaBrowser(avrStateManager), configStore);
 
-    ConfigManager.save({ avrs: [{ model: "M", ip: "1.2.3.4", port: 60128, zone: "main", useAvrReportedInputs: true }] });
+    configStore.save({ avrs: [{ model: "M", ip: "1.2.3.4", port: 60128, zone: "main", useAvrReportedInputs: true }] });
     const avrEntry = "M 1.2.3.4 main";
 
     // Before the AVR reported anything, the built-in list is used.
     expect(registrar.getInputSelectorOptions(avrEntry).length).toBeGreaterThan(5);
 
-    (await import("../src/avrContext.js")).sharedAvrContexts.get("M 1.2.3.4").inputs.set([
+    testAvrContexts.get("M 1.2.3.4").inputs.set([
       { id: "10", name: "BD/DVD" },
       { id: "33", name: "DAB" }
     ]);
     expect(registrar.getInputSelectorOptions(avrEntry)).toEqual(["BD/DVD", "DAB"]);
 
     // Disabling AVR-reported names ignores what was collected and uses the built-in list again.
-    ConfigManager.save({ avrs: [{ model: "M", ip: "1.2.3.4", port: 60128, zone: "main", useAvrReportedInputs: false }] });
+    configStore.save({ avrs: [{ model: "M", ip: "1.2.3.4", port: 60128, zone: "main", useAvrReportedInputs: false }] });
     expect(registrar.getInputSelectorOptions(avrEntry).length).toBeGreaterThan(5);
 
-    (await import("../src/avrContext.js")).sharedAvrContexts.clear();
+    testAvrContexts.clear();
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
   }
@@ -130,20 +128,19 @@ it("EntityRegistrar applies AVR names to matching aliases and keeps unmatched op
     const module = (await import("../src/entityRegistrar.js")) as any;
     const cfgModule = (await import("../src/configManager.js")) as any;
 
-    const { ConfigManager, setConfigDir } = cfgModule;
-    if (typeof setConfigDir === "function") setConfigDir(tmp);
+    const configStore = new (cfgModule as any).ConfigStore((cfgModule as any).configPathFor(tmp));
 
     const avrStateModule = (await import("../src/avrState.js")) as any;
     const EntityRegistrar = module.default as any;
-    const { avrStateManager } = avrStateModule;
-    const registrar = new EntityRegistrar(avrStateManager);
+    const { avrStateManager } = await import("./helpers/avrState.js");
+    const registrar = new EntityRegistrar(avrStateManager, testAvrContexts, testMediaBrowser(avrStateManager), configStore);
 
-    ConfigManager.save({ avrs: [{ model: "M", ip: "1.2.3.4", port: 60128, zone: "main", useAvrReportedInputs: true }] });
-    (await import("../src/avrContext.js")).sharedAvrContexts.get("M 1.2.3.4").inputs.set([{ id: "10", name: "BD/DVD" }]);
+    configStore.save({ avrs: [{ model: "M", ip: "1.2.3.4", port: 60128, zone: "main", useAvrReportedInputs: true }] });
+    testAvrContexts.get("M 1.2.3.4").inputs.set([{ id: "10", name: "BD/DVD" }]);
 
     expect(registrar.getInputSelectorOptions("M 1.2.3.4 main")).toEqual(["BD/DVD"]);
 
-    (await import("../src/avrContext.js")).sharedAvrContexts.clear();
+    testAvrContexts.clear();
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
   }
@@ -154,17 +151,15 @@ it("EntityRegistrar lists the tuner preset stations the AVR reported, and none b
   try {
     const module = (await import("../src/entityRegistrar.js")) as any;
     const cfgModule = (await import("../src/configManager.js")) as any;
-    const { sharedAvrContexts } = await import("../src/avrContext.js");
 
-    const { ConfigManager, setConfigDir } = cfgModule;
-    if (typeof setConfigDir === "function") setConfigDir(tmp);
+    const configStore = new (cfgModule as any).ConfigStore((cfgModule as any).configPathFor(tmp));
 
     const avrStateModule = (await import("../src/avrState.js")) as any;
     const EntityRegistrar = module.default as any;
-    const { avrStateManager } = avrStateModule;
-    const registrar = new EntityRegistrar(avrStateManager);
+    const { avrStateManager } = await import("./helpers/avrState.js");
+    const registrar = new EntityRegistrar(avrStateManager, testAvrContexts, testMediaBrowser(avrStateManager), configStore);
 
-    ConfigManager.save({ avrs: [{ model: "M", ip: "1.2.3.4", port: 60128, zone: "main" }] });
+    configStore.save({ avrs: [{ model: "M", ip: "1.2.3.4", port: 60128, zone: "main" }] });
     const avrEntry = "M 1.2.3.4 main";
 
     // Nothing was reported yet: the entity exists but has no stations to show.
@@ -173,7 +168,7 @@ it("EntityRegistrar lists the tuner preset stations the AVR reported, and none b
     expect(select.id).toBe(`${avrEntry}_tuner_presets`);
     expect((select as any).attributes.options).toEqual([]);
 
-    sharedAvrContexts.get("M 1.2.3.4").tunerPresets.set([
+    testAvrContexts.get("M 1.2.3.4").tunerPresets.set([
       { slot: 12, name: "NPO FunX", band: "2", freq: "0" },
       { slot: 28, name: "STRKSTAD", band: "1", freq: "107.20" }
     ]);
@@ -182,7 +177,7 @@ it("EntityRegistrar lists the tuner preset stations the AVR reported, and none b
     // The stations are also part of the entity definition, not only of the attribute update.
     expect((registrar.createTunerPresetsSelectEntity(avrEntry, async () => {}) as any).attributes.options).toEqual(["NPO FunX", "STRKSTAD"]);
 
-    sharedAvrContexts.clear();
+    testAvrContexts.clear();
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
   }

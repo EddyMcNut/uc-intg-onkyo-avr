@@ -1,6 +1,6 @@
+import { testAvrContexts } from "./helpers/contexts.js";
 import { afterEach, describe, expect, it } from "vitest";
 import { resolveIscpCommand, type IscpCommandContext } from "../src/iscpCommandResolver.js";
-import { sharedAvrContexts } from "../src/avrContext.js";
 import { resetAvrInfo, setAvrInfo } from "./helpers/avrInfo.js";
 
 const ENTITY = "TX-RZ50 192.0.2.50 main";
@@ -8,7 +8,9 @@ const stateReader = { getSource: () => "net", getSubSource: () => "unknown" };
 const context = (networkNavigationMode: "modern" | "legacy" = "modern"): IscpCommandContext => ({
   config: { model: "TX-RZ50", host: "192.0.2.50", networkNavigationMode },
   stateReader,
-  avrContexts: sharedAvrContexts
+  avrContexts: testAvrContexts,
+  // Not used by these cases (no learned listening modes).
+  configSource: { get: () => ({}) }
 });
 
 function reportNetServices(netServices: { id: string; name: string }[]) {

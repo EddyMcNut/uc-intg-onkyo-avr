@@ -1,3 +1,4 @@
+import { testAvrContexts } from "./helpers/contexts.js";
 import { describe, expect, it } from "vitest";
 import * as uc from "@unfoldedcircle/integration-api";
 import { TuneInMediaBrowser } from "../src/tuneInMediaBrowser.js";
@@ -6,7 +7,7 @@ const ENTITY = "Tune 10.0.0.1 main";
 
 describe("TuneInMediaBrowser branch coverage", () => {
   it("ingests presets only in the My Presets context", () => {
-    const browser = new TuneInMediaBrowser();
+    const browser = new TuneInMediaBrowser(testAvrContexts, { get: () => ({}) });
     expect(() => browser.ingestListEntry("bad", "U0-Station")).not.toThrow();
     browser.ingestListEntry(ENTITY, "bad");
     browser.ingestListEntry(ENTITY, "U0-Station | FM");
@@ -19,7 +20,7 @@ describe("TuneInMediaBrowser branch coverage", () => {
   });
 
   it("handles menu entries, exclusions and XML items", async () => {
-    const browser = new TuneInMediaBrowser();
+    const browser = new TuneInMediaBrowser(testAvrContexts, { get: () => ({}) });
     browser.ingestMenuListEntry(ENTITY, "bad");
     browser.ingestMenuListEntry(ENTITY, "U0-Search");
     browser.ingestMenuListEntry(ENTITY, "U1-Station | FM");

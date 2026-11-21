@@ -155,7 +155,7 @@ export class ManualConfigParser {
   }
 
   // Numbers are only converted here (not a number -> default). Range checks are left to
-  // ConfigManager.validateAvrPayload, so an out-of-range value is reported to the user instead of silently replaced.
+  // validateAvrPayload (configValidation.ts), so an out-of-range value is reported to the user instead of silently replaced.
   private parsePort(port: unknown): number {
     return parseIntegerSetting(port, AVR_DEFAULTS.port);
   }

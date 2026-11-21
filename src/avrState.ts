@@ -355,6 +355,3 @@ export class AvrStateManager {
     // NSV000 + NLA/NLAL flow and must not use the legacy NET menu commands.
   }
 }
-
-// Singleton instance of the state manager
-export const avrStateManager = new AvrStateManager();

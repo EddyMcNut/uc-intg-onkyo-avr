@@ -1,3 +1,4 @@
+import { applyAvrDefaults, validateAvrPayload } from "../src/configValidation.js";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockExistsSync = vi.fn();
@@ -11,13 +12,13 @@ vi.mock("node:fs", () => ({
   default: { existsSync: mockExistsSync, readFileSync: mockReadFileSync, writeFileSync: mockWriteFileSync }
 }));
 
-const { ConfigManager, normalizeAvrConfig } = await import("../src/configManager.js");
+const { ConfigStore, configPathFor, normalizeAvrConfig } = await import("../src/configManager.js");
 const { ManualConfigParser } = await import("../src/manualConfigParser.js");
 
 // Characterization of the four ways an AVR setting is parsed:
-// - load:     ConfigManager.applyDefaults (config file at startup; result is persisted)
+// - load:     applyAvrDefaults (config file at startup, via ConfigStore.load; result is persisted)
 // - runtime:  normalizeAvrConfig (per-zone runtime config)
-// - validate: ConfigManager.validateAvrPayload (setup save and backup restore; may reject)
+// - validate: validateAvrPayload (setup save and backup restore; may reject)
 // - manual:   ManualConfigParser (setup form)
 // They all use the shared field parsers in configConstants.ts and must agree, with two intended exceptions:
 // - validate may reject a value that the lenient paths replace with the default;
@@ -45,15 +46,15 @@ const FIELDS: Record<string, unknown[]> = {
 };
 
 const MANUAL_KEYS: Record<string, string> = { port: "portNum", queueThreshold: "queueThresholdValue", albumArtURL: "albumArtURLValue" };
-const BASE = { model: "TX-RZ50", ip: "192.168.1.10", port: 60128, zone: "main" };
+const BASE = { model: "TX-RZ50", ip: "192.168.1.10", port: 60128, zone: "main" as const };
 
 function parseAll(field: string, raw: unknown) {
   const avr: Record<string, unknown> = { ...BASE, [field]: raw };
   if (raw === undefined) delete avr[field];
-  const validated = ConfigManager.validateAvrPayload({ ...avr });
+  const validated = validateAvrPayload({ ...avr });
   const manual = new ManualConfigParser().parse({ model: BASE.model, ipAddress: BASE.ip, port: BASE.port, [field]: raw } as never) as unknown as Record<string, unknown>;
   return {
-    load: (ConfigManager as unknown as { applyDefaults(a: unknown): Record<string, unknown> }).applyDefaults({ ...avr })[field],
+    load: (applyAvrDefaults({ ...avr }) as unknown as Record<string, unknown>)[field],
     runtime: (normalizeAvrConfig({ ...avr } as never) as unknown as Record<string, unknown>)[field],
     validate: validated.errors.length > 0 ? undefined : (validated.normalized as unknown as Record<string, unknown>)[field],
     rejected: validated.errors.length > 0,
@@ -100,12 +101,12 @@ describe("AVR config parse paths agree", () => {
   });
 
   it("keeps volumeScaleDiscovered when a setup payload is validated", () => {
-    const result = ConfigManager.validateAvrPayload({ ...BASE, volumeScale: 80, volumeScaleDiscovered: true });
+    const result = validateAvrPayload({ ...BASE, volumeScale: 80, volumeScaleDiscovered: true });
     expect(result.normalized?.volumeScaleDiscovered).toBe(true);
   });
 });
 
-describe("ConfigManager.load persistence", () => {
+describe("ConfigStore.load persistence", () => {
   beforeEach(() => {
     mockExistsSync.mockReset();
     mockReadFileSync.mockReset();
@@ -113,11 +114,11 @@ describe("ConfigManager.load persistence", () => {
   });
 
   it("does not rewrite a config that is already normalized", () => {
-    const normalized = (ConfigManager as unknown as { applyDefaults(a: unknown): unknown }).applyDefaults({ ...BASE, createTunerPresets: "preset-order" });
+    const normalized = applyAvrDefaults({ ...BASE, createTunerPresets: "preset-order" });
     mockExistsSync.mockReturnValue(true);
     mockReadFileSync.mockReturnValue(JSON.stringify({ avrs: [normalized] }));
 
-    ConfigManager.load();
+    new ConfigStore(configPathFor("/tmp/uc-test")).load();
 
     expect(mockWriteFileSync).not.toHaveBeenCalled();
   });
@@ -126,7 +127,7 @@ describe("ConfigManager.load persistence", () => {
     mockExistsSync.mockReturnValue(true);
     mockReadFileSync.mockReturnValue(JSON.stringify({ avrs: [{ ...BASE, volumeDisplay: "RELATIVE", queueThreshold: "-5", inputSourceLayout: "separate" }] }));
 
-    const result = ConfigManager.load();
+    const result = new ConfigStore(configPathFor("/tmp/uc-test")).load();
 
     expect(mockWriteFileSync).toHaveBeenCalledTimes(1);
     expect(result.avrs?.[0]).toMatchObject({ volumeDisplay: "relative", queueThreshold: 100, inputSourceLayout: "network-last" });

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import * as uc from "@unfoldedcircle/integration-api";
 import SetupHandler from "../src/setupHandler.js";
+import { memoryConfigStore } from "./helpers/configStore.js";
 
 function responseValues(action: uc.SetupAction): Record<string, unknown> {
   const values: Record<string, unknown> = {
@@ -30,8 +31,9 @@ describe("setup configuration flow", () => {
   it("walks the complete integration, input-source, and listening-mode flow", async () => {
     let saved = false;
     const setup = new SetupHandler({
-      driver: {},
+      driver: {} as never,
       getConfigDirPath: () => undefined,
+      configStore: memoryConfigStore(),
       onConfigSaved: async () => {
         saved = true;
       },
@@ -49,7 +51,7 @@ describe("setup configuration flow", () => {
     let action: uc.SetupAction = await setup.handle(new uc.DriverSetupRequest(false, {}));
     expect(action).toBeInstanceOf(uc.RequestUserInput);
     for (let page = 0; page < 9; page++) {
-      action = await setup.handle(new uc.UserDataResponse(responseValues(action)));
+      action = await setup.handle(new uc.UserDataResponse(responseValues(action) as Record<string, string>));
       if (action instanceof uc.SetupComplete) break;
     }
     expect(action).toBeInstanceOf(uc.SetupComplete);

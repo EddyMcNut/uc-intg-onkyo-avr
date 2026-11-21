@@ -1,4 +1,4 @@
-import { sharedAvrContexts, type AvrContextRegistry } from "./avrContext.js";
+import type { AvrContextRegistry } from "./avrContext.js";
 import {
   consumeListModeActive,
   getContiguousMenuItemCount,
@@ -15,31 +15,36 @@ export type TuneInMenuOption = MenuBrowseOption;
 
 export type TuneInMenuBrowseState = MenuBrowseState<TuneInMenuOption>;
 
-// The state lives in each AVR's AvrContext (`tuneInMenu`). The `contexts` parameters default to the shared registry
-// during the item-10 migration (see avrContext.ts).
+// The state lives in each AVR's AvrContext (`tuneInMenu`); every function takes the registry to look it up in.
 
 function buildTuneInMenuMediaId(menuIndex: number, title: string): string {
   return `tunein:menu:${menuIndex}:${encodeURIComponent(title)}`;
 }
 
-export function getTuneInMenuBrowseState(entityId: string, contexts: AvrContextRegistry = sharedAvrContexts): TuneInMenuBrowseState | null {
+export function getTuneInMenuBrowseState(entityId: string, contexts: AvrContextRegistry): TuneInMenuBrowseState | null {
   return contexts.forEntity(entityId)?.tuneInMenu ?? null;
 }
 
-export function setTuneInMenuBrowseContextState(entityId: string, title: string, contexts: AvrContextRegistry = sharedAvrContexts): void {
+export function setTuneInMenuBrowseContextState(entityId: string, title: string, contexts: AvrContextRegistry): void {
   const state = getTuneInMenuBrowseState(entityId, contexts);
   if (state) state.contextTitle = title.trim().toLowerCase();
 }
+
+export type AddTuneInMenuOptionOptions = {
+  thumbnailResolver?: (state: TuneInMenuBrowseState, title: string) => string;
+  // Kept in the state for index bookkeeping but not listed (default false).
+  hidden?: boolean;
+  // Also update the list while it is frozen after a selection (default false).
+  allowWhenFrozen?: boolean;
+};
 
 export function addTuneInMenuOption(
   entityId: string,
   menuIndex: number,
   title: string,
   isBrowsable: boolean,
-  thumbnailResolver?: (state: TuneInMenuBrowseState, title: string) => string,
-  hidden = false,
-  allowWhenFrozen = false,
-  contexts: AvrContextRegistry = sharedAvrContexts
+  contexts: AvrContextRegistry,
+  { thumbnailResolver, hidden = false, allowWhenFrozen = false }: AddTuneInMenuOptionOptions = {}
 ): void {
   const state = getTuneInMenuBrowseState(entityId, contexts);
   if (!state) {
@@ -61,7 +66,7 @@ export function addTuneInMenuOption(
   );
 }
 
-export function listTuneInMenuOptions(entityId: string, contexts: AvrContextRegistry = sharedAvrContexts): TuneInMenuOption[] {
+export function listTuneInMenuOptions(entityId: string, contexts: AvrContextRegistry): TuneInMenuOption[] {
   const state = getTuneInMenuBrowseState(entityId, contexts);
   if (!state) {
     return [];
@@ -70,13 +75,13 @@ export function listTuneInMenuOptions(entityId: string, contexts: AvrContextRegi
   return listMenuOptions(state).filter((item) => !item.hidden);
 }
 
-export function getContiguousTuneInMenuItemCount(entityId: string, contexts: AvrContextRegistry = sharedAvrContexts): number {
+export function getContiguousTuneInMenuItemCount(entityId: string, contexts: AvrContextRegistry): number {
   const state = getTuneInMenuBrowseState(entityId, contexts);
   if (!state || state.optionsByMenuIndex.size === 0) return 0;
   return getContiguousMenuItemCount(state);
 }
 
-export function resetTuneInMenuBrowseState(entityId: string, contexts: AvrContextRegistry = sharedAvrContexts): void {
+export function resetTuneInMenuBrowseState(entityId: string, contexts: AvrContextRegistry): void {
   const state = getTuneInMenuBrowseState(entityId, contexts);
   if (!state) {
     return;
@@ -85,7 +90,7 @@ export function resetTuneInMenuBrowseState(entityId: string, contexts: AvrContex
   resetMenuBrowseState(state);
 }
 
-export function consumeTraceNextTuneInSelectionAfterMainMenu(entityId: string, contexts: AvrContextRegistry = sharedAvrContexts): boolean {
+export function consumeTraceNextTuneInSelectionAfterMainMenu(entityId: string, contexts: AvrContextRegistry): boolean {
   const state = getTuneInMenuBrowseState(entityId, contexts);
   if (!state || !state.traceNextSelectionAfterMainMenu) {
     return false;
@@ -94,24 +99,19 @@ export function consumeTraceNextTuneInSelectionAfterMainMenu(entityId: string, c
   return true;
 }
 
-export function consumeTuneInListModeActive(entityId: string, contexts: AvrContextRegistry = sharedAvrContexts): boolean {
+export function consumeTuneInListModeActive(entityId: string, contexts: AvrContextRegistry): boolean {
   const state = getTuneInMenuBrowseState(entityId, contexts);
   if (!state) return false;
   return consumeListModeActive(state);
 }
 
-export function setTuneInMenuBrowseFrozen(entityId: string, frozen: boolean, contexts: AvrContextRegistry = sharedAvrContexts): void {
+export function setTuneInMenuBrowseFrozen(entityId: string, frozen: boolean, contexts: AvrContextRegistry): void {
   const state = getTuneInMenuBrowseState(entityId, contexts);
   if (!state) return;
   setBrowseListFrozen(state, frozen);
 }
 
-export function getTuneInMenuThumbnailForTitle(
-  entityId: string,
-  title: string,
-  resolver: (state: TuneInMenuBrowseState, title: string) => string,
-  contexts: AvrContextRegistry = sharedAvrContexts
-): string {
+export function getTuneInMenuThumbnailForTitle(entityId: string, title: string, resolver: (state: TuneInMenuBrowseState, title: string) => string, contexts: AvrContextRegistry): string {
   const state = getTuneInMenuBrowseState(entityId, contexts);
   if (!state) {
     return "";
@@ -119,7 +119,7 @@ export function getTuneInMenuThumbnailForTitle(
   return resolver(state, title);
 }
 
-export function updateTuneInMenuNowPlayingStation(entityId: string, candidate: string, contexts: AvrContextRegistry = sharedAvrContexts): void {
+export function updateTuneInMenuNowPlayingStation(entityId: string, candidate: string, contexts: AvrContextRegistry): void {
   const state = getTuneInMenuBrowseState(entityId, contexts);
   if (!state) return;
 
@@ -133,7 +133,7 @@ export function updateTuneInMenuNowPlayingStation(entityId: string, candidate: s
 }
 
 // Backward-compatible TuneIn naming on top of the generic shared nowPlayingTitle field.
-export function setTuneInMenuNowPlayingStation(entityId: string, station: string, contexts: AvrContextRegistry = sharedAvrContexts): void {
+export function setTuneInMenuNowPlayingStation(entityId: string, station: string, contexts: AvrContextRegistry): void {
   const state = getTuneInMenuBrowseState(entityId, contexts);
   if (!state) return;
   setBrowseNowPlayingTitle(state, station);

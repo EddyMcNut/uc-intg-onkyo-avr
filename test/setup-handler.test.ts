@@ -3,6 +3,7 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 import * as uc from "@unfoldedcircle/integration-api";
+import { memoryConfigStore } from "./helpers/configStore.js";
 
 function mkTmpDir(prefix = "onkyo-test-") {
   const base = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
@@ -16,16 +17,16 @@ it("handleRestorePayload: applies valid payload and calls onConfigSaved", async 
   try {
     const configModule = await import("../src/configManager.js");
     const SetupHandlerModule = await import("../src/setupHandler.js");
-    const ConfigManager = configModule.ConfigManager;
-    if (typeof configModule.setConfigDir === "function") configModule.setConfigDir(tmp);
+    const configStore = new configModule.ConfigStore(configModule.configPathFor(tmp));
 
     // Seed initial config to ensure it changes
-    ConfigManager.save({ avrs: [{ model: "OLD", ip: "0.0.0.0", port: 60128, zone: "main" }] });
+    configStore.save({ avrs: [{ model: "OLD", ip: "0.0.0.0", port: 60128, zone: "main" }] });
 
     let saved = false;
     const host: any = {
       driver: {},
       getConfigDirPath: () => tmp,
+      configStore,
       onConfigSaved: async () => {
         saved = true;
       },
@@ -45,11 +46,11 @@ it("handleRestorePayload: applies valid payload and calls onConfigSaved", async 
     expect(res).toBeInstanceOf(uc.SetupComplete);
     expect((setup as any).initialConfiguration).toBe(false);
 
-    const reloaded = ConfigManager.load();
+    const reloaded = configStore.load();
     expect(reloaded.avrs).toBeTruthy();
-    expect(reloaded.avrs[0].model).toBe(targetConfig.avrs[0].model);
-    expect(reloaded.avrs[0].ip).toBe(targetConfig.avrs[0].ip);
-    expect(reloaded.avrs[0].entityNameStyle).toBe("short");
+    expect(reloaded.avrs![0].model).toBe(targetConfig.avrs[0].model);
+    expect(reloaded.avrs![0].ip).toBe(targetConfig.avrs[0].ip);
+    expect(reloaded.avrs![0].entityNameStyle).toBe("short");
     expect(saved).toBe(true);
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
@@ -61,15 +62,15 @@ it("offers physical AVR selection for listening-mode reconfiguration and loads t
   try {
     const configModule = await import("../src/configManager.js");
     const SetupHandlerModule = await import("../src/setupHandler.js");
-    configModule.setConfigDir(tmp);
-    configModule.ConfigManager.save({
+    const configStore = new configModule.ConfigStore(configModule.configPathFor(tmp));
+    configStore.save({
       avrs: [
         { model: "TX-RZ50", ip: "192.168.1.20", port: 60128, zone: "main", listeningModes: { "01": { name: "A", setting: "dont-include" } } },
         { model: "TX-RZ50", ip: "192.168.1.20", port: 60128, zone: "zone2", listeningModes: { "01": { name: "A", setting: "dont-include" } } },
         { model: "TX-NR7100", ip: "192.168.1.21", port: 60128, zone: "main", listeningModes: { "01": { name: "B", setting: "discover" } } }
       ]
     });
-    const host: any = { driver: {}, getConfigDirPath: () => tmp, onConfigSaved: async () => {}, onConfigCleared: async () => {}, log: console };
+    const host: any = { driver: {}, getConfigDirPath: () => tmp, configStore, onConfigSaved: async () => {}, onConfigCleared: async () => {}, log: console };
     const setup = new SetupHandlerModule.default(host);
 
     const integrationSelection = await (setup as any).requestIntegrationConfiguration();
@@ -95,11 +96,12 @@ it("handleRestorePayload: preserves AVR-reported input mode", async () => {
   try {
     const configModule = await import("../src/configManager.js");
     const SetupHandlerModule = await import("../src/setupHandler.js");
-    if (typeof configModule.setConfigDir === "function") configModule.setConfigDir(tmp);
+    const configStore = new configModule.ConfigStore(configModule.configPathFor(tmp));
 
     const host: any = {
       driver: {},
       getConfigDirPath: () => tmp,
+      configStore,
       onConfigSaved: async () => {},
       onConfigCleared: async () => {},
       log: console
@@ -113,7 +115,7 @@ it("handleRestorePayload: preserves AVR-reported input mode", async () => {
 
     const res = await (setup as any).handleRestorePayload(raw);
     expect(res).toBeInstanceOf(uc.SetupComplete);
-    expect(configModule.ConfigManager.load().avrs![0].useAvrReportedInputs).toBe(true);
+    expect(configStore.load().avrs![0].useAvrReportedInputs).toBe(true);
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
   }
@@ -124,11 +126,12 @@ it("handleRestorePayload: invalid payload returns RequestUserInput with preserve
   try {
     const configModule = await import("../src/configManager.js");
     const SetupHandlerModule = await import("../src/setupHandler.js");
-    if (typeof configModule.setConfigDir === "function") configModule.setConfigDir(tmp);
+    const configStore = new configModule.ConfigStore(configModule.configPathFor(tmp));
 
     const host: any = {
       driver: {},
       getConfigDirPath: () => tmp,
+      configStore,
       onConfigSaved: async () => {},
       onConfigCleared: async () => {},
       log: console
@@ -158,18 +161,18 @@ it("handleDeleteConfigPayload: confirm=false prompts and confirm=true clears con
   try {
     const configModule = await import("../src/configManager.js");
     const SetupHandlerModule = await import("../src/setupHandler.js");
-    const ConfigManager = configModule.ConfigManager;
-    if (typeof configModule.setConfigDir === "function") configModule.setConfigDir(tmp);
+    const configStore = new configModule.ConfigStore(configModule.configPathFor(tmp));
 
     // Seed a config
-    ConfigManager.save({ avrs: [{ model: "TX-RZ50", ip: "192.168.2.103", port: 60128, zone: "main" }] });
+    configStore.save({ avrs: [{ model: "TX-RZ50", ip: "192.168.2.103", port: 60128, zone: "main" }] });
 
     const host: any = {
       driver: {},
       getConfigDirPath: () => tmp,
+      configStore,
       onConfigSaved: async () => {},
       onConfigCleared: async () => {
-        ConfigManager.clear();
+        configStore.clear();
       },
       log: console
     };
@@ -182,7 +185,7 @@ it("handleDeleteConfigPayload: confirm=false prompts and confirm=true clears con
     const res = await (setup as any).handleDeleteConfigPayload(true, false);
     expect(res).toBeInstanceOf(uc.SetupComplete);
 
-    const reloaded = ConfigManager.load();
+    const reloaded = configStore.load();
     // After clearing, avrs should be undefined or empty
     expect(!reloaded.avrs || reloaded.avrs.length === 0).toBe(true);
   } finally {
@@ -195,13 +198,13 @@ it("handleManualConfiguration: valid input creates AVR entries", async () => {
   try {
     const configModule = await import("../src/configManager.js");
     const SetupHandlerModule = await import("../src/setupHandler.js");
-    const ConfigManager = configModule.ConfigManager;
-    if (typeof configModule.setConfigDir === "function") configModule.setConfigDir(tmp);
+    const configStore = new configModule.ConfigStore(configModule.configPathFor(tmp));
 
     let saved = false;
     const host: any = {
       driver: {},
       getConfigDirPath: () => tmp,
+      configStore,
       onConfigSaved: async () => {
         saved = true;
       },
@@ -229,11 +232,11 @@ it("handleManualConfiguration: valid input creates AVR entries", async () => {
     expect(res).toBeInstanceOf(uc.SetupComplete);
     expect(saved).toBe(true);
 
-    const reloaded = ConfigManager.load();
+    const reloaded = configStore.load();
     expect(reloaded.avrs).toBeTruthy();
-    expect(reloaded.avrs.length).toBe(2);
-    expect(reloaded.avrs[0].model).toBe("TX-RZ50");
-    expect(reloaded.avrs[0].entityNameStyle).toBe("short");
+    expect(reloaded.avrs!.length).toBe(2);
+    expect(reloaded.avrs![0].model).toBe("TX-RZ50");
+    expect(reloaded.avrs![0].entityNameStyle).toBe("short");
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
   }
@@ -244,11 +247,12 @@ it("handleManualConfiguration: invalid input returns RequestUserInput with error
   try {
     const configModule = await import("../src/configManager.js");
     const SetupHandlerModule = await import("../src/setupHandler.js");
-    if (typeof configModule.setConfigDir === "function") configModule.setConfigDir(tmp);
+    const configStore = new configModule.ConfigStore(configModule.configPathFor(tmp));
 
     const host: any = {
       driver: {},
       getConfigDirPath: () => tmp,
+      configStore,
       onConfigSaved: async () => {},
       onConfigCleared: async () => {},
       log: console
@@ -278,15 +282,15 @@ it("handleBackupPayload: returns backup data JSON textarea", async () => {
   try {
     const configModule = await import("../src/configManager.js");
     const SetupHandlerModule = await import("../src/setupHandler.js");
-    const ConfigManager = configModule.ConfigManager;
-    if (typeof configModule.setConfigDir === "function") configModule.setConfigDir(tmp);
+    const configStore = new configModule.ConfigStore(configModule.configPathFor(tmp));
 
     // Seed config
-    ConfigManager.save({ avrs: [{ model: "TX-RZ50", ip: "192.168.2.103", port: 60128, zone: "main" }] });
+    configStore.save({ avrs: [{ model: "TX-RZ50", ip: "192.168.2.103", port: 60128, zone: "main" }] });
 
     const host: any = {
       driver: {},
       getConfigDirPath: () => tmp,
+      configStore,
       onConfigSaved: async () => {},
       onConfigCleared: async () => {},
       log: console
@@ -313,6 +317,7 @@ it("handle: returns SetupComplete for non-matching message", async () => {
   const host: any = {
     driver: {},
     getConfigDirPath: () => "/tmp",
+    configStore: memoryConfigStore(),
     onConfigSaved: async () => {},
     onConfigCleared: async () => {},
     log: console
@@ -328,6 +333,7 @@ it("handleDriverSetupReconfigure: returns undefined for unknown choice", async (
   const host: any = {
     driver: {},
     getConfigDirPath: () => "/tmp",
+    configStore: memoryConfigStore(),
     onConfigSaved: async () => {},
     onConfigCleared: async () => {},
     log: console
@@ -343,6 +349,7 @@ it("handleRestorePayload: returns restore form for undefined payload", async () 
   const host: any = {
     driver: {},
     getConfigDirPath: () => "/tmp",
+    configStore: memoryConfigStore(),
     onConfigSaved: async () => {},
     onConfigCleared: async () => {},
     log: console
@@ -359,18 +366,17 @@ it("handleManualConfiguration: autodiscovery should persist listening modes when
     const configModule = await import("../src/configManager.js");
     const SetupHandlerModule = await import("../src/setupHandler.js");
     const EiscpModule = await import("../src/eiscp.js");
-
-    const ConfigManager = configModule.ConfigManager;
-    if (typeof configModule.setConfigDir === "function") configModule.setConfigDir(tmp);
+    const configStore = new configModule.ConfigStore(configModule.configPathFor(tmp));
 
     // Stub discovery to return a host
     const originalDiscover = EiscpModule.default.prototype.discover;
-    EiscpModule.default.prototype.discover = async () => [{ model: "TX-RZ50", host: "192.168.2.103", port: 60128 }];
+    EiscpModule.default.prototype.discover = async () => [{ model: "TX-RZ50", host: "192.168.2.103", port: "60128", mac: "", areacode: "" }];
 
     let saved = false;
     const host: any = {
       driver: {},
       getConfigDirPath: () => tmp,
+      configStore,
       onConfigSaved: async () => {
         saved = true;
       },
@@ -391,8 +397,8 @@ it("handleManualConfiguration: autodiscovery should persist listening modes when
     expect(res).toBeInstanceOf(uc.SetupComplete);
     expect(saved).toBe(true);
 
-    const reloaded = ConfigManager.load();
-    expect(reloaded.avrs && reloaded.avrs[0].listeningModes).toBeTruthy();
+    const reloaded = configStore.load();
+    expect(reloaded.avrs && reloaded.avrs![0].listeningModes).toBeTruthy();
     expect(reloaded.avrs![0].listeningModes!["00"].setting).toBe("stereo");
     expect(reloaded.avrs![0].entityNameStyle).toBe("short");
 
@@ -410,16 +416,15 @@ it("handleManualConfiguration: autodiscovery persists default listening modes", 
     const configModule = await import("../src/configManager.js");
     const SetupHandlerModule = await import("../src/setupHandler.js");
     const EiscpModule = await import("../src/eiscp.js");
-
-    const ConfigManager = configModule.ConfigManager;
-    if (typeof configModule.setConfigDir === "function") configModule.setConfigDir(tmp);
+    const configStore = new configModule.ConfigStore(configModule.configPathFor(tmp));
 
     const originalDiscover = EiscpModule.default.prototype.discover;
-    EiscpModule.default.prototype.discover = async () => [{ model: "TX-RZ50", host: "192.168.2.103", port: 60128 }];
+    EiscpModule.default.prototype.discover = async () => [{ model: "TX-RZ50", host: "192.168.2.103", port: "60128", mac: "", areacode: "" }];
 
     const host: any = {
       driver: {},
       getConfigDirPath: () => tmp,
+      configStore,
       onConfigSaved: async () => {},
       onConfigCleared: async () => {},
       log: console
@@ -430,7 +435,7 @@ it("handleManualConfiguration: autodiscovery persists default listening modes", 
     const res = await (setup as any).handleManualConfiguration({ model: "", ipAddress: "" });
     expect(res).toBeInstanceOf(uc.SetupComplete);
 
-    const reloaded = ConfigManager.load();
+    const reloaded = configStore.load();
     expect(Object.keys(reloaded.avrs![0].listeningModes!)).toContain("00");
 
     // restore stub

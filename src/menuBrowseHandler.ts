@@ -1,5 +1,4 @@
 import * as uc from "@unfoldedcircle/integration-api";
-import { ConfigManager, AVR_DEFAULTS, buildEntityId } from "./configManager.js";
 import log from "./loggers.js";
 import { MenuBrowseHandlerBase, type MenuSignatureItem } from "./menuBrowseHandlerBase.js";
 import type { MenuBrowseState, MenuBrowseOption } from "./menuBrowseState.js";
@@ -27,6 +26,8 @@ export type MenuBrowseHandlerConfig = {
   resetState: StateResetter;
   getBrowseState: BrowseStateGetter;
   listMenuItems: MenuItemLister;
+  // The configured network menu delay (ms) of the zone.
+  getMenuDelay: (entityId: string) => number;
   afterHarvest?: (entityId: string, rawSend: RawSendFn) => Promise<void>;
   // XML-only services (such as Music Server) must request NLAL before waiting
   // for a list signature; the list does not exist until that request is made.
@@ -79,9 +80,7 @@ export function createMenuBrowseHandler(cfg: MenuBrowseHandlerConfig): MenuBrows
     }
 
     protected getMenuDelay(entityId: string): number {
-      const avrCfg = ConfigManager.get();
-      const avr = avrCfg?.avrs?.find((a) => buildEntityId(a.model, a.ip, a.zone) === entityId);
-      return avr?.netMenuDelay ?? AVR_DEFAULTS.netMenuDelay;
+      return cfg.getMenuDelay(entityId);
     }
 
     protected getContiguousItemCount(entityId: string): number {

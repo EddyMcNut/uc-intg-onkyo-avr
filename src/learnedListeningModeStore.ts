@@ -1,4 +1,4 @@
-import { ConfigManager, physicalAvrIdFromEntityId } from "./configManager.js";
+import { physicalAvrIdFromEntityId, type ConfigSource, type ConfigStore } from "./configManager.js";
 import { normalizeLearnedListeningModes, type LearnedListeningMode, type ListeningModeContext } from "./configConstants.js";
 import { DISCOVERED_LISTENING_MODE } from "./listeningModePreferences.js";
 
@@ -10,8 +10,8 @@ function contextKey(mode: Pick<LearnedListeningMode, "source" | "audioFormat" | 
   return [key(mode.source), key(mode.audioFormat), key(mode.inputChannels)].join("|");
 }
 
-function modesForAvr(avrId: string): LearnedListeningMode[] {
-  const avr = (ConfigManager.get().avrs ?? []).find((item) => `${item.model} ${item.ip}` === avrId);
+function modesForAvr(config: ConfigSource, avrId: string): LearnedListeningMode[] {
+  const avr = (config.get().avrs ?? []).find((item) => `${item.model} ${item.ip}` === avrId);
   const result: LearnedListeningMode[] = [];
   for (const [code, mode] of Object.entries(avr?.listeningModes ?? {})) {
     if (mode.name) result.push({ code, name: mode.name });
@@ -32,34 +32,34 @@ function matchingModes(modes: LearnedListeningMode[], source?: string, audioForm
   return modes.filter((mode) => !mode.source && !mode.audioFormat);
 }
 
-export function getLearnedListeningModes(entityId: string, source?: string, audioFormat?: string, inputChannels?: string): LearnedListeningMode[] {
+export function getLearnedListeningModes(config: ConfigSource, entityId: string, source?: string, audioFormat?: string, inputChannels?: string): LearnedListeningMode[] {
   const avrId = physicalAvrIdFromEntityId(entityId);
-  return avrId ? matchingModes(modesForAvr(avrId), source, audioFormat, inputChannels).map((mode) => ({ ...mode })) : [];
+  return avrId ? matchingModes(modesForAvr(config, avrId), source, audioFormat, inputChannels).map((mode) => ({ ...mode })) : [];
 }
 
-export function getAllLearnedListeningModes(physicalAvrId: string): LearnedListeningMode[] {
-  return modesForAvr(physicalAvrId);
+export function getAllLearnedListeningModes(config: ConfigSource, physicalAvrId: string): LearnedListeningMode[] {
+  return modesForAvr(config, physicalAvrId);
 }
 
-export function findLearnedListeningModeCode(physicalAvrId: string, name: string, source?: string, audioFormat?: string, inputChannels?: string): string | undefined {
+export function findLearnedListeningModeCode(config: ConfigSource, physicalAvrId: string, name: string, source?: string, audioFormat?: string, inputChannels?: string): string | undefined {
   const wanted = key(name);
-  return matchingModes(modesForAvr(physicalAvrId), source, audioFormat, inputChannels).find((mode) => key(mode.name) === wanted)?.code;
+  return matchingModes(modesForAvr(config, physicalAvrId), source, audioFormat, inputChannels).find((mode) => key(mode.name) === wanted)?.code;
 }
 
-export function findLearnedListeningModeName(physicalAvrId: string, code: string, source?: string, audioFormat?: string, inputChannels?: string): string | undefined {
+export function findLearnedListeningModeName(config: ConfigSource, physicalAvrId: string, code: string, source?: string, audioFormat?: string, inputChannels?: string): string | undefined {
   const wanted = code.trim().toUpperCase();
-  return matchingModes(modesForAvr(physicalAvrId), source, audioFormat, inputChannels).find((mode) => mode.code === wanted)?.name;
+  return matchingModes(modesForAvr(config, physicalAvrId), source, audioFormat, inputChannels).find((mode) => mode.code === wanted)?.name;
 }
 
 // Learn an observed mode and persist it under its source/audio context. The top-level name
 // remains as a fallback and is updated for setup display when the AVR reports a new name.
-export function learnListeningMode(entityId: string, mode: LearnedListeningMode): boolean {
+export function learnListeningMode(config: Pick<ConfigStore, "get" | "save">, entityId: string, mode: LearnedListeningMode): boolean {
   const avrId = physicalAvrIdFromEntityId(entityId);
   if (!avrId) return false;
   const normalized = normalizeLearnedListeningModes([mode]);
   if (normalized.length === 0) return false;
   const observed = normalized[0];
-  const avr = (ConfigManager.get().avrs ?? []).find((item) => `${item.model} ${item.ip}` === avrId);
+  const avr = (config.get().avrs ?? []).find((item) => `${item.model} ${item.ip}` === avrId);
   if (!avr) return false;
   const listeningModes = { ...(avr.listeningModes ?? {}) };
   const wasExisting = Boolean(listeningModes[observed.code]);
@@ -82,6 +82,6 @@ export function learnListeningMode(entityId: string, mode: LearnedListeningMode)
   }
   listeningModes[observed.code] = { ...existing, name: observed.name, setting: existing.setting ?? DISCOVERED_LISTENING_MODE, ...(contexts.length ? { contexts } : {}) };
   if (!changed) return false;
-  ConfigManager.save({ avrs: (ConfigManager.get().avrs ?? []).map((item) => (`${item.model} ${item.ip}` === avrId ? { ...item, listeningModes } : item)) });
+  config.save({ avrs: (config.get().avrs ?? []).map((item) => (`${item.model} ${item.ip}` === avrId ? { ...item, listeningModes } : item)) });
   return true;
 }
