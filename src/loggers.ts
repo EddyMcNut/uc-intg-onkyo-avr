@@ -28,6 +28,11 @@ export function getLogLevel(): LogLevel {
   return currentLevel;
 }
 
+// Arguments are evaluated before log.debug checks the level, so guard debug output that is costly to build with this.
+export function isDebugEnabled(): boolean {
+  return currentLevel === "debug";
+}
+
 const log = {
   debug: (...args: unknown[]) => {
     if (LEVEL_RANK["debug"] >= LEVEL_RANK[currentLevel]) console.log("[DEBUG]", formatLogMessage(args));

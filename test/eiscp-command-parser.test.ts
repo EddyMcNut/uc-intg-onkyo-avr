@@ -682,6 +682,31 @@ describe("IscpCommandParser NRI handling", () => {
     }
   });
 
+  it("dumps a repeated NRI payload only once, and again when it changes", async () => {
+    const loggers = await import("../src/loggers.js");
+    const spy = vi.spyOn(console, "log").mockImplementation(() => {});
+    const dumps = () => spy.mock.calls.filter((call) => String(call[1]).includes("Complete NRI payload")).length;
+    try {
+      loggers.setLogLevel("debug");
+      const { parser, store } = await makeNriParser();
+      store.resetAvrInfo(entityId);
+
+      parser.parse("NRI", realResponseXml);
+      parser.parse("NRI", realResponseXml);
+      parser.parse("NRI", realResponseXml);
+      expect(dumps()).toBe(1);
+      expect(spy.mock.calls.filter((call) => String(call[1]).includes("NRI payload unchanged"))).toHaveLength(2);
+
+      parser.parse("NRI", realResponseXml.replace(/name="R10 80s\s*"/, 'name="Other   "'));
+      expect(dumps()).toBe(2);
+
+      store.resetAvrInfo(entityId);
+    } finally {
+      loggers.setLogLevel("warn");
+      spy.mockRestore();
+    }
+  });
+
   it("ignores NRI replies that carry no XML", async () => {
     const { parser, store } = await makeNriParser();
     store.resetAvrInfo(entityId);

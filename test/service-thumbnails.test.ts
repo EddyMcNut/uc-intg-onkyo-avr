@@ -1,16 +1,14 @@
-import { describe, it, expect, vi, beforeAll } from "vitest";
+import { describe, it, expect, vi, beforeAll, beforeEach } from "vitest";
+import log from "../src/loggers.js";
 
 const mockExistsSync = vi.fn();
-const mockStatSync = vi.fn();
 const mockReadFileSync = vi.fn();
 
 vi.mock("node:fs", () => ({
   existsSync: mockExistsSync,
-  statSync: mockStatSync,
   readFileSync: mockReadFileSync,
   default: {
     existsSync: mockExistsSync,
-    statSync: mockStatSync,
     readFileSync: mockReadFileSync
   }
 }));
@@ -90,7 +88,6 @@ describe("serviceThumbnails", () => {
 
   it("loads SVG asset and generates path-based logo markup", () => {
     mockExistsSync.mockReturnValue(true);
-    mockStatSync.mockReturnValue({ mtimeMs: 1234, size: 5678 });
     const svgContent = `<svg><path d="M10 10 L20 20" fill="#fff"/><polygon points="0,0 10,0 10,10 0,10"/></svg>`;
     mockReadFileSync.mockReturnValue(Buffer.from(svgContent, "utf8"));
 
@@ -103,7 +100,6 @@ describe("serviceThumbnails", () => {
 
   it("loadAsset caches and reuses signature", () => {
     mockExistsSync.mockReturnValue(true);
-    mockStatSync.mockReturnValue({ mtimeMs: 1234, size: 5678 });
     mockReadFileSync.mockReturnValue(Buffer.from("<svg></svg>", "utf8"));
 
     const thumbnails = createServiceThumbnails(baseConfig);
@@ -143,7 +139,6 @@ describe("serviceThumbnails", () => {
 
   it("polygonPointsToPath handles odd coordinate count", () => {
     mockExistsSync.mockReturnValue(true);
-    mockStatSync.mockReturnValue({ mtimeMs: 1, size: 2 });
     const svgContent = '<svg><polygon points="0,0 10,0 10,10 0"/></svg>';
     mockReadFileSync.mockReturnValue(Buffer.from(svgContent, "utf8"));
     const thumbnails = createServiceThumbnails(baseConfig);
@@ -163,7 +158,6 @@ describe("serviceThumbnails", () => {
 
   it("loadAsset handles SVG with path element", () => {
     mockExistsSync.mockReturnValue(true);
-    mockStatSync.mockReturnValue({ mtimeMs: 99, size: 88 });
     const svgContent = '<svg><path d="M10 10 L20 20" fill="#fff"/></svg>';
     mockReadFileSync.mockReturnValue(Buffer.from(svgContent, "utf8"));
     const thumbnails = createServiceThumbnails(baseConfig);
@@ -173,7 +167,6 @@ describe("serviceThumbnails", () => {
 
   it("loadAsset handles SVG with empty polygon points", () => {
     mockExistsSync.mockReturnValue(true);
-    mockStatSync.mockReturnValue({ mtimeMs: 77, size: 66 });
     const svgContent = '<svg><polygon points=""/></svg>';
     mockReadFileSync.mockReturnValue(Buffer.from(svgContent, "utf8"));
     const thumbnails = createServiceThumbnails(baseConfig);
@@ -183,11 +176,63 @@ describe("serviceThumbnails", () => {
 
   it("loadAsset handles non-SVG extension (PNG)", () => {
     mockExistsSync.mockReturnValue(true);
-    mockStatSync.mockReturnValue({ mtimeMs: 55, size: 44 });
     mockReadFileSync.mockReturnValue(Buffer.from("fake-png-data", "utf8"));
     const thumbnails = createServiceThumbnails({ ...baseConfig, svgFileName: "test.png" });
     const result = thumbnails.createBackdrop();
     expect(result).toBeTruthy();
+  });
+
+  describe("file-system access", () => {
+    beforeEach(() => {
+      mockExistsSync.mockReset();
+      mockReadFileSync.mockReset();
+    });
+
+    it("reads the logo once, however many thumbnails and backdrops are made", () => {
+      mockExistsSync.mockReturnValue(true);
+      mockReadFileSync.mockReturnValue(Buffer.from('<svg><path d="M0 0 L10 10"/></svg>', "utf8"));
+      const thumbnails = createServiceThumbnails(baseConfig);
+      const state = { thumbnailByTitle: new Map(), backgroundSignature: "" };
+
+      for (let row = 0; row < 50; row++) thumbnails.getOrCreateThumbnail(state, `Station ${row}`);
+      const backdrop = thumbnails.createBackdrop();
+
+      expect(mockExistsSync).toHaveBeenCalledTimes(1);
+      expect(mockReadFileSync).toHaveBeenCalledTimes(1);
+      expect(state.thumbnailByTitle.size).toBe(50);
+      // The logo is drawn, not the fallback label, and the backdrop is the same string every time.
+      expect(backdrop).not.toContain("TEST");
+      expect(thumbnails.createBackdrop()).toBe(backdrop);
+    });
+
+    it("looks for a missing logo once, warns once and uses the fallback label", () => {
+      mockExistsSync.mockReturnValue(false);
+      const warn = vi.spyOn(log, "warn").mockImplementation(() => log);
+      const thumbnails = createServiceThumbnails(baseConfig);
+      const state = { thumbnailByTitle: new Map(), backgroundSignature: "" };
+
+      for (let row = 0; row < 10; row++) thumbnails.getOrCreateThumbnail(state, `Station ${row}`);
+      const backdrop = thumbnails.createBackdrop();
+
+      // Four candidate locations are checked, once.
+      expect(mockExistsSync).toHaveBeenCalledTimes(4);
+      expect(mockReadFileSync).not.toHaveBeenCalled();
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(backdrop).toContain("TEST");
+      warn.mockRestore();
+    });
+
+    it("keeps the thumbnails of a state that was built for the same logo", () => {
+      mockExistsSync.mockReturnValue(false);
+      const thumbnails = createServiceThumbnails(baseConfig);
+      const state = { thumbnailByTitle: new Map(), backgroundSignature: "" };
+      thumbnails.getOrCreateThumbnail(state, "A");
+
+      thumbnails.getOrCreateThumbnail(state, "B");
+
+      expect(state.backgroundSignature).toBe("missing");
+      expect([...state.thumbnailByTitle.keys()]).toEqual(["A", "B"]);
+    });
   });
 
   describe("createTunerArtwork", () => {

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 const h = vi.hoisted(() => {
   const handlers: Record<string, (...args: any[]) => any> = {};
@@ -95,7 +95,10 @@ const h = vi.hoisted(() => {
       save: vi.fn(),
       addAvr: vi.fn()
     },
-    mockLog: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() }
+    mockLog: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
+    mockSetZoneEntitiesAvailability: vi.fn(),
+    // Constructor arguments of the mocked classes, so tests can call the callbacks the driver hands out.
+    ctorArgs: { connectionManager: [] as any[][], selectHandler: [] as any[][], commandReceiver: [] as any[][], commandSender: [] as any[][] }
   };
 });
 
@@ -114,7 +117,9 @@ const {
   mockSetAvrInputs,
   mockClearAvrInputs,
   mockHasAvrInputs,
-  mockConfigStore
+  mockConfigStore,
+  mockSetZoneEntitiesAvailability,
+  ctorArgs
 } = h;
 
 vi.mock("@unfoldedcircle/integration-api", () => ({
@@ -187,12 +192,14 @@ vi.mock("../src/eiscp.js", () => ({
   }
 }));
 vi.mock("../src/commandSender.js", () => ({
-  CommandSender: function () {
+  CommandSender: function (...args: any[]) {
+    h.ctorArgs.commandSender.push(args);
     return mockCommandSender;
   }
 }));
 vi.mock("../src/commandReceiver.js", () => ({
-  CommandReceiver: function () {
+  CommandReceiver: function (...args: any[]) {
+    h.ctorArgs.commandReceiver.push(args);
     return {};
   }
 }));
@@ -236,12 +243,14 @@ vi.mock("../src/entityRegistrar.js", () => ({
   }
 }));
 vi.mock("../src/connectionManager.js", () => ({
-  default: function () {
+  default: function (...args: any[]) {
+    h.ctorArgs.connectionManager.push(args);
     return mockConnectionManager;
   }
 }));
 vi.mock("../src/selectEntityHandler.js", () => ({
-  SelectEntityHandler: function () {
+  SelectEntityHandler: function (...args: any[]) {
+    h.ctorArgs.selectHandler.push(args);
     return { handle: vi.fn() };
   }
 }));
@@ -261,12 +270,14 @@ vi.mock("../src/connectCoordinator.js", () => ({
   }
 }));
 vi.mock("../src/utils.js", () => ({ delay: vi.fn() }));
+vi.mock("../src/entityAvailability.js", () => ({ setZoneEntitiesAvailability: h.mockSetZoneEntitiesAvailability }));
 
 let OnkyoDriver: any;
 
 beforeEach(() => {
   vi.clearAllMocks();
   h.availableEntityIds.clear();
+  for (const list of Object.values(h.ctorArgs)) list.length = 0;
 });
 
 async function createDriver() {
@@ -1002,6 +1013,238 @@ describe("OnkyoDriver", () => {
       await driver.init();
 
       expect(mockConnectCoordinator.connect).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("select entity option providers", () => {
+    const handlerFor = (suffix: string) => ctorArgs.selectHandler.find((args) => args[3] === suffix)!;
+
+    it("offers listening modes for the current audio format, or all of them when it is unknown", async () => {
+      await createDriver();
+      const options = handlerFor("_listening_mode")[6];
+
+      mockAvrStateApi.getAudioFormat.mockReturnValueOnce("unknown");
+      expect(options("TX-RZ50_1.2.3.4_main")).toEqual(["option1"]);
+      expect(mockEntityRegistrar.getListeningModeOptions).toHaveBeenLastCalledWith(undefined, "TX-RZ50_1.2.3.4_main");
+
+      mockAvrStateApi.getAudioFormat.mockReturnValueOnce("dolby atmos");
+      options("TX-RZ50_1.2.3.4_main");
+      expect(mockEntityRegistrar.getListeningModeOptions).toHaveBeenLastCalledWith("dolby atmos", "TX-RZ50_1.2.3.4_main");
+    });
+
+    it("offers the input sources and tuner presets of the zone, and recalls presets by slot", async () => {
+      const driver = await createDriver();
+
+      expect(handlerFor("_input_selector")[6]("TX-RZ50_1.2.3.4_main")).toEqual(["input1"]);
+      expect(mockEntityRegistrar.getInputSelectorOptions).toHaveBeenCalledWith("TX-RZ50_1.2.3.4_main");
+
+      const tunerPresets = handlerFor("_tuner_presets");
+      expect(tunerPresets[6]("TX-RZ50_1.2.3.4_main")).toEqual(["R10 80s", "NPO FunX", "STRKSTAD"]);
+      // The option is sent as a preset slot by the driver, not as a mapped command value.
+      (driver as any).avrContexts.get("TX-RZ50_1.2.3.4").tunerPresets.set([{ slot: 3, name: "R10 80s", band: "2", freq: "0" }]);
+      const raw = vi.fn().mockResolvedValue(undefined);
+      await tunerPresets[8]({ raw }, "TX-RZ50_1.2.3.4_main", "main", "R10 80s");
+      expect(raw).toHaveBeenCalledWith("PRS03");
+    });
+
+    it("offers the fixed Dirac options", async () => {
+      await createDriver();
+      const { DIRAC_OPTION_LABELS } = await import("../src/diracSelect.js");
+
+      expect(handlerFor("_dirac")[6]()).toEqual([...DIRAC_OPTION_LABELS]);
+    });
+  });
+
+  describe("AVR availability", () => {
+    it("greys out the entities of every configured zone of the AVR that lost its connection", async () => {
+      mockConfigStore.load.mockReturnValue({
+        avrs: [
+          { model: "TX-RZ50", ip: "1.2.3.4", zone: "main", createSensors: false },
+          { model: "TX-RZ50", ip: "1.2.3.4", zone: "zone2", createSensors: false },
+          { model: "TX-NR860", ip: "5.6.7.8", zone: "main", createSensors: false }
+        ],
+        logLevel: "info"
+      });
+      await createDriver();
+      const onAvailability = ctorArgs.connectionManager[0][6];
+
+      onAvailability("TX-RZ50_1.2.3.4", false);
+
+      expect(mockSetZoneEntitiesAvailability).toHaveBeenCalledWith(mockDriver, ["TX-RZ50_1.2.3.4_main", "TX-RZ50_1.2.3.4_zone2"], false, mockAvrStateApi);
+    });
+  });
+
+  describe("raw send", () => {
+    it("sends over the current connection of the AVR, and does nothing without one", async () => {
+      const driver = await createDriver();
+      const send = (driver as any).createRawSend({ model: "TX-RZ50", ip: "1.2.3.4", zone: "zone2" });
+      const raw = vi.fn().mockResolvedValue(undefined);
+
+      mockConnectionManager.getPhysicalConnection.mockReturnValueOnce({ eiscp: { raw } });
+      await send("PWR01");
+      mockConnectionManager.getPhysicalConnection.mockReturnValueOnce(undefined);
+      await expect(send("PWR00")).resolves.toBeUndefined();
+
+      expect(mockConnectionManager.getPhysicalConnection).toHaveBeenCalledWith("TX-RZ50_1.2.3.4");
+      expect(raw).toHaveBeenCalledTimes(1);
+      expect(raw).toHaveBeenCalledWith("PWR01");
+    });
+  });
+
+  describe("setup host", () => {
+    it("forgets every AVR and disconnects when the config is cleared", async () => {
+      mockConfigStore.load.mockReturnValue({ avrs: [{ model: "TX-RZ50", ip: "1.2.3.4", zone: "main", createSensors: false }], logLevel: "info" });
+      const driver = await createDriver();
+      await driver.handleDriverSetup({ command: "start" } as any);
+      driver.avrInstances.set("TX-RZ50_1.2.3.4_main", {});
+      mockConfigStore.load.mockReturnValue({});
+
+      await mockSetupHost.current.onConfigCleared();
+
+      expect(mockConnectCoordinator.reconcile).toHaveBeenCalledWith({ avrs: [] });
+      expect(mockConfigStore.clear).toHaveBeenCalled();
+      expect(driver.config).toEqual({});
+      expect(driver.avrInstances.size).toBe(0);
+      expect(mockConnectionManager.clearAllConnections).toHaveBeenCalled();
+      expect(mockDriver.setDeviceState).toHaveBeenCalledWith("disconnected");
+    });
+
+    it("probes input sources through the setup probe", async () => {
+      const driver = await createDriver();
+      await driver.handleDriverSetup({ command: "start" } as any);
+      const query = vi.spyOn((driver as any).setupInputSourceProbe, "query").mockResolvedValue([{ id: "10", name: "BD/DVD" }]);
+
+      await expect(mockSetupHost.current.queryInputSources({ model: "TX-RZ50", ip: "1.2.3.4", port: 60128 })).resolves.toEqual([{ id: "10", name: "BD/DVD" }]);
+      expect(query).toHaveBeenCalledWith("TX-RZ50", "1.2.3.4", 60128);
+    });
+
+    it("creates the setup handler once and passes it every message", async () => {
+      const driver = await createDriver();
+      await driver.handleDriverSetup({ command: "start" } as any);
+      const first = driver.setupHandler;
+      await driver.handleDriverSetup({ command: "next" } as any);
+
+      expect(driver.setupHandler).toBe(first);
+      expect(first.handle).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe("AVR info collection after connecting", () => {
+    const config = { avrs: [{ model: "TX-RZ50", ip: "1.2.3.4", zone: "main", createSensors: false }], logLevel: "info" };
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("asks again after 10 and 30 seconds, and a new save restarts that schedule", async () => {
+      vi.useFakeTimers();
+      mockConfigStore.load.mockReturnValue(config);
+      const driver = await createDriver();
+      await driver.handleDriverSetup({ command: "start" } as any);
+      const command = vi.fn().mockResolvedValue(undefined);
+      mockConnectionManager.getPhysicalConnection.mockReturnValue({ eiscp: { command, connected: true } });
+
+      await mockSetupHost.current.onConfigSaved();
+      expect(command).toHaveBeenCalledTimes(1);
+      await vi.advanceTimersByTimeAsync(5_000);
+      // A second save within the first 10 seconds replaces the pending retries instead of adding to them.
+      await mockSetupHost.current.onConfigSaved();
+      expect(command).toHaveBeenCalledTimes(2);
+
+      await vi.advanceTimersByTimeAsync(10_000);
+      expect(command).toHaveBeenCalledTimes(3);
+      await vi.advanceTimersByTimeAsync(20_000);
+      expect(command).toHaveBeenCalledTimes(4);
+      await vi.advanceTimersByTimeAsync(60_000);
+      expect(command).toHaveBeenCalledTimes(4);
+    });
+
+    it("warns when the AVR info query fails", async () => {
+      mockConfigStore.load.mockReturnValue(config);
+      const driver = await createDriver();
+      const error = new Error("socket closed");
+      mockConnectionManager.getPhysicalConnection.mockReturnValue({ eiscp: { command: vi.fn().mockRejectedValue(error), connected: true } });
+
+      await driver.triggerAvrInfoQuery();
+
+      expect(mockLog.warn).toHaveBeenCalledWith(expect.stringContaining("Failed to collect the AVR info"), "driver:", "TX-RZ50_1.2.3.4", error);
+    });
+
+    it("reports connected and wires each connection to a command receiver and sender", async () => {
+      vi.useFakeTimers();
+      mockConfigStore.load.mockReturnValue(config);
+      const driver = await createDriver();
+      mockConnectCoordinator.connect.mockResolvedValueOnce(true);
+
+      await driver.handleConnect();
+
+      expect(mockDriver.setDeviceState).toHaveBeenCalledWith("connected");
+      const [, receiverFactory, senderFactory] = mockConnectCoordinator.connect.mock.calls[0];
+      const eiscp = { connected: true };
+      const receiver = receiverFactory(config.avrs[0])(eiscp);
+      const receiverArgs = ctorArgs.commandReceiver[0];
+      expect(receiverArgs[0]).toBe(mockDriver);
+      expect(receiverArgs[1].avrs[0]).toMatchObject({ ip: "1.2.3.4", zone: "main" });
+      expect(receiverArgs[2]).toBe(eiscp);
+      expect(receiverArgs[7]).toBe("2.0.0");
+      // The receiver reports NRI replies back to the driver.
+      expect(typeof receiverArgs[8]).toBe("function");
+
+      const avrSpecificConfig = driver.createAvrSpecificConfig(config.avrs[0]);
+      expect(senderFactory(avrSpecificConfig, eiscp, receiver)).toBe(mockCommandSender);
+      expect(ctorArgs.commandSender[0].slice(0, 5)).toEqual([mockDriver, avrSpecificConfig, eiscp, mockAvrStateApi, receiver]);
+    });
+  });
+
+  describe("handleAvrInfo entity refresh", () => {
+    beforeEach(() => {
+      mockConnectionManager.getPhysicalConnection.mockReturnValue(undefined);
+      mockResolveAutoVolumeScale.mockReturnValue(undefined);
+      mockResolveInputSourceList.mockReturnValue(undefined);
+    });
+
+    it("also re-registers the remote entity of a zone that has one", async () => {
+      const config = { avrs: [{ model: "TX-RZ50", ip: "1.2.3.4", zone: "main", volumeScale: "auto", createSensors: false, createRemoteEntity: true }], logLevel: "info" };
+      mockConfigStore.load.mockReturnValue(config);
+      const driver = await createDriver();
+      mockResolveAutoVolumeScale.mockReturnValue({ scale: 80, reason: "AVR reports a maximum display volume of 80", discovered: true });
+      mockConfigStore.patchAvr.mockReturnValue(true);
+      mockEntityRegistrar.createRemoteEntity.mockClear();
+
+      driver.handleAvrInfo("TX-RZ50_1.2.3.4_main");
+
+      expect(mockConfigStore.patchAvr).toHaveBeenCalledWith("1.2.3.4", "main", { volumeScale: 80, volumeScaleDiscovered: true });
+      expect(mockEntityRegistrar.createRemoteEntity).toHaveBeenCalledTimes(1);
+    });
+
+    it("stores the volume scale and the input switch in one write", async () => {
+      const config = { avrs: [{ model: "TX-RZ50", ip: "1.2.3.4", zone: "main", volumeScale: "auto", useAvrReportedInputs: true, createSensors: false }], logLevel: "info" };
+      mockConfigStore.load.mockReturnValue(config);
+      const driver = await createDriver();
+      mockResolveAutoVolumeScale.mockReturnValue({ scale: 100, reason: "default", discovered: false });
+      mockResolveInputSourceList.mockReturnValue({ reason: "AVR reports no input sources" });
+      mockConfigStore.patchAvr.mockReturnValue(true);
+
+      driver.handleAvrInfo("TX-RZ50_1.2.3.4_main");
+
+      expect(mockConfigStore.patchAvr).toHaveBeenCalledTimes(1);
+      expect(mockConfigStore.patchAvr).toHaveBeenCalledWith("1.2.3.4", "main", { volumeScale: 100, volumeScaleDiscovered: false, useAvrReportedInputs: false });
+    });
+
+    it("logs an error when the input switch cannot be stored", async () => {
+      const config = { avrs: [{ model: "TX-RZ50", ip: "1.2.3.4", zone: "main", volumeScale: 100, useAvrReportedInputs: true, createSensors: false }], logLevel: "info" };
+      mockConfigStore.load.mockReturnValue(config);
+      const driver = await createDriver();
+      mockResolveInputSourceList.mockReturnValue({ reason: "AVR reports no input sources" });
+      mockHasAvrInputs.mockReturnValue(false);
+      mockConfigStore.patchAvr.mockReturnValue(false);
+      mockEntityRegistrar.createMediaPlayerEntity.mockClear();
+
+      driver.handleAvrInfo("TX-RZ50_1.2.3.4_main");
+
+      expect(mockLog.error).toHaveBeenCalledWith("%s [%s] Could not disable AVR-reported input names in the config", "driver:", "TX-RZ50_1.2.3.4_main");
+      // Nothing changed, so the entities are left as they are.
+      expect(mockEntityRegistrar.createMediaPlayerEntity).not.toHaveBeenCalled();
     });
   });
 });

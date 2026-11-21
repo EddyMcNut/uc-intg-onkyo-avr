@@ -38,7 +38,7 @@ describe("SetupFormBuilder", () => {
     expect(builder.buildManualConfigForm(base).settings.length).toBeGreaterThan(0);
     expect(builder.buildManualConfigPage1(base).title).toContain("1/3");
     expect(builder.buildManualConfigPage2(base).title).toContain("2/3");
-    expect(builder.buildManualConfigPage3(base).title).toContain("3/4");
+    expect(builder.buildManualConfigPage3(base).title).toContain("3/3");
     expect(builder.buildManualConfigPage4(base).title).toContain("1/6");
     expect(builder.buildManualConfigPage5(base).title).toContain("2/6");
     expect(builder.buildManualConfigPage6(base).title).toContain("3/6");

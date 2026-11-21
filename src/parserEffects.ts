@@ -8,7 +8,7 @@ import { DEEZER_SERVICE_ID, MUSIC_SERVER_SERVICE_ID, TIDAL_SERVICE_ID, TUNEIN_SE
 import { getMenuBrowseService } from "./menuBrowseServices.js";
 import type { MenuBrowseOption, MenuBrowseState } from "./menuBrowseState.js";
 import { getTuneInMenuBrowseState, type TuneInMenuBrowseState } from "./tuneInMenuStore.js";
-import log from "./loggers.js";
+import log, { isDebugEnabled } from "./loggers.js";
 
 const logSource = "parserEffects:";
 
@@ -111,12 +111,25 @@ export function createDefaultParserEffects(avrContexts: AvrContextRegistry): Par
   );
 }
 
+function samePresets(a: AvrInfo["presets"], b: AvrInfo["presets"]): boolean {
+  return a.length === b.length && a.every((preset, index) => preset.slot === b[index].slot && preset.name === b[index].name && preset.band === b[index].band && preset.freq === b[index].freq);
+}
+
 const storeAndLogAvrInfo =
   (avrContexts: AvrContextRegistry) =>
   (entityId: string, info: AvrInfo): void => {
     const avrInfo = avrContexts.forEntity(entityId)?.avrInfo;
     if (!avrInfo) return;
+    const previousPresets = avrInfo.get()?.presets;
     avrInfo.set(info);
+
+    // The summary below is only built at debug level (its arguments cost work even when not logged), and the full
+    // preset lists only when they changed: the AVR repeats the same document on every NRI reply.
+    if (!isDebugEnabled()) return;
+    if (previousPresets && samePresets(previousPresets, info.presets)) {
+      log.debug("%s [%s] AVR info received again, %d preset slot(s) unchanged", logSource, entityId, info.presets.length);
+      return;
+    }
     const dabPresets = avrInfo.dabPresets();
     const fmPresets = avrInfo.fmPresets();
     const emptyPresets = info.presets.filter((preset) => preset.band === PRESET_BAND_EMPTY);

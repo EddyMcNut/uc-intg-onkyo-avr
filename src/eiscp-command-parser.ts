@@ -6,7 +6,7 @@ import { hasServiceCapability, toServiceId } from "./networkServices.js";
 import { parseAvrInfo } from "./avrInfoStore.js";
 import type { AvrContextRegistry } from "./avrContext.js";
 import { physicalAvrIdFromEntityId } from "./configManager.js";
-import log, { getLogLevel } from "./loggers.js";
+import log, { isDebugEnabled } from "./loggers.js";
 import type { ListHeader, ParserEffects } from "./parserEffects.js";
 
 const COMMANDS = eiscpCommands.commands;
@@ -41,6 +41,9 @@ type CommandHandler = (value: string, command: string, result: CommandResult) =>
 // Parses raw ISCP command strings into structured CommandResult objects; owns current metadata state.
 export class IscpCommandParser {
   private currentMetadata: Metadata = {};
+  // The last NRI document dumped to the debug log. The parser belongs to one AVR connection, and the AVR repeats the
+  // same document on every reply, so it is dumped again only when it changed.
+  private lastDumpedNri: string | undefined;
   private readonly commandHandlers: Record<string, CommandHandler>;
 
   // getEntityId: returns the UC entity id for a zone (called at parse time). stateReader: read-only zone state, used to
@@ -466,14 +469,18 @@ export class IscpCommandParser {
       return result;
     }
 
-    // Dump the full payload only at debug ("Debug (all)") level. Formatting the 9 KB document is
-    // not free, and the reply repeats forever, so it is kept out of the normal debug stream where
-    // it would drown out everything else. Newlines go in at element boundaries only, and are
-    // collapsed again inside empty elements, so the dump stays valid XML. The AVR terminates the
-    // frame with SUB (0x1A), which is not XML and is stripped.
-    if (getLogLevel() === "debug") {
+    // Dump the full payload only at debug ("Debug (all)") level, and only when it differs from the last dump: formatting
+    // and logging the 9 KB document is not free, and the AVR repeats it on every reply. Newlines go in at element
+    // boundaries only, and are collapsed again inside empty elements, so the dump stays valid XML. The AVR terminates
+    // the frame with SUB (0x1A), which is not XML and is stripped.
+    if (isDebugEnabled()) {
       const dumpable = xml.replace(/\x1a+$/, "");
-      log.debug("%s [%s] Complete NRI payload (%d chars):\n%s", logSource, entityId, dumpable.length, dumpable.replace(/></g, ">\n<").replace(/>\n<\//g, "></"));
+      if (dumpable === this.lastDumpedNri) {
+        log.debug("%s [%s] NRI payload unchanged (%d chars), not dumped again", logSource, entityId, dumpable.length);
+      } else {
+        this.lastDumpedNri = dumpable;
+        log.debug("%s [%s] Complete NRI payload (%d chars):\n%s", logSource, entityId, dumpable.length, dumpable.replace(/></g, ">\n<").replace(/>\n<\//g, "></"));
+      }
     }
 
     this.effects.storeAvrInfo(entityId, info);

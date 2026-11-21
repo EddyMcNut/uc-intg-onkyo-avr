@@ -50,7 +50,7 @@ export class SetupFormBuilder {
 
   buildManualConfigPage3(values: ParsedManualConfig): uc.RequestUserInput {
     const ids = ["createRemoteEntity", "createSensors", "createTunerPresets", "createDiracSelectEntity", "logLevel"];
-    return this.buildManualConfigFormPage(values, "Manual configuration (3/4)", ids);
+    return this.buildManualConfigFormPage(values, "Manual configuration (3/3)", ids);
   }
 
   buildInputSourcePage(values: ParsedManualConfig, page: number, total: number): uc.RequestUserInput {

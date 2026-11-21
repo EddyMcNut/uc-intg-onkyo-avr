@@ -1,11 +1,19 @@
 /*jslint node:true nomen:true*/
 "use strict";
-import { ConfigStore, configPathFor } from "./configManager.js";
 import * as uc from "@unfoldedcircle/integration-api";
 import { SelectAttributes } from "@unfoldedcircle/integration-api";
 import EiscpDriver from "./eiscp.js";
-import { IntegrationConfig, AvrConfig, buildEntityId, buildPhysicalAvrId, physicalAvrIdFromEntityId, DEFAULT_QUEUE_THRESHOLD, normalizeAvrConfig } from "./configManager.js";
-import { isTunerPresetModeEnabled, parseTunerPresetMode } from "./configConstants.js";
+import {
+  ConfigStore,
+  configPathFor,
+  IntegrationConfig,
+  AvrConfig,
+  buildEntityId,
+  buildPhysicalAvrId,
+  physicalAvrIdFromEntityId,
+  DEFAULT_QUEUE_THRESHOLD,
+  normalizeAvrConfig
+} from "./configManager.js";
 import { CommandSender } from "./commandSender.js";
 import { CommandReceiver } from "./commandReceiver.js";
 import { ReconnectionManager } from "./reconnectionManager.js";
@@ -24,8 +32,7 @@ import { remoteEntityCommandHandler } from "./remoteEntityCommandHandler.js";
 import SubscriptionHandler from "./subscriptionHandler.js";
 import ConnectCoordinator from "./connectCoordinator.js";
 import { AvrInstance, EiscpInstance, type AvrStateApi } from "./types.js";
-import { resolveAutoVolumeScale } from "./volumeScaleResolver.js";
-import { resolveInputSourceList } from "./inputSourceResolver.js";
+import { resolveAvrInfo, configPatchFor, type AvrInfoZoneResolution } from "./avrInfoResolver.js";
 import { tunerPresetCommandValue } from "./tunerPresetStore.js";
 import { AvrContextRegistry } from "./avrContext.js";
 import { readDriverMetadata } from "./driverMetadata.js";
@@ -332,102 +339,50 @@ export default class Driver {
     }, 10_000);
   }
 
-  // Act on what the AVR reported about itself: resolve the volume scale and the input source list that were left on "auto". NRI describes the AVR as a whole and is answered on the main zone, so the single reply resolves every configured zone of that AVR — each zone reading the volume scale the AVR reported for it, while the inputs it reports are shared by all zones of that AVR. A resolved volume scale replaces "auto" in the config and is saved, so it behaves exactly like a value the user entered: it is never determined again. An input source list that the AVR cannot provide is saved as "manual" for the same reason: there is nothing left to resolve. The entities carrying these settings are re-registered, since both are part of their entity options, and the runtime configs are refreshed so they take effect from the next update on.
+  // Act on what the AVR reported about itself (see avrInfoResolver.ts for what is resolved). A resolved volume scale replaces "auto" in the config and is saved, so it behaves exactly like a value the user entered: it is never determined again. An input source list that the AVR cannot provide is saved as "manual" for the same reason. The entities carrying these settings are re-registered, since they are part of their entity options, and the runtime configs are refreshed so they take effect from the next update on.
   private handleAvrInfo(entityId: string): void {
-    const physicalAVR = physicalAvrIdFromEntityId(entityId);
-    if (!physicalAVR) {
+    const resolution = resolveAvrInfo(this.config.avrs ?? [], entityId, this.avrContexts);
+    if (!resolution) {
       return;
     }
 
-    const zones = (this.config.avrs ?? []).filter((avrConfig) => buildPhysicalAvrId(avrConfig.model, avrConfig.ip) === physicalAVR);
-    if (zones.length === 0) {
-      return;
+    if (resolution.inputsUpdate) {
+      log.debug("%s [%s] Input source list 'auto' resolved: %s", logSource, resolution.inputsUpdate.zoneEntry, resolution.inputsUpdate.reason);
+    }
+    if (resolution.presetsUpdate) {
+      const { zoneEntry, names } = resolution.presetsUpdate;
+      log.debug("%s [%s] Tuner presets collected from the AVR: %d station(s): %s", logSource, zoneEntry, names.length, names.join(", "));
     }
 
-    // The input list belongs to the AVR, not to a single zone: it is stored once, and every zone of
-    // this AVR has to rebuild the entities that list the inputs. The same holds for the tuner
-    // presets, which are also AVR-wide.
-    let inputsChanged = false;
-    let inputsDecided = false;
-    let presetsChanged = false;
-    let presetsCollected = false;
-
-    const resolvedZones: AvrConfig[] = [];
+    const changedZones: AvrConfig[] = [];
     let configChanged = false;
-    for (const avrConfig of zones) {
-      const zoneEntry = buildEntityId(avrConfig.model, avrConfig.ip, avrConfig.zone);
-      let changed = false;
+    for (const zone of resolution.zones) {
+      const stored = this.storeResolvedZoneConfig(zone);
+      configChanged ||= stored;
 
-      const volumeResolution = resolveAutoVolumeScale(avrConfig, entityId, this.avrContexts);
-      if (volumeResolution) {
-        if (this.configStore.patchAvr(avrConfig.ip, avrConfig.zone, { volumeScale: volumeResolution.scale, volumeScaleDiscovered: volumeResolution.discovered })) {
-          log.debug("%s [%s] Volume scale 'auto' resolved to 0-%d: %s", logSource, zoneEntry, volumeResolution.scale, volumeResolution.reason);
-          configChanged = true;
-          changed = true;
-        } else {
-          log.warn("%s [%s] Could not store the resolved volume scale 0-%d in the config", logSource, zoneEntry, volumeResolution.scale);
-        }
+      if (zone.inputsResolved) {
+        // Push the AVR spelling directly to already-instantiated entities. Re-registering the available definitions
+        // is needed for entities not instantiated yet, but an existing remote entity may otherwise keep the old
+        // built-in alias list.
+        this.updateInputSourceOptions(zone.avrConfig);
       }
-
-      const inputResolution = resolveInputSourceList(avrConfig, entityId, this.avrContexts);
-      if (inputResolution) {
-        if (!inputResolution.inputs) {
-          // Nothing to collect: fall back to integration mappings and remember that, so unsupported
-          // older AVRs are not queried for names on every NRI reply.
-          if (this.configStore.patchAvr(avrConfig.ip, avrConfig.zone, { useAvrReportedInputs: false })) {
-            log.debug("%s [%s] AVR-reported input names disabled: %s", logSource, zoneEntry, inputResolution.reason);
-            configChanged = true;
-            changed = true;
-          } else {
-            log.error("%s [%s] Could not disable AVR-reported input names in the config", logSource, zoneEntry);
-          }
-          if (!inputsDecided) {
-            inputsDecided = true;
-            inputsChanged = this.avrContexts.get(physicalAVR).inputs.has();
-            this.avrContexts.get(physicalAVR).inputs.clear();
-          }
-        } else if (!inputsDecided) {
-          inputsDecided = true;
-          inputsChanged = this.avrContexts.get(physicalAVR).inputs.set(inputResolution.inputs);
-          if (inputsChanged) {
-            // The inputs changed, so the entities listing them have to be rebuilt.
-            log.debug("%s [%s] Input source list 'auto' resolved: %s", logSource, zoneEntry, inputResolution.reason);
-          }
-        }
-
-        // Push the AVR spelling directly to already-instantiated entities. Re-registering the
-        // available definitions is needed for entities not instantiated yet, but an existing
-        // remote entity may otherwise keep the old built-in alias list.
-        this.updateInputSourceOptions(avrConfig);
+      if (zone.tunerPresets) {
+        this.registerTunerPresetsEntity(zone.avrConfig);
+        this.updateTunerPresetsOptions(zone.avrConfig, resolution.presetsChanged);
       }
-
-      if (isTunerPresetModeEnabled(avrConfig.createTunerPresets) && !presetsCollected) {
-        presetsCollected = true;
-        presetsChanged = this.avrContexts.get(physicalAVR).tunerPresets.set(this.avrContexts.get(physicalAVR).avrInfo.namedPresets());
-        if (presetsChanged) {
-          const names = this.avrContexts.get(physicalAVR).tunerPresets.names(parseTunerPresetMode(avrConfig.createTunerPresets) === "preset-order" ? "preset-order" : "alphabetical");
-          log.debug("%s [%s] Tuner presets collected from the AVR: %d station(s): %s", logSource, zoneEntry, names.length, names.join(", "));
-        }
-      }
-
-      if (isTunerPresetModeEnabled(avrConfig.createTunerPresets)) {
-        this.registerTunerPresetsEntity(avrConfig);
-        this.updateTunerPresetsOptions(avrConfig, presetsChanged);
-      }
-
-      if (changed || inputsChanged || presetsChanged) {
-        resolvedZones.push(avrConfig);
+      if (stored || zone.avrDataChanged) {
+        changedZones.push(zone.avrConfig);
       }
     }
 
-    if (resolvedZones.length === 0) {
+    if (changedZones.length === 0) {
       return;
     }
 
     this.config = configChanged ? this.configStore.load() : this.config;
-    for (const resolvedZone of resolvedZones) {
+    for (const changedZone of changedZones) {
       // Register and refresh with the value from the saved config, since that is what is persisted now.
-      const updatedConfig = this.config.avrs?.find((a) => a.ip === resolvedZone.ip && a.zone === resolvedZone.zone) ?? resolvedZone;
+      const updatedConfig = this.config.avrs?.find((a) => a.ip === changedZone.ip && a.zone === changedZone.zone) ?? changedZone;
       this.registerMediaPlayer(updatedConfig);
       this.registerInputSelector(updatedConfig);
       if (updatedConfig.createRemoteEntity === true) {
@@ -435,6 +390,32 @@ export default class Driver {
       }
       this.refreshZoneRuntimeConfig(updatedConfig);
     }
+  }
+
+  // Save the config values resolved for one zone, in a single write. Returns true when something was stored.
+  private storeResolvedZoneConfig(zone: AvrInfoZoneResolution): boolean {
+    const patch = configPatchFor(zone);
+    if (!patch) {
+      return false;
+    }
+
+    const { avrConfig, zoneEntry, volumeScale, disableReportedInputs } = zone;
+    const stored = this.configStore.patchAvr(avrConfig.ip, avrConfig.zone, patch);
+    if (volumeScale) {
+      if (stored) {
+        log.debug("%s [%s] Volume scale 'auto' resolved to 0-%d: %s", logSource, zoneEntry, volumeScale.scale, volumeScale.reason);
+      } else {
+        log.warn("%s [%s] Could not store the resolved volume scale 0-%d in the config", logSource, zoneEntry, volumeScale.scale);
+      }
+    }
+    if (disableReportedInputs !== undefined) {
+      if (stored) {
+        log.debug("%s [%s] AVR-reported input names disabled: %s", logSource, zoneEntry, disableReportedInputs);
+      } else {
+        log.error("%s [%s] Could not disable AVR-reported input names in the config", logSource, zoneEntry);
+      }
+    }
+    return stored;
   }
 
   // Grey out (or restore) every entity of an AVR's configured zones when its TCP connection drops (or comes back).
@@ -473,17 +454,6 @@ export default class Driver {
     const handler = this.tunerPresetsHandler?.handle.bind(this.tunerPresetsHandler);
     const entity = this.entityRegistrar.createTunerPresetsSelectEntity(avrEntry, handler);
     this.registerEntity(entity, avrEntry);
-  }
-
-  // Rebuild tuner preset entities after setup connection handling, which may race the first NRI reply.
-  private refreshTunerPresetEntities(): void {
-    for (const avrConfig of this.config.avrs ?? []) {
-      if (!isTunerPresetModeEnabled(avrConfig.createTunerPresets)) {
-        continue;
-      }
-
-      this.registerTunerPresetsEntity(avrConfig);
-    }
   }
 
   // Push a refreshed per-zone runtime config into the live command handlers after a config change.

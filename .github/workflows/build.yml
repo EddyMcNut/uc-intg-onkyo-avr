@@ -49,10 +49,14 @@ jobs:
         with:
           node-version-file: ".nvmrc"
 
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Code check (prettier, eslint, typecheck)
+        run: npm run code-check
+
       - name: Build
-        run: |
-          npm ci
-          npm run build
+        run: npm run build
 
       - name: Run tests
         run: |

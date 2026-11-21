@@ -10,6 +10,7 @@ export type ThumbnailCacheState = {
 
 type BackgroundAsset = {
   dataUri: string | null;
+  // Identifies the loaded asset (its path, or "missing"); a thumbnail cache built for another asset is dropped.
   signature: string;
   inlineSafe: boolean;
   logoMarkup: string | null;
@@ -135,8 +136,17 @@ export function createServiceThumbnails(config: ServiceThumbnailConfig) {
   const logSource = `${config.logName.toLowerCase()}Thumbnails:`;
 
   let cachedAsset: BackgroundAsset | null = null;
+  let cachedBackdrop: string | null = null;
 
+  // The logo is part of the installed integration and does not change while it runs, so it is looked up and read
+  // once, on first use, and kept: browsing then does no file-system work per row. A missing logo is remembered too
+  // (the fallback label is used).
   function loadAsset(): BackgroundAsset {
+    cachedAsset ??= readAsset();
+    return cachedAsset;
+  }
+
+  function readAsset(): BackgroundAsset {
     const currentDir = path.dirname(fileURLToPath(import.meta.url));
     const candidatePaths = [
       path.resolve(currentDir, `logos/${config.svgFileName}`),
@@ -148,13 +158,6 @@ export function createServiceThumbnails(config: ServiceThumbnailConfig) {
     for (const candidate of candidatePaths) {
       try {
         if (fs.existsSync(candidate)) {
-          const stat = fs.statSync(candidate);
-          const signature = `${candidate}:${stat.mtimeMs}:${stat.size}`;
-
-          if (cachedAsset?.signature === signature) {
-            return cachedAsset;
-          }
-
           const fileContents = fs.readFileSync(candidate);
           const extension = path.extname(candidate).toLowerCase();
           const mimeType = extension === ".svg" ? "image/svg+xml" : "image/png";
@@ -180,20 +183,15 @@ export function createServiceThumbnails(config: ServiceThumbnailConfig) {
             }
           }
 
-          cachedAsset = { dataUri, signature, inlineSafe: dataUri.length <= MAX_INLINE_BACKGROUND_DATA_LENGTH, logoMarkup };
-          return cachedAsset;
+          return { dataUri, signature: candidate, inlineSafe: dataUri.length <= MAX_INLINE_BACKGROUND_DATA_LENGTH, logoMarkup };
         }
       } catch (err) {
         log.warn("%s failed to load background asset %s: %s", logSource, candidate, err);
       }
     }
 
-    if (cachedAsset?.signature !== "missing") {
-      log.warn("%s background asset not found; falling back to default icon", logSource);
-    }
-
-    cachedAsset = { dataUri: null, signature: "missing", inlineSafe: false, logoMarkup: null };
-    return cachedAsset;
+    log.warn("%s background asset not found; falling back to default icon", logSource);
+    return { dataUri: null, signature: "missing", inlineSafe: false, logoMarkup: null };
   }
 
   function buildBackgroundMarkup(asset: BackgroundAsset): string {
@@ -216,10 +214,10 @@ export function createServiceThumbnails(config: ServiceThumbnailConfig) {
     return uri.length <= maxLength ? uri : config.fallbackIcon;
   }
 
+  // The backdrop only depends on the asset, so it is built once.
   function createBackdrop(): string {
-    const asset = loadAsset();
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360" viewBox="0 0 640 360">${buildBackgroundMarkup(asset)}</svg>`;
-    return finalize(svg);
+    cachedBackdrop ??= finalize(`<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360" viewBox="0 0 640 360">${buildBackgroundMarkup(loadAsset())}</svg>`);
+    return cachedBackdrop;
   }
 
   function getOrCreateThumbnail(state: ThumbnailCacheState, title: string): string {
